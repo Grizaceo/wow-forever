@@ -1,0 +1,5 @@
+# Build outputs are committed for installability; regenerate from source.
+dist/
+.plugin-build-new
+__pycache__/
+*.pyc

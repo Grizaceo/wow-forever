@@ -1,0 +1,24 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "wow-forever",
+  "version": "1.0.0",
+  "description": "Guía offline de WoW Forever (Classic 1.12) para Hermes: sendas de clase y facción con ruta, armas, macros, dungeons y milestones; mercado Auctionator local con importación de SavedVariables y recomendador de farmeo. Incluye una skill para que el agente asista al jugador. 100% offline: no lee el juego, no usa red ni datos de cuenta.",
+  "author": {
+    "name": "Cristóbal Muñoz"
+  },
+  "homepage": "https://github.com/Grizaceo/wow-forever",
+  "repository": "https://github.com/Grizaceo/wow-forever",
+  "license": "GPL-3.0-or-later",
+  "keywords": [
+    "wow",
+    "world of warcraft",
+    "wow forever",
+    "classic",
+    "leveling",
+    "guide",
+    "auctionator",
+    "market",
+    "farming",
+    "desktop"
+  ]
+}
