@@ -91,6 +91,11 @@
      "sha256": "8d61c45ec7d23535c3916642ae4b3a8341e38ac0cdca817144536b954488bd23"
     },
     {
+     "tabla": "DungeonEncounter",
+     "destino": "DungeonEncounter.csv",
+     "sha256": "8e0b39eacaef229c083dff18ad4926ccf8fd3babd586ac0a2300586bb00ad245"
+    },
+    {
      "tabla": "FactionTemplate",
      "destino": "FactionTemplate.csv",
      "sha256": "edeb93c741ec2f9796b513c91da9c5ac7f7db139e27e3d1c60a5ef1b215cbdba"
@@ -186,6 +191,11 @@
      "tabla": "ChrRaces",
      "destino": "ChrRaces.csv",
      "sha256": "738ec1705a55485b0c82cd3bd1b7f94bd4e60c187032b96ba10f3b0f1171a3ec"
+    },
+    {
+     "tabla": "DungeonEncounter",
+     "destino": "DungeonEncounter.csv",
+     "sha256": "609607fc657d2e21ad9ab309ddb99c70db5c6749cc94b91e2941357206e49e15"
     },
     {
      "tabla": "ItemSparse",

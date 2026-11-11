@@ -3,8 +3,8 @@
 
 Public build only: no market prices, no private overlays. Users import their own
 Auctionator.lua. Only scripts whose data has a redistributable licence are
-inlined (see LICENSE-DATA.md); the ForeverDungeonJournal-derived catalog and the
-azeroth.wiki spawn scrape are deliberately absent.
+inlined (see LICENSE-DATA.md): the market catalog is regenerated from data/; the
+old catalog derived from an unlicensed addon and the azeroth.wiki scrape are rejected.
 
 No game reads, network, package installation, or Hermes core changes.
 """
@@ -18,13 +18,15 @@ import re
 ROOT = Path(__file__).resolve().parents[1]          # standalone/
 DEFAULT = ROOT.parent / 'desktop' / 'plugin.js'     # the package's desktop half
 
-CORE_SCRIPTS = {'market.js', 'market-ui.js', 'drop-data.js', 'market-farm.js',
+CORE_SCRIPTS = {'market.js', 'market-catalog.js', 'market-ui.js', 'drop-data.js', 'market-farm.js',
                 'market-history.js', 'market-deals.js', 'market-chart.js',
                 'guide-hunter.js', 'guide-warrior.js',
                 'guide-shaman.js', 'guide-legacy.js'}
 # Never inlined: private payloads and data without a redistributable licence.
-FORBIDDEN_MARKERS = ('HunterDropDataPrivate=', 'HunterMarketLocalScan=',
-                     'HunterMarketCatalog=', 'HunterDropForever=')
+# market-catalog.js is regenerated from data/ by tools/build-catalogo-mercado.py; the
+# old ForeverDungeonJournal-derived one is rejected by its source marker.
+FORBIDDEN_MARKERS = ('HunterDropDataPrivate=', 'HunterMarketLocalScan=', 'HunterDropForever=',
+                     'ForeverDungeonJournal')
 
 
 def safe_script(source):

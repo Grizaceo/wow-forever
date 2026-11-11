@@ -26,7 +26,7 @@ try {
   await upload();await ready();
   check('Lua import succeeds',await page.locator('#marketStatus').innerText().then(t=>t.includes('Importación guardada')));
   check('realms are separate',await page.locator('#marketRealm option').count()===2);
-  check('catalog has local provenance',await page.evaluate(()=>window.HunterMarketCatalog?.source?.addon==='ForeverDungeonJournal'&&HunterMarketCatalog.source.files.every(f=>/^[a-f0-9]{64}$/.test(f.sha256))));
+  check('catalog is the public one generated from data/',await page.evaluate(()=>window.HunterMarketCatalog?.source?.addon==='CMaNGOS classic-db + cliente WoW Forever'&&HunterMarketCatalog.source.files.every(f=>/^[a-f0-9]{64}$/.test(f.sha256))));
   await page.locator('#marketRealm').selectOption({label:'PvP'});
   check('variants preserved',await page.locator('#marketRows tr[data-market-key]').count()===4);
   await search('6469');

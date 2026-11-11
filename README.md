@@ -68,8 +68,12 @@ tools/fuentes.json ── tools/descargar-fuentes.py ──▶ ~/.cache/wow-fore
                          tools/build-drop-data.py ◀──────┤──▶ tools/build-datos-juego.py
                                    │                                 │
                          standalone/drop-data.js                    data/*.json
-                                   │
-            standalone/tools/build-desktop-plugin.py ──▶ desktop/plugin.js
+                                   │                                 │
+                                   │                 tools/build-catalogo-mercado.py
+                                   │                                 │
+                                   │                  standalone/market-catalog.js
+                                   └───────────────┬─────────────────┘
+                      standalone/tools/build-desktop-plugin.py ──▶ desktop/plugin.js
 ```
 
 - Las fuentes de datos están fijadas por versión y sha256 en `tools/fuentes.json`:
@@ -81,8 +85,8 @@ tools/fuentes.json ── tools/descargar-fuentes.py ──▶ ~/.cache/wow-fore
 - Cada dato dice de dónde viene: generado de CMaNGOS 1.12, generado del cliente de
   Forever, o curado a mano.
 
-Tests: `python3 -m unittest discover -s tests`, `node --test tests/` y los de
-`standalone/tests/` (ver su README).
+Tests: `python3 -m unittest discover -s tests`, `node --test tests/perfil.test.mjs` y los
+de `standalone/tests/` (ver su README).
 
 ## Cómo se hizo
 

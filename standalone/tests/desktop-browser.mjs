@@ -46,7 +46,7 @@ try{
  check('SDK sidebar, route and palette registered',await page.evaluate(()=>registered.some(v=>v.area==='nav'&&v.data.label==='WoW Forever')&&registered.some(v=>v.area==='palette')));
  check('opaque sandbox, no same-origin privilege',await page.locator('iframe').getAttribute('sandbox')==='allow-scripts'&&await frame.evaluate(()=>{try{return !parent.document;}catch{return true;}}));
  await frame.locator('[data-t="market"]').click();await ready(frame);
- check('public build ships no bundled scan',!(await marketState())?.snapshot&&await frame.evaluate(()=>!window.HunterMarketLocalScan&&!window.HunterMarketCatalog&&!window.HunterDropForever));
+ check('public build ships no bundled scan',!(await marketState())?.snapshot&&await frame.evaluate(()=>!window.HunterMarketLocalScan&&window.HunterMarketCatalog?.source?.addon==='CMaNGOS classic-db + cliente WoW Forever'&&!window.HunterDropForever));
  await frame.locator('#lvlNum').fill('23');await frame.locator('#lvlNum').dispatchEvent('change');
  await frame.waitForFunction(()=>document.querySelector('#hermesSaveStatus')?.textContent.includes('guardado'));
  frame=await load();check('build persists after host reload',await frame.locator('#lvlNum').inputValue()==='23');await ready(frame);

@@ -10,7 +10,7 @@ edita a mano: lo curado vive aparte y se declara como curado.
 | Clave `f` | Qué es | Fidelidad a Forever |
 |---|---|---|
 | `cmangos-1.12` | CMaNGOS classic-db, commit fijado (GPL-3.0) | Referencia de 1.12: Forever puede diferir. La interfaz lo muestra como aproximado |
-| `cliente-forever` | Tablas del cliente WoW Forever 1.60.1.70888 vía wago.tools, en inglés y `esMX` | Fiel en lo que el cliente define (razas, clases, recetas, ítems, zonas). No incluye datos del servidor: spawns, entrenadores, botín |
+| `cliente-forever` | Tablas del cliente WoW Forever 1.60.1.70888 vía wago.tools, en inglés y `esMX` | Fiel en lo que el cliente define (razas, clases, recetas, ítems, zonas, jefes de dungeons). No incluye datos del servidor: spawns, entrenadores, botín |
 | `curado` | Texto o tabla escrita a mano en el repo, con sus referencias | Tan fiel como su autor; cada pieza cita de dónde sale |
 
 Cada archivo de `data/` lleva un bloque `meta`:
@@ -22,9 +22,13 @@ Cada archivo de `data/` lleva un bloque `meta`:
 
 Cuando una colección mezcla fuentes, cada registro lleva su propio `f`. Los nombres
 visibles van como `n: {"es": "...", "en": "..."}`; si falta el español se usa el inglés.
+El dump de CMaNGOS no trae traducciones, así que los títulos de misión y los nombres de
+NPC van solo en inglés; lo que viene del cliente (razas, clases, ítems, recetas, zonas,
+jefes) sí trae español.
 
 **Huecos explícitos.** Lo que debería existir y no tiene una fuente publicable no se
-omite en silencio: va a una lista `huecos` con `{tema, clase?, faccion?, raza?, motivo}`.
+omite en silencio: va a una lista `huecos` con `{tema, clase?, faccion?, raza?, motivo}`
+(`faccion` siempre `alianza` u `horda`).
 Los tests fallan si una combinación válida queda sin dato y sin hueco declarado.
 
 ## Archivos
@@ -61,8 +65,13 @@ Por profesión (ID de SkillLine: 171 Alquimia, 164 Herrería, 333 Encantamiento,
 - `entrenadores`: `{alianza, horda}` con `{npc, n, zona, x, y, max}`; `max` es el skill
   más alto que enseña.
 - `recetas`: `[{spell, n, crea: [item, cantidad], reactivos: [[item, cantidad]...],
-  rango: {aprende, amarillo, verde, gris}, como: "entrenador"|"receta"|"desconocido",
+  rango: {aprende, amarillo, verde, gris}, como: "entrenador"|"receta"|"automatica"|"desconocido",
   receta_item, vendedores: {alianza, horda}, f}]`.
+  - `crea` es `null` en los encantamientos: aplican un efecto, no crean un ítem.
+  - `como`: el entrenador de 1.12 lista el hechizo que enseña la receta y se traduce
+    al de la receta; `automatica` es una receta que se aprende sola al tomar la
+    profesión (`AcquireMethod = 1` en el cliente). Las recetas nuevas de Forever quedan
+    casi todas en `desconocido`: cómo se aprenden es dato del servidor.
   - `amarillo` y `gris` vienen del cliente (`TrivialSkillLineRankLow/High`); `verde` es
     su punto medio (regla de Classic); `aprende` es el requisito del entrenador o del
     objeto receta. Si no se conoce, es `null`.
@@ -89,15 +98,28 @@ desde ItemSparse e Item del cliente, sin el rango 200000–239999. Sirve para no
 
 ### `data/misiones.json`
 
-`questId → {t: {es, en}, nivel, min, zona, faccion: "a"|"h"|"ah", clases?, prof?, prev?}`
-(`cmangos-1.12`; títulos en español de `locales_quest`).
+`questId → {t: {es, en}, nivel, min, zona, dungeon?, categoria?, faccion: "a"|"h"|"ah",
+clases?, prof?, prev?}` (`cmangos-1.12`; títulos solo en inglés). `zona` sale del área
+de la misión y, si no, de dónde está quien la da; `dungeon` es el mapa cuando la misión
+es de un dungeon; `categoria` es el `ZoneOrSort` negativo (clase, profesión, evento).
 
 ### `data/dungeons.json`
 
-- `clasicos`: por mapa → `n`, `niveles`, `jugadores`, `jefes: [{npc, n, botin: [[item,
-  prob]]}]` (`cmangos-1.12`).
-- `forever`: los mapas de instancia nuevos del cliente, con nombre y sin jefes ni
-  botín, más un hueco por cada uno.
+- `clasicos`: por mapa → `n`, `niveles`, `jugadores`, `raid?`, `jefes: [{encuentro,
+  orden, npc, n, botin: [[item, prob]]}]`. La lista y el orden de jefes vienen del
+  cliente (`DungeonEncounter`); la criatura de cada encuentro, de `instance_encounters`
+  de CMaNGOS o, si falta, de la criatura del mapa con el mismo nombre; el botín, de
+  CMaNGOS (`cmangos-1.12`). Los jefes sin criatura vinculada (encuentros de grupo,
+  invocados) quedan con `npc: null`, botín vacío y un hueco `botin`.
+- `forever`: los 9 dungeons nuevos que nombra el buscador de grupos del cliente
+  (`LFGDungeons`), con sus jefes del cliente y `botin: null`, más un hueco `botin`
+  por cada uno: el botín es dato del servidor.
+
+### `standalone/market-catalog.js`
+
+Catálogo del mercado de la app standalone (`window.HunterMarketCatalog`), generado
+desde `data/` por `tools/build-catalogo-mercado.py`: nombre, jefe, dungeon y rango de
+niveles de cada ítem del botín de jefes.
 
 ### `data/MANIFEST.json`
 
