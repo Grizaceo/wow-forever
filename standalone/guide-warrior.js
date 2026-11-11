@@ -305,7 +305,7 @@ const MILE_M = [
   {lvl:60,cat:"Meta",txt:"BiS pre-raid: 2H épica o dual-wield + T0/trinkets melee"},
 ];
 
-window.GUIDE_WARRIOR={
+(typeof module==='object'&&module&&module.exports?module.exports:window).GUIDE_WARRIOR={
 id:"warrior",name:"Warrior",icon:"sword",title:"Senda del Guerrero",accent:"#8a4a26",
 specs:{arms:"Arms",fury:"Fury",protection:"Protection"},defaultSpec:"arms",
 specNote:"Arms = el DPS clásico de leveling. Protection para tankear. Fury escala peor en Classic.",

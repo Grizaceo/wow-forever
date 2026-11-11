@@ -1,4 +1,7 @@
-/* Pure validation and durable storage. No game/browser-profile access. */
+/* Almacén durable del plugin (ctx.storage + carpeta de datos propia). Mismas claves y
+   archivos que la versión anterior (build, market-pointer, price-history-pointer,
+   market-{a,b}.json, price-history-{a,b}.json): el progreso y los precios ya guardados se
+   leen sin migración. Validación pura; nada fuera de las APIs del SDK. */
 const MAX_MARKET=4*1024*1024, MAX_BUILD=128*1024, MAX_HISTORY=4*1024*1024;
 const ownKeys=(o,allowed)=>o&&typeof o==='object'&&!Array.isArray(o)&&Object.keys(o).every(k=>allowed.includes(k));
 const int=(n,min=0,max=Number.MAX_SAFE_INTEGER)=>Number.isSafeInteger(n)&&n>=min&&n<=max;
@@ -41,13 +44,23 @@ export function validMarket(m){
   if(!ownKeys(m,['snapshot','realm','bundledScan'])||JSON.stringify(m).length>MAX_MARKET)return false;
   if(m.realm!==undefined&&!text(m.realm))return false;
   if(m.bundledScan!==undefined&&!/^[a-f0-9]{64}$/.test(m.bundledScan))return false;
-  const s=m.snapshot;if(s===undefined)return m.realm===undefined;
-  return ownKeys(s,['schemaVersion','sourceVersion','importedAt','realms','warnings'])&&s.schemaVersion===1&&s.sourceVersion===8&&text(s.importedAt,60)&&Number.isFinite(Date.parse(s.importedAt))&&
-    Array.isArray(s.warnings)&&s.warnings.length<=1000&&s.warnings.every(w=>text(w,1000))&&Array.isArray(s.realms)&&s.realms.length>0&&s.realms.length<=100&&s.realms.every(r=>
-    ownKeys(r,['name','items'])&&text(r.name)&&Array.isArray(r.items)&&r.items.length<=100000&&r.items.every(i=>
-    ownKeys(i,['sourceKey','itemId','unitPriceCopper','observedDay','history'])&&text(i.sourceKey,300)&&(i.itemId===null||int(i.itemId,1))&&int(i.unitPriceCopper,1)&&(i.observedDay===null||int(i.observedDay,0,100000))&&
-    Array.isArray(i.history)&&i.history.length<=10000&&i.history.every(h=>ownKeys(h,['day','low','high','available'])&&int(h.day,0,100000)&&int(h.low,1)&&int(h.high,h.low)&&(h.available===null||int(h.available)))))&&
-    (m.realm===undefined||s.realms.some(r=>r.name===m.realm));
+  const s=m.snapshot;
+  if(s===undefined)return m.realm===undefined;
+  if(!ownKeys(s,['schemaVersion','sourceVersion','importedAt','realms','warnings']))return false;
+  if(s.schemaVersion!==1||s.sourceVersion!==8)return false;
+  if(!text(s.importedAt,60)||!Number.isFinite(Date.parse(s.importedAt)))return false;
+  if(!Array.isArray(s.warnings)||s.warnings.length>1000||!s.warnings.every(w=>text(w,1000)))return false;
+  if(!Array.isArray(s.realms)||s.realms.length<1||s.realms.length>100)return false;
+  const validHist=h=>ownKeys(h,['day','low','high','available'])&&int(h.day,0,100000)&&int(h.low,1)&&
+    int(h.high,h.low)&&(h.available===null||int(h.available));
+  const validItem=i=>ownKeys(i,['sourceKey','itemId','unitPriceCopper','observedDay','history'])&&
+    text(i.sourceKey,300)&&(i.itemId===null||int(i.itemId,1))&&int(i.unitPriceCopper,1)&&
+    (i.observedDay===null||int(i.observedDay,0,100000))&&
+    Array.isArray(i.history)&&i.history.length<=10000&&i.history.every(validHist);
+  const validRealm=r=>ownKeys(r,['name','items'])&&text(r.name)&&Array.isArray(r.items)&&
+    r.items.length<=100000&&r.items.every(validItem);
+  if(!s.realms.every(validRealm))return false;
+  return m.realm===undefined||s.realms.some(r=>r.name===m.realm);
 }
 export function validBuild(b){
   if(b===null)return true;

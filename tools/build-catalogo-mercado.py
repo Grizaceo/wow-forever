@@ -85,8 +85,8 @@ def main():
              ' * WoW Forever client tables, (c) Blizzard Entertainment). See LICENSE-DATA.md.\n'
              ' * Exposes window.HunterMarketCatalog. */\n'
              '(function(){\'use strict\';var DATA=' + cuerpo + ';\n'
-             'if(typeof window!==\'undefined\')window.HunterMarketCatalog=DATA;\n'
-             'if(typeof module!==\'undefined\'&&module.exports)module.exports=DATA;})();\n')
+             'if(typeof module!==\'undefined\'&&module.exports)module.exports=DATA;\n'
+             'else if(typeof window!==\'undefined\')window.HunterMarketCatalog=DATA;})();\n')
     with open(args.out, 'w', encoding='utf-8', newline='\n') as f:
         f.write(texto)
     con = sum(1 for e in cat['items'].values() if e['sources'])

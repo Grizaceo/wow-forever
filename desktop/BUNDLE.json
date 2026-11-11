@@ -1,0 +1,15 @@
+{
+  "artifact": "desktop/plugin.js",
+  "sha256": "84d25e603749c2a5db0bda4bfbc3a941db90b3b2e484578841be649e832c57e8",
+  "bytes": 5442772,
+  "built_with": {
+    "esbuild": "0.28.2"
+  },
+  "external": [
+    "@hermes/plugin-sdk",
+    "react",
+    "react/jsx-runtime"
+  ],
+  "data_manifest": "../data/MANIFEST.json",
+  "check": "python3 scripts/check_desktop_bundle.py"
+}

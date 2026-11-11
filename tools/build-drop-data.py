@@ -327,8 +327,8 @@ def read_rarescanner(rs):
 def emit(path, var, data, header):
     body = json.dumps(data, ensure_ascii=False, separators=(',', ':'), sort_keys=False)
     js = header + '(function(){"use strict";var DATA=' + body + ';\n' \
-        'if(typeof window!=="undefined")window.' + var + '=DATA;\n' \
-        'if(typeof module!=="undefined"&&module.exports)module.exports=DATA;})();\n'
+        'if(typeof module!=="undefined"&&module.exports)module.exports=DATA;\n' \
+        'else if(typeof window!=="undefined")window.' + var + '=DATA;})();\n'
     tmp = path + '.tmp'
     with open(tmp, 'w', encoding='utf-8') as f:
         f.write(js)

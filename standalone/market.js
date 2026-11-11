@@ -771,6 +771,7 @@
     'self.postMessage(out);};})();';
 
   var root = typeof globalThis !== 'undefined' ? globalThis : typeof self !== 'undefined' ? self : this;
+  // Como módulo (Node, bundle de Desktop) solo se exporta: no se toca el global.
   if (typeof module === 'object' && module && module.exports) module.exports = HunterMarket;
-  if (root) root.HunterMarket = HunterMarket;
+  else if (root) root.HunterMarket = HunterMarket;
 })();

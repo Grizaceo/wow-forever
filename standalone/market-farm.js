@@ -1,6 +1,9 @@
+/* ENV: en la página standalone es `window` (como siempre); como módulo (bundle de Desktop,
+   Node) es un objeto propio que el host llena con configure({...}): no toca el global. */
+const ENV=(typeof module==='object'&&module&&module.exports)?{}:window;
 /* market-farm.js — recomendador de farmeo offline (fases 2+3).
- * Motor puro + renderer sobre window.HunterDropData (público, GPL-3.0) y
- * window.HunterDropDataPrivate (opcional, puede ser null/undefined).
+ * Motor puro + renderer sobre ENV.HunterDropData (público, GPL-3.0) y
+ * ENV.HunterDropDataPrivate (opcional, puede ser null/undefined).
  * Sin red, sin fetch, sin datos del juego. Todo texto de dataset pasa por esc(). */
 (() => {
 'use strict';
@@ -91,7 +94,7 @@ function zoneSpawnPairs(main,others){
 }
 function index(){
   if(IX)return IX;
-  const d=window.HunterDropData;
+  const d=ENV.HunterDropData;
   const ix={hasData:!!(d&&d.zones&&d.mobs&&d.objects&&d.items),zones:d?.zones||{},mobs:d?.mobs||{},objects:d?.objects||{},items:d?.items||{},zoneByName:{},
     byZoneM:{},byZoneO:{},mobItems:{},objItems:{},mobZoneSpawns:{},objZoneSpawns:{},zoneItems:{},zoneSrcCache:new Map(),srcCache:new Map(),privItemSrc:{},privRaresByZone:{},privChestsByZone:{}};
   if(ix.hasData){
@@ -112,7 +115,7 @@ function index(){
     for(const[zk,set]of Object.entries(ix.byZoneM))for(const mid of set)for(const iid of ix.mobItems[mid]||[])(ix.zoneItems[zk]=ix.zoneItems[zk]||new Set()).add(iid);
     for(const[zk,set]of Object.entries(ix.byZoneO))for(const oid of set)for(const iid of ix.objItems[oid]||[])(ix.zoneItems[zk]=ix.zoneItems[zk]||new Set()).add(iid);
   }
-  const p=window.HunterDropDataPrivate;
+  const p=ENV.HunterDropDataPrivate;
   if(p){
     for(const[nid,r]of Object.entries(p.rares||{})){
       const[name,level,spots,loot]=r||[];
@@ -191,7 +194,7 @@ function session(items){
     const recent=it.observedDay!=null&&it.observedDay<=t&&t-it.observedDay<=3;
     if(!recent)L*=0.5;
     liq.set(iid,L);
-    const dd=IX.items[iid],cat=window.HunterMarketCatalog?.items?.[iid];
+    const dd=IX.items[iid],cat=ENV.HunterMarketCatalog?.items?.[iid];
     info.set(iid,{name:cat?.name||dd?.[0]||`Ítem #${it.itemId}`,quality:dd?dd[1]:0,icls:dd?dd[2]:-1,sub:dd?dd[3]:-1,req:dd?dd[5]:0,allow:dd?dd[8]:-1});
   }
   SESS={items,scan,liq,info,drops:new Map(),vendorCache:new Map(),profCache:new Map()};
@@ -458,7 +461,7 @@ function byZone(zoneKey){
 }
 function byMob(id){
   index();const sid=String(id),out=new Set(IX.mobItems[sid]||[]);
-  const r=window.HunterDropDataPrivate?.rares?.[sid];
+  const r=ENV.HunterDropDataPrivate?.rares?.[sid];
   if(r)for(const i of Object.keys(r[3]||{}))out.add(i);
   return[...out];
 }
@@ -488,7 +491,7 @@ function itemMetrics(scanItem,profile,settings){
   return out;
 }
 function matchStats(scanItems){
-  index();const items=scanItems||[],cat=window.HunterMarketCatalog?.items||{};
+  index();const items=scanItems||[],cat=ENV.HunterMarketCatalog?.items||{};
   let matched=0;const byLayer={public:0,private:0,catalog:0};
   for(const it of items){
     const id=it&&it.itemId;if(!Number.isSafeInteger(id)||id<=0)continue;
@@ -636,7 +639,7 @@ function zoneEntry(zk,level,cls,profile,settings,sess){
     if(allow!==-1&&!(allow&CLASS_BIT[cls]))continue;
     const g=usefulGear({icls,sub},cls,level,profile.pref||'any');
     if(!g.ok)continue;
-    const cat=window.HunterMarketCatalog?.items?.[iid];
+    const cat=ENV.HunterMarketCatalog?.items?.[iid];
     useful.push({iid:+iid,name:cat?.name||dd[0]||`Ítem #${iid}`,srcName:best.name,preferred:g.preferred,isRare:isRareKind(best),v:itemZone.get(iid)?.v||0,hist:sess.scan.get(iid)?.history||[],price:sess.scan.get(iid)?.unitPriceCopper});
   }
   useful.sort((a,b)=>b.v-a.v||Number(b.isRare)-Number(a.isRare)||a.name.localeCompare(b.name));
@@ -757,7 +760,7 @@ function zoneName(zk){return IX.zones[String(zk)]?.[0]||String(zk);}
 const zoneSlugOf=zn=>String(zn||'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'');
 function spotCoords(camp,zk){
   index();
-  const fd=window.HunterDropForever?.mobs;
+  const fd=ENV.HunterDropForever?.mobs;
   // solo camps 'mob': los IDs de objetos son otro namespace y podrían colisionar
   const c=camp&&camp.kind==='mob'&&camp.id!=null?fd?.[camp.id]:null;
   if(!c)return'';
@@ -780,8 +783,8 @@ function settingsHTML(s){
 // Métricas tiempo×precio del historial acumulado (approx): sparkline del
 // mínimo diario + tendencia + mediana vs precio actual. Vacío sin datos.
 function priceMetricsHTML(hist,price){
-  const ch=window.HunterChart?.sparkline?window.HunterChart.sparkline(hist):'';
-  const st=window.HunterHistory?.priceStats?window.HunterHistory.priceStats(hist):null;
+  const ch=ENV.HunterChart?.sparkline?ENV.HunterChart.sparkline(hist):'';
+  const st=ENV.HunterHistory?.priceStats?ENV.HunterHistory.priceStats(hist):null;
   if(!ch&&!st?.diasMuestra)return'';
   const tend=st?{sube:'al alza',baja:'a la baja',estable:'estable','sin-datos':'pocos datos'}[st.tendencia]||'':'';
   const bits=[];
@@ -809,7 +812,7 @@ function cardHTML(e,rank,profile,settings,profTop){
   return h;
 }
 function footerHTML(items){
-  const ms=matchStats(items),d=window.HunterDropData,priv=window.HunterDropDataPrivate,pd=priv?.source;
+  const ms=matchStats(items),d=ENV.HunterDropData,priv=ENV.HunterDropDataPrivate,pd=priv?.source;
   const L=[`Cobertura del scan: ${ms.matched}/${ms.total} ítems (${ms.pct}%) — capas: dataset público ${ms.byLayer.public}, ${priv?'RareScanner':'sin capa privada'} ${ms.byLayer.private}, catálogo ${ms.byLayer.catalog}.`];
   const src=d?.source;
   if(src)L.push(`${src.license||''} · ${src.attribution||''}`.trim());
@@ -867,6 +870,7 @@ function render(el,ctx){
   }));
 }
 
-window.HunterFarm={index,byZone,byMob,sources,itemMetrics,matchStats,rank,progression,render,travelFor,profRecommendations,trafficZones,spotCoords,
+ENV.HunterFarm={index,byZone,byMob,sources,itemMetrics,matchStats,rank,progression,render,travelFor,profRecommendations,trafficZones,spotCoords,
   fmt:{gph:gphF,pct:pctF,money,esc,zoneName,srcLabel}};
 })();
+if(typeof module==='object'&&module&&module.exports)module.exports=Object.assign({configure:o=>Object.assign(ENV,o)},ENV.HunterFarm);

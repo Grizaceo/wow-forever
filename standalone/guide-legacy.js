@@ -41,7 +41,7 @@
    - Zonas exactas de Rosecap/Stranglevine/Bauxite/Pitchblende/Pristine Scale.
    - Si el perk enlazado necesita rango máximo o solo estar aprendido
      (foreverdb asume rango máximo; los archivos del juego solo piden abrirlo). */
-window.GUIDE_LEGACY = {
+(typeof module==='object'&&module&&module.exports?module.exports:window).GUIDE_LEGACY= {
 
   /* Texto del sistema — bullets cortos para la card principal. */
   sys: [

@@ -305,7 +305,7 @@ const BAR_MOUSE = [
 ];
 const BAR_CLICK = ["Alimentar al pet","Growl on/off (para grupos)","Flare en el cursor","Tranquilizing Shot (mouseover o focus)"];
 const BAR_ALT1 = ["Tag rápido","Apertura en 3 toques"];
-window.GUIDE_HUNTER={
+(typeof module==='object'&&module&&module.exports?module.exports:window).GUIDE_HUNTER={
 id:"hunter",name:"Hunter",icon:"bow",title:"Senda del Cazador",accent:"#4e7a2e",
 specs:{bm:"Beast Mastery",mm:"Marksmanship",sv:"Survival"},defaultSpec:"bm",
 prefs:[["bow","Arco"],["gun","Gun"],["any","Cualq."]],defaultPref:"bow",

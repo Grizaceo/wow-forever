@@ -291,7 +291,7 @@ const MILE_M_S = [
   {lvl:60,cat:"Meta",txt:"BiS pre-raid: weapon caster o dual wield + T0/trinkets"},
 ];
 
-window.GUIDE_SHAMAN={
+(typeof module==='object'&&module&&module.exports?module.exports:window).GUIDE_SHAMAN={
 id:"shaman",name:"Shaman",icon:"staff",title:"Senda del Chamán",accent:"#2e5f96",
 specs:{elemental:"Elemental",enhancement:"Enhancement",restoration:"Restoration"},defaultSpec:"enhancement",
 specNote:"Enhancement = el DPS/solo de leveling (dual wield + shocks). Elemental pega más pero es caster frágil. Restoration si vas a healer.",
