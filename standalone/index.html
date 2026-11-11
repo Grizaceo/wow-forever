@@ -1,0 +1,1518 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WoW Forever — guía de leveling · Classic+</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23abd473' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M7 3v18'/%3E%3Cpath d='M7 3c9 3 13 6 13 9s-4 6-13 9'/%3E%3Cpath d='M3.5 12H19M15.5 8.5L19 12l-3.5 3.5'/%3E%3C/svg%3E">
+<style>
+  :root{
+    --bg:#0b0b0d; --bg2:#131419; --bg3:#1b1d24; --hover:#23262f;
+    --border:#33291a; --border2:#4a3d24; --bronze:#7a5c2e;
+    --gold:#c9aa68; --gold2:#f8b700; --txt:#d6cdbd; --dim:#8a8272;
+    --hunter:#abd473; --horde:#c8352a;
+    --q-common:#ffffff; --q-uncommon:#1eff00; --q-rare:#0070dd; --q-epic:#a335ee;
+  }
+  *{box-sizing:border-box; margin:0; padding:0}
+  body{background:var(--bg); color:var(--txt); font:14px/1.45 "Segoe UI",system-ui,sans-serif}
+
+  /* ===== Header: character plate ===== */
+  header{background:linear-gradient(180deg,#1a150c 0%,#14110b 100%); border-bottom:1px solid var(--bronze); padding:12px 20px; display:flex; align-items:center; gap:16px; flex-wrap:wrap}
+  .avatar{width:52px;height:52px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#2c3a1e,#141a0c);border:2px solid var(--gold);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+  .avatar svg{width:30px;height:30px;color:var(--hunter)}
+  .who h1,.who input{font-family:Georgia,"Times New Roman",serif;font-size:19px;color:var(--gold2);letter-spacing:1px;text-shadow:0 1px 3px #000}
+  .who input{background:transparent;border:none;border-bottom:1px dashed transparent;width:185px;padding:0}
+  .who input:hover{border-color:var(--border2)}
+  .who input:focus{outline:none;border-color:var(--bronze)}
+  .who .sub{font-size:11.5px;color:var(--dim)}
+  .lvlchip{display:flex;flex-direction:column;align-items:center;justify-content:center;width:54px;height:54px;border-radius:8px;border:1px solid var(--bronze);background:#181410;margin-left:6px}
+  .lvlchip b{font-size:22px;color:var(--gold2);line-height:1}
+  .lvlchip span{font-size:9px;color:var(--dim);text-transform:uppercase;letter-spacing:1px}
+  .chips{display:flex;gap:6px;flex-wrap:wrap;margin-left:8px}
+  .chip{font-size:11px;padding:4px 10px;border-radius:12px;border:1px solid var(--border2);color:var(--dim);background:#15120c;display:flex;align-items:center;gap:5px}
+  .chip svg{width:12px;height:12px}
+  .chip.gold{color:var(--gold);border-color:var(--bronze)}
+  .chip.green{color:var(--hunter);border-color:#3d5226}
+  .chip.red{color:#ff6b5e;border-color:#5c2620}
+  .ver{margin-left:auto;font-size:11px;color:var(--dim);text-align:right;line-height:1.5}
+
+  .wrap{display:flex;min-height:calc(100vh - 79px)}
+
+  /* ===== Sidebar: character sheet ===== */
+  aside{width:295px;min-width:295px;background:var(--bg2);border-right:1px solid var(--border);padding:16px;height:calc(100vh - 79px);overflow-y:auto;position:sticky;top:79px}
+  aside h2{font-family:Georgia,serif;font-size:12px;letter-spacing:2px;color:var(--gold);margin-bottom:12px;border-bottom:1px solid var(--border2);padding-bottom:7px;text-transform:uppercase}
+  .field{margin-bottom:13px}
+  .field>label{display:block;font-size:11px;color:var(--dim);margin-bottom:4px;text-transform:uppercase;letter-spacing:.5px}
+  .field input[type=number],.field select{width:100%;background:#0f1013;border:1px solid var(--border2);color:var(--txt);padding:7px 9px;border-radius:5px;font-size:13.5px}
+  .field input:focus,.field select:focus{outline:none;border-color:var(--gold)}
+  .field input[type=range]{width:100%;accent-color:var(--gold2)}
+  .lvlrow{display:flex;gap:10px;align-items:center}
+  .lvlrow input[type=number]{width:78px}
+  .chk{display:flex;align-items:center;gap:8px;font-size:12.5px;cursor:pointer;user-select:none}
+  .chk input{accent-color:var(--gold2);width:15px;height:15px}
+  .seg{display:flex;gap:4px}
+  .seg button{flex:1;background:#0f1013;border:1px solid var(--border2);color:var(--dim);padding:6px 3px;border-radius:5px;cursor:pointer;font-size:11.5px;transition:.15s}
+  .seg button:hover{color:var(--txt)}
+  .seg button.on{background:#2a2113;color:var(--gold2);border-color:var(--bronze);font-weight:600}
+  .tip{font-size:11.5px;color:var(--dim);margin-top:5px}
+  .sheet{margin-top:14px;background:#0f1013;border:1px solid var(--border2);border-radius:6px;padding:10px 12px}
+  .sheet .r{display:flex;justify-content:space-between;font-size:12px;padding:3px 0}
+  .sheet .r span{color:var(--dim)}
+  .sheet .r b{color:var(--txt);font-weight:600}
+  .sheet .r b.g{color:var(--gold2)}
+  .btn{background:#1a1610;border:1px solid var(--bronze);color:var(--gold);padding:7px 12px;border-radius:5px;cursor:pointer;font-size:12px;transition:.15s;width:100%;margin-bottom:8px}
+  .btn:hover{background:#241d11;color:var(--gold2)}
+  .btn.danger{border-color:#5c2620;color:#ff6b5e}
+  .btn.danger:hover{background:#2a1210}
+
+  /* ===== Main ===== */
+  main{flex:1;min-width:0;width:100%;padding:16px 22px;max-width:1060px}
+  .table-scroll{max-width:100%;overflow-x:auto}
+  nav.tabs{display:flex;gap:6px;margin-bottom:16px;flex-wrap:wrap}
+  nav.tabs button{background:transparent;border:1px solid var(--border2);color:var(--dim);padding:7px 15px;border-radius:16px;cursor:pointer;font-size:12.5px;transition:.15s;display:flex;align-items:center;gap:6px}
+  nav.tabs button svg{width:13px;height:13px}
+  nav.tabs button:hover{color:var(--txt);border-color:var(--bronze)}
+  nav.tabs button.on{background:#2a2113;color:var(--gold2);border-color:var(--bronze);font-weight:600}
+
+  .card{background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:14px 16px;margin-bottom:13px}
+  .card.key{border-left:3px solid var(--hunter)}
+  .card.warn{border-left:3px solid var(--gold2)}
+  .card.danger{border-left:3px solid var(--horde)}
+  .card.gold{border-left:3px solid var(--gold)}
+  .card h3{font-family:Georgia,serif;font-size:14px;color:var(--gold);margin-bottom:9px;display:flex;align-items:center;gap:8px}
+  .card h3 svg{width:16px;height:16px;color:var(--gold);flex-shrink:0}
+  .card.key h3{color:var(--hunter)} .card.key h3 svg{color:var(--hunter)}
+  .card.warn h3{color:var(--gold2)} .card.warn h3 svg{color:var(--gold2)}
+  .card.danger h3{color:#ff6b5e} .card.danger h3 svg{color:#ff6b5e}
+  .card h3 .sub{color:var(--dim);font-weight:400;font-size:11.5px;margin-left:4px}
+  .zonebig{font-size:16.5px;color:#fff;font-weight:600}
+  .muted{color:var(--dim);font-size:12.5px}
+
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th{text-align:left;color:var(--gold);font-family:Georgia,serif;font-size:10.5px;letter-spacing:1px;text-transform:uppercase;padding:6px 8px;border-bottom:1px solid var(--border2)}
+  td{padding:6px 8px;border-bottom:1px solid #1e1a13;vertical-align:top}
+  tr:hover td{background:#c9aa6808}
+  tr.owned td{opacity:.42}
+  tr.equipped td{background:#abd47310}
+  .q-common{color:var(--q-common)}.q-uncommon{color:var(--q-uncommon)}
+  .q-rare{color:var(--q-rare)}.q-epic{color:var(--q-epic)}
+
+  .badge{display:inline-flex;align-items:center;font-size:10px;padding:2px 8px;border-radius:9px;border:1px solid var(--border2);color:var(--dim);margin-left:6px;white-space:nowrap;vertical-align:middle}
+  .badge.now{background:#abd4731c;color:var(--hunter);border-color:#3d5226;font-weight:600}
+  .badge.soon{color:var(--gold2);border-color:#6b5516}
+  .badge.bow{color:var(--hunter);border-color:#3d5226}
+  .badge.gun{color:#e0a02f;border-color:#6b4f16}
+  .badge.xbow{color:#7fb0dd;border-color:#2e4a63}
+  .badge.sword{color:#d8c9a3;border-color:#5a4f36}
+  .badge.axe{color:#e0a86a;border-color:#6b4f2a}
+  .badge.mace{color:#a9bfd4;border-color:#3a4a5e}
+  .badge.dagger{color:#c3aee0;border-color:#4a3a5e}
+  .badge.pole{color:#a8cf8e;border-color:#3d5226}
+  .badge.staff{color:#8fb8d8;border-color:#2e4a63}
+  .badge.wt{color:var(--dim);border-color:var(--border2)}
+  .badge.cat{color:var(--gold);border-color:var(--bronze)}
+  .badge.eq{color:#0b0b0d;background:var(--hunter);border-color:var(--hunter);font-weight:700}
+
+  .loot{display:flex;justify-content:space-between;gap:10px;align-items:center;padding:5px 0;border-bottom:1px dashed #231f16}
+  .loot:last-child{border-bottom:none}
+  .loot .own{opacity:.4}
+  .loot .own b{text-decoration:line-through}
+  .tick{cursor:pointer;accent-color:var(--gold2);width:14px;height:14px;flex-shrink:0}
+  .weapline{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:8px 0;border-bottom:1px dashed #231f16}
+  .weapline:last-child{border-bottom:none}
+  .weapname{font-weight:600}
+  .weapsrc{color:var(--dim);font-size:11.5px;margin-top:2px}
+  .delta{color:var(--hunter);font-size:11px}
+  .delta.neg{color:var(--dim)}
+
+  .filters{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center}
+  .filters .btn{width:auto;margin-bottom:0;padding:5px 12px}
+  .filters .btn.fon{background:#2a2113;color:var(--gold2)}
+  .prog{height:7px;background:#0f1013;border:1px solid var(--border2);border-radius:4px;overflow:hidden;margin:8px 0 4px}
+  .prog i{display:block;height:100%;background:linear-gradient(90deg,#7a5c2e,var(--gold2));transition:width .3s}
+
+  details.dung{background:var(--bg2);border:1px solid var(--border);border-radius:8px;margin-bottom:9px;overflow:hidden}
+  details.dung[open]{border-color:var(--border2)}
+  details.dung.inrange{border-left:3px solid var(--hunter)}
+  details.dung summary{cursor:pointer;list-style:none;padding:11px 14px;display:flex;align-items:center;gap:10px;user-select:none}
+  details.dung summary::-webkit-details-marker{display:none}
+  details.dung summary:hover{background:var(--hover)}
+  details.dung summary .arrow{color:var(--bronze);font-size:10px;transition:transform .2s;flex-shrink:0}
+  details.dung[open] summary .arrow{transform:rotate(90deg)}
+  .dname{font-weight:600;color:var(--txt);font-size:13.5px}
+  .dmeta{color:var(--dim);font-size:11.5px;margin-left:4px}
+  .dloot{padding:4px 14px 12px;border-top:1px solid var(--border)}
+  .dprog{margin-left:auto;font-size:11px;color:var(--dim);flex-shrink:0}
+  .dprog.full{color:var(--hunter)}
+
+  .mst{display:flex;gap:10px;align-items:flex-start;padding:6px 0;border-bottom:1px dashed #231f16;font-size:13px}
+  .mst:last-child{border-bottom:none}
+  .mst .lvl{min-width:32px;color:var(--gold2);font-weight:700;text-align:right;flex-shrink:0}
+  .mst .txt{padding-top:1px}
+  .mst.done .txt{opacity:.4}
+  .mst.done .txt b{text-decoration:line-through}
+  .bandhead{font-family:Georgia,serif;color:var(--gold);font-size:12px;letter-spacing:1px;text-transform:uppercase;margin:14px 0 6px;border-bottom:1px solid var(--border2);padding-bottom:4px;display:flex;justify-content:space-between}
+  .bandhead:first-child{margin-top:0}
+  .bandhead .zn{color:var(--dim);font-family:"Segoe UI",sans-serif;text-transform:none;letter-spacing:0;font-size:11.5px}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:13px}
+  @media (max-width:920px){.wrap{flex-direction:column}aside{width:100%;min-width:0;position:static;height:auto}.grid2{grid-template-columns:1fr}}
+  .footer{color:var(--dim);font-size:11px;margin-top:18px;border-top:1px solid var(--border);padding-top:10px}
+
+  /* ===== Identidad + pulido ===== */
+  ::selection{background:#c9aa6833;color:#fff}
+  aside::-webkit-scrollbar{width:9px}
+  aside::-webkit-scrollbar-thumb{background:#33291a;border-radius:5px;border:2px solid var(--bg2)}
+  button:focus-visible,input:focus-visible,select:focus-visible,details.dung summary:focus-visible,details.fold summary:focus-visible{outline:1px solid var(--gold);outline-offset:2px}
+  main{background:radial-gradient(1100px 380px at 25% -90px,#c9aa680b,transparent 70%),radial-gradient(700px 300px at 90% -40px,#abd47308,transparent 70%)}
+  .badge.locK{color:var(--gold);border-color:#6b5516}
+  .badge.locE{color:#7fb0dd;border-color:#2e4a63}
+  .tdot{width:8px;height:8px;background:var(--gold);transform:rotate(45deg);margin:7px 2px 0 0;flex-shrink:0;border-radius:1px;opacity:.85}
+  table tr:nth-child(even) td{background:#ffffff03}
+  .btn.copy{border-color:var(--border2);color:var(--dim)}
+  .btn.copy:hover{color:var(--gold2);border-color:var(--bronze)}
+  .btn.mini{width:auto;padding:4px 10px;font-size:11px;margin:0}
+  .mhead{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .mhead h3{margin:0}
+  .mlen{margin-left:auto;font:10.5px Consolas,"Cascadia Mono",monospace;color:var(--dim)}
+  .mlen.over{color:#ff6b5e;font-weight:700}
+  .card.later{opacity:.72;transition:opacity .15s}
+  .card.later:hover{opacity:1}
+  .filters .btn .n{color:var(--dim);font-size:10.5px;margin-left:3px}
+  /* ===== Macros: barra recomendada (teclado) ===== */
+  .barhead{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:4px}
+  .barhead h3{margin:0}
+  .barhead .seg{margin-left:auto;min-width:190px}
+  .kbwrap{display:grid;grid-template-columns:minmax(0,1fr) 230px;gap:14px;margin-top:10px}
+  .kb{display:flex;flex-direction:column;gap:6px}
+  .kbrow{display:flex;gap:6px}
+  .kc{flex:0 0 calc((100% - 36px)/7);min-width:0;height:80px;display:flex;flex-direction:column;align-items:flex-start;gap:2px;padding:6px 7px;border-radius:7px;border:1px solid var(--border2);border-bottom-width:3px;background:linear-gradient(180deg,#1d1f26,#141519);color:var(--txt);text-align:left;font:inherit;position:relative;overflow:hidden;transition:transform .12s,border-color .12s,box-shadow .12s}
+  button.kc{cursor:pointer}
+  button.kc:hover{transform:translateY(-2px);border-color:var(--gold);box-shadow:0 4px 10px #0007}
+  .kc .kk{font:700 13px Georgia,serif;color:var(--gold2);line-height:1}
+  .kc .km{position:absolute;top:6px;right:7px;font-size:9px;color:var(--gold);letter-spacing:.3px}
+  .kc .kn{font-size:11px;line-height:1.2;margin-top:auto;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  .kc .ks{font-size:9px;color:var(--dim);text-transform:uppercase;letter-spacing:.5px}
+  .kc.ready{border-color:#3d5226;background:linear-gradient(180deg,#1d2617,#13170e)}
+  .kc.ready .ks{color:var(--hunter)}
+  .kc.spell{border-color:var(--bronze)} .kc.spell .ks{color:var(--gold)}
+  .kc.soon{border-style:dashed;opacity:.62}
+  .kc.soon .ks{color:var(--gold2)}
+  .kc.free,.kc.move{opacity:.3}
+  .kc.move{background:#0f1013;border-style:dotted}
+  .kcoff{flex:0 0 auto}
+  .mouse{background:#0f1013;border:1px solid var(--border2);border-radius:8px;padding:8px;display:flex;flex-direction:column;gap:6px}
+  .mouse .mt{font-family:Georgia,serif;font-size:10.5px;letter-spacing:1px;text-transform:uppercase;color:var(--gold);padding:0 2px}
+  .mrow{display:flex;align-items:center;gap:8px;width:100%;padding:6px 8px;border-radius:6px;border:1px solid var(--border2);background:#15161b;color:var(--txt);font:inherit;font-size:12px;text-align:left}
+  button.mrow{cursor:pointer} button.mrow:hover{border-color:var(--gold)}
+  .mrow .mk{font-size:10px;color:var(--gold2);background:#2a2113;border:1px solid var(--bronze);border-radius:9px;padding:1px 7px;white-space:nowrap}
+  .mrow .ks{margin-left:auto;font-size:9px;color:var(--dim);text-transform:uppercase;letter-spacing:.5px}
+  .mrow.ready{border-color:#3d5226} .mrow.ready .ks{color:var(--hunter)}
+  .mrow.soon{opacity:.62;border-style:dashed}
+  .legend{display:flex;gap:12px;flex-wrap:wrap;font-size:11px;color:var(--dim);margin-top:10px}
+  .legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px;vertical-align:-1px;border:1px solid}
+  .chipln{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:8px;font-size:11.5px;color:var(--dim)}
+  .chipln button{background:#15120c;border:1px solid var(--border2);color:var(--txt);border-radius:12px;padding:3px 10px;font:inherit;font-size:11.5px;cursor:pointer}
+  .chipln button:hover{border-color:var(--gold);color:var(--gold2)}
+  .chipln button.soon{opacity:.6;border-style:dashed}
+  @media (max-width:920px){.kbwrap{grid-template-columns:1fr}}
+  @media (max-width:640px){
+    .kb{display:grid;grid-template-columns:repeat(4,minmax(0,1fr))}
+    .kbrow{display:contents} .kcoff,.kc.move{display:none}
+    .kc{height:auto;min-height:62px}
+    .barhead .seg{margin-left:0;width:100%}
+  }
+  /* ===== Macros: herramientas + tarjetas ===== */
+  .mtools{position:sticky;top:0;z-index:4;background:var(--bg);padding:9px 0 8px;margin-bottom:6px;border-bottom:1px solid var(--border);display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  .mtools .filters{margin:0}
+  .msearch{flex:1 1 220px;min-width:0;background:#0f1013;border:1px solid var(--border2);color:var(--txt);padding:6px 12px;border-radius:16px;font:inherit;font-size:12.5px}
+  .msearch:focus{outline:none;border-color:var(--gold)}
+  .mrules{margin-bottom:13px}
+  .mrules .dloot{padding-top:6px}
+  .card.mac{transition:border-color .15s}
+  .card.mac:hover{border-color:var(--border2)}
+  .card.flash{animation:mflash 1.6s ease-out}
+  @keyframes mflash{0%,35%{box-shadow:0 0 0 2px var(--gold2)}100%{box-shadow:0 0 0 0 transparent}}
+  .badge.key{color:var(--gold2);border-color:#6b5516;font-family:Consolas,"Cascadia Mono",monospace}
+  .badge.tal{color:#c79cf0;border-color:#4b3566}
+  .badge.tal.off{opacity:.55}
+  .copyM{display:inline-flex;align-items:center;gap:5px}
+  .mcode{background:#0f1013;border:1px solid var(--border2);border-radius:6px;padding:9px 11px;margin-top:7px;font-family:Consolas,"Cascadia Mono",monospace;font-size:12px;color:#a8c896;white-space:pre;overflow-x:auto;line-height:1.5}
+
+  /* ===== Import SimC ===== */
+  #simcModal{position:fixed;inset:0;background:#000b;display:none;align-items:center;justify-content:center;z-index:60;padding:18px}
+  #simcModal.open{display:flex}
+  #simcModal .box{background:var(--bg2);border:1px solid var(--border2);border-radius:10px;width:min(760px,94vw);max-height:92vh;overflow-y:auto;padding:18px 20px;box-shadow:0 14px 44px #000d}
+  #simcModal h3{font-family:Georgia,serif;color:var(--gold);font-size:15px;margin-bottom:6px}
+  #simcModal textarea{width:100%;height:300px;background:#0f1013;border:1px solid var(--border2);color:var(--txt);border-radius:6px;padding:10px;font:12px/1.45 Consolas,"Cascadia Mono",monospace;resize:vertical;margin-top:8px}
+  #simcModal textarea:focus{outline:none;border-color:var(--gold)}
+  .simcrow{display:flex;gap:8px;justify-content:flex-end;margin-top:10px;align-items:center}
+  .simcrow .err{color:#ff6b5e;font-size:12px;margin-right:auto}
+  .statgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:4px 16px;margin-top:10px}
+  .statgrid .st{display:flex;justify-content:space-between;gap:8px;font-size:12px;padding:3px 0;border-bottom:1px dashed #231f16}
+  .statgrid .st span{color:var(--dim)}
+  .statgrid .st b{color:var(--txt);font-weight:600;text-align:right}
+  .statgrid .st b.g{color:var(--gold2)}
+  .simcmeta{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+  .simcdel{margin-left:auto}
+  /* Local market shares the guide palette; wide tables scroll, not the page. */
+  .market-toolbar{display:flex;flex-wrap:wrap;gap:12px;align-items:end;margin:14px 0}
+  .market-toolbar>label{display:flex;flex-direction:column;gap:5px;min-width:0;font-size:12px;color:var(--dim)}
+  .market-toolbar>label.chk{flex-direction:row;align-items:center;max-width:100%}
+  .market-toolbar input[type=search],.market-toolbar select,.market-toolbar input[type=file]{max-width:100%;width:100%;background:var(--bg);border:1px solid var(--border2);color:var(--txt);padding:8px;border-radius:5px}
+  .market-toolbar .btn{width:auto;margin:0;min-height:34px}
+  .market-search{flex:1;min-width:180px!important}
+  .market-file{flex:1;min-width:180px!important}
+  #marketRoot{min-width:0;overflow-wrap:anywhere}
+  #marketRoot .table-scroll{margin-top:12px}
+  #marketRoot table{min-width:650px}
+  #marketRoot button:disabled,#marketRoot input:disabled,#marketRoot select:disabled{opacity:.45;cursor:not-allowed}
+  .market-item{border:0;background:transparent;text-align:left;color:var(--hunter);font:inherit;font-weight:600;cursor:pointer;text-decoration:underline;text-underline-offset:3px}
+  .market-money{white-space:nowrap;color:var(--gold2)}
+  .market-source{min-width:180px;max-width:270px}
+  #marketDetail h4{color:var(--gold);margin:16px 0 8px}
+  #marketDetail ul{padding-left:20px}
+  #marketDetail li{margin:8px 0}
+  #marketStatus{min-height:22px;color:var(--hunter)}
+  .market-pages{justify-content:space-between}
+  .market-chart{margin:6px 0 4px}
+  .farm-metrics{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin-top:4px}
+  .farm-spark{display:inline-block;line-height:0}
+  .farm-spark svg{width:120px;height:auto;display:block}
+  .badge.down{color:#e0a0a0;border-color:#5e2e2e}
+  .badge.deal{color:var(--hunter);border-color:#3d5226;font-weight:600}
+  .badge.pricy{color:#ff9d8a;border-color:#5e2e2e}
+  #farmRoot .farm-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px;margin:12px 0}
+  .farm-card{border:1px solid var(--border2);border-radius:8px;padding:10px 12px;background:#0f1013}
+  .farm-chead{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px}
+  .farm-chead b{color:var(--gold)}
+  .farm-sec{margin:8px 0}
+  .farm-sec h5{font-size:11px;color:var(--gold);text-transform:uppercase;letter-spacing:.5px;margin:0 0 4px}
+  .farm-sec ul{margin:0;padding-left:18px}
+  .farm-sec li{font-size:12px;margin:3px 0}
+  .farm-ctl{display:flex;gap:10px;align-items:end;flex-wrap:wrap;margin:8px 0}
+  .farm-ctl label{display:flex;flex-direction:column;gap:4px;font-size:11px;color:var(--dim)}
+  .farm-ctl select{background:var(--bg);border:1px solid var(--border2);color:var(--txt);padding:5px;border-radius:5px}
+  .farm-note{color:var(--dim);font-size:12px;margin:6px 0}
+  .farm-reasons{margin:8px 0 0;padding-left:18px}
+  .farm-reasons li{font-size:11.5px;color:var(--dim);margin:2px 0}
+  .farm-prog ul{margin:6px 0;padding-left:20px}
+  .farm-prog li{font-size:12.5px;margin:4px 0}
+
+  /* ===== Ficha de personaje (portada) — pergamino estilo panel del juego ===== */
+  .ficha{display:grid;grid-template-columns:136px minmax(0,1fr);background:
+    radial-gradient(140% 130% at 12% -10%,#f0dcae 0%,#e0c48e 46%,#cba96e 100%);
+    border:1px solid #7d5f2c;border-radius:10px;color:#3a2a12;overflow:hidden;
+    box-shadow:0 8px 22px #000a,inset 0 0 0 1px #f6e7bd99,inset 0 0 46px #a97e3f26;
+    margin-bottom:13px}
+  .ficha-emb{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;
+    padding:14px 8px;border-right:1px solid #8a6a35aa;
+    background:radial-gradient(circle at 50% 26%,#0000000d,transparent 72%)}
+  .ficha-portrait{position:relative;width:100%;aspect-ratio:4/5;border-radius:8px;overflow:hidden;
+    border:1px solid #6b4f22;background:#241a0e;box-shadow:inset 0 0 14px #00000066,0 2px 6px #00000033}
+  .ficha-portrait svg,.ficha-portrait img{width:100%;height:100%;display:block}
+  .ficha-portrait img{object-fit:cover}
+  .ficha-pbadge{position:absolute;right:5px;bottom:5px;width:26px;height:26px;border-radius:50%;
+    background:#f6e7bdcc;border:1px solid #6b4f22;display:flex;align-items:center;justify-content:center;
+    box-shadow:0 1px 3px #00000044}
+  .ficha-avbtns{display:flex;gap:4px;justify-content:center}
+  .ficha-avbtns .btn{font-size:9.5px;padding:2px 8px}
+  .ficha-cls{font-family:Georgia,serif;font-size:14.5px;color:#4a3312;letter-spacing:.4px}
+  .ficha-lvl{display:flex;align-items:baseline;gap:5px}
+  .ficha-lvl b{font-size:27px;color:#503713;line-height:1;font-family:Georgia,serif}
+  .ficha-lvl span{font-size:9.5px;text-transform:uppercase;letter-spacing:1.2px;color:#7a5a28}
+  .ficha-fac{line-height:0}
+  .ficha-fac svg{width:24px;height:24px;filter:drop-shadow(0 1px 1px #0003)}
+  .ficha-main{padding:11px 16px 12px;min-width:0}
+  .ficha-name{font-family:Georgia,serif;font-size:19px;color:#38230a;text-shadow:0 1px 0 #f6e7bd;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .ficha-name.noname{font-style:italic;color:#7a5a28}
+  .ficha-sub{font-size:12px;color:#6d4f24;margin-top:1px}
+  .ficha-vitals{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));margin-top:9px;
+    border-top:1px solid #8a6a3566;border-bottom:1px solid #8a6a3566}
+  .fv{padding:6px 10px 7px;border-right:1px solid #8a6a3540;display:flex;flex-direction:column;gap:3px;min-width:0}
+  .fv:last-child{border-right:none}
+  .fl{font-size:9.5px;text-transform:uppercase;letter-spacing:.8px;color:#7a5a28}
+  .fv-v{font-size:15.5px;color:#33200a;font-weight:700;line-height:1.15}
+  .fbar{height:4px;background:#8a6a3540;border-radius:2px;overflow:hidden;display:block}
+  .fbar u{display:block;height:100%;background:linear-gradient(90deg,#8a6a35,#b8863b)}
+  .ficha-attrs{display:grid;grid-template-columns:repeat(auto-fit,minmax(118px,1fr));gap:6px 14px;margin-top:9px}
+  .fa{display:flex;flex-direction:column;gap:1px;min-width:0}
+  .fa span{font-size:9.5px;text-transform:uppercase;letter-spacing:.8px;color:#7a5a28}
+  .fa b{font-size:12.5px;color:#33200a;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .ficha-weap{display:flex;gap:8px 20px;flex-wrap:wrap;margin-top:9px;padding-top:8px;border-top:1px dashed #8a6a3566}
+  .fw{display:flex;align-items:baseline;gap:7px;font-size:12.5px;min-width:0;flex:1 1 220px}
+  .fw b{color:#33200a;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .fw i{font-style:normal;color:#6d4f24;font-size:11.5px;white-space:nowrap}
+  .fw .fl{flex-shrink:0}
+  .ficha-real{display:flex;flex-wrap:wrap;gap:4px 16px;align-items:baseline;margin-top:8px;
+    padding-top:7px;border-top:1px dashed #8a6a3555;font-size:11px;color:#6d4f24}
+  .ficha-real b{color:#33200a;font-weight:600}
+  .ficha-real .fr-items{display:flex;flex-wrap:wrap;gap:4px 16px}
+  @media (max-width:720px){
+    .ficha{grid-template-columns:1fr}
+    .ficha-emb{flex-direction:row;justify-content:flex-start;border-right:none;border-bottom:1px solid #8a6a35aa;padding:10px 14px;gap:12px}
+    .ficha-portrait{width:84px;flex-shrink:0;aspect-ratio:1/1}
+    .ficha-vitals{grid-template-columns:repeat(2,minmax(0,1fr))}
+    .fv:nth-child(2){border-right:none}
+    .fv:nth-child(-n+2){border-bottom:1px solid #8a6a3540}
+  }
+
+  /* ===== Fold sutil dentro de cards (detalle bajo demanda) ===== */
+  details.fold{border-top:1px dashed #231f16;margin-top:9px}
+  details.fold summary{cursor:pointer;list-style:none;display:flex;align-items:center;gap:8px;
+    padding:5px 0;color:var(--dim);font-size:12px;user-select:none}
+  details.fold summary::-webkit-details-marker{display:none}
+  details.fold summary:hover{color:var(--txt)}
+  details.fold summary .arrow{color:var(--bronze);font-size:9px;transition:transform .2s;flex-shrink:0}
+  details.fold[open] summary .arrow{transform:rotate(90deg)}
+  details.fold .fbody{padding:3px 0 7px}
+  details.dung.simcfold .card{border:none;background:transparent;margin-bottom:0;padding:2px 0 0}
+  .bandfold .bandzones{color:var(--dim);font-size:11.5px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+</style>
+</head>
+<body>
+<header>
+  <div class="avatar" id="avatarIcon"></div>
+  <div class="who">
+    <input id="charName" maxlength="20" spellcheck="false" placeholder="Tu personaje" title="Nombre de tu personaje">
+    <div class="sub" id="subTitle"></div>
+  </div>
+  <div class="lvlchip"><b id="lvlChip">12</b><span>lvl</span></div>
+  <div class="chips" id="headerChips"></div>
+  <div class="ver">WoW: Forever · Classic+<br>todas las clases · ambos bandos</div>
+</header>
+
+<div class="wrap">
+<aside>
+  <h2>Personaje</h2>
+  <div class="field">
+    <label>Nivel</label>
+    <div class="lvlrow">
+      <input type="range" id="lvlRange" min="1" max="60" value="12">
+      <input type="number" id="lvlNum" min="1" max="60" value="12">
+    </div>
+  </div>
+  <div class="field">
+    <label>Clase</label>
+    <div class="seg" id="clsSeg"></div>
+  </div>
+  <div class="field" id="facField">
+    <label>Bando</label>
+    <div class="seg" id="facSeg"></div>
+    <div class="tip">Cambiar de bando reinicia armas, ruta y equipo de esta guía.</div>
+  </div>
+  <div class="field">
+    <label>Talentos</label>
+    <div class="seg" id="specSeg"></div>
+    <div class="tip" id="specTip"></div>
+  </div>
+  <div class="field">
+    <label>Arma preferida</label>
+    <div class="seg" id="prefSeg"></div>
+    <div class="tip" id="prefTip"></div>
+  </div>
+  <div class="field">
+    <label>Continente</label>
+    <div class="seg" id="realmSeg">
+      <button data-v="kalimdor" class="on">Kalimdor</button>
+      <button data-v="ek">Reinos del E.</button>
+    </div>
+    <div class="tip">En qué continente estás leveleando — cambia zonas y ruta.</div>
+  </div>
+  <div class="field" id="engWrap">
+    <label class="chk"><input type="checkbox" id="engChk"> Ingeniería</label>
+    <div class="tip">Suma guns crafteados y scopes a las recomendaciones.</div>
+  </div>
+  <div class="field">
+    <label>Arma equipada</label>
+    <select id="curWeapon"></select>
+  </div>
+  <div class="field" id="customDpsWrap" style="display:none">
+    <label>DPS del arma (si no figura)</label>
+    <input type="number" id="customDps" step="0.1" min="0" placeholder="ej: 8.5">
+  </div>
+  <div class="field">
+    <label>Datos del juego</label>
+    <button class="btn" id="importSimc" style="margin-bottom:0">Importar /simc</button>
+    <div class="tip" id="simcStatus">Traé tu personaje real: nivel, arma con DPS real, pet y stats.</div>
+  </div>
+  <div class="field">
+    <label>Precios Auctionator</label>
+    <button class="btn" id="importAuction" style="margin-bottom:0">Actualizar precios</button>
+    <div class="tip" id="auctionStatus"></div>
+  </div>
+  <div class="sheet" id="sheetSummary"></div>
+  <div class="field" style="margin-top:12px">
+    <button class="btn" id="goWeapons">Inventario — marcar obtenidos</button>
+    <button class="btn copy" id="copyLink" title="Incluye build, DPS y progreso; no incluye el perfil SimC completo. En modo archivo el enlace requiere esta app en la misma ruta.">Copiar link del build</button>
+    <button class="btn danger" id="resetBtn">Resetear build</button>
+  </div>
+</aside>
+
+<main>
+  <nav class="tabs" id="tabsNav"></nav>
+  <div id="tabContent"></div>
+</main>
+</div>
+
+<div id="simcModal"><div class="box">
+  <h3>Importar personaje — SimulationCraft (/simc)</h3>
+  <div class="muted">En el juego escribí <b>/simc</b>, esperá a que cargue el perfil y copiá todo el texto. Pegalo abajo — la app detecta tu nivel, el arma equipada (con su <b>DPS real</b>), el pet, ingeniería y tus stats.</div>
+  <textarea id="simcText" spellcheck="false" placeholder="Pegá acá el perfil de /simc…"></textarea>
+  <div class="simcrow"><span class="err" id="simcErr"></span><button class="btn" id="simcCancel" style="width:auto;margin-bottom:0">Cancelar</button><button class="btn" id="simcApply" style="width:auto;margin-bottom:0">Importar</button></div>
+</div></div>
+
+<script src="market.js"></script>
+<script src="drop-data.js"></script>
+<script src="market-farm.js"></script>
+<script src="market-history.js"></script>
+<script src="market-deals.js"></script>
+<script src="market-chart.js"></script>
+<script src="market-ui.js"></script>
+<script src="guide-hunter.js"></script>
+<script src="guide-warrior.js"></script>
+<script src="guide-shaman.js"></script>
+<script src="guide-legacy.js"></script>
+<script>
+/* ================= ICONS (SVG stroke, estilo línea tipo addon) ================= */
+const ICONS = {
+  bow:'<path d="M7 3v18"/><path d="M7 3c9 3 13 6 13 9s-4 6-13 9"/><path d="M3.5 12H19M15.5 8.5L19 12l-3.5 3.5"/>',
+  pin:'<path d="M12 21s-6.5-5.2-6.5-10.4a6.5 6.5 0 1 1 13 0C18.5 15.8 12 21 12 21z"/><circle cx="12" cy="10.4" r="2.3"/>',
+  gate:'<path d="M4 21V9l8-6 8 6v12M4 21h16M9 21v-7h6v7"/>',
+  star:'<path d="M12 3.5l2.5 5.2 5.7.8-4.1 4 1 5.7-5.1-2.7-5.1 2.7 1-5.7-4.1-4 5.7-.8z"/>',
+  scroll:'<path d="M7 3h11v18l-3-1.8L12 21l-3-1.8L6 21z"/><path d="M9.5 8h6M9.5 12h6"/>',
+  coin:'<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5v9M9 9.5h6"/>',
+  alert:'<path d="M12 3.5L22 20H2z"/><path d="M12 10v4.5M12 17.5v.01"/>',
+  check:'<path d="M4.5 12.5l4.5 4.5L19.5 7"/>',
+  route:'<path d="M5 5.5h3.5l2 4H19M5 5.5v13m0 0h4M19 9.5v4l-3.5 2-4-2M15.5 15.5l-2-4"/>',
+  skull:'<path d="M12 3a7 7 0 0 0-7 7c0 2.5 1.3 4.3 3 5.4V19a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2v-3.6c1.7-1.1 3-2.9 3-5.4a7 7 0 0 0-7-7z"/><path d="M9 10.5h.01M15 10.5h.01M10.5 18v-2M13.5 18v-2"/>',
+  copy:'<rect x="8.5" y="8.5" width="11" height="11" rx="2"/><path d="M15.5 8.5V6a1.5 1.5 0 0 0-1.5-1.5H6A1.5 1.5 0 0 0 4.5 6v8A1.5 1.5 0 0 0 6 15.5h2.5"/>',
+  kbd:'<rect x="2.5" y="6" width="19" height="12" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M7 14h10"/>',
+};
+function icon(n,s){ return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" style="width:${s||16}px;height:${s||16}px">${ICONS[n]||ICONS.star}</svg>`; }
+
+/* ================= DATA (Classic Era 1.12 · ~ = aproximado) ================= */
+/* ================= GUÍAS — contenido por clase/facción =================
+   Cada guía (window.GUIDE_*) define: specs, prefs, types/badges/typeFilters,
+   macros, barra, dungeons, ahList, extras, simc y factions{fac:{weapons,
+   milestones,routes{realm:[bands]},recExtra}}. */
+const GUIDES={hunter:window.GUIDE_HUNTER,warrior:window.GUIDE_WARRIOR,shaman:window.GUIDE_SHAMAN};
+const GUIDE_ORDER=Object.keys(GUIDES);
+const FAC_LABEL={horde:"Horda",alliance:"Alianza"};
+function g(st){ st=st||state; const G=GUIDES[st.cls]||GUIDES.hunter; const fk=Object.keys(G.factions); const fac=fk.includes(st.fac)?st.fac:fk[0]; return {G,GF:G.factions[fac],fac}; }
+const weapons=(st)=>g(st).GF.weapons, dgns=(st)=>g(st).G.dungeons, mile=(st)=>g(st).GF.milestones, mcr=(st)=>g(st).G.macros;
+const spec=(st)=>g(st).G.specs, typ=(st)=>g(st).G.types, bdg=(st)=>g(st).G.badges, ahList=(st)=>g(st).G.ahList, bars=(st)=>g(st).G.bar;
+const wfOf=w=>w.f||w.t;
+const prefLabel=()=>{const p=g().G.prefs.find(x=>x[0]===state.pref);return p?p[1].toLowerCase():"cualquier arma";};
+let MACRO_KEY={}, WEAPON_LOOKUP={}, curGk="";
+function rebuildDerived(){ const G=g().G;
+  MACRO_KEY={}; [...bars().keys,...bars().mouse].forEach(b=>{(b.o||[]).forEach(o=>{if(o.m)MACRO_KEY[o.m]=b.k;});if(b.dg)MACRO_KEY[b.dg.m]=b.k+" · dungeon";});
+  WEAPON_LOOKUP={}; weapons().forEach(w=>{WEAPON_LOOKUP[normItemName(w.n)]=w;});
+}
+
+const TABS = [["rec","Recomendador","star"],["route","Ruta","route"],["weapons","Armas","bow"],["macros","Macros","scroll"],["dungeons","Dungeons","gate"],["market","Mercado local","coin"],["extras","Extras / AH","coin"],["legacy","Legacy","coin"]];
+
+/* ================= STATE ================= */
+const KEY="wowhunter-build-v2";
+function blank(){ return {lvl:12, cls:"hunter", fac:"horde", spec:"bm", pref:"bow", eng:false, realm:"kalimdor", name:"", cur:"", customDps:0, weaponDps:null, owned:[], gear:[], steps:[], tab:"rec", wf:"all", mf:"all", mdg:false, who:false, simc:null, avatar:null, farm:normalizeFarm(null)}; }
+function normalizeFarm(f){
+  const d={comp:"auto",zoneComp:{},gph:5,prof:{skin:false,herb:false,mine:false},group:false,pvp:true,n:5,session:2};
+  const o=f&&typeof f==="object"&&!Array.isArray(f)?f:{};
+  const zc={}; if(o.zoneComp&&typeof o.zoneComp==="object"&&!Array.isArray(o.zoneComp))
+    for(const k of Object.keys(o.zoneComp)) if(typeof k==="string"&&k&&["low","med","high"].includes(o.zoneComp[k])) zc[k]=o.zoneComp[k];
+  const p=o.prof&&typeof o.prof==="object"?o.prof:{}, n=Number(o.n);
+  return {comp:["auto","low","med","high"].includes(o.comp)?o.comp:d.comp, zoneComp:zc,
+    gph:Number.isFinite(+o.gph)&&+o.gph>0?Math.min(1000,+o.gph):d.gph,
+    prof:{skin:!!p.skin,herb:!!p.herb,mine:!!p.mine}, group:!!o.group, pvp:o.pvp!==false,
+    n:Number.isInteger(n)&&n>=3&&n<=8?n:d.n,
+    session:[1,2,4].includes(+o.session)?+o.session:d.session};
+}
+function validLevel(value){ const n=Number(value); return Number.isFinite(n)?Math.min(60,Math.max(1,Math.trunc(n))):12; }
+function normalizeState(value){
+  const s=Object.assign(blank(),value&&typeof value==="object"&&!Array.isArray(value)?value:{});
+  s.lvl=validLevel(s.lvl);
+  s.customDps=Number.isFinite(+s.customDps)?Math.max(0,+s.customDps):0;
+  s.weaponDps=Number.isFinite(+s.weaponDps)&&+s.weaponDps>0?+s.weaponDps:null;
+  for(const k of ["owned","gear","steps"]) s[k]=Array.isArray(s[k])?[...new Set(s[k].filter(id=>typeof id==="string"))]:[];
+  if(!GUIDES[s.cls]) s.cls="hunter";
+  const g0=GUIDES[s.cls], fk0=Object.keys(g0.factions);
+  if(!fk0.includes(s.fac)) s.fac=fk0[0];
+  const gf0=g0.factions[s.fac];
+  s.owned=s.owned.filter(id=>gf0.weapons.some(w=>w.id===id));
+  if(!Object.hasOwn(g0.specs,s.spec)) s.spec=g0.defaultSpec;
+  if(!g0.prefs.some(p=>p[0]===s.pref)) s.pref=g0.defaultPref;
+  if(!["kalimdor","ek"].includes(s.realm)||!gf0.routes[s.realm]) s.realm=Object.keys(gf0.routes)[0]||"kalimdor";
+  if(!TABS.some(t=>t[0]===s.tab)) s.tab="rec";
+  if(!g0.typeFilters.some(f=>f[0]===s.wf)) s.wf="all";
+  if(!["","other",...gf0.weapons.map(w=>w.id)].includes(s.cur)) s.cur="";
+  if(!g0.useEng) s.eng=false;
+  s.name=typeof s.name==="string"?s.name.slice(0,20):"";
+  s.farm=normalizeFarm(s.farm);
+  s.avatar=typeof s.avatar==="string"&&s.avatar.startsWith("data:image/")&&s.avatar.length<=98304?s.avatar:null;
+  return s;
+}
+let state = (()=>{ try{ return normalizeState(JSON.parse(localStorage.getItem(KEY))); }catch(e){ return blank(); } })();
+(function(){ // deep-link: #lvl=45&tab=weapons&spec=mm&pref=gun&eng=1&cur=venomstrike&owned=venomstrike&gear=d1|Venomstrike
+  try{ const p=new URLSearchParams(location.hash.slice(1));
+    // Versioned links are complete build/progress snapshots, not merges with another character.
+    if(p.get("v")==="3") state=blank();
+    if(p.has("lvl")) state.lvl=validLevel(p.get("lvl"));
+    if(p.get("tab")&&TABS.some(t=>t[0]===p.get("tab"))) state.tab=p.get("tab");
+    if(p.get("cls")&&GUIDES[p.get("cls")]){ state.cls=p.get("cls"); const nf=Object.keys(GUIDES[state.cls].factions); state.fac=nf.includes(p.get("fac"))?p.get("fac"):nf[0]; }
+    else if(p.get("fac")){ const nf=Object.keys(GUIDES[state.cls].factions); if(nf.includes(p.get("fac"))) state.fac=p.get("fac"); }
+    if(p.get("spec")&&spec()[p.get("spec")]) state.spec=p.get("spec");
+    if(p.get("pref")&&g().G.prefs.some(pp=>pp[0]===p.get("pref"))) state.pref=p.get("pref");
+    if(p.get("eng")) state.eng=p.get("eng")==="1";
+    if(p.get("cur")) state.cur=p.get("cur");
+    if(p.get("realm")&&["kalimdor","ek"].includes(p.get("realm"))) state.realm=p.get("realm");
+    if(p.get("name")) state.name=p.get("name").slice(0,20);
+    if(p.has("customDps")) state.customDps=+p.get("customDps");
+    if(p.has("weaponDps")) state.weaponDps=+p.get("weaponDps");
+    // progreso: owned=id1,id2 (solo ids de weapons()) · gear=id1,id2 (ids libres, ej. "d1|Venomstrike")
+    if(p.get("owned")) p.get("owned").split(",").forEach(id=>{
+      if(weapons().some(w=>w.id===id)&&!state.owned.includes(id)) state.owned.push(id);
+    });
+    if(p.get("gear")) p.get("gear").split(",").forEach(id=>{
+      if(id&&!state.gear.includes(id)) state.gear.push(id);
+    });
+    if(p.get("steps")) p.get("steps").split(",").forEach(id=>{
+      if(id&&!state.steps.includes(id)) state.steps.push(id);
+    });
+    // Consume the snapshot once, so reloading cannot roll back subsequent progress.
+    if(p.get("v")==="3"){ const url=new URL(location.href); url.hash=""; history.replaceState(null,"",url.href); }
+  }catch(e){}
+})();
+state=normalizeState(state);
+function weaponForLoot(gid){
+  const name=gid.slice(gid.indexOf("|")+1);
+  return weapons().find(w=>w.n.toLowerCase()===name.toLowerCase());
+}
+function setWeaponOwned(id,obtained){
+  const w=weapons().find(w=>w.id===id); if(!w) return;
+  const os=new Set(state.owned), gs=new Set(state.gear);
+  obtained?os.add(id):os.delete(id);
+  dgns().forEach((d,i)=>d.loot.forEach(l=>{
+    if(l[0].toLowerCase()===w.n.toLowerCase()){
+      const gid="d"+i+"|"+l[0]; obtained?gs.add(gid):gs.delete(gid);
+    }
+  }));
+  state.owned=[...os]; state.gear=[...gs];
+}
+// Preserve existing progress while unifying the two inventory views.
+const migratedOwned=new Set(state.owned);
+state.gear.forEach(gid=>{const w=weaponForLoot(gid);if(w)migratedOwned.add(w.id);});
+migratedOwned.forEach(id=>setWeaponOwned(id,true));
+function save(){ localStorage.setItem(KEY, JSON.stringify(state)); }
+
+const $ = id => document.getElementById(id);
+const fmtDps = w => w.dps.toFixed(1)+(w.approx?"~":"");
+const wById = id => weapons().find(w=>w.id===id);
+const ownedSet = () => new Set(state.owned);
+const gearSet = () => new Set(state.gear);
+const stepSet = () => new Set(state.steps);
+const curDps = () => {
+  if(state.cur==="other") return state.customDps||0;
+  const w=wById(state.cur); if(!w) return 0;
+  const sw=state.simc&&state.simc.weapon;
+  if(sw&&sw.match&&sw.match.id===state.cur&&sw.dps) return sw.dps; // DPS real del juego
+  if(state.weaponDps) return state.weaponDps; // DPS importado conservado en un enlace local
+  return w.dps;
+};
+const curName = () => state.cur==="other" ? "arma custom ("+(state.customDps||0)+" dps)" : (wById(state.cur)||{n:"sin definir"}).n;
+function bands(){ const{GF}=g(); return GF.routes[state.realm]||GF.routes[Object.keys(GF.routes)[0]]; }
+function bandOf(lvl){ return bands().find(b=>lvl>=b.min&&lvl<=b.max); }
+function realmName(){ return state.realm==="ek"?"Reinos del Este":"Kalimdor"; }
+const LOCN = {K:"Kalimdor", E:"EK"};
+const escH = s => String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+const macroLen = c => new TextEncoder().encode(c).length; // el juego cuenta bytes
+const locBadge = c => `<span class="badge loc${c}">${LOCN[c]}</span>`;
+function buildLink(){
+  const p=new URLSearchParams();
+  p.set("v","3");
+  p.set("lvl",state.lvl); p.set("cls",state.cls); p.set("fac",state.fac); p.set("spec",state.spec); p.set("pref",state.pref); p.set("realm",state.realm);
+  p.set("eng",state.eng?"1":"0"); p.set("cur",state.cur); p.set("name",state.name); p.set("tab",state.tab);
+  p.set("customDps",state.customDps);
+  const sw=state.simc&&state.simc.weapon;
+  if(state.cur!=="other"&&(state.weaponDps||(sw&&sw.match&&sw.match.id===state.cur&&sw.dps))) p.set("weaponDps",curDps());
+  for(const k of ["owned","gear","steps"]) p.set(k,state[k].join(","));
+  const url=new URL(window.HunterStandaloneUrl||location.href); url.hash=p.toString(); return url.href;
+}
+
+/* ================= RENDER ================= */
+function render(){
+  const {G,GF,fac}=g();
+  rebuildDerived();
+  $("lvlRange").value=state.lvl; $("lvlNum").value=state.lvl; $("lvlChip").textContent=state.lvl;
+  $("engChk").checked=state.eng; $("charName").value=state.name||"";
+  $("subTitle").textContent=`${G.title} · ${FAC_LABEL[fac]||fac} · WoW: Forever · Classic+`;
+  $("avatarIcon").innerHTML=icon(G.icon,30);
+  $("clsSeg").innerHTML=GUIDE_ORDER.map(id=>`<button data-v="${id}" class="${state.cls===id?"on":""}">${GUIDES[id].name}</button>`).join("");
+  const facs=Object.keys(G.factions);
+  $("facField").style.display=facs.length>1?"":"none";
+  $("facSeg").innerHTML=facs.map(f=>`<button data-v="${f}" class="${fac===f?"on":""}">${FAC_LABEL[f]||f}</button>`).join("");
+  $("specSeg").innerHTML=Object.entries(G.specs).map(([k,v])=>`<button data-v="${k}" class="${state.spec===k?"on":""}">${v}</button>`).join("");
+  $("prefSeg").innerHTML=G.prefs.map(([k,v])=>`<button data-v="${k}" class="${state.pref===k?"on":""}">${v}</button>`).join("");
+  $("specTip").textContent=G.specNote||"";
+  $("prefTip").textContent=G.prefNote||"";
+  document.querySelectorAll("#realmSeg button").forEach(b=>b.classList.toggle("on",b.dataset.v===state.realm));
+  $("customDpsWrap").style.display = state.cur==="other" ? "block":"none";
+  if(document.activeElement!==$("customDps")) $("customDps").value=state.customDps;
+  const gk=state.cls+"/"+fac;
+  if(gk!==curGk||!$("curWeapon").options.length){
+    curGk=gk;
+    let h = `<option value="">— elegir —</option><option value="other">Otra (dps manual)</option>`;
+    GF.weapons.slice().sort((a,b)=>a.lvl-b.lvl||a.dps-b.dps).forEach(w=>{
+      h += `<option value="${w.id}">${w.n} (${fmtDps(w)} dps)</option>`;
+    });
+    $("curWeapon").innerHTML=h;
+  }
+  $("curWeapon").value=state.cur;
+  renderChips(); renderSheet(); renderTabs();
+  const sstat=$("simcStatus");
+  if(sstat) sstat.textContent = state.simc
+    ? `Importado ${new Date(state.simc.ts).toLocaleDateString("es")}: ${state.simc.weapon?(state.simc.weapon.name||"arma")+" · ":""}${state.simc.level?"lvl "+state.simc.level:""}`.replace(/ · $/,"")
+    : "Traé tu personaje real: nivel, arma con DPS real y stats.";
+  const c=$("tabContent");
+  c.innerHTML = {rec:viewRec, route:viewRoute, weapons:viewWeapons, macros:viewMacros, dungeons:viewDungeons, market:HunterMarketUI.view, extras:viewExtras, legacy:viewLegacy}[state.tab]();
+  if(state.tab==="market") HunterMarketUI.mount($("marketRoot"),{level:state.lvl,cls:state.cls,fac:state.fac,spec:state.spec,pref:state.pref,farm:state.farm,saveFarm:f=>{state.farm=f;save();},hubZones:bandOf(state.lvl)?.zones||""});
+  bindDynamic();
+  save();
+}
+
+function renderChips(){
+  const {G}=g(); const dps=curDps();
+  $("headerChips").innerHTML =
+    `<span class="chip green">${icon(G.icon,12)} ${spec()[state.spec]}</span>`+
+    `<span class="chip gold">${icon("scroll",12)} ${curName()}${dps?` · ${dps.toFixed(1)} dps`:""}</span>`+
+    (g().G.prefChips&&g().G.prefChips[state.pref]?`<span class="chip">${icon("check",12)} ${g().G.prefChips[state.pref]}</span>`:"")+
+    (state.eng?`<span class="chip red">${icon("coin",12)} ing</span>`:"")+
+    `<span class="chip">${icon("pin",12)} ${realmName()}</span>`;
+}
+function renderSheet(){
+  const o=state.owned.length, g=state.gear.length, s=state.steps.length;
+  $("sheetSummary").innerHTML =
+    `<div class="r"><span>DPS equipado</span><b class="g">${curDps().toFixed(1)}</b></div>`+
+    `<div class="r"><span>Armas obtenidas</span><b>${o}/${weapons().length}</b></div>`+
+    `<div class="r"><span>Loot conseguido</span><b>${g}</b></div>`+
+    `<div class="r"><span>Ruta completada</span><b>${s}/${mile().length}</b></div>`;
+}
+function renderTabs(){
+  $("tabsNav").innerHTML = TABS.map(t=>
+    `<button data-t="${t[0]}" class="${state.tab===t[0]?"on":""}">${icon(t[2],13)} ${t[1]}</button>`).join("");
+}
+
+/* ================= VIEWS ================= */
+/* Escudo de facción para la ficha: color por bando + inicial, SVG inline. */
+function facShield(fac){
+  const col=fac==="alliance"?"#2f5d8a":"#9c2f24", letter=(FAC_LABEL[fac]||fac||"?").charAt(0).toUpperCase();
+  return `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 1.8l8 3.4v6.2c0 5.2-3.4 9.2-8 11-4.6-1.8-8-5.8-8-11V5.2z" fill="${col}" stroke="#3a2408" stroke-width="1.4"/><text x="12" y="16.6" text-anchor="middle" font-family="Georgia,serif" font-size="11" font-weight="700" fill="#f4e2b8">${letter}</text></svg>`;
+}
+/* Retrato procedural del personaje: busto SVG plano con casco/armadura por
+   clase (G.id), capa por facción y tono de piel por raza (SimC o neutro).
+   Determinista y 100% local — sin assets externos. */
+const RACE_SKIN={human:"#d9a066",orc:"5d7a3c",dwarf:"c68e5e",nightelf:"e0c39a",scourge:"a8a894",undead:"a8a894",tauren:"9a6a48",gnome:"d9a878",troll:"6f8f4e",goblin:"d9a066",draenei:"a8d0e0",bloodelf:"d8a8b0",worgen:"8a6a48",pandaren:"d9a878"};
+function raceSkin(){ const r=state.simc&&state.simc.race; const k=String(r||"").toLowerCase().replace(/[^a-z]/g,""); return "#"+(RACE_SKIN[k]||"d9a878"); }
+function charPortrait(G,fac){
+  const skin=raceSkin(), acc=G.accent||"#8a6a35";
+  const cloak=fac==="alliance"?"#274a72":"#6e2b1e", trim=fac==="alliance"?"#7fa8d8":"#d88a6a";
+  const armor={hunter:"#4f3d28",warrior:"#5c6068",shaman:"#4c3a26"}[G.id]||"#4f3d28";
+  const armorD={hunter:"#3a2c1d",warrior:"#454952",shaman:"#3a2c1d"}[G.id]||"#3a2c1d";
+  const gear={
+    hunter:`<path d="M32 52 C26 18 44 2 60 2 C77 2 94 19 88 52 L83 60 C76 47 44 47 37 60 Z" fill="#4a3524"/><path d="M38 50 C36 26 46 12 60 12 C74 12 84 26 82 50" fill="none" stroke="#2e2013" stroke-width="2" opacity=".55"/>`,
+    warrior:`<path d="M37 46 C37 18 46 8 60 8 C74 8 83 18 83 46 L41 46 Z" fill="#6a7078"/><path d="M37 46 C37 18 46 8 60 8 C74 8 83 18 83 46" fill="none" stroke="#4a4f57" stroke-width="2"/><path d="M40 34 C30 26 24 14 27 4 C36 8 42 18 43 30 Z" fill="#d8cbb0"/><path d="M80 34 C90 26 96 14 93 4 C84 8 78 18 77 30 Z" fill="#d8cbb0"/>`,
+    shaman:`<path d="M36 40 Q60 31 84 40 L84 47 Q60 38 36 47 Z" fill="#6b4f22"/><path d="M44 36 C38 26 36 16 40 6 M50 34 C48 22 50 12 56 4" stroke="#d8cbb0" stroke-width="3.4" fill="none" stroke-linecap="round"/><path d="M76 36 C82 26 84 16 80 6 M70 34 C72 22 70 12 64 4" stroke="#d8cbb0" stroke-width="3.4" fill="none" stroke-linecap="round"/><rect x="56" y="30" width="8" height="10" rx="2" fill="#d8cbb0" opacity=".85"/>`
+  }[G.id]||`<path d="M36 48 C34 24 46 12 60 12 C74 12 86 24 84 48 L78 44 C76 32 68 28 60 28 C52 28 44 32 42 44 Z" fill="#33241a"/>`;
+  return `<svg viewBox="0 0 120 150" preserveAspectRatio="xMidYMid slice" role="img" aria-label="Retrato de ${escH(G.name)}">
+<defs><linearGradient id="pbg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${acc}2e"/><stop offset="1" stop-color="#241a0e"/></linearGradient></defs>
+<rect width="120" height="150" fill="url(#pbg)"/>
+<circle cx="60" cy="58" r="46" fill="none" stroke="${trim}" stroke-opacity=".28" stroke-width="1.5" stroke-dasharray="3 5"/>
+<path d="M4 152 C4 104 30 90 60 90 C90 90 116 104 116 152 Z" fill="${cloak}"/>
+<path d="M16 152 C16 112 38 100 60 100 C82 100 104 112 104 152 Z" fill="${armor}"/>
+<path d="M16 152 C16 112 38 100 60 100 C82 100 104 112 104 152" fill="none" stroke="${armorD}" stroke-width="2" opacity=".7"/>
+<path d="M52 84 h16 v14 c0 5 -16 5 -16 0 z" fill="${skin}"/>
+<ellipse cx="60" cy="54" rx="25" ry="30" fill="${skin}"/>
+<ellipse cx="35" cy="56" rx="4" ry="7" fill="${skin}"/><ellipse cx="85" cy="56" rx="4" ry="7" fill="${skin}"/>
+<circle cx="50" cy="56" r="2.8" fill="#241708"/><circle cx="70" cy="56" r="2.8" fill="#241708"/>
+<path d="M45 48 q5 -2.5 9 -.5 M66 48 q5 -2 9 .5" stroke="#241708" stroke-width="1.6" fill="none" stroke-linecap="round"/>
+<path d="M59 60 q2 4 -1 7" stroke="#00000033" stroke-width="1.4" fill="none" stroke-linecap="round"/>
+${gear}
+<g transform="translate(82,104) scale(1.5)" fill="none" stroke="${trim}" stroke-opacity=".85" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">${ICONS[G.icon]||ICONS.star}</g>
+</svg>`;
+}
+// Retrato del personaje: data URI dentro de state — persiste con la build en
+// localStorage y en Hermes Desktop sin canales extra; buildLink() es campo a
+// campo así que nunca viaja en enlaces. Migra la key vieja wf-avatar-v1 una vez.
+try{ const old=localStorage.getItem("wf-avatar-v1");
+  if(old!=null){ if(old.startsWith("data:image/")&&old.length<=98304&&!state.avatar){ state.avatar=old; save(); } localStorage.removeItem("wf-avatar-v1"); }
+}catch(e){}
+function loadAvatar(file){
+  if(!file||!file.type.startsWith("image/")) return;
+  if(file.size>10*1024*1024) return;
+  const rd=new FileReader();
+  rd.onload=()=>{ const img=new Image();
+    img.onload=()=>{
+      const s=Math.min(1,256/Math.max(img.width,img.height));
+      const c=document.createElement("canvas");
+      c.width=Math.max(1,Math.round(img.width*s)); c.height=Math.max(1,Math.round(img.height*s));
+      c.getContext("2d").drawImage(img,0,0,c.width,c.height);
+      state.avatar=c.toDataURL("image/jpeg",.8);
+      save(); render();
+    };
+    img.src=rd.result;
+  };
+  rd.readAsDataURL(file);
+}
+/* Ficha de personaje (portada): pergamino con identidad, vitales y armas.
+   Todo sale de state + la guía activa (G/GF): clase→icon/acento, facción→escudo,
+   vitales→progreso, atributos→build, armas→candidatas ya calculadas. */
+function fichaCard({G,GF,lvl,os,dps,cands}){
+  const {fac}=g();
+  const specN=G.specs[state.spec]||state.spec;
+  const prefP=G.prefs.find(p=>p[0]===state.pref);
+  const wCur=state.cur==="other"?null:wById(state.cur);
+  const wTot=GF.weapons.length, wOwn=GF.weapons.reduce((n,w)=>n+(os.has(w.id)?1:0),0);
+  const lootTot=dgns().reduce((n,d)=>n+(d.loot?d.loot.length:0),0), lootN=gearSet().size;
+  const mileTot=mile().length, mileN=state.steps.length;
+  const avail=cands.filter(w=>w.lvl<=lvl).sort((a,b)=>b.dps-a.dps);
+  const next=cands.filter(w=>w.lvl>lvl).sort((a,b)=>a.lvl-b.lvl||b.dps-a.dps);
+  const pick=avail[0]||next[0]||null;
+  const wName=state.cur==="other"?"Otra (dps manual)":(wCur?wCur.n:"sin definir");
+  const wType=wCur?(typ()[wCur.t]||wCur.t):(state.cur==="other"?"manual":"—");
+  const attrs=[["Talento",specN],["Arma preferida",prefP?prefP[1]:"—"],["Continente",realmName()],["Tipo de arma",wType]];
+  if(G.useEng) attrs.push(["Ingeniería",state.eng?"Sí":"No"]);
+  const vit=(label,val,bar)=>`<div class="fv"><span class="fl">${label}</span><b class="fv-v">${val}</b>${bar!=null?`<i class="fbar"><u style="width:${Math.max(0,Math.min(100,bar*100)).toFixed(1)}%"></u></i>`:""}</div>`;
+  const sv=simcVitals();
+  const realChips=sv?(()=>{const it=[];
+    if(sv.hp!=null) it.push(["Vida",sv.hp]);
+    sv.powers.forEach(p=>it.push(p)); sv.attrs.forEach(a=>it.push(a));
+    if(sv.dpsChar!=null) it.push(["DPS",sv.dpsChar.toFixed(1)]);
+    return it.map(([l,v])=>`<span>${l} <b>${v}</b></span>`).join("");})():"";
+  return `<div class="ficha"><div class="ficha-emb">
+    <div class="ficha-portrait">${state.avatar?`<img src="${state.avatar}" alt="Retrato del personaje">`:charPortrait(G,fac)}<span class="ficha-pbadge" style="color:${G.accent||"#8a6a35"}">${icon(G.icon,15)}</span></div>
+    <div class="ficha-cls">${escH(G.name)}</div>
+    <div class="ficha-lvl"><b>${lvl}</b><span>nivel</span></div>
+    <div class="ficha-fac" title="${escH(FAC_LABEL[fac]||fac)}">${facShield(fac)}</div>
+    <div class="ficha-avbtns"><button class="btn mini" id="avatarUp" title="Subí una captura de tu personaje del juego (queda solo en este navegador)">captura</button>${state.avatar?'<button class="btn mini" id="avatarDel" title="Volver al retrato de clase">quitar</button>':""}</div></div>
+    <div class="ficha-main">
+    <div class="ficha-name${state.name?"":" noname"}">${state.name?escH(state.name):"Tu personaje"}</div>
+    <div class="ficha-sub">${escH(G.title)} · ${escH(FAC_LABEL[fac]||fac)}</div>
+    <div class="ficha-vitals">
+      ${vit("DPS equipado",dps?dps.toFixed(1)+(wCur&&wCur.approx?"~":""):"—")}
+      ${vit("Armas",`${wOwn}/${wTot}`,wTot?wOwn/wTot:null)}
+      ${vit("Loot",lootN,lootTot?lootN/lootTot:null)}
+      ${vit("Ruta",`${mileN}/${mileTot}`,mileTot?mileN/mileTot:null)}
+    </div>
+    ${sv?`<div class="ficha-real"><span class="fl">Personaje real · SimC</span><span class="fr-items">${realChips}</span></div>`:""}
+    <div class="ficha-attrs">${attrs.map(a=>`<div class="fa"><span>${a[0]}</span><b>${escH(a[1])}</b></div>`).join("")}</div>
+    <div class="ficha-weap">
+      <div class="fw"><span class="fl">Equipada</span><b>${escH(wName)}</b><i>${dps?dps.toFixed(1)+" dps":"—"}</i></div>
+      <div class="fw"><span class="fl">${avail.length?"Mejor ahora":"Siguiente"}</span><b>${pick?escH(pick.n):"—"}</b><i>${pick?`${fmtDps(pick)} dps · ${pick.lvl<=lvl?"¡ya podés!":"req "+pick.lvl}`:"sin mejoras a la vista"}</i></div>
+    </div></div></div>`;
+}
+function viewRec(){
+  const {G,GF}=g();
+  const lvl=state.lvl, os=ownedSet(), band=bandOf(lvl), nextBand=bands().find(b=>b.min>lvl), dps=curDps();
+
+  const cands = GF.weapons.filter(w=>{
+    if(os.has(w.id)||w.id===state.cur) return false;
+    if(state.pref!=="any" && wfOf(w)!==state.pref) return false;
+    if(w.eng && !state.eng) return false;
+    if(w.dps <= dps*1.02) return false;
+    return w.lvl <= lvl+12;
+  }).sort((a,b)=>a.lvl-b.lvl||b.dps-a.dps);
+
+  const ownedBetter=GF.weapons.filter(w=>os.has(w.id)&&w.id!==state.cur&&w.lvl<=lvl&&(!w.eng||state.eng)&&w.dps>dps).sort((a,b)=>b.dps-a.dps)[0];
+  const rc = state.realm==="ek"?"E":"K";
+  const dungs = G.dungeons.filter(d=>lvl>=d.r[0]-5 && lvl<=d.r[1]+5)
+    .sort((a,b)=>(lvl>=a.r[0]?0:1)-(lvl>=b.r[0]?0:1)||(a.cont===rc?0:1)-(b.cont===rc?0:1)||a.r[0]-b.r[0]);
+  const miles = GF.milestones.filter(m=>m.lvl>=lvl-2&&m.lvl<=lvl+10).sort((a,b)=>a.lvl-b.lvl);
+
+  let h = fichaCard({G,GF,lvl,os,dps,cands});
+
+  if(ownedBetter)
+    h += `<div class="card warn"><h3>${icon("alert")} Tenés un arma mejor sin equipar</h3>
+      <div><span class="weapname q-${ownedBetter.q}">${ownedBetter.n}</span> (${fmtDps(ownedBetter)} dps) está en tu inventario y supera a tu arma actual (${dps.toFixed(1)}).</div></div>`;
+  h += GF.recExtra?GF.recExtra({state,G,GF,lvl,os,dps,icon,locBadge}):"";
+
+  if(band) h += `<div class="card key"><h3>${icon("pin")} Dónde levelear ahora <span class="sub">rango ${band.min}-${band.max} · ${realmName()}</span></h3>
+    <div class="zonebig">${band.zones}</div>
+    <div class="muted" style="margin-top:6px">${band.notes}</div>
+    ${band.dung?`<div class="tip" style="margin-top:4px"><b style="color:var(--gold)">Dungeons:</b> ${band.dung}</div>`:""}
+    ${nextBand?`<div class="tip" style="margin-top:6px">▶ Después (${nextBand.min}+): <b>${nextBand.zones}</b></div>`:""}</div>`;
+
+  h += `<div class="card gold"><h3>${icon("bow")} Tus próximas armas <span class="sub">${state.pref==="gun"?"solo guns":state.pref==="bow"?"solo arcos":"todos los tipos"}${state.eng?" · +ingeniería":""}</span></h3>`;
+  if(!cands.length){
+    h += `<div class="muted">Nada mejor que tu arma actual a la vista. ${dps>=29?"Estás en territorio pre-raid — apuntá a raids o al farm solo de DM East.":"Subí unos niveles y revisá de nuevo."}</div>`;
+  } else {
+    const wline = w => {
+      const diff=w.lvl-lvl, dlt=(w.dps-dps).toFixed(1);
+      return `<div class="weapline"><div>
+        <span class="weapname q-${w.q}">${w.n}</span> <span class="badge ${bdg()[w.t]}">${typ()[w.t]}</span>
+        ${diff<=0?'<span class="badge now">¡ya podés!</span>':`<span class="badge soon">en ${diff} lvl${diff>1?"s":""}</span>`}
+        <div class="weapsrc">${w.src}${w.note?` · <i>${w.note}</i>`:""}</div></div>
+        <div style="text-align:right;flex-shrink:0"><b>${fmtDps(w)}</b><div class="weapsrc">dps · req ${w.lvl}</div>
+        ${dps?`<div class="delta">+${dlt} vs actual</div>`:""}</div></div>`;
+    };
+    const availL = cands.filter(w=>w.lvl<=lvl).sort((a,b)=>b.dps-a.dps);
+    const nextL  = cands.filter(w=>w.lvl>lvl);
+    const availShow=availL.slice(0,4), nextShow=availL.length?[]:nextL.slice(0,3);
+    const nextFold=availL.length?nextL:nextL.slice(3);
+    if(availShow.length){ h += `<div class="muted" style="margin-bottom:2px">Disponibles ya:</div>`; h += availShow.map(wline).join(""); }
+    if(nextShow.length){ h += `<div class="muted" style="margin:8px 0 2px">Próximas:</div>`; h += nextShow.map(wline).join(""); }
+    if(nextFold.length) h += `<details class="fold"><summary><span class="arrow">▶</span>${availL.length?"Mejoras a futuro":"Y "+nextFold.length+" más"} (${nextFold.length})</summary><div class="fbody">${nextFold.map(wline).join("")}</div></details>`;
+  }
+  h += `</div>`;
+
+  if(dungs.length){
+    h += `<div class="bandhead"><span>Dungeons en tu rango</span><span class="zn">${dungs.length} · abre para ver el loot</span></div>`;
+    dungs.forEach(d=>{
+      const soon = lvl < d.r[0], late = lvl > d.r[1];
+      h += `<details class="dung ${(!soon&&!late)?"inrange":""}"><summary><span class="arrow">▶</span><span class="dname">${d.n}</span>
+        <span class="dmeta">${d.loc} · ${d.r[0]}-${d.r[1]}</span>${locBadge(d.cont)}${d.key?'<span class="badge now">CLAVE</span>':''}
+        ${soon?`<span class="badge soon">en ${d.r[0]-lvl} lvl${d.r[0]-lvl>1?"s":""}</span>`:late?'<span class="badge">ya pasada</span>':'<span class="badge">disponible</span>'}
+        <span class="dprog">${d.loot.length} ítems</span></summary>
+        <div class="dloot">${d.note?`<div class="muted" style="margin-bottom:6px">${d.note}</div>`:""}
+        ${d.loot.map(l=>`<div class="loot"><span><b class="q-rare">${l[0]}</b> <span class="muted">— ${l[1]}</span></span></div>`).join("")}</div></details>`;
+    });
+  }
+
+  if(state.simc){
+    const s=state.simc, w=s.weapon;
+    const wsum=w?(w.name||"arma")+(w.dps!=null?" · "+w.dps.toFixed(1)+" dps":""):"";
+    const sum=[s.level?`lvl ${s.level}`:null,wsum,s.race].filter(Boolean).join(" · ");
+    h+=`<details class="dung simcfold"><summary><span class="arrow">▶</span><span class="dname">${icon("scroll",14)} Personaje real — SimC</span><span class="dmeta">${escH(sum)}</span></summary><div class="dloot">${simcCard()}</div></details>`;
+  } else {
+    h+=`<div class="card"><div class="mhead"><h3>${icon("scroll")} Personaje real <span class="sub">vía /simc</span></h3><button class="btn mini" id="simcQuick" style="width:auto;margin:0">importar</button></div>
+      <div class="muted">La guía trabaja con estimaciones — con el perfil de <b>/simc</b> usa tu nivel, el DPS real de tu arma y tus stats.</div></div>`;
+  }
+
+  if(miles.length){
+    const ss=stepSet();
+    h += `<details class="dung"><summary><span class="arrow">▶</span><span class="dname">${icon("route",14)} Hitos cercanos</span><span class="dmeta">${miles.length} hitos · ${lvl-2} a ${lvl+10}</span></summary><div class="dloot">`;
+    miles.forEach(m=>{
+      const k=m.lvl+"|"+GF.milestones.indexOf(m);
+      h += `<div class="mst ${ss.has(k)?"done":""}"><span class="lvl">${m.lvl}</span>
+        <span class="txt"><span class="badge cat">${m.cat}</span>${m.loc?` ${locBadge(m.loc)}`:""} ${m.txt}</span></div>`;
+    });
+    h += `</div></details>`;
+  }
+
+  h += `<div class="footer">Armas y pasos se tildan en sus pestañas — el recomendador descuenta lo que ya tenés.</div>`;
+  return h;
+}
+
+function viewRoute(){
+  const ss=stepSet(), done=mile().filter((m,i)=>ss.has(m.lvl+"|"+i)).length;
+  let h = `<div class="card gold"><h3>${icon("route")} Ruta de progreso <span class="sub">${realmName()} — tilde los pasos hechos, se guardan solos</span></h3>
+    <div class="prog"><i style="width:${(done/mile().length*100).toFixed(1)}%"></i></div>
+    <div class="muted">${done}/${mile().length} pasos</div></div>`;
+  const bs=bands();
+  let openIdx=bs.findIndex(b=>state.lvl>=b.min&&state.lvl<=b.max);
+  if(openIdx<0){ for(let i=bs.length-1;i>=0;i--) if(bs[i].min<=state.lvl){openIdx=i;break;} }
+  if(openIdx<0) openIdx=0;
+  bs.forEach((b,bi)=>{
+    const ms = mile().map((m,i)=>({m,i})).filter(x=>x.m.lvl>=b.min&&x.m.lvl<=b.max);
+    if(!ms.length) return;
+    const cur = state.lvl>=b.min&&state.lvl<=b.max;
+    const dn=ms.filter(x=>ss.has(x.m.lvl+"|"+x.i)).length;
+    h += `<details class="dung bandfold" ${bi===openIdx?"open":""}><summary><span class="arrow">▶</span>
+      <span class="dname">Nivel ${b.min}-${b.max}${cur?' <span class="badge now">estás acá</span>':""}</span>
+      <span class="bandzones">${b.zones}</span>
+      <span class="dprog ${dn===ms.length?"full":""}">${dn}/${ms.length}</span></summary>
+      <div class="dloot">${b.dung?`<div class="muted" style="padding:2px 0 5px;border-bottom:1px dashed #231f16;margin-bottom:3px"><b style="color:var(--gold)">Dungeons:</b> ${b.dung}</div>`:""}`;
+    ms.forEach(({m,i})=>{
+      const k=m.lvl+"|"+i, dnx=ss.has(k);
+      h += `<div class="mst ${dnx?"done":""}"><input type="checkbox" class="tick step" data-id="${k}" ${dnx?"checked":""}>
+        <span class="lvl">${m.lvl}</span><span class="txt"><span class="badge cat">${m.cat}</span>${m.loc?` ${locBadge(m.loc)}`:""} <b>${m.txt}</b></span></div>`;
+    });
+    h += `</div></details>`;
+  });
+  return h;
+}
+
+function viewWeapons(){
+  const {G,GF}=g();
+  const os=ownedSet(), dps=curDps();
+  let list = GF.weapons.filter(w=>state.wf==="all"||wfOf(w)===state.wf);
+  if(state.who) list=list.filter(w=>!os.has(w.id));
+  list.sort((a,b)=>a.lvl-b.lvl||a.dps-b.dps);
+  const cnt = GF.weapons.filter(w=>os.has(w.id)).length;
+  let h=`<div class="filters">
+    ${G.typeFilters.map(f=>`<button class="btn wf ${state.wf===f[0]?"fon":""}" data-f="${f[0]}">${f[1]}</button>`).join("")}
+    <label class="chk"><input type="checkbox" id="hideOwned" ${state.who?"checked":""}> ocultar obtenidas</label>
+    <span class="muted" style="margin-left:auto">obtenidas: <b id="wCnt">${cnt}/${GF.weapons.length}</b></span>
+  </div>
+  <div class="card"><div class="table-scroll"><table><tr><th></th><th>Arma</th><th>Tipo</th><th>DPS</th><th>Req</th><th>Δ vs tuya</th><th>Fuente</th></tr>`;
+  list.forEach(w=>{
+    const own=os.has(w.id), eq=state.cur===w.id, dlt=w.dps-dps;
+    h += `<tr class="${own?"owned":""} ${eq?"equipped":""}" data-row="${w.id}">
+      <td><input type="checkbox" class="tick ownW" data-id="${w.id}" ${own?"checked":""}></td>
+      <td class="q-${w.q}"><b>${w.n}</b>${eq?' <span class="badge eq">equipada</span>':""}${w.note?`<div class="muted" style="font-size:11px"><i>${w.note}</i></div>`:""}</td>
+      <td>${typ()[w.t]||w.t}${w.eng?' <span class="badge">ENG</span>':""}</td><td><b>${fmtDps(w)}</b></td><td>${w.lvl}</td>
+      <td class="${dlt>0?"delta":"delta neg"}">${dps?(dlt>0?"+":"")+dlt.toFixed(1):"—"}</td>
+      <td class="muted">${w.src}</td></tr>`;
+  });
+  h += `</table></div><div class="tip">~ = dps aproximado. Forever puede haber retocado algún stat — verificá in-game.</div></div>`;
+  return h;
+}
+
+function viewDungeons(){
+  const gs=gearSet();
+  let h=`<div class="card gold"><h3>${icon("gate")} Loot de dungeons <span class="sub">estilo AtlasLoot — tilde lo que ya tengas</span></h3>
+    <div class="muted">Las que están <b style="color:var(--hunter)">en tu rango</b> vienen abiertas.</div></div>`;
+  dgns().forEach((d,di)=>{
+    const inR = state.lvl>=d.r[0]&&state.lvl<=d.r[1];
+    const got = d.loot.filter(l=>gs.has("d"+di+"|"+l[0])).length;
+    h += `<details class="dung ${inR?"inrange":""}" ${inR?"open":""} data-di="${di}">
+      <summary><span class="arrow">▶</span><span class="dname">${d.n}</span>
+        <span class="dmeta">${d.loc} · ${d.r[0]}-${d.r[1]}</span>${locBadge(d.cont)}${d.key?' <span class="badge now">CLAVE</span>':""}
+        <span class="dprog ${got===d.loot.length?"full":""}" id="dp${di}">${got}/${d.loot.length}</span></summary>
+      <div class="dloot">${d.note?`<div class="muted" style="margin-bottom:6px">${d.note}</div>`:""}
+        ${d.loot.map(l=>{
+          const gid="d"+di+"|"+l[0], own=gs.has(gid);
+          return `<div class="loot"><span class="${own?"own":""}"><b class="q-rare">${l[0]}</b> <span class="muted">— ${l[1]}</span></span>
+          <input type="checkbox" class="tick ownG" data-id="${gid}" data-di="${di}" ${own?"checked":""}></div>`;
+        }).join("")}</div></details>`;
+  });
+  return h;
+}
+
+/* ---------- Macros ---------- */
+let mq=""; // texto de búsqueda (no se guarda)
+const mByName = n => mcr().find(m=>m.n===n);
+const macroCats = () => [...new Set(mcr().map(m=>m.cat))];
+const curMf = () => macroCats().includes(state.mf)?state.mf:"all";
+const macroMods = c => [["shift","⇧"],["ctrl","Ctrl"],["alt","Alt"]].filter(x=>c.includes("mod:"+x[0])).map(x=>x[1]);
+const usableFor = m => m.lvl<=state.lvl && (!m.tal||m.tal===state.spec);
+
+// Qué va hoy en una tecla: la primera opción disponible; si ninguna, la que llega antes.
+function slotFor(b){
+  if(b.move) return {move:true};
+  const opts=(state.mdg&&b.dg)?[b.dg,...(b.o||[])]:(b.o||[]);
+  let next=null;
+  for(const o of opts){
+    const m=o.m?mByName(o.m):null;
+    if(o.m&&!m) continue;
+    if(m&&m.tal&&m.tal!==state.spec) continue;
+    const need=m?m.lvl:o.lvl;
+    if(need<=state.lvl) return {o,m,ready:true};
+    if(!next||need<next.need) next={o,m,need};
+  }
+  return next?Object.assign(next,{ready:false}):null;
+}
+function slotView(b){
+  const s=slotFor(b);
+  if(!s) return {cls:"free", sub:"libre", t:"", tip:"Libre con tu spec actual"};
+  if(s.move) return {cls:"move", sub:"mover", t:"", tip:"Movimiento"};
+  const full=s.m?s.m.n:s.o.s;
+  return {
+    cls: s.ready?(s.m?"ready":"spell"):"soon",
+    sub: s.ready?(s.m?"macro":"spell"):`lvl ${s.need}`,
+    t: s.o.t, mods: s.m?macroMods(s.m.code):[], mi: s.m?mcr().indexOf(s.m):-1,
+    tip: s.ready ? (s.m?`${full} — clic para ver la macro`:`${full}: arrastralo desde el libro de hechizos hasta que llegue la macro`) : `${full} — llega al ${s.need}`,
+  };
+}
+function keycap(b){
+  const v=slotView(b), tag=v.mi>=0?"button":"div";
+  return `<${tag} class="kc ${v.cls}" ${v.mi>=0?`data-mc="${v.mi}"`:""} title="${escH(v.tip)}"><span class="kk">${b.k}</span>${v.mods&&v.mods.length?`<span class="km">${v.mods.join(" ")}</span>`:""}<span class="kn">${v.t}</span><span class="ks">${v.sub}</span></${tag}>`;
+}
+function mouseRow(b){
+  const v=slotView(b), tag=v.mi>=0?"button":"div";
+  return `<${tag} class="mrow ${v.cls}" ${v.mi>=0?`data-mc="${v.mi}"`:""} title="${escH(v.tip)}"><span class="mk">${b.k}</span><span>${v.t}</span><span class="ks">${v.sub}</span></${tag}>`;
+}
+function macroChip(n){
+  const m=mByName(n); if(!m) return "";
+  const ok=usableFor(m);
+  return `<button class="${ok?"":"soon"}" data-mc="${mcr().indexOf(m)}" title="${escH(m.n)}${ok?"":` — llega al ${m.lvl}`}">${escH(m.n)}${ok?"":` · ${m.lvl}`}</button>`;
+}
+function viewBar(){
+  const {G}=g(); const B=G.bar, N=G.barNotes;
+  const byK=Object.fromEntries(B.keys.map(b=>[b.k,b]));
+  const unit="((100% - 36px)/7 + 6px)";
+  const rows=B.rows.map((r,i)=>`<div class="kbrow">${B.offset[i]?`<span class="kcoff" style="width:calc(${unit} * ${B.offset[i]} - 6px)"></span>`:""}${r.map(k=>keycap(byK[k])).join("")}</div>`).join("");
+  return `<div class="card key"><div class="barhead"><h3>${icon("kbd")} Tu barra a lvl ${state.lvl} <span class="sub">${G.specs[state.spec]} · ${state.mdg?"dungeon":"solo"}</span></h3>
+      <div class="seg"><button class="mdg ${state.mdg?"":"on"}" data-v="0">Solo</button><button class="mdg ${state.mdg?"on":""}" data-v="1">Dungeon</button></div></div>
+    <div class="muted">${N.intro}</div>
+    <div class="kbwrap"><div class="kb">${rows}</div>
+      <div class="mouse"><div class="mt">Mouse</div>${B.mouse.map(mouseRow).join("")}</div></div>
+    <div class="legend"><span><i style="background:#1d2617;border-color:#3d5226"></i>macro lista</span><span><i style="border-color:var(--bronze)"></i>spell del libro (hasta que llegue la macro)</span><span><i style="border:1px dashed var(--gold2)"></i>llega más adelante</span><span><i style="border-color:var(--border2);opacity:.4"></i>movimiento / libre</span></div>
+    <div class="chipln"><b style="color:var(--txt)">Sin tecla, a clic:</b> ${B.click.map(macroChip).join("")}</div>
+    <div class="chipln"><b style="color:var(--txt)">Alternativa para el 1:</b> ${B.alt1.map(macroChip).join("")} <span>— ${N.altNote||""}</span></div>
+    <div class="tip" style="margin-top:10px"><b>Antes de empezar:</b> ${N.before}${state.mdg?N.dungeon:""}</div></div>`;
+}
+function macroCard(m){
+  const k=mcr().indexOf(m), len=macroLen(m.code), ok=usableFor(m), key=MACRO_KEY[m.n];
+  const talOk=!m.tal||m.tal===state.spec;
+  return `<div class="card mac${ok?"":" later"}" id="mc-${k}"><div class="mhead"><h3>${icon("scroll")} ${m.n}</h3>
+      <span class="badge cat">${m.cat}</span><span class="badge">lvl ${m.lvl}+</span>
+      ${ok?'<span class="badge now">usable ya</span>':m.lvl>state.lvl?`<span class="badge soon">en ${m.lvl-state.lvl} lvl${m.lvl-state.lvl>1?"s":""}</span>`:'<span class="badge soon">requiere otra spec</span>'}
+      ${m.tal?`<span class="badge tal${talOk?"":" off"}" title="${talOk?"Talento de tu spec":"Tu spec elegida es "+g().G.specs[state.spec]}">talento ${m.tal.toUpperCase()}${talOk?"":" · otra spec"}</span>`:""}
+      ${key?`<span class="badge key" title="Tecla en la barra recomendada">tecla ${key}</span>`:""}
+      <span class="mlen${len>255?" over":""}" title="caracteres usados / límite del juego">${len}/255</span>
+      <button class="btn mini copyM" data-i="${k}">${icon("copy",12)}<span class="lbl">copiar</span></button></div>
+      <div class="muted" style="margin-top:6px">${m.desc}</div>
+      <pre class="mcode">${escH(m.code)}</pre></div>`;
+}
+function macroList(){
+  const mf=curMf(), q=mq.trim().toLowerCase();
+  const pool=mcr().filter(m=>(mf==="all"||m.cat===mf)&&(!q||(m.n+"\n"+m.code+"\n"+m.desc).toLowerCase().includes(q)));
+  if(!pool.length) return `<div class="card"><div class="muted">Ninguna macro coincide${q?` con "<b>${escH(mq)}</b>"`:""}${mf!=="all"?` en ${escH(mf)}`:""}. <button class="btn mini mclear" style="margin-left:6px">limpiar filtros</button></div></div>`;
+  const now=pool.filter(usableFor), later=pool.filter(m=>m.lvl>state.lvl), other=pool.filter(m=>m.lvl<=state.lvl&&!usableFor(m));
+  let h="";
+  if(now.length) h+=`<div class="bandhead"><span>Disponibles ahora</span><span class="zn">${now.length} macros</span></div>`+now.map(macroCard).join("");
+  if(later.length) h+=`<details class="dung"><summary><span class="arrow">▶</span><span class="dname">Próximas por nivel</span><span class="dmeta">llegan con tu nivel</span><span class="dprog">${later.length}</span></summary><div class="dloot">${later.map(macroCard).join("")}</div></details>`;
+  if(other.length) h+=`<details class="dung"><summary><span class="arrow">▶</span><span class="dname">Requieren otra spec</span><span class="dmeta">fuera de tu build actual</span><span class="dprog">${other.length}</span></summary><div class="dloot">${other.map(macroCard).join("")}</div></details>`;
+  return h;
+}
+function viewMacros(){
+  const mf=curMf(), usable=mcr().filter(usableFor).length;
+  let h=`<div class="card gold"><h3>${icon("scroll")} Macros meta — WoW: Forever <span class="sub">${usable} de ${mcr().length} usables a tu nivel</span></h3>
+    <div class="muted"><b>/macro</b> → <b>Nuevo</b> → pegá → arrastrá a la barra. Los spells van en inglés; límite 255 caracteres (cada macro trae su contador).</div>
+    <details class="fold"><summary><span class="arrow">▶</span>Cómo usarlas y notas de auditoría</summary><div class="fbody"><div class="muted">Con <b>#showtooltip</b> el botón muestra ícono y cooldown. Si tu cliente está en español, usá los nombres de tu libro.<br>
+    <b>Sin probar in-game:</b> revisadas el 6-nov contra las notas oficiales de Blizzard y guías que leen datos del cliente (ForeverDB, endgametools, wowclassicforever.info, wowf.io, Method).</div></div></details></div>`;
+  h+=viewBar();
+  h+=`<details class="dung mrules"><summary><span class="arrow">▶</span><span class="dname">${icon("alert",14)} Reglas de Forever que cambian macros</span><span class="dmeta">reglas del servidor que cambian el comportamiento</span></summary><div class="dloot">
+    ${g().G.macroRules}</div></details>`;
+  h+=`<div class="mtools"><input id="mq" class="msearch" type="search" placeholder="Buscar macro, spell o comando… (ej: trap, focus, pet)" value="${escH(mq)}" autocomplete="off" spellcheck="false">
+    <div class="filters">${[["all","Todas"],...macroCats().map(c=>[c,c])].map(f=>{
+      const n=mcr().filter(m=>(f[0]==="all"||m.cat===f[0])&&usableFor(m)).length;
+      return `<button class="btn mf ${mf===f[0]?"fon":""}" data-f="${f[0]}" title="${n} usables a tu nivel">${f[1]}<span class="n">${n}</span></button>`;
+    }).join("")}</div></div>`;
+  h+=`<div id="mlist">${macroList()}</div>`;
+  return h;
+}
+function jumpToMacro(i){
+  let el=$("mc-"+i);
+  if(!el){ mq=""; state.mf="all"; render(); el=$("mc-"+i); }
+  if(!el) return;
+  const fd=el.closest("details"); if(fd) fd.open=true;
+  el.scrollIntoView({behavior:"smooth",block:"center"});
+  el.classList.remove("flash"); void el.offsetWidth; el.classList.add("flash");
+}
+function bindMacroCards(root){
+  root.querySelectorAll(".copyM").forEach(b=>b.addEventListener("click",e=>{
+    const t=mcr()[+e.currentTarget.dataset.i].code, btn=e.currentTarget, lbl=btn.querySelector(".lbl");
+    const done=x=>{lbl.textContent=x;setTimeout(()=>lbl.textContent="copiar",1400);};
+    // si no se puede copiar, deja el código seleccionado para Ctrl+C
+    const selPre=()=>{const pre=btn.closest(".card").querySelector(".mcode"), r=document.createRange(); r.selectNodeContents(pre); const sel=getSelection(); sel.removeAllRanges(); sel.addRange(r);};
+    const fb=()=>{const ta=document.createElement("textarea");ta.value=t;ta.style.cssText="position:fixed;opacity:0";document.body.appendChild(ta);ta.select();let ok=false;try{ok=document.execCommand("copy");}catch(_){}ta.remove();if(ok)done("¡copiado!");else{selPre();done("Ctrl+C");}};
+    if(navigator.clipboard&&navigator.clipboard.writeText) navigator.clipboard.writeText(t).then(()=>done("¡copiado!")).catch(fb); else fb();
+  }));
+  const c=root.querySelector(".mclear"); if(c) c.addEventListener("click",()=>{mq=""; state.mf="all"; render();});
+}
+function bindMacros(){
+  document.querySelectorAll(".mf").forEach(b=>b.addEventListener("click",e=>{state.mf=e.currentTarget.dataset.f; render();}));
+  document.querySelectorAll(".mdg").forEach(b=>b.addEventListener("click",e=>{state.mdg=e.currentTarget.dataset.v==="1"; render();}));
+  document.querySelectorAll("[data-mc]").forEach(b=>b.addEventListener("click",e=>jumpToMacro(+e.currentTarget.dataset.mc)));
+  const q=$("mq"); if(q) q.addEventListener("input",e=>{ mq=e.target.value; const l=$("mlist"); l.innerHTML=macroList(); bindMacroCards(l); });
+  bindMacroCards(document);
+}
+
+function viewExtras(){
+  const X=g().G.extras;
+  return `<div class="grid2">
+    <div class="card"><h3>${icon("coin")} ${X.ahTitle}</h3>
+      ${g().G.ahList.map(a=>`<div class="loot"><span><b class="q-rare">${a[0]}</b> <span class="muted">${a[1]}</span></span><span class="muted" style="text-align:right;max-width:45%">${a[2]}</span></div>`).join("")}
+    </div>
+    <details class="dung"><summary><span class="arrow">▶</span><span class="dname">${icon("scroll",14)} ${X.tipsTitle}</span><span class="dmeta">${X.tips.length} tips</span></summary><div class="dloot">
+      ${X.tips.map(t=>`<div class="mst"><span class="tdot"></span><span class="txt"><b>${t[0]}</b> ${t[1]}</span></div>`).join("")}
+    </div></details>
+  </div>
+  <details class="dung"><summary><span class="arrow">▶</span><span class="dname">${icon("alert",14)} Sobre el servidor "Forever"</span><span class="dmeta">contexto del servidor</span></summary><div class="dloot">
+    <div class="muted">${X.warn}</div>
+  </div></details>`;
+}
+
+/* ================= LEGACY — puntos de cuenta, perks y track de recolección =================
+   Datos: window.GUIDE_LEGACY (guide-legacy.js). Fuentes y lo no verificado están
+   documentados en la cabecera de ese archivo; la UI marca lo approx. */
+function viewLegacy(){
+  const L=window.GUIDE_LEGACY||{sys:[],progress:[],progressNote:"",challenges:[],challengesNote:"",perks:{},perksNote:"",scarce:[],scarceNote:"",gather:{},gatherNote:"",now:{}};
+  const lvl=state.lvl, fac=state.fac, profs=state.farm.prof||{};
+  const clsName=(g().G&&g().G.name)||state.cls;
+  const esc=s=>escH(s);
+  let h=`<div class="card gold"><h3>${icon("coin")} Legacy — puntos de cuenta <span class="sub">WoW: Forever · 65 pts ganables · 16 por personaje</span></h3>
+    ${L.sys.map(s=>`<div class="mst"><span class="tdot"></span><span class="txt">${s}</span></div>`).join("")}
+    <div class="tip" style="margin-top:8px">${lvl<25?(L.now&&L.now.locked)||"El panel Legacy se desbloquea al nivel 25 del primer personaje.":`A nivel ${lvl} el panel ya debería estar desbloqueado si algún personaje de la cuenta pasó de 25 — ábrelo con <b>Y</b> (Options → Keybindings).`}</div>
+  </div>`;
+
+  /* ---- Tus próximos puntos (por nivel y clase) ---- */
+  const mileL=[[25,"Novice"],[45,"Experienced"],[60,"Master"]];
+  h+=`<div class="card"><h3>${icon("star")} Tus próximos puntos <span class="sub">a nivel ${lvl} · ${esc(clsName)}</span></h3>
+    <div class="loot" style="border-bottom:none"><span><b>${esc(clsName)}</b> <span class="muted">— hitos de clase (1 pt c/u, primera vez)</span></span></div>`;
+  for(const [m,label] of mileL){
+    const got=lvl>=m;
+    h+=`<div class="loot"><span class="${got?"own":""}"><b>${label} ${esc(clsName)}</b> <span class="muted">— nivel ${m}${got?" · ya deberías tenerlo ganado":" · te falta"}</span></span><span class="badge ${got?"now":"soon"}">${got?"OK":"lvl "+m}</span></div>`;
+  }
+  h+=`<div class="loot"><span><b>Spelunker</b> <span class="muted">— sets de dungeons por tier (3 pts)</span></span><span class="badge soon">dgn</span></div>
+    <div class="loot"><span><b>Oficios de craft</b> <span class="muted">— 150/225/300 skill = 1 pt c/u (solo los 6 crafts)</span></span><span class="badge soon">craft</span></div>
+    <div class="loot"><span><b>PvP</b> <span class="muted">— rangos de honor + reputaciones BG + Field of Honor (12 pts)</span></span><span class="badge soon">pvp</span></div>
+    <div class="loot"><span><b>Raids</b> <span class="muted">— Hyjal Summit · Barrow Deeps · Onyxia (3 pts, lvl 60)</span></span><span class="badge soon">raid</span></div>
+    <div class="loot" style="border-bottom:none"><span><b>Aventura</b> <span class="muted">— Valthalak (BRM) + Explore Azeroth (2 pts)</span></span><span class="badge soon">world</span></div>
+    <p class="tip" role="status" aria-live="polite">${lvl<25?"El panel se abre al llegar a nivel 25 — los puntos se acumulan igual a nivel cuenta.":`A nivel ${lvl}: revisá el panel (Y) — los hitos de clase ya cumplidos deberían figurar como ganados.`} Recolección <b>no</b> da puntos directos; alimenta el árbol Professions (ver abajo).</p>
+  </div>`;
+
+  /* ---- Progress Track ---- */
+  h+=`<div class="card"><h3>${icon("pin")} Progress Track <span class="sub">recompensas por puntos ganados (cuenta)</span></h3>
+    ${L.progress.map(p=>`<div class="loot"><span><b>${p[0]} pts</b> — ${esc(p[1])} <span class="muted">${esc(p[2])}</span></span></div>`).join("")}
+    <p class="tip">${esc(L.progressNote)}</p></div>`;
+
+  /* ---- Challenges ---- */
+  h+=`<div class="card"><h3>${icon("scroll")} Legacy Challenges <span class="sub">lo que paga puntos · ${L.challengesNote}</span></h3></div>`;
+  for(const c of L.challenges){
+    h+=`<details class="dung"><summary><span class="arrow">▶</span><span class="dname">${esc(c.name)}</span><span class="dmeta">~${c.pts} pts · ${esc(c.desc)}</span></summary><div class="dloot">
+      ${c.rows.map(r=>`<div class="loot"><span><b>${esc(r[0])}</b> <span class="muted">— ${esc(r[1])}</span></span></div>`).join("")}
+      ${c.note?`<p class="tip">${c.note}</p>`:""}
+    </div></details>`;
+  }
+
+  /* ---- Árboles de perks ---- */
+  const tagLabel={gather:"recolección",skill:"skill",craft:"craft",fish:"pesca",vendor:"vendors",crate:"crates",xp:"descanso",talent:"talentos",combat:"combate",camp:"camp",heal:"vendas",pvp:"pvp",travel:"viaje",party:"party",dead:"muerte",death:"durabilidad",reagent:"reagents",rep:"rep",food:"comida"};
+  for(const [pk,P] of Object.entries(L.perks)){
+    const open=pk==="prof"; // el árbol de recolección va desplegado
+    h+=`<details class="dung ${open?"inrange":""}" ${open?"open":""}><summary><span class="arrow">▶</span><span class="dname">${icon("star",14)} ${esc(P.name)}</span><span class="dmeta">${esc(P.sub||"")} · ${P.perks.reduce((a,x)=>a+x.r,0)} ranks</span></summary><div class="dloot">
+      ${P.perks.map(p=>`<div class="loot"><div><b>${esc(p.n)}</b> <span class="badge ${p.tag==="gather"?"now":""}">${tagLabel[p.tag]||p.tag} · ${p.r}r</span>${p.pre?` <span class="badge soon">req: ${esc(p.pre)}</span>`:""}<div class="muted" style="margin-top:2px">${p.fx}</div></div></div>`).join("")}
+      ${L.perksNote?`<p class="tip">${esc(L.perksNote)}</p>`:""}
+    </div></details>`;
+  }
+
+  /* ---- Track de recolección: escasos + perks + spots ---- */
+  h+=`<div class="card gold"><h3>${icon("star")} Recolección y Legacy <span class="sub">Herbalism · Mining · Skinning</span></h3>
+    <div class="mst"><span class="tdot"></span><span class="txt">Herbalism, Mining y Skinning <b>no otorgan Legacy Points</b>: no hay challenges de recolección (solo los 6 crafts pagan por skill). Lo que sí hacen es alimentar el árbol <b>Professions</b> — empezá por <b>Bountiful Harvest</b>.</span></div>
+    <div class="loot" style="border-bottom:none"><span><b>Bountiful Harvest</b> <span class="badge now">${profs.skin?"tu Skinning suma":"perk del árbol"}</span></span><span class="muted">5 rangos · +20/40/60/80/100% escasos · libre</span></div>
+    <p class="tip">Ojo: a nivel ${lvl} tu tabla de escasos es el <b>${lvl<=25?"tier 1":lvl<46?"tier 2":"tier 3 (aprox)"}</b> — los tiers dependen del nivel del personaje (≤25 → tier 1, ≥26 → tier 2).${lvl<=25?" Te toca Pristine Leather / Frilled Lichen / Pyrite.":lvl<46?" Te toca Pristine Hide / Rosecap / Bauxite; Pristine Leather y Frilled Lichen ya no te caen (van a un alt ≤25).":" Probablemente Pristine Scale / Stranglevine / Pitchblende."} El perk multiplica el drop de la tabla que te toca.</p>
+  </div>`;
+
+  /* Materiales escasos */
+  h+=`<div class="card"><h3>${icon("coin")} Materiales escasos (Scarce) <span class="sub">bonus drops de nodos/menas/cadáveres normales</span></h3>
+    <div class="loot" style="border-bottom:none;padding-bottom:2px"><span class="muted" style="font-size:11px">GATHERED · TIER · SE CONVIERTE · RECETAS · NOTA</span></div>
+    ${L.scarce.map(s=>`<div class="loot"><div><b>${esc(s[0])}</b> <span class="badge">${esc(s[1])}</span> <span class="badge soon">ilvl ${s[2]}</span><div class="muted" style="margin-top:2px">→ ${esc(s[3])} · ${esc(s[4])}</div><div class="muted" style="font-size:11px">${esc(s[5])}</div></div></div>`).join("")}
+    <p class="tip">${esc(L.scarceNote)}</p></div>`;
+
+  /* Spots por oficio y nivel */
+  const profMeta=[ ["skin","Skinning","skull"], ["herb","Herbalism","star"], ["mine","Mining","pin"] ];
+  for(const [pk,label,ic] of profMeta){
+    const has=!!profs[pk];
+    h+=`<div class="card"><h3>${icon(ic in ICONS?ic:"star")} ${label} — dónde farmear <span class="sub">${has?"<b style='color:var(--hunter)'>tenés esta profesión</b> · ":""}por nivel</span></h3>`;
+    const rows=(L.gather[pk]||[]).filter(e=>!e.fac||e.fac==="both"||e.fac===fac);
+    for(const e of rows){
+      const inR=lvl>=e.lvl[0]&&lvl<=e.lvl[1];
+      h+=`<div class="loot" style="${inR?"border-left:2px solid var(--hunter);padding-left:8px":""}"><div><b>${esc(e.what)}</b> <span class="muted">· nv ${e.lvl[0]}–${e.lvl[1]}</span><div class="muted" style="margin-top:2px">${esc(e.zones)}</div>${e.note?`<div class="muted" style="font-size:11px;margin-top:1px">${esc(e.note)}</div>`:""}</div>${inR?'<span class="badge now">tu nivel</span>':""}</div>`;
+    }
+    h+=`</div>`;
+  }
+  h+=`<p class="tip">${esc(L.gatherNote)}</p>`;
+  return h;
+}
+
+/* ================= SIMC IMPORT (/simc → datos reales del personaje) ================= */
+const SIMC_CLASSES = new Set(["warrior","paladin","hunter","rogue","priest","shaman","mage","warlock","druid","deathknight","monk","demonhunter","evoker"]);
+const SIMC_STAT_KEYS = new Set(["character_stats","character_stats_base","character_stats_bonus","character_stats_gear","attack_power","spell_stats","spell_power","regen","crit","hit","haste","combat_modifiers","combat_ratings","defense","weapon_damage","pet_info","pet_stats","pet_attack_power","pet_defense","pet_weapon_damage","pet_modifiers","skills","buffs"]);
+const SIMC_SLOT_RE = /^(main_hand|off_hand|head|neck|shoulder|back|chest|shirt|tabard|wrist|hands|waist|legs|feet|finger1|finger2|trinket1|trinket2|ammo|bag\d+)$/;
+const normItemName = s => String(s||"").toLowerCase().replace(/[^a-z0-9]/g,"");
+
+// "a:1:2/b:3" → {a:["1","2"], b:["3"]}  (el nombre es el primer campo, el resto son valores)
+function parseFields(str){
+  const out={};
+  String(str||"").split("/").forEach(e=>{
+    const i=e.indexOf(":"); if(i<0) return;
+    out[e.slice(0,i)]=e.slice(i+1).split(":");
+  });
+  return out;
+}
+const fval=(sec,k,i)=>{ const f=sec&&sec[k]; if(!f) return null; const v=parseFloat(f[i==null?0:i]); return isFinite(v)?v:null; };
+
+function parseSimcProfile(text){
+  const d={level:null,name:null,className:null,race:null,server:null,eng:null,weapon:null,pet:{},stats:{}};
+  let pendingName=null;
+  const clean=String(text||"").replace(/\|\|/g,"|");
+  for(const raw of clean.split(/\r?\n/)){
+    const line=raw.trim();
+    if(!line) continue;
+    if(line[0]==="#"){
+      // "# Nombre del item (ilvl)" precede a cada línea de slot — solo si no tiene '='
+      const m=line.match(/^#\s*(.+?)\s*\((\d+)\)\s*$/);
+      if(m && line.indexOf("=")<0){ pendingName=m[1]; continue; }
+      const body=line.replace(/^#\s*/,""), eq=body.indexOf("=");
+      if(eq>0){
+        const k=body.slice(0,eq);
+        if(SIMC_STAT_KEYS.has(k)) d.stats[k]=parseFields(body.slice(eq+1));
+      }
+      continue;
+    }
+    const eq=line.indexOf("="); if(eq<0) continue;
+    const k=line.slice(0,eq), v=line.slice(eq+1);
+    if(SIMC_CLASSES.has(k)){ d.className=k; d.name=v.replace(/^"|"$/g,""); pendingName=null; continue; }
+    switch(k){
+      case "level": { const n=parseInt(v,10); d.level=(n>=1&&n<=60)?n:null; break; }
+      case "race": d.race=v; break;
+      case "server": d.server=v; break;
+      case "region": d.region=v; break;
+      case "role": d.role=v; break;
+      case "talents": d.talents=v; break;
+      case "professions":
+        d.eng=v.split("/").some(p=>/^engineering=/i.test(p));
+        d.professions=v.split("/").map(p=>{const i=p.indexOf("=");return i<0?[p.trim(),null]:[p.slice(0,i).trim(),+p.slice(i+1)||null];}).filter(p=>p[0]);
+        break;
+      case "ranged": case "main_hand": case "off_hand":
+        (d.wslots=d.wslots||{})[k]={ name:pendingName, id:(v.match(/(?:^|,)id=(\d+)/)||[])[1]||null, dps:null, range:null, match:null, slot:k };
+        break;
+      case "pet_family": case "pet_level": case "pet_happiness": case "pet_abilities": case "pet_creature_id":
+        d.pet[k]=v; break;
+      default: break;
+    }
+    if(k!=="ranged"&&k!=="main_hand"&&k!=="off_hand") pendingName=null;
+  }
+  // DPS real por slot desde weapon_damage: slot:min:max:speed (+buffs aparte)
+  // Ojo: weapon_damage usa "mainhand"/"offhand" sin underscore.
+  const wd=d.stats.weapon_damage, WD={main_hand:"mainhand",off_hand:"offhand",ranged:"ranged"};
+  if(d.wslots && wd){
+    for(const sl in d.wslots){
+      const w=d.wslots[sl], key=wd[sl]?sl:(wd[WD[sl]]?WD[sl]:null);
+      if(key){ const mn=fval(wd,key,0), mx=fval(wd,key,1), sp=fval(wd,key,2);
+        if(mn!=null&&mx!=null&&sp>0){ w.dps=((mn+mx)/2)/sp; w.range={min:mn,mx:mx,spd:sp}; } }
+    }
+  }
+  return d;
+}
+// El arma que importa depende de la guía activa (hunter=ranged, melee=main_hand).
+function pickSimcWeapon(d){
+  if(!d.wslots){ d.weapon=null; return; }
+  const sl=g().G.simc.slot;
+  d.weapon=d.wslots[sl]||d.wslots.ranged||d.wslots.main_hand||null;
+  if(d.weapon&&!d.weapon.match&&d.weapon.name) d.weapon.match=WEAPON_LOOKUP[normItemName(d.weapon.name)]||null;
+}
+
+function applySimcProfile(d){
+  const notes=[];
+  state.weaponDps=null;
+  if(d.level){ state.lvl=d.level; notes.push(`nivel ${d.level}`); }
+  if(d.name) state.name=d.name;
+  const rp=g().G.simc.racePref;
+  if(rp&&rp[d.race]){ state.pref=rp[d.race]; notes.push(d.race+" → pref "+rp[d.race]); }
+  if(g().G.useEng){ if(d.eng===true){ state.eng=true; notes.push("ingeniería"); } else if(d.eng===false){ state.eng=false; } }
+  if(d.weapon){
+    if(d.weapon.match){
+      state.cur=d.weapon.match.id;
+      setWeaponOwned(state.cur,true);
+      notes.push(`arma ${d.weapon.match.n}`);
+    } else if(d.weapon.dps){
+      state.cur="other"; state.customDps=Math.round(d.weapon.dps*10)/10;
+      notes.push(`arma "${d.weapon.name||"?"}" ${state.customDps} dps`);
+    }
+  }
+  state.simc={ ts:Date.now(), level:d.level, name:d.name, race:d.race, server:d.server, region:d.region||null, role:d.role||null, talents:d.talents||null, professions:d.professions||null, eng:d.eng, weapon:d.weapon, slots:d.wslots||null, pet:d.pet, stats:d.stats };
+  // Las profesiones del personaje alimentan los checks de farmeo (Piel/Hierbas/Minería).
+  if(d.professions&&d.professions.length){
+    const names=d.professions.map(p=>String(p[0]||"").toLowerCase());
+    const has=n=>names.some(x=>x.includes(n));
+    state.farm.prof={skin:has("skinning"),herb:has("herbalism"),mine:has("mining")};
+    if(state.farm.prof.skin||state.farm.prof.herb||state.farm.prof.mine)notes.push("profesiones → farmeo");
+  }
+  return notes;
+}
+
+const PET_HAPPY={1:"Infeliz · 75%",2:"Contento · 100%",3:"Feliz · 125%"};
+function petHappyText(v){ const n=parseInt(v,10); return PET_HAPPY[n]||v||"—"; }
+
+/* Stats reales del personaje desde el SimC importado (character_stats).
+   Devuelve null si no hay import o no hay datos. */
+function simcVitals(){
+  const s=state.simc; if(!s||!s.stats) return null;
+  const cs=s.stats.character_stats||{};
+  const gv=k=>{const v=fval(cs,k);return v==null?null:Math.round(v);};
+  const attrs=[["Fuerza","strength"],["Agilidad","agility"],["Aguante","stamina"],["Intelecto","intellect"],["Espíritu","spirit"]]
+    .map(([l,k])=>[l,gv(k)]).filter(p=>p[1]!=null);
+  const powers=[["Maná","mana"],["Rage","rage"],["Focus","focus"],["Energy","energy"]]
+    .map(([l,k])=>[l,gv(k)]).filter(p=>p[1]>0);
+  const hp=gv("health"), dpsChar=fval(s.stats.character_stats_gear,"damage_per_second");
+  if(hp==null&&!powers.length&&!attrs.length&&dpsChar==null) return null;
+  return {hp,powers,attrs,dpsChar};
+}
+function simcCard(){
+  const s=state.simc;
+  if(!s) return `<div class="card"><h3>${icon("scroll")} Personaje real <span class="sub">vía /simc</span></h3>
+    <div class="muted">Con el perfil de <b>/simc</b> la guía trabaja con datos reales: tu nivel, el DPS verdadero de tu arma, el estado del pet y tus stats — en vez de estimaciones.</div></div>`;
+  const st=s.stats||{};
+  const row=(label,val)=> val==null||val===""?"":`<div class="st"><span>${label}</span><b>${val}</b></div>`;
+  const num=(sec,k,i)=>{ const v=fval(st[sec],k,i); return v==null?null:Math.round(v); };
+  const dec=(sec,k,i)=>{ const v=fval(st[sec],k,i); return v==null?null:v.toFixed(1); };
+  let h=`<div class="card key"><div class="mhead"><h3>${icon("scroll")} Tu personaje — datos reales <span class="sub">SimC · ${new Date(s.ts).toLocaleDateString("es")}</span></h3>
+    <button class="btn mini simcdel" id="simcDel">quitar import</button></div>`;
+  // estado vital + atributos primarios (character_stats del export)
+  const vit=simcVitals();
+  if(vit){
+    const vrows=[];
+    if(vit.hp!=null) vrows.push(["Vida",vit.hp]);
+    vit.powers.forEach(p=>vrows.push(p));
+    if(vit.dpsChar!=null) vrows.push(["DPS total",vit.dpsChar.toFixed(1)]);
+    if(vrows.length) h+=`<div class="statgrid">`+vrows.map(r=>row(r[0],r[1])).join("")+`</div>`;
+    if(vit.attrs.length) h+=`<div class="muted" style="margin-top:8px"><b style="color:var(--gold)">Atributos primarios:</b></div><div class="statgrid">`+vit.attrs.map(r=>row(r[0],r[1])).join("")+`</div>`;
+  }
+  // rangos de daño por swing de cada slot (weapon_damage del export)
+  const SLOT_LBL={main_hand:"Mano princ.",off_hand:"Mano izq.",ranged:"A distancia"};
+  const slots=Object.keys(s.slots||{}).map(sl=>[SLOT_LBL[sl]||sl,s.slots[sl]]).filter(x=>x[1].range);
+  if(slots.length) h+=`<div class="muted" style="margin-top:8px"><b style="color:var(--gold)">Daño por swing:</b></div><div class="statgrid">`+
+    slots.map(([l,w])=>`<div class="st"><span>${l} — ${escH(w.name||"?")}</span><b>${w.range.min.toFixed(1)}–${w.range.mx.toFixed(1)} · ${w.range.spd.toFixed(2)} vel</b></div>`).join("")+`</div>`;
+  // arma
+  if(s.weapon){
+    const w=s.weapon.match, real=s.weapon.dps;
+    const delta=(real!=null&&w)?(real-w.dps):null;
+    h+=`<div class="statgrid">
+      <div class="st" style="grid-column:1/-1"><span>Arma equipada</span><b class="g">${escH(s.weapon.name||"arma")} · ${real!=null?real.toFixed(1)+" dps":"?"}</b></div>`;
+    if(w) h+=row("tabla (arma sola)", w.dps.toFixed(1)+" dps"+(w.approx?" ~":""));
+    if(delta!=null&&Math.abs(delta)>=0.3) h+=`<div class="muted" style="grid-column:1/-1;font-size:11.5px">El DPS real (${real.toFixed(1)}) incluye tus stats (AP/gear); la tabla es solo del arma — la diferencia es esperada, no un error de la guía.</div>`;
+    if(!w&&s.weapon.name) h+=`<div class="muted" style="grid-column:1/-1;font-size:11.5px">"${escH(s.weapon.name)}" no está en la tabla de armas — la app usa su DPS real igual.</div>`;
+    h+=`</div>`;
+  }
+  // stats de combate — filas definidas por la guía activa
+  const pct=(sec,k,i)=>{ const v=fval(st[sec],k,i); return v==null?null:v.toFixed(1)+"%"; };
+  const ap=kind=>{ const a=st.attack_power&&st.attack_power[kind]; if(!a) return null;
+    const v=(+a[0]||0)+(+a[1]||0)-(+a[2]||0); return v?String(Math.round(v)):null; };
+  const rows=g().G.simc.rows?g().G.simc.rows({st,num,dec,pct,ap,fval}):[];
+  h+=`<div class="statgrid">`+rows.filter(r=>r[1]!=null&&r[1]!=="").map(r=>row(r[0],r[1])).join("")+`</div>`;
+  // pet (solo clases con pet)
+  const p=s.pet||{};
+  if(g().G.simc.pet&&(p.pet_family||p.pet_happiness)){
+    const hab=p.pet_abilities?p.pet_abilities.split("/").filter(Boolean).length:0;
+    // Imported strings are text, never markup (including unknown happiness values).
+    h+=`<div class="muted" style="margin-top:8px"><b style="color:var(--hunter)">Pet:</b> ${escH(p.pet_family||"?")} · nivel ${escH(p.pet_level||"?")} · ${escH(petHappyText(p.pet_happiness))}${hab?` · ${hab} habilidades`:""}</div>`;
+  }
+  const pvp=/pvp/i.test(s.server||"")?"PvP":null;
+  const meta=[s.level?`lvl ${s.level}`:null,s.race,s.server,s.region,pvp,s.role,s.eng?"ingeniería":null].filter(Boolean).join(" · ");
+  if(meta) h+=`<div class="simcmeta">${meta.split(" · ").map(x=>`<span class="badge">${escH(x)}</span>`).join("")}</div>`;
+  if(s.professions&&s.professions.length) h+=`<div class="simcmeta">${s.professions.map(p=>`<span class="badge">${escH(p[0])}${p[1]!=null?" "+p[1]:""}</span>`).join("")}</div>`;
+  h+=`</div>`;
+  return h;
+}
+
+/* ================= DYNAMIC BINDINGS (sin re-render completo) ================= */
+function bindDynamic(){
+  document.querySelectorAll(".ownW").forEach(cb=>cb.addEventListener("change",e=>{
+    const id=e.target.dataset.id;
+    setWeaponOwned(id,e.target.checked);
+    save();
+    const row=e.target.closest("tr"); if(row) row.classList.toggle("owned",e.target.checked);
+    const cnt=$("wCnt"); if(cnt) cnt.textContent=state.owned.length+"/"+weapons().length;
+    renderSheet();
+    if(state.who && e.target.checked) row && row.remove();
+  }));
+  document.querySelectorAll(".ownG").forEach(cb=>cb.addEventListener("change",e=>{
+    const id=e.target.dataset.id, di=e.target.dataset.di;
+    state.gear = e.target.checked ? [...new Set([...state.gear,id])] : state.gear.filter(x=>x!==id);
+    const w=weaponForLoot(id); if(w) setWeaponOwned(w.id,e.target.checked);
+    save();
+    const span=e.target.closest(".loot").querySelector("span"); if(span) span.classList.toggle("own",e.target.checked);
+    const d=dgns()[+di], gs=gearSet();
+    const got=d.loot.filter(l=>gs.has("d"+di+"|"+l[0])).length;
+    const p=$("dp"+di); if(p){ p.textContent=got+"/"+d.loot.length; p.classList.toggle("full",got===d.loot.length); }
+    renderSheet();
+  }));
+  document.querySelectorAll(".step").forEach(cb=>cb.addEventListener("change",e=>{
+    const id=e.target.dataset.id;
+    state.steps = e.target.checked ? [...new Set([...state.steps,id])] : state.steps.filter(x=>x!==id);
+    save();
+    e.target.closest(".mst").classList.toggle("done",e.target.checked);
+    renderSheet();
+    // actualizar barra
+    const done=state.steps.length, bar=document.querySelector(".prog i");
+    if(bar) bar.style.width=(done/mile().length*100).toFixed(1)+"%";
+    const lbl=document.querySelector(".prog + .muted"); if(lbl) lbl.textContent=done+"/"+mile().length+" pasos";
+  }));
+  const ho=$("hideOwned"); if(ho) ho.addEventListener("change",e=>{state.who=e.target.checked; render();});
+  document.querySelectorAll(".wf").forEach(b=>b.addEventListener("click",e=>{state.wf=e.currentTarget.dataset.f; render();}));
+  const sd=document.getElementById("simcDel"); if(sd) sd.addEventListener("click",()=>{ state.simc=null; save(); render(); });
+  const sq=document.getElementById("simcQuick"); if(sq) sq.addEventListener("click",()=>{ const im=document.getElementById("importSimc"); if(im) im.click(); });
+  const avUp=document.getElementById("avatarUp");
+  if(avUp) avUp.addEventListener("click",()=>{ const inp=document.createElement("input"); inp.type="file"; inp.accept="image/*";
+    inp.onchange=()=>{ const f=inp.files&&inp.files[0]; if(f) loadAvatar(f); }; inp.click(); });
+  const avDel=document.getElementById("avatarDel");
+  if(avDel) avDel.addEventListener("click",()=>{ state.avatar=null; save(); render(); });
+  bindMacros();
+}
+
+/* Cambia de guía (clase/bando): el progreso es por guía, así que se reinicia
+   lo específico (armas, ruta, equipo, spec/pref) y se conservan nivel/nombre. */
+async function switchGuide(cls,fac){
+  const NG=GUIDES[cls]; if(!NG) return;
+  const fk=fac&&NG.factions[fac]?fac:Object.keys(NG.factions)[0];
+  const prevCls=state.cls, prevFac=state.fac;
+  if(cls===prevCls&&fk===prevFac) return;
+  const dirty=state.owned.length||state.gear.length||state.steps.length||state.cur||state.simc;
+  if(dirty){
+    const msg="Cambiar de "+(GUIDES[prevCls]?GUIDES[prevCls].name:prevCls)+"/"+(FAC_LABEL[prevFac]||prevFac)+" a "+NG.name+"/"+(FAC_LABEL[fk]||fk)+" reinicia armas, ruta y equipo de esta guía. ¿Seguir?";
+    const ok=window.HunterConfirm?await window.HunterConfirm(msg):confirm(msg);
+    if(!ok) return;
+  }
+  state.cls=cls; state.fac=fk;
+  const GG=g().G, GF=g().GF;
+  state.spec=GG.defaultSpec; state.pref=GG.defaultPref; state.eng=false;
+  state.owned=[];state.gear=[];state.steps=[];state.cur="";state.customDps=0;state.weaponDps=null;state.wf="all";state.mf="all";
+  if(cls!==prevCls) state.simc=null;
+  if(!GF.routes[state.realm]) state.realm=Object.keys(GF.routes)[0]||"kalimdor";
+  curGk="";
+  render();
+}
+
+/* ================= EVENTS ================= */
+function updateAuctionStatus(s){
+  const el=$("auctionStatus");if(!el)return;
+  s=s||window.HunterMarketUI.status();
+  if(s.loading){el.textContent="Cargando mercado local…";return;}
+  if(!s.importedAt){el.textContent="Sin precios importados. Tras un full scan en Auctionator, usá «Actualizar precios».";return;}
+  const EPOCH=Date.UTC(2020,0,1),DAY=86400000;
+  const dTxt=s.maxDay!=null?new Date(EPOCH+s.maxDay*DAY).toISOString().slice(0,10):null;
+  const age=s.maxDay!=null?Math.floor((Date.now()-EPOCH)/DAY)-s.maxDay:null;
+  const stale=age!=null&&age>1;
+  el.textContent=`${(s.items||0).toLocaleString("es")} ítems · precios al ${dTxt||"s/f"} · importado ${new Date(s.importedAt).toLocaleString("es")}${s.histDays?` · historial ${s.histDays} día${s.histDays===1?"":"s"}`:""}${stale?` — hace ${age} días, conviene re-escanear`:""}.`;
+}
+window.HunterMarketUI.setStatusListener(updateAuctionStatus);
+updateAuctionStatus();
+$("lvlRange").addEventListener("input",e=>{state.lvl=+e.target.value;render();});
+$("lvlNum").addEventListener("change",e=>{state.lvl=validLevel(e.target.value);render();});
+const segBind=(id,fn)=>$(id).addEventListener("click",e=>{const b=e.target.closest("button[data-v]");if(b)fn(b.dataset.v);});
+segBind("clsSeg",v=>switchGuide(v));
+segBind("facSeg",v=>switchGuide(state.cls,v));
+segBind("specSeg",v=>{state.spec=v;render();});
+segBind("prefSeg",v=>{state.pref=v;render();});
+segBind("realmSeg",v=>{state.realm=v;render();});
+$("engChk").addEventListener("change",e=>{state.eng=e.target.checked;render();});
+$("curWeapon").addEventListener("change",e=>{state.cur=e.target.value;state.weaponDps=null;render();});
+$("customDps").addEventListener("change",e=>{const n=+e.target.value;state.customDps=Number.isFinite(n)?Math.max(0,n):0;render();});
+$("charName").addEventListener("input",e=>{state.name=e.target.value;save();});
+$("copyLink").addEventListener("click",e=>{
+  const b=e.currentTarget, url=buildLink(), orig=b.textContent;
+  const ok=t=>{b.textContent=t;setTimeout(()=>b.textContent=orig,1600);};
+  if(navigator.clipboard&&navigator.clipboard.writeText)
+    navigator.clipboard.writeText(url).then(()=>ok(location.protocol==="file:"?"¡Enlace local copiado!":"¡Link copiado!")).catch(()=>{location.hash=url.split("#")[1];ok("Link en la barra ↑");});
+  else{location.hash=url.split("#")[1];ok("Link en la barra ↑");}
+});
+$("importAuction").addEventListener("click",()=>{
+  state.tab="market";render();
+  setTimeout(()=>{const f=document.getElementById("marketFile");if(f)f.click();},80);
+});
+$("goWeapons").addEventListener("click",()=>{state.tab="weapons";render();});
+$("tabsNav").addEventListener("click",e=>{const b=e.target.closest("button[data-t]"); if(b){state.tab=b.dataset.t;render();}});
+$("resetBtn").addEventListener("click",async()=>{if(window.HunterConfirm?await window.HunterConfirm("¿Borrar tu build guardada?"):confirm("¿Borrar tu build guardada?")){localStorage.removeItem(KEY);state=blank();render();}});
+
+/* ---- Import SimC ---- */
+$("importSimc").addEventListener("click",()=>{ $("simcModal").classList.add("open"); $("simcErr").textContent=""; setTimeout(()=>$("simcText").focus(),60); });
+$("simcCancel").addEventListener("click",()=>$("simcModal").classList.remove("open"));
+$("simcModal").addEventListener("click",e=>{ if(e.target.id==="simcModal") $("simcModal").classList.remove("open"); });
+$("simcApply").addEventListener("click",async()=>{
+  const d=parseSimcProfile($("simcText").value), err=$("simcErr");
+  if(!d.level&&!d.weapon&&!d.name&&!d.pet.pet_family){ err.textContent="No encontré datos de personaje — ¿copiaste el perfil completo de /simc?"; return; }
+  const SIMC_GUIDE={warrior:"warrior",hunter:"hunter"};
+  const want=d.className?SIMC_GUIDE[d.className]:null;
+  if(want&&want!==state.cls) await switchGuide(want); // switchGuide confirma si hay progreso
+  pickSimcWeapon(d);
+  err.textContent = d.className&&!SIMC_GUIDE[d.className] ? "Ojo: tu personaje es "+d.className+" — todavía no hay guía para esa clase." : "";
+  const notes=applySimcProfile(d);
+  $("simcModal").classList.remove("open"); $("simcText").value="";
+  render();
+  const st=$("simcStatus"); if(st&&notes.length) st.textContent="Importado: "+notes.join(" · ")+".";
+});
+
+render();
+</script>
+</body>
+</html>

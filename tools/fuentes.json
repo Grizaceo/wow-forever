@@ -1,0 +1,218 @@
+{
+ "nota": "Entradas fijadas de los generadores. tools/descargar-fuentes.py las baja y verifica el sha256. Cambiar una versión = cambiar url/parámetros y sha256 juntos, y regenerar.",
+ "fuentes": [
+  {
+   "id": "cmangos-classic-db",
+   "descripcion": "CMaNGOS classic-db: base de contenido de WoW 1.12 (misiones, NPC, entrenadores, botín, spawns)",
+   "licencia": "GPL-3.0",
+   "licencia_url": "https://github.com/cmangos/classic-db/blob/master/LICENSE.md",
+   "url": "https://raw.githubusercontent.com/cmangos/classic-db/{commit}/Full_DB/ClassicDB_1_12_1_z2815.sql.gz",
+   "parametros": {
+    "commit": "28ef6259c782928b08a8dc9cacf6bc02e64f2b29"
+   },
+   "carpeta": "",
+   "archivos": [
+    {
+     "destino": "ClassicDB.sql.gz",
+     "sha256": "4f92db520868ab4e566726f68b5b2e380ae781209beaf22237b4f7f04600d0c0"
+    }
+   ]
+  },
+  {
+   "id": "wago-classic-era",
+   "descripcion": "Tablas del cliente WoW Classic Era (zonas, mapas, cerraduras, facciones) vía wago.tools",
+   "licencia": "Datos de Blizzard Entertainment; uso no comercial con atribución (ver LICENSE-DATA.md)",
+   "url": "https://wago.tools/db2/{tabla}/csv?product=wow_classic_era&build={build}",
+   "parametros": {
+    "build": "1.15.9.70576"
+   },
+   "carpeta": "",
+   "archivos": [
+    {
+     "tabla": "UiMapAssignment",
+     "destino": "UiMapAssignment.csv",
+     "sha256": "da74d3984c2625b4ec3a13d2a7cd93ed8c318dda4ab35ed82f69824a1e273fa1"
+    },
+    {
+     "tabla": "UiMap",
+     "destino": "UiMap.csv",
+     "sha256": "b8fdb1648f42d62876f878adbab67b575658d07c3eb5d1f32498e47e875b7aa9"
+    },
+    {
+     "tabla": "AreaTable",
+     "destino": "AreaTable.csv",
+     "sha256": "2d7dbadd2f9dc005cd2b8139b50db18bb26cecb61ee2551edcc755d63e01ec41"
+    },
+    {
+     "tabla": "Map",
+     "destino": "Map.csv",
+     "sha256": "1cc783a7f1b129a603a9941caef1277e29a5083a8c35803fbaec8b9717bb2094"
+    },
+    {
+     "tabla": "Lock",
+     "destino": "Lock.csv",
+     "sha256": "1320a562b070531ad280095aa5e7a63d3171c3bbd88e99cc2607c5d417e3f9e6"
+    },
+    {
+     "tabla": "FactionTemplate",
+     "destino": "FactionTemplate.csv",
+     "sha256": "9dfeedd9b266ff0fd900af7e2974b48cbec545b55a3692d317aeba3511c81151"
+    }
+   ]
+  },
+  {
+   "id": "wago-forever",
+   "descripcion": "Tablas del cliente WoW Forever (producto wowf) en inglés: razas, clases, combinaciones, profesiones, recetas, ítems, zonas, dungeons",
+   "licencia": "Datos de Blizzard Entertainment; uso no comercial con atribución (ver LICENSE-DATA.md)",
+   "url": "https://wago.tools/db2/{tabla}/csv?product=wowf&build={build}",
+   "parametros": {
+    "build": "1.60.1.70888"
+   },
+   "carpeta": "wowf",
+   "archivos": [
+    {
+     "tabla": "AreaTable",
+     "destino": "AreaTable.csv",
+     "sha256": "42280ffb99cedb21ad7420744df20a0678914d6d8f448dca0b41ca3d05e02c51"
+    },
+    {
+     "tabla": "CharBaseInfo",
+     "destino": "CharBaseInfo.csv",
+     "sha256": "6894b5d04495e875c3f08085630b951abeda6b798b5ed47de4f3405dd346cbc2"
+    },
+    {
+     "tabla": "ChrClasses",
+     "destino": "ChrClasses.csv",
+     "sha256": "e08c2f00e1652ff6857734915d649a80d8a2a86419986f59dbe82ba3a6975597"
+    },
+    {
+     "tabla": "ChrRaces",
+     "destino": "ChrRaces.csv",
+     "sha256": "8d61c45ec7d23535c3916642ae4b3a8341e38ac0cdca817144536b954488bd23"
+    },
+    {
+     "tabla": "FactionTemplate",
+     "destino": "FactionTemplate.csv",
+     "sha256": "edeb93c741ec2f9796b513c91da9c5ac7f7db139e27e3d1c60a5ef1b215cbdba"
+    },
+    {
+     "tabla": "Item",
+     "destino": "Item.csv",
+     "sha256": "037ac6248ce1fceaad391fb0ec717cdb7ae1e8999e8c976c11b086a05deb5c57"
+    },
+    {
+     "tabla": "ItemSparse",
+     "destino": "ItemSparse.csv",
+     "sha256": "ced52fc6e5ca345805cfe3c015c05426c138aebd23ff1ad8a26cff5f1fe08be9"
+    },
+    {
+     "tabla": "LFGDungeons",
+     "destino": "LFGDungeons.csv",
+     "sha256": "5e41c3350d315d90059d99fac3b109c7fdde5c912dce2c5580b45d47eabb4611"
+    },
+    {
+     "tabla": "Lock",
+     "destino": "Lock.csv",
+     "sha256": "3517273a64414c1e2c49e2f8c0767d0d4816a7f20535532c1afe4610dcfcd0e1"
+    },
+    {
+     "tabla": "Map",
+     "destino": "Map.csv",
+     "sha256": "a4fa6474f5bba3dc815f0e78943b3a907840b8f44bba605d4ff0680048994908"
+    },
+    {
+     "tabla": "SkillLine",
+     "destino": "SkillLine.csv",
+     "sha256": "f3867d43ab42d1f5278e6e5028d0151bc06e4ef8e5cbd790a20df6ee57aa654d"
+    },
+    {
+     "tabla": "SkillLineAbility",
+     "destino": "SkillLineAbility.csv",
+     "sha256": "13ef58a08253125e3e9dca642a39bc480187987e90cfbe5c8be30e1ab3c8be0a"
+    },
+    {
+     "tabla": "SkillRaceClassInfo",
+     "destino": "SkillRaceClassInfo.csv",
+     "sha256": "2193908c90f65d38fa9bc68907217fd759c132ccdc9f882cd3bc5acecabba322"
+    },
+    {
+     "tabla": "SpellEffect",
+     "destino": "SpellEffect.csv",
+     "sha256": "da2fb074eedb51bd1246ef53666044c0b757bdb67340c3969b712caa8481ac2b"
+    },
+    {
+     "tabla": "SpellName",
+     "destino": "SpellName.csv",
+     "sha256": "4358b3d1a2a859284b2f46cf614e6a1f85320be342acc1c4b68b625f30cf47a5"
+    },
+    {
+     "tabla": "SpellReagents",
+     "destino": "SpellReagents.csv",
+     "sha256": "f37423f667c09a6aaada6f05bed12e6d307fe15b3596944e132492f7f1dc9cc8"
+    },
+    {
+     "tabla": "UiMap",
+     "destino": "UiMap.csv",
+     "sha256": "1f4aac70eaac015b1d2d0ea0faf6e3d7fb2cf7afdf45e5bb6772d9b80a72346b"
+    },
+    {
+     "tabla": "UiMapAssignment",
+     "destino": "UiMapAssignment.csv",
+     "sha256": "79267e8be8034e47daab14350411b3acc0b1f64e86efc9d821a217497254ca0a"
+    }
+   ]
+  },
+  {
+   "id": "wago-forever-esMX",
+   "descripcion": "Las mismas tablas de texto del cliente WoW Forever en español latino (esMX)",
+   "licencia": "Datos de Blizzard Entertainment; uso no comercial con atribución (ver LICENSE-DATA.md)",
+   "url": "https://wago.tools/db2/{tabla}/csv?product=wowf&build={build}&locale=esMX",
+   "parametros": {
+    "build": "1.60.1.70888"
+   },
+   "carpeta": "wowf/esMX",
+   "archivos": [
+    {
+     "tabla": "AreaTable",
+     "destino": "AreaTable.csv",
+     "sha256": "c88744f54f9596f8cd4acb318e4020176070ea6d72e5c76b304f5e89bb2b41da"
+    },
+    {
+     "tabla": "ChrClasses",
+     "destino": "ChrClasses.csv",
+     "sha256": "e89e53162a367f1681797116f7035222703f5cc9b2163c224cf41f143039d4fb"
+    },
+    {
+     "tabla": "ChrRaces",
+     "destino": "ChrRaces.csv",
+     "sha256": "738ec1705a55485b0c82cd3bd1b7f94bd4e60c187032b96ba10f3b0f1171a3ec"
+    },
+    {
+     "tabla": "ItemSparse",
+     "destino": "ItemSparse.csv",
+     "sha256": "d74281f2c6f9bad3934c24568e48b1dd5f8bfe2632f3a1813085ba07f07f2e84"
+    },
+    {
+     "tabla": "LFGDungeons",
+     "destino": "LFGDungeons.csv",
+     "sha256": "c127627104e8eaa230c8f180835459c113017b756ed6fbb6ae6283c9282751c7"
+    },
+    {
+     "tabla": "Map",
+     "destino": "Map.csv",
+     "sha256": "a7b14fe8b3d14413b3051fd58a3bb11a8c06a3de8d41cb7938af55a874694b91"
+    },
+    {
+     "tabla": "SkillLine",
+     "destino": "SkillLine.csv",
+     "sha256": "b6b27920a7ffd1a016de7efbea24293906cd726403eb26cecafcde284ad1042e"
+    },
+    {
+     "tabla": "SpellName",
+     "destino": "SpellName.csv",
+     "sha256": "be3065668d64410febad738ba4479688aee8266c83233a93d8710a339781e8c8"
+    }
+   ]
+  }
+ ]
+}

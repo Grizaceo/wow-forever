@@ -3,3 +3,13 @@ dist/
 .plugin-build-new
 __pycache__/
 *.pyc
+
+# vitrina: el taller queda fuera de la vitrina
+.workshop/
+.claude/
+.devin/
+.codex/
+# Datos privados: nunca se publican
+*.private.js
+standalone/drop-data-private.js
+standalone/market-local-scan.js

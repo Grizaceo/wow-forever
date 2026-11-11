@@ -1,79 +1,109 @@
 # WoW Forever para Hermes
 
-Guía offline de **World of Warcraft: Forever** (Classic 1.12) como plugin de
-Hermes: sendas de clase y facción, ruta de niveles, armas, macros, loot de
-dungeons, mercado Auctionator local y recomendador de farmeo — más una skill
-para que tu agente de Hermes sepa asistirte mientras jugás.
+Guía offline de **World of Warcraft: Forever** dentro de Hermes: ruta de niveles,
+armas, macros, dungeons, Legacy y un mercado con tus precios de Auctionator, más una
+skill para que tu agente te asista mientras juegas.
 
-100% offline: la guía no abre el juego, no usa red y no envía datos a ningún
-lado. Los datos del mercado los aportás vos exportando `Auctionator.lua`.
+## Estado
 
-## Qué instala
+En desarrollo, rama por rama. Lo que funciona hoy:
 
-Un paquete unificado agente + escritorio:
+- **Guías curadas** de Cazador (Horda), Guerrero y Chamán (ambos bandos), y la pestaña
+  Legacy.
+- **Mercado local**: importa tu `Auctionator.lua`, acumula historial por ítem, marca
+  ofertas y recomienda zonas de farmeo según tu nivel y facción.
+- **Skill del agente** `wow-forever`.
 
-- **Agente** (`~/.hermes/plugins/wow-forever/`): registra la skill
-  `wow-forever` para que tu agente conozca el juego, la guía y cómo
-  interpretar el mercado.
-- **Escritorio** (`~/.hermes/desktop-plugins/wow-forever/`): la guía en la
-  barra lateral de Hermes Desktop ("WoW Forever", ruta `/wow-hunter-guide`).
+En construcción (ver `docs/MODELO-DATOS.md`):
+
+- Cualquier personaje: las 10 razas, las 9 clases en ambas facciones y las 12
+  profesiones, con datos generados desde fuentes publicadas (`data/`).
+- Una mitad de escritorio hecha con componentes del SDK de Hermes. La actual muestra
+  la app HTML dentro de un iframe aislado; funciona, pero no cumple todavía las reglas
+  del catálogo de plugins.
+
+WoW Forever es el juego oficial de Blizzard (cliente 1.60). Parte de los datos viene de
+WoW Classic 1.12 y se marca como aproximada donde Forever puede diferir.
 
 ## Instalación
-
-Con el CLI de Hermes:
 
 ```sh
 hermes plugins install Grizaceo/wow-forever
 ```
 
-O desde Hermes Desktop: **Plugins → instalar desde git** con
-`Grizaceo/wow-forever` (o la URL del repo).
+O desde Hermes Desktop: **Plugins → instalar desde git** con `Grizaceo/wow-forever`.
+La mitad de escritorio aparece en la barra lateral como **WoW Forever** tras el
+próximo arranque de la app. El agente funciona en cualquier superficie de Hermes.
 
-Manual (equivalente): cloná el repo dentro de `~/.hermes/plugins/`:
+## Precios de Auctionator
 
-```sh
-git clone https://github.com/Grizaceo/wow-forever ~/.hermes/plugins/wow-forever
+1. En el juego, haz un **full scan** con Auctionator.
+2. `/reload` o vuelve a entrar, para que el juego guarde los datos.
+3. En la guía → **Mercado local** → **Leer Auctionator.lua**. La primera vez, Hermes
+   abre su selector de carpetas: elige `WTF/Account/<tu cuenta>/SavedVariables`.
+   Hermes recuerda ese permiso; puedes revocarlo en **Capacidades → Plugins → Acceso
+   a carpetas**. También puedes importar el archivo a mano con **Importar
+   Auctionator.lua**.
+
+Cada importación suma sus días al historial de cada ítem, aunque Auctionator solo
+guarde unas tres semanas.
+
+## Qué lee y qué guarda
+
+- **Lee** únicamente `Auctionator.lua` dentro de la carpeta que concedes con el
+  selector de Hermes (busca hasta 4 niveles de subcarpetas dentro de ella). Nada fuera
+  de esa carpeta. El archivo se interpreta como datos: nunca se ejecuta Lua.
+- **Guarda** el progreso de la guía y los precios normalizados en el almacenamiento
+  propio del plugin en tu máquina. Puedes borrarlos desde la app.
+- **Sin red**: la página bloquea toda conexión (`connect-src 'none'`), sin telemetría.
+- **Sin procesos** ni acceso al juego en ejecución.
+- La skill del agente no trae herramientas propias: no lee archivos ni usa red por su
+  cuenta.
+
+## Cómo funciona
+
+```
+tools/fuentes.json ── tools/descargar-fuentes.py ──▶ ~/.cache/wow-forever-drops
+   (versiones y sha256 fijados)                         │
+                         tools/build-drop-data.py ◀──────┤──▶ tools/build-datos-juego.py
+                                   │                                 │
+                         standalone/drop-data.js                    data/*.json
+                                   │
+            standalone/tools/build-desktop-plugin.py ──▶ desktop/plugin.js
 ```
 
-La mitad de escritorio se materializa sola al próximo arranque de la app.
+- Las fuentes de datos están fijadas por versión y sha256 en `tools/fuentes.json`:
+  CMaNGOS classic-db (commit `28ef625`), tablas del cliente Classic Era 1.15.9.70576 y
+  del cliente WoW Forever 1.60.1.70888 (en inglés y español), vía wago.tools.
+- Los generadores son deterministas: con las mismas entradas producen los mismos bytes.
+  `standalone/tests/public-build.mjs` reconstruye `desktop/plugin.js` y comprueba que
+  coincide con el versionado.
+- Cada dato dice de dónde viene: generado de CMaNGOS 1.12, generado del cliente de
+  Forever, o curado a mano.
 
-## Requisitos
+Tests: `python3 -m unittest discover -s tests`, `node --test tests/` y los de
+`standalone/tests/` (ver su README).
 
-- Hermes con app de escritorio (el plugin usa el SDK de desktop: sidebar,
-  rutas y paleta). El agente funciona en cualquier superficie.
-- Cliente de WoW Forever **opcional**: la guía funciona sin datos del juego.
-  Para el mercado con precios reales hace falta exportar `Auctionator.lua`.
+## Cómo se hizo
 
-## Datos del mercado (Auctionator)
+El mantenedor decidió el alcance, las fuentes de datos admitidas y qué se publica;
+revisa cada rama antes de fusionarla. El código lo escribieron agentes de IA
+(Claude Code y Devin) bajo esa dirección. Lo verificado en cada paso queda en los
+tests del repo. No se verificó dentro del juego: macros, rutas y estimaciones de oro
+por hora.
 
-1. Dentro del juego, corré un **full scan** en Auctionator.
-2. `/reload` o relogueá para que WoW escriba SavedVariables.
-3. En la guía → pestaña **Mercado local** → seleccioná `Auctionator.lua`
-   (está en `WTF/Account/<tu-cuenta>/SavedVariables/`). No hace falta
-   copiar el WTF ni ningún archivo de configuración.
-4. Elegí tu realm de subastas y buscá por ID, nombre, dungeon o boss.
+## Límites
 
-El scan se guarda normalizado (precios, historial por día, realm) en el
-almacenamiento local de Hermes de tu máquina: sobrevive reinicios, no se
-comparte con nadie y podés borrarlo desde la app.
-
-## Privacidad
-
-- El build público **no incluye** precios ni datos de subastas embebidos:
-  cada usuario importa los suyos.
-- La app es offline por diseño (CSP `connect-src 'none'`): no hay telemetría
-  ni llamadas externas desde la guía.
-- El plugin nunca lee el juego, addons ni perfiles del navegador.
+- Los datos de 1.12 (misiones, entrenadores, botín, spawns) son una referencia: Forever
+  cambió zonas, ítems y botín. El contenido nuevo de Forever que solo existe en el
+  servidor (misiones nuevas, entrenadores de Paladín de la Horda y Chamán de la
+  Alianza, zona de inicio Skyborne, botín de los dungeons nuevos) no tiene todavía una
+  fuente que se pueda publicar: la guía lo muestra como **sin datos**.
+- Oro por hora, ROI y ofertas son estimaciones sobre precios anunciados, no ventas.
+- Las macros y rutas curadas no se probaron en el juego.
 
 ## Licencia
 
-GPL-3.0-or-later — ver `LICENSE`. Atribución y origen de los datasets en
-`LICENSE-DATA.md` (CMaNGOS classic-db GPL-3.0, tablas de cliente vía
-wago.tools). Los nombres de World of Warcraft son marcas de Blizzard
-Entertainment; uso no comercial, sin afiliación.
-
-## Fuente
-
-El código fuente completo de la guía (app standalone, generadores de datos,
-tests) vive en el repositorio fuente; `desktop/plugin.js` de este paquete es
-el build público generado desde ahí.
+GPL-3.0-or-later (`LICENSE`). Origen y licencia de cada dataset en `LICENSE-DATA.md`.
+World of Warcraft y sus nombres son marcas de Blizzard Entertainment. Proyecto sin
+afiliación con Blizzard y de uso no comercial.
