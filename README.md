@@ -6,24 +6,28 @@ skill para que tu agente te asista mientras juegas.
 
 ## Estado
 
-En desarrollo, rama por rama. Lo que funciona hoy:
+En desarrollo, en la rama `agent/claude-code/fuente-y-datos`; `main` todavía tiene la
+versión anterior. Lo que hace hoy:
 
-- **Guías curadas** de Cazador (Horda), Guerrero y Chamán (ambos bandos), y la pestaña
-  Legacy.
-- **Mercado local**: importa tu `Auctionator.lua`, acumula historial por ítem, marca
-  ofertas y recomienda zonas de farmeo según tu nivel y facción.
+- **Cualquier personaje**: eliges facción, raza (las 10, Skyborne incluida), clase (las 9 en
+  ambas facciones), nivel y profesiones. La guía se adapta.
+- **Clase**: entrenadores de tu facción con coordenadas, hechizos por nivel, misiones de clase
+  y armas y armaduras que puedes usar.
+- **Ruta**: zonas a tu nivel con sus misiones, y las bandas curadas cuando tu clase tiene guía.
+- **Profesiones**: recetas con su dificultad, reactivos, cómo se aprenden, costo y margen con
+  tus precios, plan de subida y de dónde sale cada material.
+- **Dungeons**: jefes en orden con su botín, filtro de lo que tu clase puede usar, y los 9
+  dungeons nuevos de Forever con sus jefes.
+- **Mercado**: importa tu `Auctionator.lua`, acumula el historial, marca ofertas y recomienda
+  dónde farmear.
+- **Guía curada** (Cazador de la Horda, Guerrero y Chamán de ambas facciones) y **Legacy**.
 - **Skill del agente** `wow-forever`.
 
-En construcción (ver `docs/MODELO-DATOS.md`):
+Interfaz en español con botón para inglés, en tema claro u oscuro. Todo dato dice si viene de
+WoW Classic 1.12 (aproximado para Forever), del cliente de Forever o de la guía curada, y lo
+que no está en ninguna fuente publicable se muestra como **sin datos**.
 
-- Cualquier personaje: las 10 razas, las 9 clases en ambas facciones y las 12
-  profesiones, con datos generados desde fuentes publicadas (`data/`).
-- Una mitad de escritorio hecha con componentes del SDK de Hermes. La actual muestra
-  la app HTML dentro de un iframe aislado; funciona, pero no cumple todavía las reglas
-  del catálogo de plugins.
-
-WoW Forever es el juego oficial de Blizzard (cliente 1.60). Parte de los datos viene de
-WoW Classic 1.12 y se marca como aproximada donde Forever puede diferir.
+WoW Forever es el juego oficial de Blizzard (cliente 1.60).
 
 ## Instalación
 
@@ -73,20 +77,29 @@ tools/fuentes.json ── tools/descargar-fuentes.py ──▶ ~/.cache/wow-fore
                                    │                                 │
                                    │                  standalone/market-catalog.js
                                    └───────────────┬─────────────────┘
-                      standalone/tools/build-desktop-plugin.py ──▶ desktop/plugin.js
+                        desktop/src/ (React + SDK) ── desktop/build.mjs ──▶ desktop/plugin.js
 ```
 
 - Las fuentes de datos están fijadas por versión y sha256 en `tools/fuentes.json`:
   CMaNGOS classic-db (commit `28ef625`), tablas del cliente Classic Era 1.15.9.70576 y
   del cliente WoW Forever 1.60.1.70888 (en inglés y español), vía wago.tools.
 - Los generadores son deterministas: con las mismas entradas producen los mismos bytes.
-  `standalone/tests/public-build.mjs` reconstruye `desktop/plugin.js` y comprueba que
-  coincide con el versionado.
+- La mitad de escritorio son componentes React del SDK de Hermes (`desktop/src/`), empaquetados
+  sin minificar por esbuild en un solo `desktop/plugin.js`; `desktop/BUNDLE.json` guarda su
+  sha256 y un test lo reconstruye y compara. Solo importa `@hermes/plugin-sdk` y React. Ver
+  `docs/DESKTOP.md`.
+- Mismo id interno que la versión anterior (`wow-hunter-guide`): Hermes guarda los datos y
+  permisos por id, así que el progreso, los precios y el permiso de carpeta se conservan.
 - Cada dato dice de dónde viene: generado de CMaNGOS 1.12, generado del cliente de
   Forever, o curado a mano.
 
-Tests: `python3 -m unittest discover -s tests`, `node --test tests/perfil.test.mjs` y los
-de `standalone/tests/` (ver su README).
+Tests:
+
+```sh
+python3 -m unittest discover -s tests     # datos, lint de Hermes, bundle reproducible
+node --test tests/                         # lógica pura (perfil, crafteo, mercado, ruta, guía)
+PLAYWRIGHT_MODULE=… CHROMIUM_PATH=… node desktop/test/navegador.mjs   # y desktop/test/vista-*.mjs
+```
 
 ## Cómo se hizo
 

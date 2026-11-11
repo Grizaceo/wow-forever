@@ -336,7 +336,7 @@ var require_guide_hunter = __commonJS({
           dung: "Strat UD · Scholo · LBRS/UBRS · BRD · DM East vía Kalimdor"
         }
       ];
-      const MILESTONES = [
+      const MILESTONES2 = [
         { lvl: 10, cat: "Clase", txt: "Quest de clase: domar tu primer pet (trainer, Durotar)" },
         { lvl: 11, cat: "Vendor", txt: "Laminated Recurve Bow en cualquier bowyer" },
         { lvl: 14, cat: "Vendor", txt: "Fine Longbow en bowyer" },
@@ -687,7 +687,7 @@ var require_guide_hunter = __commonJS({
         factions: {
           horde: {
             weapons: WEAPONS,
-            milestones: MILESTONES,
+            milestones: MILESTONES2,
             routes: { kalimdor: BANDS, ek: EKBANDS },
             recExtra: ({ lvl, os, dps, state, icon, locBadge }) => {
               const SPEC = { bm: "BM", mm: "MM", sv: "SV" };
@@ -3649,7 +3649,7 @@ var require_market_chart = __commonJS({
         grid: "var(--border,#33291a)"
       };
       function render(pts, o) {
-        var W = o.w, H = o.h, P = o.pad;
+        var W = o.w, H = o.h, P2 = o.pad;
         var n = pts.length;
         var lows = pts.map(function(p) {
           return p.low;
@@ -3661,7 +3661,7 @@ var require_market_chart = __commonJS({
           lo -= pad;
           hi += pad;
         }
-        var x0 = P.l, x1 = W - P.r, y0 = P.t, y1 = H - P.b;
+        var x0 = P2.l, x1 = W - P2.r, y0 = P2.t, y1 = H - P2.b;
         var plotW = Math.max(1, x1 - x0), plotH = Math.max(1, y1 - y0);
         var dMin = pts[0].day, dMax = pts[n - 1].day;
         var sx = function(d) {
@@ -4269,8 +4269,8 @@ var require_market_farm = __commonJS({
         const routes = fac ? G.factions[fac]?.routes : null;
         if (!routes) return /* @__PURE__ */ new Map();
         const level = profile.level || 12, out = /* @__PURE__ */ new Map();
-        for (const bands of Object.values(routes)) {
-          for (const b of bands || []) {
+        for (const bands2 of Object.values(routes)) {
+          for (const b of bands2 || []) {
             if (!b || !(b.min <= level && level <= b.max)) continue;
             const text2 = String(b.zones || "").replace(/\([^)]*\)/g, " ");
             for (const seg of text2.split(/[\/→]/)) {
@@ -5037,8 +5037,8 @@ function createStore(ctx) {
 }
 
 // src/app.jsx
-import { Component, useCallback as useCallback2, useEffect as useEffect3, useMemo as useMemo12, useState as useState8 } from "react";
-import { Button as Button6, SegmentedControl as SegmentedControl4, Tabs, TabsList, TabsTrigger } from "@hermes/plugin-sdk";
+import { Component, useCallback as useCallback3, useEffect as useEffect5, useMemo as useMemo13, useState as useState11 } from "react";
+import { Button as Button8, SegmentedControl as SegmentedControl6, Tabs, TabsList, TabsTrigger } from "@hermes/plugin-sdk";
 
 // ../src/perfil.js
 var VERSION = 1;
@@ -5185,6 +5185,7 @@ var import_guide_shaman = __toESM(require_guide_shaman());
 var import_guide_legacy = __toESM(require_guide_legacy());
 var D = { personaje: personaje_default, clases: clases_default, profesiones: profesiones_default, items: items_default, zonas: zonas_default, misiones: misiones_default, dungeons: dungeons_default, dropData: import_drop_data.default };
 var GUIAS = { 3: import_guide_hunter.GUIDE_HUNTER, 1: import_guide_warrior.GUIDE_WARRIOR, 7: import_guide_shaman.GUIDE_SHAMAN };
+var LEGACY = import_guide_legacy.GUIDE_LEGACY;
 var FAC_GUIA = { alianza: "alliance", horda: "horde" };
 function guiaCurada(perfil) {
   const g = perfil && GUIAS[perfil.clase];
@@ -5315,7 +5316,22 @@ var CLASES_RICAS = {
   gold: { borderLeft: `3px solid ${C.amarillo}` },
   muted: { color: C.texto3, fontSize: 12 },
   tip: { color: C.texto2, fontSize: 12 },
-  sub: { color: C.texto3, fontWeight: 400, fontSize: 12 }
+  sub: { color: C.texto3, fontWeight: 400, fontSize: 12 },
+  // Filas de hitos: <div class="mst"><span class="tdot"></span><span class="txt">…</span></div>
+  mst: { display: "flex", gap: 8, alignItems: "baseline", padding: "2px 0" },
+  tdot: { display: "inline-block", width: 6, height: 6, borderRadius: 3, background: C.acento, flexShrink: 0 },
+  txt: { flex: 1 },
+  // Calidad de ítem en el texto curado.
+  "q-poor": { color: CALIDAD[0] },
+  "q-common": { color: CALIDAD[1] },
+  "q-uncommon": { color: CALIDAD[2] },
+  "q-rare": { color: CALIDAD[3] },
+  "q-epic": { color: CALIDAD[4] },
+  "q-legendary": { color: CALIDAD[5] },
+  // Marcas de continente.
+  badge: S.chip,
+  locK: { borderColor: C.verde, color: C.verde },
+  locE: { borderColor: C.azul, color: C.azul }
 };
 
 // src/i18n.js
@@ -5476,6 +5492,65 @@ function NombreItem({ id, lang, cantidad }) {
 }
 function Dinero({ cobre }) {
   return /* @__PURE__ */ jsx("span", { style: { fontVariantNumeric: "tabular-nums" }, children: dinero(cobre) });
+}
+var PERMITIDAS = /* @__PURE__ */ new Set(["b", "strong", "i", "em", "br", "div", "p", "h3", "h4", "span", "ul", "ol", "li", "small", "code"]);
+var VACIAS = /* @__PURE__ */ new Set(["br"]);
+var ENT = { amp: "&", lt: "<", gt: ">", quot: '"', "#39": "'", apos: "'", nbsp: " ", middot: "·", mdash: "—", ndash: "–", rarr: "→", larr: "←", hellip: "…", times: "×" };
+var decodificar = (s) => s.replace(/&(#x?[0-9a-f]+|[a-z0-9]+);/gi, (m, e) => {
+  if (ENT[e.toLowerCase()] !== void 0) return ENT[e.toLowerCase()];
+  if (e[0] === "#") {
+    const n = e[1] === "x" || e[1] === "X" ? parseInt(e.slice(2), 16) : parseInt(e.slice(1), 10);
+    return Number.isFinite(n) && n > 0 && n < 1114112 ? String.fromCodePoint(n) : m;
+  }
+  return m;
+});
+var ESTILO_ETIQUETA = {
+  h3: { fontSize: 13, fontWeight: 600, margin: 0 },
+  h4: { fontSize: 12, fontWeight: 600, margin: 0 },
+  p: { margin: 0 },
+  ul: { margin: 0, paddingLeft: 18 },
+  ol: { margin: 0, paddingLeft: 18 },
+  code: { fontFamily: "var(--font-mono, monospace)", fontSize: 12 }
+};
+function arbolRico(html) {
+  const raiz = { tag: null, hijos: [] };
+  const pila = [raiz];
+  const re = /<(\/?)([a-zA-Z][a-zA-Z0-9]*)([^>]*)>|([^<]+)|(<)/g;
+  let m;
+  while ((m = re.exec(String(html ?? ""))) !== null) {
+    const cima = pila[pila.length - 1];
+    if (m[4] !== void 0 || m[5] !== void 0) {
+      cima.hijos.push(decodificar(m[4] ?? "<"));
+      continue;
+    }
+    const cierre = m[1] === "/", tag = m[2].toLowerCase();
+    if (!PERMITIDAS.has(tag)) continue;
+    if (cierre) {
+      for (let k = pila.length - 1; k > 0; k--) if (pila[k].tag === tag) {
+        pila.length = k;
+        break;
+      }
+      continue;
+    }
+    const clase = /\bclass\s*=\s*"([^"]*)"/.exec(m[3] || "");
+    const nodo = { tag, clases: clase ? clase[1].split(/\s+/).filter(Boolean) : [], hijos: [] };
+    cima.hijos.push(nodo);
+    if (!VACIAS.has(tag) && !/\/\s*$/.test(m[3] || "")) pila.push(nodo);
+  }
+  return raiz.hijos;
+}
+function aReact(nodos, ruta) {
+  return nodos.map((n, i) => {
+    const key = ruta + "." + i;
+    if (typeof n === "string") return /* @__PURE__ */ jsx(Fragment, { children: n }, key);
+    if (n.tag === "br") return /* @__PURE__ */ jsx("br", {}, key);
+    const estilo = Object.assign({}, ESTILO_ETIQUETA[n.tag], ...n.clases.map((c) => CLASES_RICAS[c] || {}));
+    const Tag = n.tag;
+    return /* @__PURE__ */ jsx(Tag, { style: estilo, children: aReact(n.hijos, key) }, key);
+  });
+}
+function TextoRico({ html }) {
+  return /* @__PURE__ */ jsx(Fragment2, { children: aReact(arbolRico(html), "r") });
 }
 
 // src/vistas/personaje.jsx
@@ -7537,7 +7612,7 @@ function geometriaGrafico(history, opciones = {}) {
   const pts = puntosDe(history);
   if (!pts.length) return null;
   const W = opciones.w || 720, H = opciones.h || 210;
-  const P = opciones.pad || { l: 52, r: 12, t: 12, b: 30 };
+  const P2 = opciones.pad || { l: 52, r: 12, t: 12, b: 30 };
   const axes = opciones.axes !== false;
   const current = opciones.current != null && Number.isFinite(opciones.current) && opciones.current > 0 ? opciones.current : null;
   const n = pts.length;
@@ -7548,7 +7623,7 @@ function geometriaGrafico(history, opciones = {}) {
     lo -= pad;
     hi += pad;
   }
-  const x0 = P.l, x1 = W - P.r, y0 = P.t, y1 = H - P.b;
+  const x0 = P2.l, x1 = W - P2.r, y0 = P2.t, y1 = H - P2.b;
   const plotW = Math.max(1, x1 - x0), plotH = Math.max(1, y1 - y0);
   const dMin = pts[0].day, dMax = pts[n - 1].day;
   const sx = (d) => dMax > dMin ? x0 + (d - dMin) / (dMax - dMin) * plotW : x0 + plotW / 2;
@@ -9058,19 +9133,2784 @@ function VistaMercado({ ctx, almacen, estado, recargar, perfil, lang }) {
 }
 
 // src/vistas/guia.jsx
-import { jsx as jsx16 } from "react/jsx-runtime";
-function VistaGuia({ lang }) {
-  return /* @__PURE__ */ jsx16(Tarjeta, { titulo: t(lang, "tab.guia"), children: /* @__PURE__ */ jsx16("p", { children: t(lang, "pendiente") }) });
+import { useCallback as useCallback2, useEffect as useEffect4, useMemo as useMemo12, useRef as useRef3, useState as useState10 } from "react";
+import { Button as Button7, Checkbox as Checkbox8, Input as Input4, SegmentedControl as SegmentedControl5, Select as Select5, SelectContent as SelectContent5, SelectItem as SelectItem5, SelectTrigger as SelectTrigger5, SelectValue as SelectValue5 } from "@hermes/plugin-sdk";
+
+// src/guia-logica.js
+var validLevel = (value) => {
+  const n = Number(value);
+  return Number.isFinite(n) ? Math.min(60, Math.max(1, Math.trunc(n))) : 12;
+};
+function normalizeFarm(f) {
+  const d = { comp: "auto", zoneComp: {}, gph: 5, prof: { skin: false, herb: false, mine: false }, group: false, pvp: true, n: 5, session: 2 };
+  const o = f && typeof f === "object" && !Array.isArray(f) ? f : {};
+  const zc = {};
+  if (o.zoneComp && typeof o.zoneComp === "object" && !Array.isArray(o.zoneComp)) {
+    for (const k of Object.keys(o.zoneComp)) if (typeof k === "string" && k && ["low", "med", "high"].includes(o.zoneComp[k])) zc[k] = o.zoneComp[k];
+  }
+  const p = o.prof && typeof o.prof === "object" ? o.prof : {};
+  const n = Number(o.n);
+  return {
+    comp: ["auto", "low", "med", "high"].includes(o.comp) ? o.comp : d.comp,
+    zoneComp: zc,
+    gph: Number.isFinite(+o.gph) && +o.gph > 0 ? Math.min(1e3, +o.gph) : d.gph,
+    prof: { skin: !!p.skin, herb: !!p.herb, mine: !!p.mine },
+    group: !!o.group,
+    pvp: o.pvp !== false,
+    n: Number.isInteger(n) && n >= 3 && n <= 8 ? n : d.n,
+    session: [1, 2, 4].includes(+o.session) ? +o.session : d.session
+  };
+}
+var listaUnica = (x) => Array.isArray(x) ? [...new Set(x.filter((i) => typeof i === "string"))] : [];
+function weaponForLoot(gid, weapons) {
+  const s = String(gid || "");
+  const name = s.slice(s.indexOf("|") + 1).toLowerCase();
+  return (weapons || []).find((w) => String(w.n).toLowerCase() === name) || null;
+}
+function setWeaponOwnedEstado(state, id, obtained, { weapons, dungeons }) {
+  const w = (weapons || []).find((x) => x.id === id);
+  if (!w) return { owned: state.owned, gear: state.gear };
+  const os = new Set(state.owned), gs = new Set(state.gear);
+  if (obtained) os.add(id);
+  else os.delete(id);
+  (dungeons || []).forEach((d, i) => (d.loot || []).forEach((l) => {
+    if (String(l[0]).toLowerCase() === String(w.n).toLowerCase()) {
+      const gid = "d" + i + "|" + l[0];
+      if (obtained) gs.add(gid);
+      else gs.delete(gid);
+    }
+  }));
+  return { owned: [...os], gear: [...gs] };
+}
+function normalizarGuia(v, ctx) {
+  const { G, GF, perfil } = ctx || {};
+  const s = { ...v && typeof v === "object" && !Array.isArray(v) ? v : {} };
+  s.customDps = Number.isFinite(+s.customDps) ? Math.max(0, +s.customDps) : 0;
+  s.weaponDps = Number.isFinite(+s.weaponDps) && +s.weaponDps > 0 ? +s.weaponDps : null;
+  s.owned = listaUnica(s.owned);
+  s.gear = listaUnica(s.gear);
+  s.steps = listaUnica(s.steps);
+  s.lvl = perfil && Number.isFinite(+perfil.nivel) ? Math.min(60, Math.max(1, Math.trunc(+perfil.nivel))) : validLevel(s.lvl);
+  if (!G) return s;
+  s.cls = G.id || s.cls;
+  if (!Object.hasOwn(G.specs || {}, s.spec)) s.spec = G.defaultSpec;
+  if (!(G.prefs || []).some((p) => p[0] === s.pref)) s.pref = G.defaultPref;
+  if (!(G.typeFilters || []).some((f) => f[0] === s.wf)) s.wf = "all";
+  s.eng = G.useEng ? !!s.eng : false;
+  s.name = typeof s.name === "string" ? s.name.slice(0, 20) : "";
+  s.farm = normalizeFarm(s.farm);
+  s.avatar = typeof s.avatar === "string" && s.avatar.startsWith("data:image/") && s.avatar.length <= 98304 ? s.avatar : null;
+  if (typeof s.mf !== "string") s.mf = "all";
+  s.mdg = !!s.mdg;
+  s.who = !!s.who;
+  if (!GF) return s;
+  s.fac = ctx.facKey || s.fac;
+  const weapons = GF.weapons || [];
+  const ids = new Set(weapons.map((w) => w.id));
+  s.owned = s.owned.filter((id) => ids.has(id));
+  if (!["", "other", ...weapons.map((w) => w.id)].includes(s.cur)) s.cur = "";
+  const routes = GF.routes || {};
+  if (!["kalimdor", "ek"].includes(s.realm) || !routes[s.realm]) s.realm = Object.keys(routes)[0] || "kalimdor";
+  const mig = new Set(s.owned);
+  s.gear.forEach((gid) => {
+    const w = weaponForLoot(gid, weapons);
+    if (w) mig.add(w.id);
+  });
+  for (const id of mig) {
+    const r = setWeaponOwnedEstado(s, id, true, { weapons, dungeons: G.dungeons || [] });
+    s.owned = r.owned;
+    s.gear = r.gear;
+  }
+  return s;
+}
+function leerBuild2(texto, ctx) {
+  let v = null;
+  try {
+    v = JSON.parse(texto);
+  } catch {
+    v = null;
+  }
+  return normalizarGuia(v, ctx);
+}
+var wfOf = (w) => w.f || w.t;
+var fmtDps = (w) => (w.dps || 0).toFixed(1) + (w.approx ? "~" : "");
+var wById = (weapons, id) => (weapons || []).find((w) => w.id === id);
+function curDps(state, weapons) {
+  if (state.cur === "other") return state.customDps || 0;
+  const w = wById(weapons, state.cur);
+  if (!w) return 0;
+  const sw = state.simc && state.simc.weapon;
+  if (sw && sw.match && sw.match.id === state.cur && sw.dps) return sw.dps;
+  if (state.weaponDps) return state.weaponDps;
+  return w.dps;
+}
+function proximasArmas(weapons, { lvl, pref, eng, os, cur, dps }) {
+  return (weapons || []).filter((w) => {
+    if (os.has(w.id) || w.id === cur) return false;
+    if (pref !== "any" && wfOf(w) !== pref) return false;
+    if (w.eng && !eng) return false;
+    if (w.dps <= dps * 1.02) return false;
+    return w.lvl <= lvl + 12;
+  }).sort((a, b) => a.lvl - b.lvl || b.dps - a.dps);
+}
+function mejorObtenida(weapons, { lvl, eng, os, cur, dps }) {
+  return (weapons || []).filter((w) => os.has(w.id) && w.id !== cur && w.lvl <= lvl && (!w.eng || eng) && w.dps > dps).sort((a, b) => b.dps - a.dps)[0] || null;
+}
+var bands = (GF, realm) => {
+  const routes = GF && GF.routes || {};
+  return routes[realm] || routes[Object.keys(routes)[0]] || [];
+};
+var bandOf = (lista, lvl) => (lista || []).find((b) => lvl >= b.min && lvl <= b.max);
+function dungeonsEnRango(dungeons, lvl, rc) {
+  return (dungeons || []).filter((d) => lvl >= d.r[0] - 5 && lvl <= d.r[1] + 5).sort((a, b) => (lvl >= a.r[0] ? 0 : 1) - (lvl >= b.r[0] ? 0 : 1) || (a.cont === rc ? 0 : 1) - (b.cont === rc ? 0 : 1) || a.r[0] - b.r[0]);
+}
+var macroLen = (code) => new TextEncoder().encode(String(code ?? "")).length;
+var mByName = (macros, n) => (macros || []).find((m) => m.n === n);
+var macroCats = (macros) => [...new Set((macros || []).map((m) => m.cat))];
+var curMf = (mf, cats) => (cats || []).includes(mf) ? mf : "all";
+var macroMods = (code) => [["shift", "⇧"], ["ctrl", "Ctrl"], ["alt", "Alt"]].filter((x) => String(code || "").includes("mod:" + x[0])).map((x) => x[1]);
+var usableFor = (m, lvl, spec) => m.lvl <= lvl && (!m.tal || m.tal === spec);
+function slotFor(b, { mdg, spec, lvl, macros }) {
+  if (b.move) return { move: true };
+  const opts = mdg && b.dg ? [b.dg, ...b.o || []] : b.o || [];
+  let next = null;
+  for (const o of opts) {
+    const m = o.m ? mByName(macros, o.m) : null;
+    if (o.m && !m) continue;
+    if (m && m.tal && m.tal !== spec) continue;
+    const need = m ? m.lvl : o.lvl;
+    if (need <= lvl) return { o, m, ready: true };
+    if (!next || need < next.need) next = { o, m, need };
+  }
+  return next ? Object.assign(next, { ready: false }) : null;
+}
+function slotView(b, ctx) {
+  const s = slotFor(b, ctx);
+  if (!s) return { cls: "free", sub: "libre", t: "", mods: [], mi: -1, tip: "Libre con tu spec actual" };
+  if (s.move) return { cls: "move", sub: "mover", t: "", mods: [], mi: -1, tip: "Movimiento" };
+  const full = s.m ? s.m.n : s.o.s || s.o.t;
+  return {
+    cls: s.ready ? s.m ? "ready" : "spell" : "soon",
+    sub: s.ready ? s.m ? "macro" : "spell" : `lvl ${s.need}`,
+    t: s.o.t,
+    mods: s.m ? macroMods(s.m.code) : [],
+    mi: s.m ? ctx.macros.indexOf(s.m) : -1,
+    tip: s.ready ? s.m ? `${full} — clic para ver la macro` : `${full}: arrastralo desde el libro de hechizos hasta que llegue la macro` : `${full} — llega al ${s.need}`
+  };
+}
+function macroKeyMap(bar) {
+  const out = {};
+  [...bar.keys || [], ...bar.mouse || []].forEach((b) => {
+    ;
+    (b.o || []).forEach((o) => {
+      if (o.m) out[o.m] = b.k;
+    });
+    if (b.dg && b.dg.m) out[b.dg.m] = b.k + " · dungeon";
+  });
+  return out;
+}
+var normItemName = (s) => String(s || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+function weaponLookup(weapons) {
+  const out = {};
+  (weapons || []).forEach((w) => {
+    out[normItemName(w.n)] = w;
+  });
+  return out;
+}
+var SIMC_CLASSES = /* @__PURE__ */ new Set(["warrior", "paladin", "hunter", "rogue", "priest", "shaman", "mage", "warlock", "druid", "deathknight", "monk", "demonhunter", "evoker"]);
+var SIMC_STAT_KEYS = /* @__PURE__ */ new Set(["character_stats", "character_stats_base", "character_stats_bonus", "character_stats_gear", "attack_power", "spell_stats", "spell_power", "regen", "crit", "hit", "haste", "combat_modifiers", "combat_ratings", "defense", "weapon_damage", "pet_info", "pet_stats", "pet_attack_power", "pet_defense", "pet_weapon_damage", "pet_modifiers", "skills", "buffs"]);
+function parseFields(str) {
+  const out = {};
+  String(str || "").split("/").forEach((e) => {
+    const i = e.indexOf(":");
+    if (i < 0) return;
+    out[e.slice(0, i)] = e.slice(i + 1).split(":");
+  });
+  return out;
+}
+var fval = (sec, k, i) => {
+  const f = sec && sec[k];
+  if (!f) return null;
+  const v = parseFloat(f[i == null ? 0 : i]);
+  return Number.isFinite(v) ? v : null;
+};
+function parseSimcProfile(text2) {
+  const d = { level: null, name: null, className: null, race: null, server: null, eng: null, weapon: null, pet: {}, stats: {} };
+  let pendingName = null;
+  const clean = String(text2 || "").replace(/\|\|/g, "|");
+  for (const raw of clean.split(/\r?\n/)) {
+    const line = raw.trim();
+    if (!line) continue;
+    if (line[0] === "#") {
+      const m = line.match(/^#\s*(.+?)\s*\((\d+)\)\s*$/);
+      if (m && line.indexOf("=") < 0) {
+        pendingName = m[1];
+        continue;
+      }
+      const body = line.replace(/^#\s*/, ""), eq2 = body.indexOf("=");
+      if (eq2 > 0) {
+        const k2 = body.slice(0, eq2);
+        if (SIMC_STAT_KEYS.has(k2)) d.stats[k2] = parseFields(body.slice(eq2 + 1));
+      }
+      continue;
+    }
+    const eq = line.indexOf("=");
+    if (eq < 0) continue;
+    const k = line.slice(0, eq), v = line.slice(eq + 1);
+    if (SIMC_CLASSES.has(k)) {
+      d.className = k;
+      d.name = v.replace(/^"|"$/g, "");
+      pendingName = null;
+      continue;
+    }
+    switch (k) {
+      case "level": {
+        const n = parseInt(v, 10);
+        d.level = n >= 1 && n <= 60 ? n : null;
+        break;
+      }
+      case "race":
+        d.race = v;
+        break;
+      case "server":
+        d.server = v;
+        break;
+      case "region":
+        d.region = v;
+        break;
+      case "role":
+        d.role = v;
+        break;
+      case "talents":
+        d.talents = v;
+        break;
+      case "professions":
+        d.eng = v.split("/").some((p) => /^engineering=/i.test(p));
+        d.professions = v.split("/").map((p) => {
+          const i = p.indexOf("=");
+          return i < 0 ? [p.trim(), null] : [p.slice(0, i).trim(), +p.slice(i + 1) || null];
+        }).filter((p) => p[0]);
+        break;
+      case "ranged":
+      case "main_hand":
+      case "off_hand":
+        (d.wslots = d.wslots || {})[k] = { name: pendingName, id: (v.match(/(?:^|,)id=(\d+)/) || [])[1] || null, dps: null, range: null, match: null, slot: k };
+        break;
+      case "pet_family":
+      case "pet_level":
+      case "pet_happiness":
+      case "pet_abilities":
+      case "pet_creature_id":
+        d.pet[k] = v;
+        break;
+      default:
+        break;
+    }
+    if (k !== "ranged" && k !== "main_hand" && k !== "off_hand") pendingName = null;
+  }
+  const wd = d.stats.weapon_damage, WD = { main_hand: "mainhand", off_hand: "offhand", ranged: "ranged" };
+  if (d.wslots && wd) {
+    for (const sl in d.wslots) {
+      const w = d.wslots[sl], key = wd[sl] ? sl : wd[WD[sl]] ? WD[sl] : null;
+      if (key) {
+        const mn = fval(wd, key, 0), mx = fval(wd, key, 1), sp = fval(wd, key, 2);
+        if (mn != null && mx != null && sp > 0) {
+          w.dps = (mn + mx) / 2 / sp;
+          w.range = { min: mn, mx, spd: sp };
+        }
+      }
+    }
+  }
+  return d;
+}
+function pickSimcWeapon(d, slot, lookup) {
+  if (!d.wslots) {
+    d.weapon = null;
+    return;
+  }
+  d.weapon = d.wslots[slot] || d.wslots.ranged || d.wslots.main_hand || null;
+  if (d.weapon && !d.weapon.match && d.weapon.name) d.weapon.match = lookup[normItemName(d.weapon.name)] || null;
+}
+var PET_HAPPY = { 1: "Infeliz · 75%", 2: "Contento · 100%", 3: "Feliz · 125%" };
+var petHappyText = (v) => {
+  const n = parseInt(v, 10);
+  return PET_HAPPY[n] || v || "—";
+};
+function simcHelpers(stats) {
+  const st = stats || {};
+  const num6 = (sec, k, i) => {
+    const v = fval(st[sec], k, i);
+    return v == null ? null : Math.round(v);
+  };
+  const dec = (sec, k, i) => {
+    const v = fval(st[sec], k, i);
+    return v == null ? null : v.toFixed(1);
+  };
+  const pct2 = (sec, k, i) => {
+    const v = fval(st[sec], k, i);
+    return v == null ? null : v.toFixed(1) + "%";
+  };
+  const ap = (kind) => {
+    const a = st.attack_power && st.attack_power[kind];
+    if (!a) return null;
+    const v = (+a[0] || 0) + (+a[1] || 0) - (+a[2] || 0);
+    return v ? String(Math.round(v)) : null;
+  };
+  return { st, num: num6, dec, pct: pct2, ap, fval };
+}
+function simcVitals(stats) {
+  if (!stats) return null;
+  const cs = stats.character_stats || {};
+  const gv = (k) => {
+    const v = fval(cs, k);
+    return v == null ? null : Math.round(v);
+  };
+  const attrs = [["Fuerza", "strength"], ["Agilidad", "agility"], ["Aguante", "stamina"], ["Intelecto", "intellect"], ["Espíritu", "spirit"]].map(([l, k]) => [l, gv(k)]).filter((p) => p[1] != null);
+  const powers = [["Maná", "mana"], ["Rage", "rage"], ["Focus", "focus"], ["Energy", "energy"]].map(([l, k]) => [l, gv(k)]).filter((p) => p[1] > 0);
+  const hp = gv("health"), dpsChar = fval(stats.character_stats_gear, "damage_per_second");
+  if (hp == null && !powers.length && !attrs.length && dpsChar == null) return null;
+  return { hp, powers, attrs, dpsChar };
+}
+function aplicarSimc(state, d, ctx) {
+  const { G, weapons, dungeons } = ctx || {};
+  const out = { ...state };
+  const notes = [];
+  out.weaponDps = null;
+  if (d.level) {
+    out.lvl = d.level;
+    notes.push(`nivel ${d.level}`);
+  }
+  if (d.name) out.name = String(d.name).slice(0, 20);
+  const rp = G && G.simc && G.simc.racePref;
+  if (rp && rp[d.race]) {
+    out.pref = rp[d.race];
+    notes.push(`${d.race} → pref ${rp[d.race]}`);
+  }
+  if (G && G.useEng) {
+    if (d.eng === true) {
+      out.eng = true;
+      notes.push("ingeniería");
+    } else if (d.eng === false) {
+      out.eng = false;
+    }
+  }
+  if (d.weapon) {
+    if (d.weapon.match) {
+      out.cur = d.weapon.match.id;
+      const r = setWeaponOwnedEstado(out, out.cur, true, { weapons, dungeons });
+      out.owned = r.owned;
+      out.gear = r.gear;
+      notes.push(`arma ${d.weapon.match.n}`);
+    } else if (d.weapon.dps) {
+      out.cur = "other";
+      out.customDps = Math.round(d.weapon.dps * 10) / 10;
+      notes.push(`arma "${d.weapon.name || "?"}" ${out.customDps} dps`);
+    }
+  }
+  out.simc = {
+    ts: Date.now(),
+    level: d.level,
+    name: d.name,
+    race: d.race,
+    server: d.server,
+    region: d.region || null,
+    role: d.role || null,
+    talents: d.talents || null,
+    professions: d.professions || null,
+    eng: d.eng,
+    weapon: d.weapon,
+    slots: d.wslots || null,
+    pet: d.pet,
+    stats: d.stats
+  };
+  if (d.professions && d.professions.length) {
+    const names = d.professions.map((p) => String(p[0] || "").toLowerCase());
+    const has = (n) => names.some((x) => x.includes(n));
+    const farm = normalizeFarm(out.farm);
+    farm.prof = { skin: has("skinning"), herb: has("herbalism"), mine: has("mining") };
+    out.farm = farm;
+    if (farm.prof.skin || farm.prof.herb || farm.prof.mine) notes.push("profesiones → farmeo");
+  }
+  return { state: out, nivel: d.level, notes };
+}
+var SIMC_GUIA = { warrior: "warrior", hunter: "hunter", shaman: "shaman" };
+
+// src/vistas/guia/piezas.jsx
+import { useState as useState8 } from "react";
+import { Fragment as Fragment13, jsx as jsx16, jsxs as jsxs16 } from "react/jsx-runtime";
+agregarTextos({
+  "guia.ficha.retrato": "Retrato de {clase}",
+  "guia.ficha.nivel": "nivel",
+  "guia.ficha.personaje": "Tu personaje",
+  "guia.ficha.dps": "DPS equipado",
+  "guia.ficha.armas": "Armas",
+  "guia.ficha.loot": "Loot",
+  "guia.ficha.ruta": "Ruta",
+  "guia.ficha.real": "Personaje real · SimC",
+  "guia.ficha.vida": "Vida",
+  "guia.ficha.talento": "Talento",
+  "guia.ficha.prefArma": "Arma preferida",
+  "guia.ficha.continente": "Continente",
+  "guia.ficha.tipoArma": "Tipo de arma",
+  "guia.ficha.ingenieria": "Ingeniería",
+  "guia.ficha.ingenieria2": "ingeniería",
+  "guia.ficha.equipada": "Equipada",
+  "guia.ficha.mejorAhora": "Mejor ahora",
+  "guia.ficha.siguiente": "Siguiente",
+  "guia.ficha.sinMejoras": "sin mejoras a la vista",
+  "guia.ficha.sinDefinir": "sin definir",
+  "guia.ficha.otraManual": "Otra (dps manual)",
+  "guia.ficha.manual": "manual",
+  "guia.ficha.captura": "captura",
+  "guia.ficha.quitar": "quitar",
+  "guia.rec.yaPodes": "¡ya podés!",
+  "guia.rec.enNivel": "en {n} nivel",
+  "guia.rec.enNiveles": "en {n} niveles",
+  "guia.rec.req": "req {lvl}",
+  "guia.si": "Sí",
+  "guia.no": "No",
+  "guia.simc.tuPersonaje": "Tu personaje — datos reales",
+  "guia.simc.atributos": "Atributos primarios:",
+  "guia.simc.danoSwing": "Daño por swing:",
+  "guia.simc.vel": "vel",
+  "guia.simc.armaEquipada": "Arma equipada",
+  "guia.simc.tablaArma": "tabla (arma sola)",
+  "guia.simc.manoPrinc": "Mano princ.",
+  "guia.simc.manoIzq": "Mano izq.",
+  "guia.simc.aDistancia": "A distancia",
+  "guia.simc.deltaReal": "El DPS real ({real}) incluye tus stats (AP/gear); la tabla es solo del arma — la diferencia es esperada, no un error de la guía.",
+  "guia.simc.noEnTabla": '"{arma}" no está en la tabla de armas — la app usa su DPS real igual.',
+  "guia.simc.pet": "Pet",
+  "guia.simc.nivel": "nivel",
+  "guia.simc.habilidades": "habilidades",
+  "guia.simc.fecha": "Importado el {fecha}."
+}, {
+  "guia.ficha.retrato": "Portrait of {clase}",
+  "guia.ficha.nivel": "level",
+  "guia.ficha.personaje": "Your character",
+  "guia.ficha.dps": "Equipped dps",
+  "guia.ficha.armas": "Weapons",
+  "guia.ficha.loot": "Loot",
+  "guia.ficha.ruta": "Route",
+  "guia.ficha.real": "Real character · SimC",
+  "guia.ficha.vida": "Health",
+  "guia.ficha.talento": "Talent",
+  "guia.ficha.prefArma": "Preferred weapon",
+  "guia.ficha.continente": "Continent",
+  "guia.ficha.tipoArma": "Weapon type",
+  "guia.ficha.ingenieria": "Engineering",
+  "guia.ficha.ingenieria2": "engineering",
+  "guia.ficha.equipada": "Equipped",
+  "guia.ficha.mejorAhora": "Best now",
+  "guia.ficha.siguiente": "Next",
+  "guia.ficha.sinMejoras": "no upgrades in sight",
+  "guia.ficha.sinDefinir": "undefined",
+  "guia.ficha.otraManual": "Other (manual dps)",
+  "guia.ficha.manual": "manual",
+  "guia.ficha.captura": "screenshot",
+  "guia.ficha.quitar": "remove",
+  "guia.rec.yaPodes": "ready!",
+  "guia.rec.enNivel": "at level {n}",
+  "guia.rec.enNiveles": "at level {n}",
+  "guia.rec.req": "req {lvl}",
+  "guia.si": "Yes",
+  "guia.no": "No",
+  "guia.simc.tuPersonaje": "Your character — real data",
+  "guia.simc.atributos": "Primary attributes:",
+  "guia.simc.danoSwing": "Damage per swing:",
+  "guia.simc.vel": "speed",
+  "guia.simc.armaEquipada": "Equipped weapon",
+  "guia.simc.tablaArma": "table (weapon alone)",
+  "guia.simc.manoPrinc": "Main hand",
+  "guia.simc.manoIzq": "Off hand",
+  "guia.simc.aDistancia": "Ranged",
+  "guia.simc.deltaReal": "The real dps ({real}) includes your stats (AP/gear); the table is weapon-only — the difference is expected, not a guide error.",
+  "guia.simc.noEnTabla": '"{arma}" is not in the weapon table — the app uses its real dps anyway.',
+  "guia.simc.pet": "Pet",
+  "guia.simc.nivel": "level",
+  "guia.simc.habilidades": "abilities",
+  "guia.simc.fecha": "Imported on {fecha}."
+});
+var P = {
+  dung: { background: C.fondo2, border: `1px solid ${C.borde}`, borderRadius: 8, marginBottom: 9, overflow: "hidden" },
+  resumen: {
+    cursor: "pointer",
+    listStyle: "none",
+    padding: "11px 14px",
+    display: "flex",
+    alignItems: "center",
+    gap: 10,
+    userSelect: "none",
+    color: C.texto,
+    fontSize: 13
+  },
+  flecha: { color: C.naranja, fontSize: 10, flexShrink: 0, display: "inline-block", transition: "transform .2s" },
+  dname: { fontWeight: 600, color: C.texto, fontSize: 13.5 },
+  dmeta: { color: C.texto3, fontSize: 11.5, marginLeft: 4 },
+  dprog: { marginLeft: "auto", fontSize: 11, color: C.texto3, flexShrink: 0 },
+  dprogFull: { color: C.verde },
+  dloot: { padding: "4px 14px 12px", borderTop: `1px solid ${C.borde}` },
+  inrange: { borderLeft: `3px solid ${C.verde}` },
+  mst: { display: "flex", gap: 10, alignItems: "flex-start", padding: "6px 0", borderBottom: `1px dashed ${C.borde2}`, fontSize: 13 },
+  mstUlt: { borderBottom: "none" },
+  mstLvl: { minWidth: 32, color: C.amarillo, fontWeight: 700, textAlign: "right", flexShrink: 0 },
+  mstTxt: { paddingTop: 1, color: C.texto2, fontSize: 12.5 },
+  tdot: { width: 8, height: 8, background: C.amarillo, transform: "rotate(45deg)", margin: "7px 2px 0 0", flexShrink: 0, borderRadius: 1, opacity: 0.85 },
+  loot: {
+    display: "flex",
+    justifyContent: "space-between",
+    gap: 10,
+    alignItems: "center",
+    padding: "5px 0",
+    borderBottom: `1px dashed ${C.borde2}`
+  },
+  lootSinBorde: { borderBottom: "none" },
+  lootOwn: { opacity: 0.4 },
+  weapline: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: 10,
+    padding: "8px 0",
+    borderBottom: `1px dashed ${C.borde2}`
+  },
+  weaplineUlt: { borderBottom: "none" },
+  weapname: { fontWeight: 600 },
+  weapsrc: { color: C.texto3, fontSize: 11.5, marginTop: 2 },
+  delta: { color: C.verde, fontSize: 11 },
+  deltaNeg: { color: C.texto3 },
+  prog: { height: 7, background: C.fondo3, border: `1px solid ${C.borde2}`, borderRadius: 4, overflow: "hidden", margin: "8px 0 4px" },
+  progBar: { display: "block", height: "100%", background: `linear-gradient(90deg, ${C.naranja}, ${C.amarillo})`, transition: "width .3s" },
+  bandhead: {
+    fontFamily: "Georgia,serif",
+    color: C.amarillo,
+    fontSize: 12,
+    letterSpacing: 1,
+    textTransform: "uppercase",
+    margin: "14px 0 6px",
+    borderBottom: `1px solid ${C.borde2}`,
+    paddingBottom: 4,
+    display: "flex",
+    justifyContent: "space-between"
+  },
+  bandheadZn: { color: C.texto3, fontFamily: "inherit", textTransform: "none", letterSpacing: 0, fontSize: 11.5 },
+  zonaBig: { fontSize: 16.5, color: C.texto, fontWeight: 600 },
+  muted: { color: C.texto3, fontSize: 12.5 },
+  tip: { color: C.texto2, fontSize: 12 },
+  tablaScroll: { maxWidth: "100%", overflowX: "auto" },
+  trPar: { background: "transparent" },
+  trOwned: { opacity: 0.42 },
+  trEq: { background: C.acento + "14" },
+  // teclado / macros
+  kbwrap: { display: "grid", gridTemplateColumns: "minmax(0,1fr) 230px", gap: 14, marginTop: 10 },
+  kb: { display: "flex", flexDirection: "column", gap: 6 },
+  kbrow: { display: "flex", gap: 6 },
+  kcoff: { flex: "0 0 auto" },
+  kcBase: {
+    flex: "0 0 calc((100% - 36px)/7)",
+    minWidth: 0,
+    height: 80,
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "flex-start",
+    gap: 2,
+    padding: "6px 7px",
+    borderRadius: 7,
+    border: `1px solid ${C.borde2}`,
+    borderBottomWidth: 3,
+    background: C.fondo3,
+    color: C.texto,
+    textAlign: "left",
+    font: "inherit",
+    position: "relative",
+    overflow: "hidden",
+    cursor: "pointer",
+    transition: "transform .12s, border-color .12s"
+  },
+  kcReady: { borderColor: C.verde, background: C.fondo3 },
+  kcSpell: { borderColor: C.amarillo },
+  kcSoon: { borderStyle: "dashed", opacity: 0.62 },
+  kcFree: { opacity: 0.3 },
+  kcMove: { opacity: 0.3, background: C.fondo2, borderStyle: "dotted" },
+  kk: { font: `700 13px Georgia,serif`, color: C.amarillo, lineHeight: 1 },
+  km: { position: "absolute", top: 6, right: 7, fontSize: 9, color: C.amarillo, letterSpacing: ".3px" },
+  kn: {
+    fontSize: 11,
+    lineHeight: 1.2,
+    marginTop: "auto",
+    display: "-webkit-box",
+    WebkitLineClamp: 2,
+    WebkitBoxOrient: "vertical",
+    overflow: "hidden"
+  },
+  ks: { fontSize: 9, color: C.texto3, textTransform: "uppercase", letterSpacing: ".5px" },
+  ksReady: { color: C.verde },
+  ksSpell: { color: C.amarillo },
+  ksSoon: { color: C.amarillo },
+  mouse: {
+    background: C.fondo2,
+    border: `1px solid ${C.borde2}`,
+    borderRadius: 8,
+    padding: 8,
+    display: "flex",
+    flexDirection: "column",
+    gap: 6
+  },
+  mt: { fontFamily: "Georgia,serif", fontSize: 10.5, letterSpacing: 1, textTransform: "uppercase", color: C.amarillo, padding: "0 2px" },
+  mrow: {
+    display: "flex",
+    alignItems: "center",
+    gap: 8,
+    width: "100%",
+    padding: "6px 8px",
+    borderRadius: 6,
+    border: `1px solid ${C.borde2}`,
+    background: C.fondo3,
+    color: C.texto,
+    font: "inherit",
+    fontSize: 12,
+    textAlign: "left",
+    cursor: "pointer"
+  },
+  mrowMk: {
+    fontSize: 10,
+    color: C.amarillo,
+    background: C.fondo2,
+    border: `1px solid ${C.amarillo}`,
+    borderRadius: 9,
+    padding: "1px 7px",
+    whiteSpace: "nowrap"
+  },
+  mrowKs: { marginLeft: "auto", fontSize: 9, color: C.texto3, textTransform: "uppercase", letterSpacing: ".5px" },
+  legend: { display: "flex", gap: 12, flexWrap: "wrap", fontSize: 11, color: C.texto3, marginTop: 10 },
+  legendI: { display: "inline-block", width: 10, height: 10, borderRadius: 3, marginRight: 5, verticalAlign: -1, border: `1px solid ${C.borde2}` },
+  chipln: { display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center", marginTop: 8, fontSize: 11.5, color: C.texto3 },
+  chipBtn: {
+    background: C.fondo2,
+    border: `1px solid ${C.borde2}`,
+    color: C.texto,
+    borderRadius: 12,
+    padding: "3px 10px",
+    font: "inherit",
+    fontSize: 11.5,
+    cursor: "pointer"
+  },
+  btnMini: {
+    background: "transparent",
+    border: `1px solid ${C.borde2}`,
+    color: C.texto3,
+    borderRadius: 6,
+    padding: "2px 8px",
+    font: "inherit",
+    fontSize: 11,
+    cursor: "pointer",
+    whiteSpace: "nowrap"
+  },
+  mcode: {
+    background: C.fondo3,
+    border: `1px solid ${C.borde2}`,
+    borderRadius: 6,
+    padding: "9px 11px",
+    marginTop: 7,
+    fontFamily: 'Consolas,"Cascadia Mono",monospace',
+    fontSize: 12,
+    color: C.verde,
+    whiteSpace: "pre",
+    overflowX: "auto",
+    lineHeight: 1.5
+  },
+  mlen: { marginLeft: "auto", font: `10.5px Consolas,"Cascadia Mono",monospace`, color: C.texto3 },
+  mlenOver: { color: C.rojo, fontWeight: 700 },
+  statgrid: { display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(150px,1fr))", gap: "4px 16px", marginTop: 10 },
+  st: {
+    display: "flex",
+    justifyContent: "space-between",
+    gap: 8,
+    fontSize: 12,
+    padding: "3px 0",
+    borderBottom: `1px dashed ${C.borde2}`
+  },
+  stB: { color: C.texto, fontWeight: 600, textAlign: "right" },
+  // ficha de personaje (versión con variables de tema, no pergamino fijo)
+  ficha: { display: "grid", gridTemplateColumns: "120px minmax(0,1fr)", gap: 14, alignItems: "start" },
+  fichaEmb: { display: "flex", flexDirection: "column", alignItems: "center", gap: 6 },
+  fichaPortrait: {
+    position: "relative",
+    width: "100%",
+    aspectRatio: "4/5",
+    borderRadius: 8,
+    overflow: "hidden",
+    border: `1px solid ${C.borde2}`,
+    background: C.fondo3
+  },
+  fichaCls: { fontFamily: "Georgia,serif", fontSize: 14.5, color: C.amarillo, letterSpacing: ".4px" },
+  fichaLvl: { display: "flex", alignItems: "baseline", gap: 5 },
+  fichaLvlB: { fontSize: 24, color: C.amarillo, lineHeight: 1, fontFamily: "Georgia,serif" },
+  fichaLvlS: { fontSize: 9.5, textTransform: "uppercase", letterSpacing: 1.2, color: C.texto3 },
+  fichaAvbtns: { display: "flex", gap: 4, justifyContent: "center" },
+  fichaName: { fontFamily: "Georgia,serif", fontSize: 18, color: C.texto, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" },
+  fichaNameNon: { fontStyle: "italic", color: C.texto3 },
+  fichaSub: { fontSize: 12, color: C.texto3, marginTop: 1 },
+  fichaVitals: {
+    display: "grid",
+    gridTemplateColumns: "repeat(4,minmax(0,1fr))",
+    marginTop: 9,
+    borderTop: `1px solid ${C.borde}`,
+    borderBottom: `1px solid ${C.borde}`
+  },
+  fv: { padding: "6px 10px 7px", borderRight: `1px solid ${C.borde2}`, display: "flex", flexDirection: "column", gap: 3, minWidth: 0 },
+  fvUlt: { borderRight: "none" },
+  fl: { fontSize: 9.5, textTransform: "uppercase", letterSpacing: ".8px", color: C.texto3 },
+  fvV: { fontSize: 15.5, color: C.texto, fontWeight: 700, lineHeight: 1.15 },
+  fbar: { height: 4, background: C.fondo3, borderRadius: 2, overflow: "hidden", display: "block" },
+  fbarU: { display: "block", height: "100%", background: `linear-gradient(90deg, ${C.naranja}, ${C.amarillo})` },
+  fichaAttrs: { display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(118px,1fr))", gap: "6px 14px", marginTop: 9 },
+  fa: { display: "flex", flexDirection: "column", gap: 1, minWidth: 0 },
+  faB: { fontSize: 12.5, color: C.texto, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" },
+  fichaWeap: { display: "flex", gap: "8px 20px", flexWrap: "wrap", marginTop: 9, paddingTop: 8, borderTop: `1px dashed ${C.borde}` },
+  fw: { display: "flex", alignItems: "baseline", gap: 7, fontSize: 12.5, minWidth: 0, flex: "1 1 220px" },
+  fwI: { fontStyle: "normal", color: C.texto3, fontSize: 11.5, whiteSpace: "nowrap" },
+  fichaReal: {
+    display: "flex",
+    flexWrap: "wrap",
+    gap: "4px 16px",
+    alignItems: "baseline",
+    marginTop: 8,
+    paddingTop: 7,
+    borderTop: `1px dashed ${C.borde}`,
+    fontSize: 11,
+    color: C.texto3
+  },
+  fichaRealB: { color: C.texto, fontWeight: 600 },
+  frItems: { display: "flex", flexWrap: "wrap", gap: "4px 16px" },
+  // badges / placas
+  placaBase: {
+    display: "inline-flex",
+    alignItems: "center",
+    fontSize: 10,
+    padding: "2px 8px",
+    borderRadius: 9,
+    border: `1px solid ${C.borde2}`,
+    color: C.texto3,
+    marginLeft: 6,
+    whiteSpace: "nowrap",
+    verticalAlign: "middle"
+  },
+  placaNow: { background: C.verde + "1c", color: C.verde, borderColor: C.verde, fontWeight: 600 },
+  placaSoon: { color: C.amarillo, borderColor: C.amarillo },
+  placaCat: { color: C.amarillo, borderColor: C.naranja },
+  placaEq: { color: C.fondo2, background: C.verde, borderColor: C.verde, fontWeight: 700, marginLeft: 0 },
+  placaKey: { color: C.amarillo, borderColor: C.amarillo, fontFamily: "Consolas,monospace" },
+  placaTal: { color: C.morado, borderColor: C.morado },
+  placaTalOff: { opacity: 0.55 },
+  placaLocK: { color: C.amarillo, borderColor: C.amarillo },
+  placaLocE: { color: C.azul, borderColor: C.azul },
+  placaEng: { color: C.naranja, borderColor: C.naranja },
+  fold: { borderTop: `1px dashed ${C.borde2}`, marginTop: 9 },
+  foldSum: {
+    cursor: "pointer",
+    listStyle: "none",
+    display: "flex",
+    alignItems: "center",
+    gap: 8,
+    padding: "5px 0",
+    color: C.texto3,
+    fontSize: 12,
+    userSelect: "none"
+  },
+  foldBody: { padding: "3px 0 7px" }
+};
+var ICONOS = {
+  bow: /* @__PURE__ */ jsxs16(Fragment13, { children: [
+    /* @__PURE__ */ jsx16("path", { d: "M7 3v18" }),
+    /* @__PURE__ */ jsx16("path", { d: "M7 3c9 3 13 6 13 9s-4 6-13 9" }),
+    /* @__PURE__ */ jsx16("path", { d: "M3.5 12H19M15.5 8.5L19 12l-3.5 3.5" })
+  ] }),
+  pin: /* @__PURE__ */ jsxs16(Fragment13, { children: [
+    /* @__PURE__ */ jsx16("path", { d: "M12 21s-6.5-5.2-6.5-10.4a6.5 6.5 0 1 1 13 0C18.5 15.8 12 21 12 21z" }),
+    /* @__PURE__ */ jsx16("circle", { cx: "12", cy: "10.4", r: "2.3" })
+  ] }),
+  gate: /* @__PURE__ */ jsx16(Fragment13, { children: /* @__PURE__ */ jsx16("path", { d: "M4 21V9l8-6 8 6v12M4 21h16M9 21v-7h6v7" }) }),
+  star: /* @__PURE__ */ jsx16("path", { d: "M12 3.5l2.5 5.2 5.7.8-4.1 4 1 5.7-5.1-2.7-5.1 2.7 1-5.7-4.1-4 5.7-.8z" }),
+  scroll: /* @__PURE__ */ jsxs16(Fragment13, { children: [
+    /* @__PURE__ */ jsx16("path", { d: "M7 3h11v18l-3-1.8L12 21l-3-1.8L6 21z" }),
+    /* @__PURE__ */ jsx16("path", { d: "M9.5 8h6M9.5 12h6" })
+  ] }),
+  coin: /* @__PURE__ */ jsxs16(Fragment13, { children: [
+    /* @__PURE__ */ jsx16("circle", { cx: "12", cy: "12", r: "8.5" }),
+    /* @__PURE__ */ jsx16("path", { d: "M12 7.5v9M9 9.5h6" })
+  ] }),
+  alert: /* @__PURE__ */ jsxs16(Fragment13, { children: [
+    /* @__PURE__ */ jsx16("path", { d: "M12 3.5L22 20H2z" }),
+    /* @__PURE__ */ jsx16("path", { d: "M12 10v4.5M12 17.5v.01" })
+  ] }),
+  check: /* @__PURE__ */ jsx16("path", { d: "M4.5 12.5l4.5 4.5L19.5 7" }),
+  route: /* @__PURE__ */ jsx16(Fragment13, { children: /* @__PURE__ */ jsx16("path", { d: "M5 5.5h3.5l2 4H19M5 5.5v13m0 0h4M19 9.5v4l-3.5 2-4-2M15.5 15.5l-2-4" }) }),
+  skull: /* @__PURE__ */ jsxs16(Fragment13, { children: [
+    /* @__PURE__ */ jsx16("path", { d: "M12 3a7 7 0 0 0-7 7c0 2.5 1.3 4.3 3 5.4V19a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2v-3.6c1.7-1.1 3-2.9 3-5.4a7 7 0 0 0-7-7z" }),
+    /* @__PURE__ */ jsx16("path", { d: "M9 10.5h.01M15 10.5h.01M10.5 18v-2M13.5 18v-2" })
+  ] }),
+  copy: /* @__PURE__ */ jsxs16(Fragment13, { children: [
+    /* @__PURE__ */ jsx16("rect", { x: "8.5", y: "8.5", width: "11", height: "11", rx: "2" }),
+    /* @__PURE__ */ jsx16("path", { d: "M15.5 8.5V6a1.5 1.5 0 0 0-1.5-1.5H6A1.5 1.5 0 0 0 4.5 6v8A1.5 1.5 0 0 0 6 15.5h2.5" })
+  ] }),
+  kbd: /* @__PURE__ */ jsxs16(Fragment13, { children: [
+    /* @__PURE__ */ jsx16("rect", { x: "2.5", y: "6", width: "19", height: "12", rx: "2" }),
+    /* @__PURE__ */ jsx16("path", { d: "M6 10h.01M10 10h.01M14 10h.01M18 10h.01M7 14h10" })
+  ] }),
+  sword: /* @__PURE__ */ jsxs16(Fragment13, { children: [
+    /* @__PURE__ */ jsx16("path", { d: "M14.5 17.5L4 7V4h3l10.5 10.5" }),
+    /* @__PURE__ */ jsx16("path", { d: "M13 19l6-6" }),
+    /* @__PURE__ */ jsx16("path", { d: "M16 16l3 3" }),
+    /* @__PURE__ */ jsx16("path", { d: "M19 13l2 2" })
+  ] }),
+  staff: /* @__PURE__ */ jsxs16(Fragment13, { children: [
+    /* @__PURE__ */ jsx16("path", { d: "M12 3v18" }),
+    /* @__PURE__ */ jsx16("path", { d: "M12 3l-2.5 3M12 3l2.5 3" }),
+    /* @__PURE__ */ jsx16("circle", { cx: "12", cy: "8", r: "1.6" })
+  ] })
+};
+function Icono({ n, size = 16, color }) {
+  return /* @__PURE__ */ jsx16(
+    "svg",
+    {
+      viewBox: "0 0 24 24",
+      fill: "none",
+      stroke: "currentColor",
+      strokeWidth: "1.7",
+      strokeLinecap: "round",
+      strokeLinejoin: "round",
+      style: { width: size, height: size, color, flexShrink: 0 },
+      "aria-hidden": "true",
+      children: ICONOS[n] || ICONOS.star
+    }
+  );
+}
+function Detalle({ titulo, meta, extra, children, abierto, estilo, resumenExtra }) {
+  const [open, setOpen] = useState8(!!abierto);
+  return /* @__PURE__ */ jsxs16(
+    "details",
+    {
+      open,
+      onToggle: (e) => setOpen(e.currentTarget.open),
+      style: { ...P.dung, ...open ? { borderColor: C.borde2 } : {}, ...estilo },
+      children: [
+        /* @__PURE__ */ jsxs16("summary", { style: P.resumen, children: [
+          /* @__PURE__ */ jsx16("span", { style: { ...P.flecha, transform: open ? "rotate(90deg)" : "none" }, children: "▶" }),
+          titulo != null ? /* @__PURE__ */ jsx16("span", { style: P.dname, children: titulo }) : null,
+          meta != null ? /* @__PURE__ */ jsx16("span", { style: P.dmeta, children: meta }) : null,
+          extra,
+          resumenExtra
+        ] }),
+        /* @__PURE__ */ jsx16("div", { style: P.dloot, children })
+      ]
+    }
+  );
+}
+function Placa({ tono = "plain", children, title, estilo }) {
+  const base = { ...P.placaBase, ...P["placa" + tono[0].toUpperCase() + tono.slice(1)] || {} };
+  return /* @__PURE__ */ jsx16("span", { title, style: { ...base, ...estilo }, children });
+}
+var locPlaca = (cont, lang) => {
+  const k = cont === "K" ? "Kalimdor" : "EK";
+  return /* @__PURE__ */ jsx16(Placa, { tono: cont === "K" ? "locK" : "locE", title: k, children: k });
+};
+var QMAP = { common: 1, uncommon: 2, rare: 3, epic: 4 };
+function NombreCalidad({ q, children, estilo }) {
+  return /* @__PURE__ */ jsx16("span", { style: { color: CALIDAD[QMAP[q]] || C.texto, ...estilo }, children });
+}
+function Wline({ w, lvl, dps, tipos, lang, ultimo }) {
+  const diff = w.lvl - lvl, dlt = dps ? (w.dps - dps).toFixed(1) : null;
+  return /* @__PURE__ */ jsxs16("div", { className: "weapline", style: { ...P.weapline, ...ultimo ? P.weaplineUlt : {} }, children: [
+    /* @__PURE__ */ jsxs16("div", { children: [
+      /* @__PURE__ */ jsx16(NombreCalidad, { q: w.q, estilo: P.weapname, children: w.n }),
+      " ",
+      /* @__PURE__ */ jsx16(Placa, { tono: "plain", estilo: { marginLeft: 0 }, children: tipos && (tipos[w.t] || w.t) }),
+      diff <= 0 ? /* @__PURE__ */ jsx16(Placa, { tono: "now", estilo: { marginLeft: 4 }, children: t(lang, "guia.rec.yaPodes") }) : /* @__PURE__ */ jsx16(Placa, { tono: "soon", estilo: { marginLeft: 4 }, children: diff <= 1 ? t(lang, "guia.rec.enNivel", { n: diff }) : t(lang, "guia.rec.enNiveles", { n: diff }) }),
+      /* @__PURE__ */ jsxs16("div", { style: P.weapsrc, children: [
+        w.src,
+        w.note ? /* @__PURE__ */ jsxs16(Fragment13, { children: [
+          " · ",
+          /* @__PURE__ */ jsx16("i", { children: w.note })
+        ] }) : null
+      ] })
+    ] }),
+    /* @__PURE__ */ jsxs16("div", { style: { textAlign: "right", flexShrink: 0 }, children: [
+      /* @__PURE__ */ jsx16("b", { children: fmtDps(w) }),
+      /* @__PURE__ */ jsxs16("div", { style: P.weapsrc, children: [
+        "dps · req ",
+        w.lvl
+      ] }),
+      dlt != null ? /* @__PURE__ */ jsxs16("div", { style: dlt > 0 ? P.delta : P.deltaNeg, children: [
+        "+",
+        dlt,
+        " vs actual"
+      ] }) : null
+    ] })
+  ] });
+}
+function facEscudo(fac, letra) {
+  const col = fac === "alliance" ? C.azul : C.rojo;
+  return /* @__PURE__ */ jsxs16("svg", { viewBox: "0 0 24 24", "aria-hidden": "true", style: { width: 24, height: 24, display: "block" }, children: [
+    /* @__PURE__ */ jsx16("path", { d: "M12 1.8l8 3.4v6.2c0 5.2-3.4 9.2-8 11-4.6-1.8-8-5.8-8-11V5.2z", fill: col, stroke: C.amarillo, strokeWidth: "1.4" }),
+    /* @__PURE__ */ jsx16("text", { x: "12", y: "16.6", textAnchor: "middle", fontFamily: "Georgia,serif", fontSize: "11", fontWeight: "700", fill: C.texto, children: letra })
+  ] });
+}
+var SKINS = [C.naranja, C.amarillo];
+function skinDe(simcRace) {
+  const k = String(simcRace || "").toLowerCase().replace(/[^a-z]/g, "");
+  let h = 0;
+  for (const ch of k) h = h * 31 + ch.charCodeAt(0) >>> 0;
+  return SKINS[k ? h % SKINS.length : 0];
+}
+function charRetrato({ G, fac, simcRace, avatar, lang }) {
+  if (avatar) return /* @__PURE__ */ jsx16("img", { src: avatar, alt: t(lang, "guia.ficha.retrato", { clase: G.name }), style: { width: "100%", height: "100%", objectFit: "cover", display: "block" } });
+  const skin = skinDe(simcRace), acc = G.accent || C.amarillo;
+  const cloak = fac === "alliance" ? C.azul : C.rojo;
+  const trim = fac === "alliance" ? C.azul : C.naranja;
+  const armor = { hunter: C.naranja, warrior: C.texto3, shaman: C.morado }[G.id] || C.naranja;
+  const armorD = { hunter: C.texto4, warrior: C.texto4, shaman: C.texto4 }[G.id] || C.texto4;
+  const gear = {
+    hunter: /* @__PURE__ */ jsxs16(Fragment13, { children: [
+      /* @__PURE__ */ jsx16("path", { d: "M32 52 C26 18 44 2 60 2 C77 2 94 19 88 52 L83 60 C76 47 44 47 37 60 Z", fill: C.texto4 }),
+      /* @__PURE__ */ jsx16("path", { d: "M38 50 C36 26 46 12 60 12 C74 12 84 26 82 50", fill: "none", stroke: C.texto3, strokeWidth: "2", opacity: ".55" })
+    ] }),
+    warrior: /* @__PURE__ */ jsxs16(Fragment13, { children: [
+      /* @__PURE__ */ jsx16("path", { d: "M37 46 C37 18 46 8 60 8 C74 8 83 18 83 46 L41 46 Z", fill: armor }),
+      /* @__PURE__ */ jsx16("path", { d: "M37 46 C37 18 46 8 60 8 C74 8 83 18 83 46", fill: "none", stroke: armorD, strokeWidth: "2" }),
+      /* @__PURE__ */ jsx16("path", { d: "M40 34 C30 26 24 14 27 4 C36 8 42 18 43 30 Z", fill: skin }),
+      /* @__PURE__ */ jsx16("path", { d: "M80 34 C90 26 96 14 93 4 C84 8 78 18 77 30 Z", fill: skin })
+    ] }),
+    shaman: /* @__PURE__ */ jsxs16(Fragment13, { children: [
+      /* @__PURE__ */ jsx16("path", { d: "M36 40 Q60 31 84 40 L84 47 Q60 38 36 47 Z", fill: C.amarillo }),
+      /* @__PURE__ */ jsx16("path", { d: "M44 36 C38 26 36 16 40 6 M50 34 C48 22 50 12 56 4", stroke: skin, strokeWidth: "3.4", fill: "none", strokeLinecap: "round" }),
+      /* @__PURE__ */ jsx16("path", { d: "M76 36 C82 26 84 16 80 6 M70 34 C72 22 70 12 64 4", stroke: skin, strokeWidth: "3.4", fill: "none", strokeLinecap: "round" }),
+      /* @__PURE__ */ jsx16("rect", { x: "56", y: "30", width: "8", height: "10", rx: "2", fill: skin, opacity: ".85" })
+    ] })
+  }[G.id] || /* @__PURE__ */ jsx16("path", { d: "M36 48 C34 24 46 12 60 12 C74 12 86 24 84 48 L78 44 C76 32 68 28 60 28 C52 28 44 32 42 44 Z", fill: C.texto4 });
+  return /* @__PURE__ */ jsxs16("svg", { viewBox: "0 0 120 150", preserveAspectRatio: "xMidYMid slice", role: "img", "aria-label": t(lang, "guia.ficha.retrato", { clase: G.name }), style: { width: "100%", height: "100%", display: "block" }, children: [
+    /* @__PURE__ */ jsx16("defs", { children: /* @__PURE__ */ jsxs16("linearGradient", { id: "pbg-" + G.id, x1: "0", y1: "0", x2: "0", y2: "1", children: [
+      /* @__PURE__ */ jsx16("stop", { offset: "0", stopColor: acc, stopOpacity: ".18" }),
+      /* @__PURE__ */ jsx16("stop", { offset: "1", stopColor: C.fondo3 })
+    ] }) }),
+    /* @__PURE__ */ jsx16("rect", { width: "120", height: "150", fill: "url(#pbg-" + G.id + ")" }),
+    /* @__PURE__ */ jsx16("circle", { cx: "60", cy: "58", r: "46", fill: "none", stroke: trim, strokeOpacity: ".4", strokeWidth: "1.5", strokeDasharray: "3 5" }),
+    /* @__PURE__ */ jsx16("path", { d: "M4 152 C4 104 30 90 60 90 C90 90 116 104 116 152 Z", fill: cloak }),
+    /* @__PURE__ */ jsx16("path", { d: "M16 152 C16 112 38 100 60 100 C82 100 104 112 104 152 Z", fill: armor }),
+    /* @__PURE__ */ jsx16("path", { d: "M16 152 C16 112 38 100 60 100 C82 100 104 112 104 152", fill: "none", stroke: armorD, strokeWidth: "2", opacity: ".7" }),
+    /* @__PURE__ */ jsx16("path", { d: "M52 84 h16 v14 c0 5 -16 5 -16 0 z", fill: skin }),
+    /* @__PURE__ */ jsx16("ellipse", { cx: "60", cy: "54", rx: "25", ry: "30", fill: skin }),
+    /* @__PURE__ */ jsx16("ellipse", { cx: "35", cy: "56", rx: "4", ry: "7", fill: skin }),
+    /* @__PURE__ */ jsx16("ellipse", { cx: "85", cy: "56", rx: "4", ry: "7", fill: skin }),
+    /* @__PURE__ */ jsx16("circle", { cx: "50", cy: "56", r: "2.8", fill: C.texto4 }),
+    /* @__PURE__ */ jsx16("circle", { cx: "70", cy: "56", r: "2.8", fill: C.texto4 }),
+    /* @__PURE__ */ jsx16("path", { d: "M45 48 q5 -2.5 9 -.5 M66 48 q5 -2 9 .5", stroke: C.texto4, strokeWidth: "1.6", fill: "none", strokeLinecap: "round" }),
+    /* @__PURE__ */ jsx16("path", { d: "M59 60 q2 4 -1 7", stroke: C.texto3, strokeWidth: "1.4", fill: "none", strokeLinecap: "round" }),
+    gear,
+    /* @__PURE__ */ jsx16("g", { transform: "translate(82,104) scale(1.5)", fill: "none", stroke: trim, strokeOpacity: ".85", strokeWidth: "1.6", strokeLinecap: "round", strokeLinejoin: "round", children: ICONOS[G.icon] || ICONOS.star })
+  ] });
+}
+function Vital({ label, valor, barra, ultimo }) {
+  return /* @__PURE__ */ jsxs16("div", { style: { ...P.fv, ...ultimo ? P.fvUlt : {} }, children: [
+    /* @__PURE__ */ jsx16("span", { style: P.fl, children: label }),
+    /* @__PURE__ */ jsx16("b", { style: P.fvV, children: valor }),
+    barra != null ? /* @__PURE__ */ jsx16("i", { style: P.fbar, children: /* @__PURE__ */ jsx16("span", { style: { ...P.fbarU, width: Math.max(0, Math.min(100, barra * 100)).toFixed(1) + "%" } }) }) : null
+  ] });
+}
+function Ficha({ v, lang }) {
+  const { G, GF, fac, lvl, build, os, dps, cands, onAvatar, onAvatarDel } = v;
+  const specN = G.specs[build.spec] || build.spec;
+  const prefP = (G.prefs || []).find((p) => p[0] === build.pref);
+  const wCur = build.cur === "other" ? null : (GF.weapons || []).find((w) => w.id === build.cur);
+  const wTot = (GF.weapons || []).length;
+  const wOwn = (GF.weapons || []).reduce((n, w) => n + (os.has(w.id) ? 1 : 0), 0);
+  const lootTot = (G.dungeons || []).reduce((n, d) => n + (d.loot || []).length, 0);
+  const lootN = v.gs.size;
+  const mileTot = (GF.milestones || []).length, mileN = v.ss.size;
+  const avail = cands.filter((w) => w.lvl <= lvl).sort((a, b) => b.dps - a.dps);
+  const next = cands.filter((w) => w.lvl > lvl).sort((a, b) => a.lvl - b.lvl || b.dps - a.dps);
+  const pick = avail[0] || next[0] || null;
+  const wName = build.cur === "other" ? t(lang, "guia.ficha.otraManual") : wCur ? wCur.n : t(lang, "guia.ficha.sinDefinir");
+  const wType = wCur ? G.types[wCur.t] || wCur.t : build.cur === "other" ? t(lang, "guia.ficha.manual") : "—";
+  const facLabel = v.facLabel || fac;
+  const attrs = [
+    [t(lang, "guia.ficha.talento"), specN],
+    [t(lang, "guia.ficha.prefArma"), prefP ? prefP[1] : "—"],
+    [t(lang, "guia.ficha.continente"), v.realmLabel],
+    [t(lang, "guia.ficha.tipoArma"), wType]
+  ];
+  if (G.useEng) attrs.push([t(lang, "guia.ficha.ingenieria"), build.eng ? t(lang, "guia.si") : t(lang, "guia.no")]);
+  const vit = simcVitals(build.simc && build.simc.stats ? build.simc.stats : null);
+  const realChips = vit ? (() => {
+    const it = [];
+    if (vit.hp != null) it.push([t(lang, "guia.ficha.vida"), vit.hp]);
+    vit.powers.forEach((p) => it.push(p));
+    vit.attrs.forEach((a) => it.push(a));
+    if (vit.dpsChar != null) it.push(["DPS", vit.dpsChar.toFixed(1)]);
+    return it;
+  })() : [];
+  const dpsTxt = dps ? dps.toFixed(1) + (wCur && wCur.approx ? "~" : "") : "—";
+  return /* @__PURE__ */ jsxs16("div", { className: "ficha", style: P.ficha, children: [
+    /* @__PURE__ */ jsxs16("div", { style: P.fichaEmb, children: [
+      /* @__PURE__ */ jsxs16("div", { style: P.fichaPortrait, children: [
+        charRetrato({ G, fac, simcRace: build.simc && build.simc.race, avatar: build.avatar, lang }),
+        /* @__PURE__ */ jsx16("span", { style: {
+          position: "absolute",
+          right: 5,
+          bottom: 5,
+          width: 26,
+          height: 26,
+          borderRadius: "50%",
+          background: C.fondo2,
+          border: `1px solid ${C.borde2}`,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          color: G.accent || C.amarillo
+        }, children: /* @__PURE__ */ jsx16(Icono, { n: G.icon, size: 15 }) })
+      ] }),
+      /* @__PURE__ */ jsx16("div", { style: P.fichaCls, children: G.name }),
+      /* @__PURE__ */ jsxs16("div", { className: "ficha-lvl", style: P.fichaLvl, children: [
+        /* @__PURE__ */ jsx16("b", { style: P.fichaLvlB, children: lvl }),
+        /* @__PURE__ */ jsx16("span", { style: P.fichaLvlS, children: t(lang, "guia.ficha.nivel") })
+      ] }),
+      /* @__PURE__ */ jsx16("div", { title: facLabel, style: { lineHeight: 0 }, children: facEscudo(fac, facLabel.charAt(0).toUpperCase()) }),
+      /* @__PURE__ */ jsxs16("div", { style: P.fichaAvbtns, children: [
+        /* @__PURE__ */ jsx16("button", { type: "button", style: P.btnMini, onClick: onAvatar, title: t(lang, "guia.ficha.capturaAyuda"), children: t(lang, "guia.ficha.captura") }),
+        build.avatar ? /* @__PURE__ */ jsx16("button", { type: "button", style: P.btnMini, onClick: onAvatarDel, title: t(lang, "guia.ficha.quitarAyuda"), children: t(lang, "guia.ficha.quitar") }) : null
+      ] })
+    ] }),
+    /* @__PURE__ */ jsxs16("div", { style: { minWidth: 0 }, children: [
+      /* @__PURE__ */ jsx16("div", { children: /* @__PURE__ */ jsx16("span", { style: { ...P.fichaName, ...build.name ? {} : P.fichaNameNon }, children: build.name || t(lang, "guia.ficha.personaje") }) }),
+      /* @__PURE__ */ jsxs16("div", { style: P.fichaSub, children: [
+        /* @__PURE__ */ jsx16(TextoRico, { html: G.title }),
+        " · ",
+        facLabel
+      ] }),
+      /* @__PURE__ */ jsxs16("div", { style: P.fichaVitals, children: [
+        /* @__PURE__ */ jsx16(Vital, { label: t(lang, "guia.ficha.dps"), valor: dpsTxt, ultimo: false }),
+        /* @__PURE__ */ jsx16(Vital, { label: t(lang, "guia.ficha.armas"), valor: `${wOwn}/${wTot}`, barra: wTot ? wOwn / wTot : null }),
+        /* @__PURE__ */ jsx16(Vital, { label: t(lang, "guia.ficha.loot"), valor: lootN, barra: lootTot ? lootN / lootTot : null }),
+        /* @__PURE__ */ jsx16(Vital, { label: t(lang, "guia.ficha.ruta"), valor: `${mileN}/${mileTot}`, barra: mileTot ? mileN / mileTot : null, ultimo: true })
+      ] }),
+      vit && realChips.length ? /* @__PURE__ */ jsxs16("div", { style: P.fichaReal, children: [
+        /* @__PURE__ */ jsx16("span", { style: P.fl, children: t(lang, "guia.ficha.real") }),
+        /* @__PURE__ */ jsx16("span", { style: P.frItems, children: realChips.map(([l, val], i) => /* @__PURE__ */ jsxs16("span", { children: [
+          l,
+          " ",
+          /* @__PURE__ */ jsx16("b", { style: P.fichaRealB, children: val })
+        ] }, i)) })
+      ] }) : null,
+      /* @__PURE__ */ jsx16("div", { style: P.fichaAttrs, children: attrs.map(([l, val]) => /* @__PURE__ */ jsxs16("div", { style: P.fa, children: [
+        /* @__PURE__ */ jsx16("span", { style: P.fl, children: l }),
+        /* @__PURE__ */ jsx16("b", { style: P.faB, children: val })
+      ] }, l)) }),
+      /* @__PURE__ */ jsxs16("div", { style: P.fichaWeap, children: [
+        /* @__PURE__ */ jsxs16("div", { style: P.fw, children: [
+          /* @__PURE__ */ jsx16("span", { style: P.fl, children: t(lang, "guia.ficha.equipada") }),
+          /* @__PURE__ */ jsx16("b", { style: P.faB, children: wName }),
+          /* @__PURE__ */ jsx16("i", { style: P.fwI, children: dps ? dps.toFixed(1) + " dps" : "—" })
+        ] }),
+        /* @__PURE__ */ jsxs16("div", { style: P.fw, children: [
+          /* @__PURE__ */ jsx16("span", { style: P.fl, children: avail.length ? t(lang, "guia.ficha.mejorAhora") : t(lang, "guia.ficha.siguiente") }),
+          /* @__PURE__ */ jsx16("b", { style: P.faB, children: pick ? pick.n : "—" }),
+          /* @__PURE__ */ jsx16("i", { style: P.fwI, children: pick ? `${fmtDps(pick)} dps · ${pick.lvl <= lvl ? t(lang, "guia.rec.yaPodes") : t(lang, "guia.rec.req", { lvl: pick.lvl })}` : t(lang, "guia.ficha.sinMejoras") })
+        ] })
+      ] })
+    ] })
+  ] });
+}
+function SimcCard({ simc, G, lang }) {
+  if (!simc || typeof simc !== "object") return null;
+  const st = simc.stats || {};
+  const helpers = simcHelpers(st);
+  const row = (label, val) => val == null || val === "" ? null : /* @__PURE__ */ jsxs16("div", { style: P.st, children: [
+    /* @__PURE__ */ jsx16("span", { style: P.muted, children: label }),
+    /* @__PURE__ */ jsx16("b", { style: P.stB, children: val })
+  ] }, label);
+  const vit = simcVitals(st);
+  const SLOT_LBL = { main_hand: t(lang, "guia.simc.manoPrinc"), off_hand: t(lang, "guia.simc.manoIzq"), ranged: t(lang, "guia.simc.aDistancia") };
+  const slots = Object.keys(simc.slots || {}).map((sl) => [SLOT_LBL[sl] || sl, simc.slots[sl]]).filter((x) => x[1].range);
+  const w = simc.weapon;
+  const real = w && w.dps;
+  const delta = real != null && w && w.match ? real - w.match.dps : null;
+  const rows = G.simc && G.simc.rows ? G.simc.rows(helpers) : [];
+  const fecha = simc.ts ? new Date(simc.ts).toLocaleDateString(lang === "en" ? "en" : "es") : "";
+  const p = simc.pet || {};
+  const hab = p.pet_abilities ? p.pet_abilities.split("/").filter(Boolean).length : 0;
+  const pvp = /pvp/i.test(simc.server || "") ? "PvP" : null;
+  const meta = [
+    simc.level ? `lvl ${simc.level}` : null,
+    simc.race,
+    simc.server,
+    simc.region,
+    pvp,
+    simc.role,
+    simc.eng ? t(lang, "guia.ficha.ingenieria2") : null
+  ].filter(Boolean);
+  const sum = [
+    simc.level ? `lvl ${simc.level}` : null,
+    w ? (w.name || "arma") + (w.dps != null ? " · " + w.dps.toFixed(1) + " dps" : "") : null,
+    simc.race
+  ].filter(Boolean).join(" · ");
+  return /* @__PURE__ */ jsx16(
+    Detalle,
+    {
+      titulo: /* @__PURE__ */ jsxs16("span", { style: { display: "inline-flex", alignItems: "center", gap: 8 }, children: [
+        /* @__PURE__ */ jsx16(Icono, { n: "scroll", size: 14 }),
+        t(lang, "guia.simc.tuPersonaje")
+      ] }),
+      meta: /* @__PURE__ */ jsx16("span", { style: P.dmeta, children: sum }),
+      children: /* @__PURE__ */ jsxs16("div", { style: { paddingTop: 4 }, children: [
+        vit ? /* @__PURE__ */ jsxs16(Fragment13, { children: [
+          (() => {
+            const vrows = [];
+            if (vit.hp != null) vrows.push([t(lang, "guia.ficha.vida"), vit.hp]);
+            vit.powers.forEach((pp) => vrows.push(pp));
+            if (vit.dpsChar != null) vrows.push(["DPS", vit.dpsChar.toFixed(1)]);
+            return vrows.length ? /* @__PURE__ */ jsx16("div", { style: P.statgrid, children: vrows.map((r) => row(r[0], r[1])) }) : null;
+          })(),
+          vit.attrs.length ? /* @__PURE__ */ jsx16("div", { style: { ...P.muted, marginTop: 8 }, children: /* @__PURE__ */ jsx16("b", { style: { color: C.amarillo }, children: t(lang, "guia.simc.atributos") }) }) : null,
+          vit.attrs.length ? /* @__PURE__ */ jsx16("div", { style: P.statgrid, children: vit.attrs.map((r) => row(r[0], r[1])) }) : null
+        ] }) : null,
+        slots.length ? /* @__PURE__ */ jsxs16(Fragment13, { children: [
+          /* @__PURE__ */ jsx16("div", { style: { ...P.muted, marginTop: 8 }, children: /* @__PURE__ */ jsx16("b", { style: { color: C.amarillo }, children: t(lang, "guia.simc.danoSwing") }) }),
+          /* @__PURE__ */ jsx16("div", { style: P.statgrid, children: slots.map(([l, ww]) => /* @__PURE__ */ jsxs16("div", { style: P.st, children: [
+            /* @__PURE__ */ jsxs16("span", { style: P.muted, children: [
+              l,
+              " — ",
+              ww.name || "?"
+            ] }),
+            /* @__PURE__ */ jsxs16("b", { style: P.stB, children: [
+              ww.range.min.toFixed(1),
+              "–",
+              ww.range.mx.toFixed(1),
+              " · ",
+              ww.range.spd.toFixed(2),
+              " ",
+              t(lang, "guia.simc.vel")
+            ] })
+          ] }, l)) })
+        ] }) : null,
+        w ? /* @__PURE__ */ jsxs16("div", { style: { ...P.statgrid, marginTop: 8 }, children: [
+          /* @__PURE__ */ jsxs16("div", { style: { ...P.st, gridColumn: "1/-1" }, children: [
+            /* @__PURE__ */ jsx16("span", { style: P.muted, children: t(lang, "guia.simc.armaEquipada") }),
+            /* @__PURE__ */ jsxs16("b", { style: { ...P.stB, color: C.verde }, children: [
+              w.name || "arma",
+              " · ",
+              real != null ? real.toFixed(1) + " dps" : "?"
+            ] })
+          ] }),
+          w.match ? row(t(lang, "guia.simc.tablaArma"), w.match.dps.toFixed(1) + " dps" + (w.match.approx ? " ~" : "")) : null,
+          delta != null && Math.abs(delta) >= 0.3 ? /* @__PURE__ */ jsx16("div", { style: { ...P.muted, gridColumn: "1/-1", fontSize: 11.5 }, children: t(lang, "guia.simc.deltaReal", { real: real.toFixed(1) }) }) : null,
+          !w.match && w.name ? /* @__PURE__ */ jsx16("div", { style: { ...P.muted, gridColumn: "1/-1", fontSize: 11.5 }, children: t(lang, "guia.simc.noEnTabla", { arma: w.name }) }) : null
+        ] }) : null,
+        rows.filter((r) => r[1] != null && r[1] !== "").length ? /* @__PURE__ */ jsx16("div", { style: P.statgrid, children: rows.filter((r) => r[1] != null && r[1] !== "").map((r) => row(r[0], r[1])) }) : null,
+        G.simc && G.simc.pet && (p.pet_family || p.pet_happiness) ? /* @__PURE__ */ jsxs16("div", { style: { ...P.muted, marginTop: 8 }, children: [
+          /* @__PURE__ */ jsxs16("b", { style: { color: C.verde }, children: [
+            t(lang, "guia.simc.pet"),
+            ":"
+          ] }),
+          " ",
+          p.pet_family || "?",
+          " · ",
+          t(lang, "guia.simc.nivel"),
+          " ",
+          p.pet_level || "?",
+          " · ",
+          petHappyText(p.pet_happiness),
+          hab ? ` · ${hab} ${t(lang, "guia.simc.habilidades")}` : ""
+        ] }) : null,
+        meta.length ? /* @__PURE__ */ jsx16("div", { style: { ...P.chipln, marginTop: 8 }, children: meta.map((x) => /* @__PURE__ */ jsx16(Placa, { tono: "plain", estilo: { marginLeft: 0 }, children: x }, x)) }) : null,
+        simc.professions && simc.professions.length ? /* @__PURE__ */ jsx16("div", { style: { ...P.chipln, marginTop: 4 }, children: simc.professions.map((pp, i) => /* @__PURE__ */ jsxs16(Placa, { tono: "plain", estilo: { marginLeft: 0 }, children: [
+          pp[0],
+          pp[1] != null ? " " + pp[1] : ""
+        ] }, i)) }) : null,
+        /* @__PURE__ */ jsx16("div", { style: { ...P.muted, marginTop: 8 }, children: t(lang, "guia.simc.fecha", { fecha }) })
+      ] })
+    }
+  );
+}
+
+// src/vistas/guia/recomendador.jsx
+import { Fragment as Fragment14, jsx as jsx17, jsxs as jsxs17 } from "react/jsx-runtime";
+agregarTextos({
+  "guia.rec.donde": "Dónde levelear ahora",
+  "guia.rec.rango": "rango {min}-{max} · {realm}",
+  "guia.rec.despues": "▶ Después ({min}+):",
+  "guia.rec.dungeonsLbl": "Dungeons:",
+  "guia.rec.recomendaciones": "Recomendaciones de la guía",
+  "guia.rec.proximas": "Tus próximas armas",
+  "guia.rec.subTodos": "todos los tipos",
+  "guia.rec.subSolo": "solo {tipo}",
+  "guia.rec.conIng": "+ingeniería",
+  "guia.rec.nadaPre": "Estás en territorio pre-raid — apuntá a raids o al farm solo de DM East.",
+  "guia.rec.nadaSub": "Subí unos niveles y revisá de nuevo.",
+  "guia.rec.disponibles": "Disponibles ya:",
+  "guia.rec.proxLista": "Próximas:",
+  "guia.rec.mas": "Y {n} más",
+  "guia.rec.mejoras": "Mejoras a futuro",
+  "guia.rec.dgnRango": "Dungeons en tu rango",
+  "guia.rec.abrirLoot": "abre para ver el loot",
+  "guia.rec.items": "{n} ítems",
+  "guia.rec.clave": "CLAVE",
+  "guia.rec.disponible": "disponible",
+  "guia.rec.yaPasada": "ya pasada",
+  "guia.rec.hitos": "Hitos cercanos",
+  "guia.rec.hitosSub": "{n} hitos · {min} a {max}",
+  "guia.rec.footer": "Armas y pasos se tildan en sus pestañas — el recomendador descuenta lo que ya tenés.",
+  "guia.rec.warnMejor": "Tenés un arma mejor sin equipar",
+  "guia.rec.mejorResto": "está en tu inventario y supera a tu arma actual ({actual})."
+}, {
+  "guia.rec.donde": "Where to level now",
+  "guia.rec.rango": "range {min}-{max} · {realm}",
+  "guia.rec.despues": "▶ Next ({min}+):",
+  "guia.rec.dungeonsLbl": "Dungeons:",
+  "guia.rec.recomendaciones": "Guide recommendations",
+  "guia.rec.proximas": "Your next weapons",
+  "guia.rec.subTodos": "all types",
+  "guia.rec.subSolo": "{tipo} only",
+  "guia.rec.conIng": "+engineering",
+  "guia.rec.nadaPre": "You are in pre-raid territory — aim for raids or DM East solo farm.",
+  "guia.rec.nadaSub": "Level up a bit and check again.",
+  "guia.rec.disponibles": "Available now:",
+  "guia.rec.proxLista": "Upcoming:",
+  "guia.rec.mas": "And {n} more",
+  "guia.rec.mejoras": "Future upgrades",
+  "guia.rec.dgnRango": "Dungeons in your range",
+  "guia.rec.abrirLoot": "open for loot",
+  "guia.rec.items": "{n} items",
+  "guia.rec.clave": "KEY",
+  "guia.rec.disponible": "available",
+  "guia.rec.yaPasada": "past",
+  "guia.rec.hitos": "Nearby milestones",
+  "guia.rec.hitosSub": "{n} milestones · {min} to {max}",
+  "guia.rec.footer": "Weapons and steps are checked in their tabs — the advisor discounts what you already have.",
+  "guia.rec.warnMejor": "You own a better weapon you are not using",
+  "guia.rec.mejorResto": "is in your inventory and beats your current weapon ({actual})."
+});
+var LOC_HTML = { K: "Kalimdor", E: "EK" };
+function VistaRec({ v, lang }) {
+  const {
+    G,
+    GF,
+    lvl,
+    build,
+    os,
+    ss,
+    dps,
+    cands,
+    ownedBetter,
+    dungs,
+    miles,
+    band,
+    nextBand,
+    realmLabel,
+    tipos
+  } = v;
+  const recHtml = GF.recExtra ? GF.recExtra({ state: build, G, GF, lvl, os, dps, icon: () => "", locBadge: (c) => `<b>${LOC_HTML[c] || c}</b>` }) : "";
+  const prefP = (G.prefs || []).find((p) => p[0] === build.pref);
+  const subTipos = build.pref === "any" ? t(lang, "guia.rec.subTodos") : t(lang, "guia.rec.subSolo", { tipo: (prefP ? prefP[1] : build.pref).toLowerCase() });
+  const subArmas = `${subTipos}${build.eng ? " · " + t(lang, "guia.rec.conIng") : ""}`;
+  const availL = cands.filter((w) => w.lvl <= lvl).sort((a, b) => b.dps - a.dps);
+  const nextL = cands.filter((w) => w.lvl > lvl);
+  const availShow = availL.slice(0, 4);
+  const nextShow = availL.length ? [] : nextL.slice(0, 3);
+  const nextFold = availL.length ? nextL : nextL.slice(3);
+  const foldLabel = availL.length ? t(lang, "guia.rec.mejoras") : t(lang, "guia.rec.mas", { n: nextFold.length });
+  const wline = (w, ultimo) => /* @__PURE__ */ jsx17(Wline, { w, lvl, dps, tipos, lang, ultimo }, w.id);
+  return /* @__PURE__ */ jsxs17(Fragment14, { children: [
+    /* @__PURE__ */ jsx17(Tarjeta, { titulo: t(lang, "guia.ficha.personaje"), extra: /* @__PURE__ */ jsx17(Origen, { f: "curado", lang }), children: /* @__PURE__ */ jsx17(Ficha, { v, lang }) }),
+    ownedBetter ? /* @__PURE__ */ jsx17(
+      Tarjeta,
+      {
+        titulo: t(lang, "guia.rec.warnMejor"),
+        estilo: { borderLeft: `3px solid ${C.amarillo}` },
+        extra: /* @__PURE__ */ jsx17(Origen, { f: "curado", lang }),
+        children: /* @__PURE__ */ jsxs17("div", { children: [
+          /* @__PURE__ */ jsx17(NombreCalidad, { q: ownedBetter.q, children: ownedBetter.n }),
+          " (",
+          fmtDps(ownedBetter),
+          " dps) ",
+          t(lang, "guia.rec.mejorResto", { actual: dps.toFixed(1) })
+        ] })
+      }
+    ) : null,
+    recHtml ? /* @__PURE__ */ jsx17(Tarjeta, { titulo: t(lang, "guia.rec.recomendaciones"), extra: /* @__PURE__ */ jsx17(Origen, { f: "curado", lang }), children: /* @__PURE__ */ jsx17(TextoRico, { html: recHtml }) }) : null,
+    band ? /* @__PURE__ */ jsxs17(Tarjeta, { estilo: { borderLeft: `3px solid ${C.acento}` }, titulo: t(lang, "guia.rec.donde"), extra: /* @__PURE__ */ jsx17(Origen, { f: "curado", lang }), children: [
+      /* @__PURE__ */ jsx17("div", { style: S.sub, children: t(lang, "guia.rec.rango", { min: band.min, max: band.max, realm: realmLabel }) }),
+      /* @__PURE__ */ jsx17("div", { style: P.zonaBig, children: band.zones }),
+      band.notes ? /* @__PURE__ */ jsx17("div", { style: { ...P.tip, marginTop: 6 }, children: /* @__PURE__ */ jsx17(TextoRico, { html: band.notes }) }) : null,
+      band.dung ? /* @__PURE__ */ jsxs17("div", { style: { ...P.tip, marginTop: 4 }, children: [
+        /* @__PURE__ */ jsx17("b", { style: { color: C.amarillo }, children: t(lang, "guia.rec.dungeonsLbl") }),
+        " ",
+        /* @__PURE__ */ jsx17(TextoRico, { html: band.dung })
+      ] }) : null,
+      nextBand ? /* @__PURE__ */ jsxs17("div", { style: { ...P.tip, marginTop: 6 }, children: [
+        t(lang, "guia.rec.despues", { min: nextBand.min }),
+        " ",
+        /* @__PURE__ */ jsx17("b", { children: nextBand.zones })
+      ] }) : null
+    ] }) : null,
+    /* @__PURE__ */ jsx17(Tarjeta, { estilo: { borderLeft: `3px solid ${C.amarillo}` }, titulo: t(lang, "guia.rec.proximas"), extra: /* @__PURE__ */ jsxs17(Fragment14, { children: [
+      /* @__PURE__ */ jsx17("span", { style: { ...P.muted, textTransform: "none", letterSpacing: 0, fontWeight: 400 }, children: subArmas }),
+      /* @__PURE__ */ jsx17(Origen, { f: "curado", lang })
+    ] }), children: !cands.length ? /* @__PURE__ */ jsx17("div", { style: P.muted, children: dps >= 29 ? t(lang, "guia.rec.nadaPre") : t(lang, "guia.rec.nadaSub") }) : /* @__PURE__ */ jsxs17(Fragment14, { children: [
+      availShow.length ? /* @__PURE__ */ jsx17("div", { style: { ...P.muted, marginBottom: 2 }, children: t(lang, "guia.rec.disponibles") }) : null,
+      availShow.map((w, i) => wline(w, i === availShow.length - 1 && !nextShow.length && !nextFold.length)),
+      nextShow.length ? /* @__PURE__ */ jsx17("div", { style: { ...P.muted, margin: "8px 0 2px" }, children: t(lang, "guia.rec.proxLista") }) : null,
+      nextShow.map((w, i) => wline(w, i === nextShow.length - 1)),
+      nextFold.length ? /* @__PURE__ */ jsx17(Detalle, { titulo: foldLabel, meta: `(${nextFold.length})`, abierto: false, children: nextFold.map((w, i) => wline(w, i === nextFold.length - 1)) }) : null
+    ] }) }),
+    dungs.length ? /* @__PURE__ */ jsxs17(Fragment14, { children: [
+      /* @__PURE__ */ jsxs17("div", { style: P.bandhead, children: [
+        /* @__PURE__ */ jsx17("span", { children: t(lang, "guia.rec.dgnRango") }),
+        /* @__PURE__ */ jsxs17("span", { style: P.bandheadZn, children: [
+          dungs.length,
+          " · ",
+          t(lang, "guia.rec.abrirLoot")
+        ] })
+      ] }),
+      dungs.map((d) => {
+        const soon = lvl < d.r[0], late = lvl > d.r[1], inR = !soon && !late;
+        const diff = d.r[0] - lvl;
+        return /* @__PURE__ */ jsxs17(
+          Detalle,
+          {
+            abierto: false,
+            estilo: inR ? { borderLeft: `3px solid ${C.verde}` } : {},
+            titulo: d.n,
+            meta: `${d.loc} · ${d.r[0]}-${d.r[1]}`,
+            extra: /* @__PURE__ */ jsxs17(Fragment14, { children: [
+              locPlaca(d.cont, lang),
+              d.key ? /* @__PURE__ */ jsx17(Placa, { tono: "now", children: t(lang, "guia.rec.clave") }) : null,
+              soon ? /* @__PURE__ */ jsx17(Placa, { tono: "soon", children: diff <= 1 ? t(lang, "guia.rec.enNivel", { n: diff }) : t(lang, "guia.rec.enNiveles", { n: diff }) }) : late ? /* @__PURE__ */ jsx17(Placa, { tono: "plain", children: t(lang, "guia.rec.yaPasada") }) : /* @__PURE__ */ jsx17(Placa, { tono: "now", children: t(lang, "guia.rec.disponible") }),
+              /* @__PURE__ */ jsx17("span", { style: { ...P.dprog, marginLeft: "auto" }, children: t(lang, "guia.rec.items", { n: (d.loot || []).length }) }),
+              /* @__PURE__ */ jsx17(Origen, { f: "curado", lang })
+            ] }),
+            children: [
+              d.note ? /* @__PURE__ */ jsx17("div", { style: { ...P.muted, marginBottom: 6 }, children: /* @__PURE__ */ jsx17(TextoRico, { html: d.note }) }) : null,
+              (d.loot || []).map((l, i) => /* @__PURE__ */ jsx17("div", { style: { ...P.loot, ...i === (d.loot || []).length - 1 ? P.lootSinBorde : {} }, children: /* @__PURE__ */ jsxs17("span", { children: [
+                /* @__PURE__ */ jsx17(NombreCalidad, { q: "rare", children: l[0] }),
+                " ",
+                /* @__PURE__ */ jsxs17("span", { style: P.muted, children: [
+                  "— ",
+                  /* @__PURE__ */ jsx17(TextoRico, { html: l[1] })
+                ] })
+              ] }) }, i))
+            ]
+          },
+          d.n
+        );
+      })
+    ] }) : null,
+    miles.length ? /* @__PURE__ */ jsx17(
+      Detalle,
+      {
+        titulo: /* @__PURE__ */ jsxs17("span", { style: { display: "inline-flex", alignItems: "center", gap: 8 }, children: [
+          /* @__PURE__ */ jsx17(Icono, { n: "route", size: 14 }),
+          t(lang, "guia.rec.hitos")
+        ] }),
+        meta: t(lang, "guia.rec.hitosSub", { n: miles.length, min: lvl - 2, max: lvl + 10 }),
+        extra: /* @__PURE__ */ jsx17(Origen, { f: "curado", lang }),
+        children: miles.map(({ m, i }) => {
+          const k = m.lvl + "|" + i, done = ss.has(k);
+          return /* @__PURE__ */ jsxs17("div", { style: { ...P.mst, ...i === miles.length - 1 ? P.mstUlt : {}, ...done ? { opacity: 0.45 } : {} }, children: [
+            /* @__PURE__ */ jsx17("span", { style: P.mstLvl, children: m.lvl }),
+            /* @__PURE__ */ jsxs17("span", { style: P.mstTxt, children: [
+              /* @__PURE__ */ jsx17(Placa, { tono: "cat", estilo: { marginLeft: 0 }, children: m.cat }),
+              " ",
+              m.loc ? locPlaca(m.loc, lang) : null,
+              " ",
+              /* @__PURE__ */ jsx17(TextoRico, { html: m.txt })
+            ] })
+          ] }, k);
+        })
+      }
+    ) : null,
+    /* @__PURE__ */ jsx17("div", { style: P.tip, children: t(lang, "guia.rec.footer") })
+  ] });
+}
+
+// src/vistas/guia/armas.jsx
+import { Checkbox as Checkbox7 } from "@hermes/plugin-sdk";
+import { jsx as jsx18, jsxs as jsxs18 } from "react/jsx-runtime";
+agregarTextos({
+  "guia.armas.arma": "Arma",
+  "guia.armas.tipo": "Tipo",
+  "guia.armas.dps": "DPS",
+  "guia.armas.req": "Req",
+  "guia.armas.delta": "Δ vs tuya",
+  "guia.armas.fuente": "Fuente",
+  "guia.armas.ocultar": "ocultar obtenidas",
+  "guia.armas.obtenidas": "obtenidas:",
+  "guia.armas.equipada": "equipada",
+  "guia.armas.approx": "~ = dps aproximado. Forever puede haber retocado algún stat — verificá in-game.",
+  "guia.armas.vacia": "Ningún arma coincide con el filtro."
+}, {
+  "guia.armas.arma": "Weapon",
+  "guia.armas.tipo": "Type",
+  "guia.armas.dps": "DPS",
+  "guia.armas.req": "Req",
+  "guia.armas.delta": "Δ vs yours",
+  "guia.armas.fuente": "Source",
+  "guia.armas.ocultar": "hide owned",
+  "guia.armas.obtenidas": "owned:",
+  "guia.armas.equipada": "equipped",
+  "guia.armas.approx": "~ = approximate dps. Forever may have retuned some stats — verify in-game.",
+  "guia.armas.vacia": "No weapon matches the filter."
+});
+var btnFiltro = (activo) => ({
+  ...P.chipBtn,
+  ...activo ? { borderColor: C.acento, color: C.acento, fontWeight: 600 } : {}
+});
+function VistaArmas({ v, lang }) {
+  const { G, build, guardar, os, dps, weapons, tipos } = v;
+  let list = weapons.filter((w) => build.wf === "all" || wfOf(w) === build.wf);
+  if (build.who) list = list.filter((w) => !os.has(w.id));
+  list = list.slice().sort((a, b) => a.lvl - b.lvl || a.dps - b.dps);
+  const cnt = weapons.filter((w) => os.has(w.id)).length;
+  const toggleW = (w, checked) => guardar((b) => {
+    const r = setWeaponOwnedEstado(b, w.id, checked, { weapons, dungeons: G.dungeons || [] });
+    return { ...b, owned: r.owned, gear: r.gear };
+  });
+  return /* @__PURE__ */ jsxs18(Tarjeta, { extra: /* @__PURE__ */ jsx18(Origen, { f: "curado", lang }), children: [
+    /* @__PURE__ */ jsxs18("div", { style: { display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }, children: [
+      (G.typeFilters || []).map((f) => /* @__PURE__ */ jsx18(
+        "button",
+        {
+          type: "button",
+          style: btnFiltro(build.wf === f[0]),
+          onClick: () => guardar((b) => ({ ...b, wf: f[0] })),
+          children: f[1]
+        },
+        f[0]
+      )),
+      /* @__PURE__ */ jsxs18("label", { style: { display: "flex", gap: 6, alignItems: "center", marginLeft: 8, cursor: "pointer", fontSize: 12, color: C.texto2 }, children: [
+        /* @__PURE__ */ jsx18(Checkbox7, { checked: !!build.who, onCheckedChange: (val) => guardar((b) => ({ ...b, who: !!val })) }),
+        t(lang, "guia.armas.ocultar")
+      ] }),
+      /* @__PURE__ */ jsxs18("span", { style: { ...P.muted, marginLeft: "auto" }, children: [
+        t(lang, "guia.armas.obtenidas"),
+        " ",
+        /* @__PURE__ */ jsxs18("b", { children: [
+          cnt,
+          "/",
+          weapons.length
+        ] })
+      ] })
+    ] }),
+    /* @__PURE__ */ jsxs18("div", { style: P.tablaScroll, children: [
+      /* @__PURE__ */ jsxs18("table", { style: S.tabla, children: [
+        /* @__PURE__ */ jsx18("thead", { children: /* @__PURE__ */ jsxs18("tr", { children: [
+          /* @__PURE__ */ jsx18("th", { style: S.th }),
+          /* @__PURE__ */ jsx18("th", { style: S.th, children: t(lang, "guia.armas.arma") }),
+          /* @__PURE__ */ jsx18("th", { style: S.th, children: t(lang, "guia.armas.tipo") }),
+          /* @__PURE__ */ jsx18("th", { style: S.th, children: t(lang, "guia.armas.dps") }),
+          /* @__PURE__ */ jsx18("th", { style: S.th, children: t(lang, "guia.armas.req") }),
+          /* @__PURE__ */ jsx18("th", { style: S.th, children: t(lang, "guia.armas.delta") }),
+          /* @__PURE__ */ jsx18("th", { style: S.th, children: t(lang, "guia.armas.fuente") })
+        ] }) }),
+        /* @__PURE__ */ jsx18("tbody", { children: list.map((w) => {
+          const own = os.has(w.id), eq = build.cur === w.id, dlt = w.dps - dps;
+          return /* @__PURE__ */ jsxs18("tr", { className: (own ? "owned " : "") + (eq ? "equipped" : ""), style: { ...own ? P.trOwned : {}, ...eq ? P.trEq : {} }, children: [
+            /* @__PURE__ */ jsx18("td", { style: S.td, children: /* @__PURE__ */ jsx18(Checkbox7, { "data-wid": w.id, checked: own, onCheckedChange: (val) => toggleW(w, val) }) }),
+            /* @__PURE__ */ jsxs18("td", { style: S.td, children: [
+              /* @__PURE__ */ jsx18(NombreCalidad, { q: w.q, children: /* @__PURE__ */ jsx18("b", { children: w.n }) }),
+              eq ? /* @__PURE__ */ jsx18(Placa, { tono: "eq", children: t(lang, "guia.armas.equipada") }) : null,
+              w.note ? /* @__PURE__ */ jsx18("div", { style: { ...P.muted, fontSize: 11 }, children: /* @__PURE__ */ jsx18("i", { children: /* @__PURE__ */ jsx18(TextoRico, { html: w.note }) }) }) : null
+            ] }),
+            /* @__PURE__ */ jsxs18("td", { style: S.td, children: [
+              tipos[w.t] || w.t,
+              w.eng ? /* @__PURE__ */ jsx18(Placa, { tono: "eng", estilo: { marginLeft: 4 }, children: "ENG" }) : null
+            ] }),
+            /* @__PURE__ */ jsx18("td", { style: S.td, children: /* @__PURE__ */ jsx18("b", { children: fmtDps(w) }) }),
+            /* @__PURE__ */ jsx18("td", { style: S.td, children: w.lvl }),
+            /* @__PURE__ */ jsx18("td", { style: { ...S.td, color: dlt > 0 ? C.verde : C.texto3 }, children: dps ? (dlt > 0 ? "+" : "") + dlt.toFixed(1) : "—" }),
+            /* @__PURE__ */ jsx18("td", { style: { ...S.td, ...P.muted }, children: /* @__PURE__ */ jsx18(TextoRico, { html: w.src }) })
+          ] }, w.id);
+        }) })
+      ] }),
+      !list.length ? /* @__PURE__ */ jsx18("div", { style: { ...P.muted, padding: "8px 0" }, children: t(lang, "guia.armas.vacia") }) : null
+    ] }),
+    /* @__PURE__ */ jsx18("div", { style: P.tip, children: t(lang, "guia.armas.approx") })
+  ] });
+}
+
+// src/vistas/guia/macros.jsx
+import { useEffect as useEffect3, useRef as useRef2, useState as useState9 } from "react";
+import { Button as Button6, SearchField as SearchField3, SegmentedControl as SegmentedControl4 } from "@hermes/plugin-sdk";
+import { Fragment as Fragment15, jsx as jsx19, jsxs as jsxs19 } from "react/jsx-runtime";
+agregarTextos({
+  "guia.mac.titulo": "Macros meta — WoW: Forever",
+  "guia.mac.usables": "{u} de {t} usables a tu nivel",
+  "guia.mac.ayuda": "En el juego: /macro → Nuevo → pegá → arrastrá a la barra. Los spells van en inglés; límite 255 caracteres (cada macro trae su contador).",
+  "guia.mac.audit": "Cómo usarlas y notas de auditoría",
+  "guia.mac.auditTexto": "Con <b>#showtooltip</b> el botón muestra ícono y cooldown. Si tu cliente está en español, usá los nombres de tu libro.<br><b>Sin probar in-game:</b> revisadas contra las notas oficiales de Blizzard y guías que leen datos del cliente (ForeverDB, endgametools, wowclassicforever.info, wowf.io, Method).",
+  "guia.mac.reglas": "Reglas de Forever que cambian macros",
+  "guia.mac.reglasSub": "reglas del servidor que cambian el comportamiento",
+  "guia.mac.buscar": "Buscar macro, spell o comando… (ej: trap, focus, pet)",
+  "guia.mac.todas": "Todas",
+  "guia.mac.usablesCat": "{n} usables a tu nivel",
+  "guia.mac.nada": "Ninguna macro coincide",
+  "guia.mac.limpiar": "limpiar filtros",
+  "guia.mac.disponibles": "Disponibles ahora",
+  "guia.mac.nMacros": "{n} macros",
+  "guia.mac.proximas": "Próximas por nivel",
+  "guia.mac.proximasSub": "llegan con tu nivel",
+  "guia.mac.otraSpec": "Requieren otra spec",
+  "guia.mac.otraSpecSub": "fuera de tu build actual",
+  "guia.mac.usableYa": "usable ya",
+  "guia.mac.otraSpecBadge": "requiere otra spec",
+  "guia.mac.talento": "talento {spec}",
+  "guia.mac.otraSpecTag": " · otra spec",
+  "guia.mac.tecla": "tecla {k}",
+  "guia.mac.caracteres": "caracteres usados / límite del juego",
+  "guia.mac.copiar": "copiar",
+  "guia.mac.copiado": "¡copiado!",
+  "guia.mac.ctrlc": "Ctrl+C",
+  "guia.mac.lvlN": "lvl {n}+",
+  "guia.mac.llegaAl": "llega al {n}",
+  "guia.bar.titulo": "Tu barra a lvl {lvl}",
+  "guia.bar.solo": "Solo",
+  "guia.bar.dungeon": "Dungeon",
+  "guia.bar.leyenda1": "macro lista",
+  "guia.bar.leyenda2": "spell del libro (hasta que llegue la macro)",
+  "guia.bar.leyenda3": "llega más adelante",
+  "guia.bar.leyenda4": "movimiento / libre",
+  "guia.bar.sinTecla": "Sin tecla, a clic:",
+  "guia.bar.alt1": "Alternativa para el 1:",
+  "guia.bar.antes": "Antes de empezar:",
+  "guia.bar.libre": "libre",
+  "guia.bar.mover": "mover",
+  "guia.bar.macro": "macro",
+  "guia.bar.spell": "spell",
+  "guia.bar.llega": "lvl {n}"
+}, {
+  "guia.mac.titulo": "Meta macros — WoW: Forever",
+  "guia.mac.usables": "{u} of {t} usable at your level",
+  "guia.mac.ayuda": "In game: /macro → New → paste → drag to the bar. Spells are in English; 255-character limit (each macro shows its counter).",
+  "guia.mac.audit": "How to use them and audit notes",
+  "guia.mac.auditTexto": "With <b>#showtooltip</b> the button shows icon and cooldown. If your client is in Spanish, use your spellbook names.<br><b>Untested in-game:</b> reviewed against official Blizzard notes and guides that read client data (ForeverDB, endgametools, wowclassicforever.info, wowf.io, Method).",
+  "guia.mac.reglas": "Forever rules that change macros",
+  "guia.mac.reglasSub": "server rules that change behavior",
+  "guia.mac.buscar": "Search macro, spell or command… (e.g. trap, focus, pet)",
+  "guia.mac.todas": "All",
+  "guia.mac.usablesCat": "{n} usable at your level",
+  "guia.mac.nada": "No macro matches",
+  "guia.mac.limpiar": "clear filters",
+  "guia.mac.disponibles": "Available now",
+  "guia.mac.nMacros": "{n} macros",
+  "guia.mac.proximas": "Upcoming by level",
+  "guia.mac.proximasSub": "they unlock with your level",
+  "guia.mac.otraSpec": "Require another spec",
+  "guia.mac.otraSpecSub": "outside your current build",
+  "guia.mac.usableYa": "usable now",
+  "guia.mac.otraSpecBadge": "requires another spec",
+  "guia.mac.talento": "talent {spec}",
+  "guia.mac.otraSpecTag": " · another spec",
+  "guia.mac.tecla": "key {k}",
+  "guia.mac.caracteres": "characters used / game limit",
+  "guia.mac.copiar": "copy",
+  "guia.mac.copiado": "copied!",
+  "guia.mac.ctrlc": "Ctrl+C",
+  "guia.mac.lvlN": "lv {n}+",
+  "guia.mac.llegaAl": "comes at {n}",
+  "guia.bar.titulo": "Your bar at lv {lvl}",
+  "guia.bar.solo": "Solo",
+  "guia.bar.dungeon": "Dungeon",
+  "guia.bar.leyenda1": "ready macro",
+  "guia.bar.leyenda2": "spellbook spell (until the macro unlocks)",
+  "guia.bar.leyenda3": "unlocks later",
+  "guia.bar.leyenda4": "movement / free",
+  "guia.bar.sinTecla": "No key, on click:",
+  "guia.bar.alt1": "Alternative for 1:",
+  "guia.bar.antes": "Before you start:",
+  "guia.bar.libre": "free",
+  "guia.bar.mover": "move",
+  "guia.bar.macro": "macro",
+  "guia.bar.spell": "spell",
+  "guia.bar.llega": "lv {n}"
+});
+function subBarra(v, lang) {
+  const s = v.sub;
+  if (s === "libre") return t(lang, "guia.bar.libre");
+  if (s === "mover") return t(lang, "guia.bar.mover");
+  if (s === "macro") return t(lang, "guia.bar.macro");
+  if (s === "spell") return t(lang, "guia.bar.spell");
+  const m = /^lvl (\d+)$/.exec(s);
+  if (m) return t(lang, "guia.bar.llega", { n: m[1] });
+  return s;
+}
+var KC_ESTADO = {
+  ready: { ...P.kcReady, ks: P.ksReady },
+  spell: { ...P.kcSpell, ks: P.ksSpell },
+  soon: { ...P.kcSoon, ks: P.ksSoon },
+  free: P.kcFree,
+  move: P.kcMove
+};
+var MROW_ESTADO = {
+  ready: { borderColor: C.verde },
+  spell: { borderColor: C.amarillo },
+  soon: { borderStyle: "dashed", opacity: 0.62 },
+  free: { opacity: 0.3 },
+  move: { opacity: 0.3, borderStyle: "dotted" }
+};
+function Tecla({ b, sctx, onJump, lang }) {
+  const v = slotView(b, sctx);
+  const est = KC_ESTADO[v.cls] || {};
+  const inner = /* @__PURE__ */ jsxs19(Fragment15, { children: [
+    /* @__PURE__ */ jsx19("span", { style: P.kk, children: b.k }),
+    v.mods && v.mods.length ? /* @__PURE__ */ jsx19("span", { style: P.km, children: v.mods.join(" ") }) : null,
+    /* @__PURE__ */ jsx19("span", { style: P.kn, children: v.t }),
+    /* @__PURE__ */ jsx19("span", { style: { ...P.ks, ...est.ks || {} }, children: subBarra(v, lang) })
+  ] });
+  const estilo = { ...P.kcBase, ...est, cursor: v.mi >= 0 ? "pointer" : "default" };
+  if (v.mi >= 0) return /* @__PURE__ */ jsx19("button", { type: "button", className: "kc", style: estilo, title: v.tip, onClick: () => onJump(v.mi), children: inner });
+  return /* @__PURE__ */ jsx19("div", { className: "kc", style: estilo, title: v.tip, children: inner });
+}
+function Raton({ b, sctx, onJump, lang }) {
+  const v = slotView(b, sctx);
+  const inner = /* @__PURE__ */ jsxs19(Fragment15, { children: [
+    /* @__PURE__ */ jsx19("span", { style: P.mrowMk, children: b.k }),
+    /* @__PURE__ */ jsx19("span", { style: { flex: 1, minWidth: 0 }, children: v.t }),
+    /* @__PURE__ */ jsx19("span", { style: P.mrowKs, children: subBarra(v, lang) })
+  ] });
+  const estilo = { ...P.mrow, ...MROW_ESTADO[v.cls] || {}, cursor: v.mi >= 0 ? "pointer" : "default" };
+  if (v.mi >= 0) return /* @__PURE__ */ jsx19("button", { type: "button", className: "mrow", style: estilo, title: v.tip, onClick: () => onJump(v.mi), children: inner });
+  return /* @__PURE__ */ jsx19("div", { className: "mrow", style: estilo, title: v.tip, children: inner });
+}
+function VistaBarra({ v, lang, onJump }) {
+  const { G, build, lvl } = v;
+  const B = G.bar || {};
+  const N = G.barNotes || {};
+  const byK = Object.fromEntries((B.keys || []).map((b) => [b.k, b]));
+  const unit = "((100% - 36px)/7 + 6px)";
+  const sctx = { mdg: !!build.mdg, spec: build.spec, lvl, macros: G.macros || [] };
+  const specN = (G.specs || {})[build.spec] || build.spec;
+  return /* @__PURE__ */ jsxs19(Tarjeta, { titulo: /* @__PURE__ */ jsxs19("span", { style: { display: "inline-flex", alignItems: "center", gap: 8, flexWrap: "wrap" }, children: [
+    /* @__PURE__ */ jsx19(Icono, { n: "kbd", size: 14 }),
+    t(lang, "guia.bar.titulo", { lvl }),
+    /* @__PURE__ */ jsxs19("span", { style: P.muted, children: [
+      specN,
+      " · ",
+      build.mdg ? t(lang, "guia.bar.dungeon") : t(lang, "guia.bar.solo")
+    ] })
+  ] }), extra: /* @__PURE__ */ jsxs19(Fragment15, { children: [
+    /* @__PURE__ */ jsx19(
+      SegmentedControl4,
+      {
+        value: build.mdg ? "1" : "0",
+        onChange: (val) => v.guardar((b) => ({ ...b, mdg: val === "1" })),
+        options: [{ id: "0", label: t(lang, "guia.bar.solo") }, { id: "1", label: t(lang, "guia.bar.dungeon") }]
+      }
+    ),
+    /* @__PURE__ */ jsx19(Origen, { f: "curado", lang })
+  ] }), children: [
+    N.intro ? /* @__PURE__ */ jsx19("div", { style: P.tip, children: /* @__PURE__ */ jsx19(TextoRico, { html: N.intro }) }) : null,
+    /* @__PURE__ */ jsxs19("div", { style: P.kbwrap, children: [
+      /* @__PURE__ */ jsx19("div", { style: P.kb, children: (B.rows || []).map((r, i) => /* @__PURE__ */ jsxs19("div", { style: P.kbrow, children: [
+        (B.offset || [])[i] ? /* @__PURE__ */ jsx19("span", { style: { ...P.kcoff, width: `calc(${unit} * ${(B.offset || [])[i]} - 6px)` } }) : null,
+        r.map((k) => {
+          const b = byK[k];
+          return b ? /* @__PURE__ */ jsx19(Tecla, { b, sctx, onJump, lang }, k) : null;
+        })
+      ] }, i)) }),
+      /* @__PURE__ */ jsxs19("div", { style: P.mouse, children: [
+        /* @__PURE__ */ jsx19("div", { style: P.mt, children: lang === "en" ? "Mouse" : "Mouse" }),
+        (B.mouse || []).map((b, i) => /* @__PURE__ */ jsx19(Raton, { b, sctx, onJump, lang }, i))
+      ] })
+    ] }),
+    /* @__PURE__ */ jsxs19("div", { style: P.legend, children: [
+      /* @__PURE__ */ jsxs19("span", { children: [
+        /* @__PURE__ */ jsx19("i", { style: { ...P.legendI, background: C.fondo3, borderColor: C.verde } }),
+        t(lang, "guia.bar.leyenda1")
+      ] }),
+      /* @__PURE__ */ jsxs19("span", { children: [
+        /* @__PURE__ */ jsx19("i", { style: { ...P.legendI, borderColor: C.amarillo } }),
+        t(lang, "guia.bar.leyenda2")
+      ] }),
+      /* @__PURE__ */ jsxs19("span", { children: [
+        /* @__PURE__ */ jsx19("i", { style: { ...P.legendI, border: `1px dashed ${C.amarillo}`, borderColor: "transparent" } }),
+        t(lang, "guia.bar.leyenda3")
+      ] }),
+      /* @__PURE__ */ jsxs19("span", { children: [
+        /* @__PURE__ */ jsx19("i", { style: { ...P.legendI, borderColor: C.borde2, opacity: 0.4 } }),
+        t(lang, "guia.bar.leyenda4")
+      ] })
+    ] }),
+    (B.click || []).length ? /* @__PURE__ */ jsxs19("div", { style: P.chipln, children: [
+      /* @__PURE__ */ jsx19("b", { style: { color: C.texto }, children: t(lang, "guia.bar.sinTecla") }),
+      " ",
+      (B.click || []).map((n) => /* @__PURE__ */ jsx19(MacroChip, { n, v, lang, onJump }, n))
+    ] }) : null,
+    (B.alt1 || []).length ? /* @__PURE__ */ jsxs19("div", { style: P.chipln, children: [
+      /* @__PURE__ */ jsx19("b", { style: { color: C.texto }, children: t(lang, "guia.bar.alt1") }),
+      " ",
+      (B.alt1 || []).map((n) => /* @__PURE__ */ jsx19(MacroChip, { n, v, lang, onJump }, n)),
+      N.altNote ? /* @__PURE__ */ jsxs19("span", { children: [
+        "— ",
+        /* @__PURE__ */ jsx19(TextoRico, { html: N.altNote })
+      ] }) : null
+    ] }) : null,
+    N.before ? /* @__PURE__ */ jsxs19("div", { style: { ...P.tip, marginTop: 10 }, children: [
+      /* @__PURE__ */ jsx19("b", { children: t(lang, "guia.bar.antes") }),
+      " ",
+      /* @__PURE__ */ jsx19(TextoRico, { html: N.before }),
+      build.mdg && N.dungeon ? /* @__PURE__ */ jsx19(TextoRico, { html: N.dungeon }) : null
+    ] }) : null
+  ] });
+}
+function MacroChip({ n, v, lang, onJump }) {
+  const m = (v.G.macros || []).find((x) => x.n === n);
+  if (!m) return null;
+  const i = v.G.macros.indexOf(m);
+  const ok = usableFor(m, v.lvl, v.build.spec);
+  return /* @__PURE__ */ jsxs19(
+    "button",
+    {
+      type: "button",
+      style: { ...P.chipBtn, ...ok ? {} : { opacity: 0.62 } },
+      title: `${m.n}${ok ? "" : " — " + t(lang, "guia.mac.llegaAl", { n: m.lvl })}`,
+      onClick: () => onJump(i),
+      children: [
+        m.n,
+        ok ? "" : ` · ${m.lvl}`
+      ]
+    }
+  );
+}
+function MacroCard({ m, i, v, lang, onJump, flash, registerRef }) {
+  const { G, build, ctx, MACRO_KEY } = v;
+  const len = macroLen(m.code);
+  const ok = usableFor(m, v.lvl, build.spec);
+  const talOk = !m.tal || m.tal === build.spec;
+  const key = MACRO_KEY[m.n];
+  const [cop, setCop] = useState9("");
+  const specN = (G.specs || {})[build.spec] || build.spec;
+  const copiar = async () => {
+    try {
+      const bien = await ctx.os.writeClipboard(m.code);
+      setCop(bien ? "copiado" : "ctrlc");
+      setTimeout(() => setCop(""), 1400);
+    } catch {
+      setCop("ctrlc");
+      setTimeout(() => setCop(""), 1400);
+    }
+  };
+  const badgeEstado = ok ? /* @__PURE__ */ jsx19(Placa, { tono: "now", children: t(lang, "guia.mac.usableYa") }) : m.lvl > v.lvl ? /* @__PURE__ */ jsx19(Placa, { tono: "soon", children: m.lvl - v.lvl <= 1 ? t(lang, "guia.rec.enNivel", { n: m.lvl - v.lvl }) : t(lang, "guia.rec.enNiveles", { n: m.lvl - v.lvl }) }) : /* @__PURE__ */ jsx19(Placa, { tono: "soon", children: t(lang, "guia.mac.otraSpecBadge") });
+  return /* @__PURE__ */ jsxs19(
+    "div",
+    {
+      ref: registerRef,
+      id: "mc-" + i,
+      className: "mac",
+      style: { ...S.tarjeta, ...flash === i ? { boxShadow: `0 0 0 2px ${C.amarillo}` } : {} },
+      children: [
+        /* @__PURE__ */ jsxs19("div", { style: { display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }, children: [
+          /* @__PURE__ */ jsx19("b", { style: { fontSize: 13 }, children: m.n }),
+          /* @__PURE__ */ jsx19(Placa, { tono: "cat", estilo: { marginLeft: "auto" }, children: m.cat }),
+          /* @__PURE__ */ jsx19(Placa, { tono: "plain", children: t(lang, "guia.mac.lvlN", { n: m.lvl }) }),
+          badgeEstado,
+          m.tal ? /* @__PURE__ */ jsxs19(Placa, { tono: talOk ? "tal" : "talOff", title: talOk ? t(lang, "guia.mac.talento", { spec: m.tal.toUpperCase() }) : specN + t(lang, "guia.mac.otraSpecTag"), children: [
+            t(lang, "guia.mac.talento", { spec: m.tal.toUpperCase() }),
+            talOk ? "" : t(lang, "guia.mac.otraSpecTag")
+          ] }) : null,
+          key ? /* @__PURE__ */ jsx19(Placa, { tono: "key", title: t(lang, "guia.mac.tecla", { k: key }), children: t(lang, "guia.mac.tecla", { k: key }) }) : null,
+          /* @__PURE__ */ jsxs19("span", { title: t(lang, "guia.mac.caracteres"), style: { ...P.mlen, ...len > 255 ? P.mlenOver : {} }, children: [
+            len,
+            "/255"
+          ] }),
+          /* @__PURE__ */ jsx19(Button6, { size: "xs", variant: "outline", onClick: copiar, title: t(lang, "guia.mac.caracteres"), children: /* @__PURE__ */ jsxs19("span", { style: { display: "inline-flex", gap: 4, alignItems: "center" }, children: [
+            /* @__PURE__ */ jsx19(Icono, { n: "copy", size: 12 }),
+            cop === "copiado" ? t(lang, "guia.mac.copiado") : cop === "ctrlc" ? t(lang, "guia.mac.ctrlc") : t(lang, "guia.mac.copiar")
+          ] }) })
+        ] }),
+        m.desc ? /* @__PURE__ */ jsx19("div", { style: { ...P.muted, marginTop: 2 }, children: /* @__PURE__ */ jsx19(TextoRico, { html: m.desc }) }) : null,
+        /* @__PURE__ */ jsx19("pre", { style: P.mcode, children: m.code })
+      ]
+    }
+  );
+}
+function VistaMacros({ v, lang }) {
+  const { G, build, guardar, ctx } = v;
+  const mcr = G.macros || [];
+  const cats = macroCats(mcr);
+  const [mq, setMq] = useState9("");
+  const cardRefs = useRef2(/* @__PURE__ */ new Map());
+  const [pendingJump, setPendingJump] = useState9(null);
+  const [flash, setFlash] = useState9(-1);
+  const flashT = useRef2(null);
+  const mf = curMf(build.mf, cats);
+  const q = mq.trim().toLowerCase();
+  const pool = mcr.filter((m) => (mf === "all" || m.cat === mf) && (!q || (m.n + "\n" + m.code + "\n" + m.desc).toLowerCase().includes(q)));
+  const usableN = mcr.filter((m) => usableFor(m, v.lvl, build.spec)).length;
+  const now = pool.filter((m) => usableFor(m, v.lvl, build.spec));
+  const later = pool.filter((m) => m.lvl > v.lvl);
+  const other = pool.filter((m) => m.lvl <= v.lvl && !usableFor(m, v.lvl, build.spec));
+  const registerRef = (i) => (el) => {
+    if (el) cardRefs.current.set(i, el);
+    else cardRefs.current.delete(i);
+  };
+  const saltar = (el, i) => {
+    const fd = el.closest("details");
+    if (fd) fd.open = true;
+    el.scrollIntoView({ behavior: "smooth", block: "center" });
+    setFlash(i);
+    clearTimeout(flashT.current);
+    flashT.current = setTimeout(() => setFlash(-1), 1400);
+  };
+  const jumpToMacro = (i) => {
+    const el = cardRefs.current.get(i);
+    if (!el) {
+      setMq("");
+      guardar((b) => ({ ...b, mf: "all" }));
+      setPendingJump(i);
+      return;
+    }
+    saltar(el, i);
+  };
+  useEffect3(() => {
+    if (pendingJump == null) return;
+    const i = pendingJump;
+    setPendingJump(null);
+    const el = cardRefs.current.get(i);
+    if (el) saltar(el, i);
+  }, [pendingJump, mq, build.mf]);
+  const listaVacia = !pool.length;
+  const nadaTexto = t(lang, "guia.mac.nada") + (q ? ` con "${mq.trim()}"` : "") + (mf !== "all" ? ` en ${mf}` : "") + ".";
+  return /* @__PURE__ */ jsxs19(Fragment15, { children: [
+    /* @__PURE__ */ jsxs19(Tarjeta, { titulo: /* @__PURE__ */ jsxs19("span", { style: { display: "inline-flex", alignItems: "center", gap: 8 }, children: [
+      /* @__PURE__ */ jsx19(Icono, { n: "scroll", size: 14 }),
+      t(lang, "guia.mac.titulo"),
+      /* @__PURE__ */ jsx19("span", { style: P.muted, children: t(lang, "guia.mac.usables", { u: usableN, t: mcr.length }) })
+    ] }), extra: /* @__PURE__ */ jsx19(Origen, { f: "curado", lang }), children: [
+      /* @__PURE__ */ jsx19("div", { style: P.tip, children: t(lang, "guia.mac.ayuda") }),
+      /* @__PURE__ */ jsx19(Detalle, { titulo: t(lang, "guia.mac.audit"), children: /* @__PURE__ */ jsx19("div", { style: P.tip, children: /* @__PURE__ */ jsx19(TextoRico, { html: t(lang, "guia.mac.auditTexto") }) }) })
+    ] }),
+    /* @__PURE__ */ jsx19(VistaBarra, { v, lang, onJump: jumpToMacro }),
+    G.macroRules ? /* @__PURE__ */ jsx19(
+      Detalle,
+      {
+        titulo: /* @__PURE__ */ jsxs19("span", { style: { display: "inline-flex", alignItems: "center", gap: 8 }, children: [
+          /* @__PURE__ */ jsx19(Icono, { n: "alert", size: 14 }),
+          t(lang, "guia.mac.reglas")
+        ] }),
+        meta: t(lang, "guia.mac.reglasSub"),
+        extra: /* @__PURE__ */ jsx19(Origen, { f: "curado", lang }),
+        children: /* @__PURE__ */ jsx19(TextoRico, { html: G.macroRules })
+      }
+    ) : null,
+    /* @__PURE__ */ jsxs19(Tarjeta, { extra: /* @__PURE__ */ jsx19(Origen, { f: "curado", lang }), children: [
+      /* @__PURE__ */ jsx19(SearchField3, { placeholder: t(lang, "guia.mac.buscar"), value: mq, onChange: setMq }),
+      /* @__PURE__ */ jsx19("div", { style: { display: "flex", gap: 6, flexWrap: "wrap", marginTop: 8 }, children: [["all", t(lang, "guia.mac.todas")], ...cats.map((c) => [c, c])].map(([f, label]) => {
+        const n = mcr.filter((m) => (f === "all" || m.cat === f) && usableFor(m, v.lvl, build.spec)).length;
+        const activo = mf === f;
+        return /* @__PURE__ */ jsxs19(
+          "button",
+          {
+            type: "button",
+            style: { ...P.chipBtn, ...activo ? { borderColor: C.acento, color: C.acento, fontWeight: 600 } : {} },
+            title: t(lang, "guia.mac.usablesCat", { n }),
+            onClick: () => guardar((b) => ({ ...b, mf: f })),
+            children: [
+              label,
+              " ",
+              /* @__PURE__ */ jsx19("span", { style: P.mlen, children: n })
+            ]
+          },
+          f
+        );
+      }) })
+    ] }),
+    listaVacia ? /* @__PURE__ */ jsx19(Tarjeta, { children: /* @__PURE__ */ jsxs19("div", { style: P.muted, children: [
+      nadaTexto,
+      " ",
+      /* @__PURE__ */ jsx19(Button6, { size: "xs", variant: "ghost", onClick: () => {
+        setMq("");
+        guardar((b) => ({ ...b, mf: "all" }));
+      }, children: t(lang, "guia.mac.limpiar") })
+    ] }) }) : /* @__PURE__ */ jsxs19(Fragment15, { children: [
+      now.length ? /* @__PURE__ */ jsxs19(Fragment15, { children: [
+        /* @__PURE__ */ jsxs19("div", { style: P.bandhead, children: [
+          /* @__PURE__ */ jsx19("span", { children: t(lang, "guia.mac.disponibles") }),
+          /* @__PURE__ */ jsx19("span", { style: P.bandheadZn, children: t(lang, "guia.mac.nMacros", { n: now.length }) })
+        ] }),
+        now.map((m) => /* @__PURE__ */ jsx19(MacroCard, { m, i: mcr.indexOf(m), v, lang, flash, registerRef: registerRef(mcr.indexOf(m)) }, mcr.indexOf(m)))
+      ] }) : null,
+      later.length ? /* @__PURE__ */ jsx19(Detalle, { titulo: t(lang, "guia.mac.proximas"), meta: t(lang, "guia.mac.proximasSub"), resumenExtra: /* @__PURE__ */ jsx19("span", { style: P.dprog, children: later.length }), children: later.map((m) => /* @__PURE__ */ jsx19(MacroCard, { m, i: mcr.indexOf(m), v, lang, flash, registerRef: registerRef(mcr.indexOf(m)) }, mcr.indexOf(m))) }) : null,
+      other.length ? /* @__PURE__ */ jsx19(Detalle, { titulo: t(lang, "guia.mac.otraSpec"), meta: t(lang, "guia.mac.otraSpecSub"), resumenExtra: /* @__PURE__ */ jsx19("span", { style: P.dprog, children: other.length }), children: other.map((m) => /* @__PURE__ */ jsx19(MacroCard, { m, i: mcr.indexOf(m), v, lang, flash, registerRef: registerRef(mcr.indexOf(m)) }, mcr.indexOf(m))) }) : null
+    ] })
+  ] });
+}
+
+// src/vistas/guia/extras.jsx
+import { Fragment as Fragment16, jsx as jsx20, jsxs as jsxs20 } from "react/jsx-runtime";
+agregarTextos({
+  "guia.extras.tipsN": "{n} tips",
+  "guia.extras.servidor": 'Sobre el servidor "Forever"',
+  "guia.extras.contexto": "contexto del servidor"
+}, {
+  "guia.extras.tipsN": "{n} tips",
+  "guia.extras.servidor": 'About the "Forever" server',
+  "guia.extras.contexto": "server context"
+});
+function VistaExtras({ v, lang }) {
+  const { G } = v;
+  const X = G.extras || {};
+  const ah = G.ahList || [];
+  const tips = X.tips || [];
+  return /* @__PURE__ */ jsxs20(Fragment16, { children: [
+    /* @__PURE__ */ jsxs20("div", { style: { display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(340px,1fr))", gap: 12, alignItems: "start" }, children: [
+      /* @__PURE__ */ jsxs20(
+        Tarjeta,
+        {
+          titulo: /* @__PURE__ */ jsxs20("span", { style: { display: "inline-flex", alignItems: "center", gap: 8 }, children: [
+            /* @__PURE__ */ jsx20(Icono, { n: "coin", size: 14 }),
+            X.ahTitle || t(lang, "tab.mercado")
+          ] }),
+          extra: /* @__PURE__ */ jsx20(Origen, { f: "curado", lang }),
+          children: [
+            ah.map((a, i) => /* @__PURE__ */ jsxs20("div", { style: { ...P.loot, ...i === ah.length - 1 ? P.lootSinBorde : {} }, children: [
+              /* @__PURE__ */ jsxs20("span", { children: [
+                /* @__PURE__ */ jsx20(NombreCalidad, { q: "rare", children: /* @__PURE__ */ jsx20("b", { children: a[0] }) }),
+                " ",
+                /* @__PURE__ */ jsx20("span", { style: P.muted, children: /* @__PURE__ */ jsx20(TextoRico, { html: a[1] }) })
+              ] }),
+              a[2] ? /* @__PURE__ */ jsx20("span", { style: { ...P.muted, textAlign: "right", maxWidth: "45%", flexShrink: 0 }, children: /* @__PURE__ */ jsx20(TextoRico, { html: a[2] }) }) : null
+            ] }, i)),
+            !ah.length ? /* @__PURE__ */ jsx20("div", { style: P.muted, children: "—" }) : null
+          ]
+        }
+      ),
+      /* @__PURE__ */ jsx20(
+        Detalle,
+        {
+          titulo: /* @__PURE__ */ jsxs20("span", { style: { display: "inline-flex", alignItems: "center", gap: 8 }, children: [
+            /* @__PURE__ */ jsx20(Icono, { n: "scroll", size: 14 }),
+            X.tipsTitle || ""
+          ] }),
+          meta: t(lang, "guia.extras.tipsN", { n: tips.length }),
+          extra: /* @__PURE__ */ jsx20(Origen, { f: "curado", lang }),
+          children: tips.map((tip, i) => /* @__PURE__ */ jsxs20("div", { style: { ...P.mst, ...i === tips.length - 1 ? P.mstUlt : {} }, children: [
+            /* @__PURE__ */ jsx20("span", { style: P.tdot }),
+            /* @__PURE__ */ jsxs20("span", { style: P.mstTxt, children: [
+              /* @__PURE__ */ jsx20("b", { children: /* @__PURE__ */ jsx20(TextoRico, { html: tip[0] }) }),
+              " ",
+              /* @__PURE__ */ jsx20(TextoRico, { html: tip[1] })
+            ] })
+          ] }, i))
+        }
+      )
+    ] }),
+    /* @__PURE__ */ jsx20(
+      Detalle,
+      {
+        titulo: /* @__PURE__ */ jsxs20("span", { style: { display: "inline-flex", alignItems: "center", gap: 8 }, children: [
+          /* @__PURE__ */ jsx20(Icono, { n: "alert", size: 14 }),
+          t(lang, "guia.extras.servidor")
+        ] }),
+        meta: t(lang, "guia.extras.contexto"),
+        extra: /* @__PURE__ */ jsx20(Origen, { f: "curado", lang }),
+        children: /* @__PURE__ */ jsx20("div", { style: P.muted, children: /* @__PURE__ */ jsx20(TextoRico, { html: X.warn || "" }) })
+      }
+    )
+  ] });
+}
+
+// src/vistas/guia.jsx
+import { Fragment as Fragment17, jsx as jsx21, jsxs as jsxs21 } from "react/jsx-runtime";
+agregarTextos({
+  "guia.sinGuiaClase": "Todavía no hay guía curada para esta clase en WoW: Forever.",
+  "guia.sinGuiaFac": "La guía curada de {clase} solo cubre la Horda por ahora; tu facción queda para una actualización futura.",
+  "guia.build.titulo": "Tu build",
+  "guia.build.spec": "Talentos",
+  "guia.build.pref": "Arma preferida",
+  "guia.build.continente": "Continente",
+  "guia.build.arma": "Arma equipada",
+  "guia.build.otra": "Otra (dps manual)",
+  "guia.build.dpsArma": "DPS del arma",
+  "guia.build.nombre": "Nombre",
+  "guia.build.nombrePh": "Tu personaje",
+  "guia.build.ing": "Ingeniería",
+  "guia.build.armaAyuda": "El arma que usás para el cálculo de DPS y candidatas.",
+  "guia.sub.rec": "Recomendador",
+  "guia.sub.weapons": "Armas",
+  "guia.sub.macros": "Macros",
+  "guia.sub.extras": "Extras",
+  "guia.realm.kalimdor": "Kalimdor",
+  "guia.realm.ek": "Reinos del Este",
+  "guia.si": "Sí",
+  "guia.no": "No",
+  "guia.datos.titulo": "Datos del juego (/simc)",
+  "guia.simc.boton": "Importar /simc",
+  "guia.simc.ayuda": "Pega el perfil que exporta /simc en el juego: nivel, arma con DPS real, pet y stats.",
+  "guia.simc.instrucciones": "En el juego escribí /simc, esperá a que cargue el perfil y copiá todo el texto. Pegalo abajo — la app detecta tu nivel, el arma equipada (con su DPS real), el pet, ingeniería y tus stats.",
+  "guia.simc.vacio": "Pegá acá el perfil de /simc…",
+  "guia.simc.cancelar": "Cancelar",
+  "guia.simc.importar": "Importar",
+  "guia.simc.importarOtro": "Importar otro perfil",
+  "guia.simc.quitar": "Quitar import",
+  "guia.simc.errorVacio": "No encontré datos de personaje — ¿copiaste el perfil completo de /simc?",
+  "guia.simc.errorClase": "Ojo: tu personaje es {clase} — todavía no hay guía para esa clase.",
+  "guia.simc.avisoOtra": "El perfil importado es de {otra} pero tu guía es {guia} — se aplican los datos compatibles.",
+  "guia.simc.importado": "Importado: {notas}.",
+  "guia.ficha.capturaAyuda": "Subí una captura de tu personaje del juego (queda solo en este dispositivo)",
+  "guia.ficha.quitarAyuda": "Volver al retrato de clase"
+}, {
+  "guia.sinGuiaClase": "There is no curated guide for this class in WoW: Forever yet.",
+  "guia.sinGuiaFac": "The curated guide for {clase} only covers the Horde for now; your faction is left for a future update.",
+  "guia.build.titulo": "Your build",
+  "guia.build.spec": "Talents",
+  "guia.build.pref": "Preferred weapon",
+  "guia.build.continente": "Continent",
+  "guia.build.arma": "Equipped weapon",
+  "guia.build.otra": "Other (manual dps)",
+  "guia.build.dpsArma": "Weapon dps",
+  "guia.build.nombre": "Name",
+  "guia.build.nombrePh": "Your character",
+  "guia.build.ing": "Engineering",
+  "guia.build.armaAyuda": "The weapon used for the dps math and candidates.",
+  "guia.sub.rec": "Advisor",
+  "guia.sub.weapons": "Weapons",
+  "guia.sub.macros": "Macros",
+  "guia.sub.extras": "Extras",
+  "guia.realm.kalimdor": "Kalimdor",
+  "guia.realm.ek": "Eastern Kingdoms",
+  "guia.si": "Yes",
+  "guia.no": "No",
+  "guia.datos.titulo": "Game data (/simc)",
+  "guia.simc.boton": "Import /simc",
+  "guia.simc.ayuda": "Paste the profile /simc exports in game: level, weapon with real dps, pet and stats.",
+  "guia.simc.instrucciones": "In game type /simc, wait for the profile to load and copy all the text. Paste it below — the app picks up your level, equipped weapon (with real dps), pet, engineering and stats.",
+  "guia.simc.vacio": "Paste your /simc profile here…",
+  "guia.simc.cancelar": "Cancel",
+  "guia.simc.importar": "Import",
+  "guia.simc.importarOtro": "Import another profile",
+  "guia.simc.quitar": "Remove import",
+  "guia.simc.errorVacio": "No character data found — did you copy the full /simc profile?",
+  "guia.simc.errorClase": "Heads up: your character is {clase} — there is no guide for that class yet.",
+  "guia.simc.avisoOtra": "The imported profile is {otra} but your guide is {guia} — compatible data is applied.",
+  "guia.simc.importado": "Imported: {notas}.",
+  "guia.ficha.capturaAyuda": "Upload a screenshot of your in-game character (stays on this device)",
+  "guia.ficha.quitarAyuda": "Back to the class portrait"
+});
+var SUBTABS = ["rec", "weapons", "macros", "extras"];
+var VISTAS = { rec: VistaRec, weapons: VistaArmas, macros: VistaMacros, extras: VistaExtras };
+var FAC_A_FACCION = { horde: "horda", alliance: "alianza" };
+function VistaGuia({ ctx, almacen, estado, recargar, perfil, guardarPerfil, lang }) {
+  const curada = useMemo12(() => guiaCurada(perfil), [perfil]);
+  if (!curada) {
+    return /* @__PURE__ */ jsx21(Tarjeta, { titulo: t(lang, "tab.guia"), extra: /* @__PURE__ */ jsx21(Origen, { f: "curado", lang }), children: /* @__PURE__ */ jsx21(Hueco, { lang, children: t(lang, "guia.sinGuiaClase") }) });
+  }
+  if (!curada.datos) {
+    return /* @__PURE__ */ jsx21(Tarjeta, { titulo: curada.guia.name + " · " + t(lang, "tab.guia"), extra: /* @__PURE__ */ jsx21(Origen, { f: "curado", lang }), children: /* @__PURE__ */ jsx21(Hueco, { lang, children: t(lang, "guia.sinGuiaFac", { clase: curada.guia.name }) }) });
+  }
+  return /* @__PURE__ */ jsx21(
+    GuiaPrincipal,
+    {
+      ctx,
+      almacen,
+      estado,
+      recargar,
+      perfil,
+      guardarPerfil,
+      lang,
+      curada
+    }
+  );
+}
+function GuiaPrincipal({ ctx, almacen, estado, recargar, perfil, guardarPerfil, lang, curada }) {
+  const { guia: G, fac: facKey, datos: GF } = curada;
+  const ctxGuia = useMemo12(() => ({ G, GF, facKey, perfil }), [G, GF, facKey, perfil]);
+  const [build, setBuild] = useState10(() => leerBuild2(estado.build, ctxGuia));
+  const ref = useRef3(build);
+  useEffect4(() => {
+    const b = leerBuild2(estado.build, ctxGuia);
+    ref.current = b;
+    setBuild(b);
+  }, [estado.build, ctxGuia]);
+  const [errorG, setErrorG] = useState10("");
+  const [sub, setSub] = useState10(() => SUBTABS.includes(build.tab) ? build.tab : "rec");
+  const [simcOpen, setSimcOpen] = useState10(false);
+  const [simcTxt, setSimcTxt] = useState10("");
+  const [simcErr, setSimcErr] = useState10("");
+  const [simcNota, setSimcNota] = useState10("");
+  const [dpsTxt, setDpsTxt] = useState10(String(build.customDps || ""));
+  const avatarRef = useRef3(null);
+  useEffect4(() => {
+    setDpsTxt(String(build.customDps || ""));
+  }, [build.customDps]);
+  const guardar = useCallback2((mutar) => {
+    const base = ref.current;
+    const nuevo = typeof mutar === "function" ? mutar(base) : { ...base, ...mutar };
+    if (!nuevo || typeof nuevo !== "object") return Promise.resolve(false);
+    ref.current = nuevo;
+    setBuild(nuevo);
+    return almacen.build(JSON.stringify(nuevo)).then(() => {
+      setErrorG("");
+      recargar();
+    }).catch((e) => {
+      setErrorG(e && e.message ? e.message : String(e));
+    });
+  }, [almacen, recargar]);
+  const cambiarSub = (s) => {
+    setSub(s);
+    guardar((b) => ({ ...b, tab: s }));
+  };
+  const onAvatarFile = (e) => {
+    const f = e.target.files && e.target.files[0];
+    e.target.value = "";
+    if (!f || !f.type.startsWith("image/") || f.size > 10 * 1024 * 1024) return;
+    const rd = new FileReader();
+    rd.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        try {
+          const s = Math.min(1, 256 / Math.max(img.width, img.height));
+          const c = document.createElement("canvas");
+          c.width = Math.max(1, Math.round(img.width * s));
+          c.height = Math.max(1, Math.round(img.height * s));
+          c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+          guardar((b) => ({ ...b, avatar: c.toDataURL("image/jpeg", 0.8) }));
+        } catch {
+        }
+      };
+      img.src = rd.result;
+    };
+    rd.readAsDataURL(f);
+  };
+  const importarSimc = async () => {
+    const d = parseSimcProfile(simcTxt);
+    if (!d.level && !d.weapon && !d.name && !(d.pet && d.pet.pet_family)) {
+      setSimcErr(t(lang, "guia.simc.errorVacio"));
+      return;
+    }
+    setSimcErr("");
+    const wLookup2 = weaponLookup(GF.weapons || []);
+    const want = d.className ? SIMC_GUIA[d.className] : null;
+    const avisos = [];
+    if (want && want !== G.id) avisos.push(t(lang, "guia.simc.avisoOtra", { otra: want, guia: G.id }));
+    else if (d.className && !SIMC_GUIA[d.className]) avisos.push(t(lang, "guia.simc.errorClase", { clase: d.className }));
+    pickSimcWeapon(d, G.simc && G.simc.slot || "main_hand", wLookup2);
+    let res = null;
+    await guardar((base) => {
+      res = aplicarSimc(base, d, { G, weapons: GF.weapons || [], dungeons: G.dungeons || [] });
+      return res.state;
+    });
+    if (res && res.nivel) {
+      try {
+        await guardarPerfil({ ...perfil, nivel: res.nivel });
+      } catch {
+      }
+    }
+    const notas = (res ? res.notes : []).concat(avisos).join(" · ");
+    setSimcNota(notas ? t(lang, "guia.simc.importado", { notas }) : "");
+    setSimcOpen(false);
+    setSimcTxt("");
+  };
+  const lvl = Number.isFinite(+perfil.nivel) ? Math.min(60, Math.max(1, Math.trunc(+perfil.nivel))) : build.lvl;
+  const weapons = GF.weapons || [];
+  const os = new Set(build.owned), gs = new Set(build.gear), ss = new Set(build.steps);
+  const dps = curDps(build, weapons);
+  const cands = proximasArmas(weapons, { lvl, pref: build.pref, eng: build.eng, os, cur: build.cur, dps });
+  const ownedBetter = mejorObtenida(weapons, { lvl, eng: build.eng, os, cur: build.cur, dps });
+  const bs = bands(GF, build.realm);
+  const band = bandOf(bs, lvl);
+  const nextBand = bs.find((b) => b.min > lvl);
+  const rc = build.realm === "ek" ? "E" : "K";
+  const dungs = dungeonsEnRango(G.dungeons, lvl, rc);
+  const miles = (GF.milestones || []).map((m, i) => ({ m, i })).filter((x) => x.m.lvl >= lvl - 2 && x.m.lvl <= lvl + 10).sort((a, b) => a.m.lvl - b.m.lvl);
+  const facDato = D.personaje.facciones[FAC_A_FACCION[facKey] || "horda"];
+  const facLabel = facDato ? nombre(facDato.n, lang) : facKey;
+  const wLookup = weaponLookup(weapons);
+  const armaOps = [
+    { value: "other", label: t(lang, "guia.build.otra") },
+    ...weapons.slice().sort((a, b) => a.lvl - b.lvl || a.dps - b.dps).map((w) => ({ value: w.id, label: `${w.n} (${fmtDps(w)} dps)` }))
+  ];
+  const v = {
+    G,
+    GF,
+    fac: facKey,
+    lvl,
+    lang,
+    ctx,
+    build,
+    guardar,
+    perfil,
+    guardarPerfil,
+    os,
+    gs,
+    ss,
+    dps,
+    cands,
+    ownedBetter,
+    dungs,
+    miles,
+    band,
+    nextBand,
+    rc,
+    weapons,
+    wLookup,
+    tipos: G.types || {},
+    MACRO_KEY: macroKeyMap(G.bar || { keys: [], mouse: [] }),
+    realmLabel: t(lang, "guia.realm." + (build.realm === "ek" ? "ek" : "kalimdor")),
+    facLabel,
+    onAvatar: () => avatarRef.current && avatarRef.current.click(),
+    onAvatarDel: () => guardar((b) => ({ ...b, avatar: null }))
+  };
+  const Vista = VISTAS[sub] || VistaRec;
+  return /* @__PURE__ */ jsxs21(Fragment17, { children: [
+    /* @__PURE__ */ jsx21("input", { ref: avatarRef, type: "file", accept: "image/*", style: { display: "none" }, onChange: onAvatarFile }),
+    /* @__PURE__ */ jsxs21(Tarjeta, { titulo: t(lang, "guia.build.titulo"), extra: /* @__PURE__ */ jsx21(Origen, { f: "curado", lang }), children: [
+      /* @__PURE__ */ jsxs21("div", { style: { display: "flex", flexWrap: "wrap", gap: "12px 22px", alignItems: "flex-end" }, children: [
+        /* @__PURE__ */ jsxs21("div", { style: S.campo, children: [
+          /* @__PURE__ */ jsx21("span", { style: S.etiqueta, children: t(lang, "guia.build.spec") }),
+          /* @__PURE__ */ jsx21(
+            SegmentedControl5,
+            {
+              value: build.spec,
+              onChange: (id) => guardar((b) => ({ ...b, spec: id })),
+              options: Object.entries(G.specs || {}).map(([id, label]) => ({ id, label }))
+            }
+          ),
+          G.specNote ? /* @__PURE__ */ jsx21("span", { style: S.sub, children: G.specNote }) : null
+        ] }),
+        /* @__PURE__ */ jsxs21("div", { style: S.campo, children: [
+          /* @__PURE__ */ jsx21("span", { style: S.etiqueta, children: t(lang, "guia.build.pref") }),
+          /* @__PURE__ */ jsx21(
+            SegmentedControl5,
+            {
+              value: build.pref,
+              onChange: (id) => guardar((b) => ({ ...b, pref: id })),
+              options: (G.prefs || []).map(([id, label]) => ({ id, label }))
+            }
+          ),
+          G.prefNote ? /* @__PURE__ */ jsx21("span", { style: S.sub, children: G.prefNote }) : null
+        ] }),
+        /* @__PURE__ */ jsxs21("div", { style: S.campo, children: [
+          /* @__PURE__ */ jsx21("span", { style: S.etiqueta, children: t(lang, "guia.build.continente") }),
+          /* @__PURE__ */ jsx21(
+            SegmentedControl5,
+            {
+              value: build.realm,
+              onChange: (id) => guardar((b) => ({ ...b, realm: id })),
+              options: Object.keys(GF.routes || {}).map((k) => ({ id: k, label: t(lang, "guia.realm." + k) }))
+            }
+          )
+        ] }),
+        G.useEng ? /* @__PURE__ */ jsxs21("label", { style: { display: "flex", gap: 6, alignItems: "center", paddingBottom: 5, cursor: "pointer" }, children: [
+          /* @__PURE__ */ jsx21(Checkbox8, { checked: !!build.eng, onCheckedChange: (val) => guardar((b) => ({ ...b, eng: !!val })) }),
+          /* @__PURE__ */ jsx21("span", { style: { fontSize: 12 }, children: t(lang, "guia.build.ing") })
+        ] }) : null,
+        /* @__PURE__ */ jsxs21("div", { style: S.campo, children: [
+          /* @__PURE__ */ jsx21("span", { style: S.etiqueta, children: t(lang, "guia.build.arma") }),
+          /* @__PURE__ */ jsxs21(Select5, { value: build.cur, onValueChange: (val) => guardar((b) => ({ ...b, cur: val, weaponDps: null })), children: [
+            /* @__PURE__ */ jsx21(SelectTrigger5, { "aria-label": t(lang, "guia.build.arma"), children: /* @__PURE__ */ jsx21(SelectValue5, {}) }),
+            /* @__PURE__ */ jsx21(SelectContent5, { children: armaOps.map((o) => /* @__PURE__ */ jsx21(SelectItem5, { value: o.value, children: o.label }, o.value || "none")) })
+          ] })
+        ] }),
+        build.cur === "other" ? /* @__PURE__ */ jsxs21("div", { style: S.campo, children: [
+          /* @__PURE__ */ jsx21("span", { style: S.etiqueta, children: t(lang, "guia.build.dpsArma") }),
+          /* @__PURE__ */ jsx21(
+            Input4,
+            {
+              value: dpsTxt,
+              inputMode: "decimal",
+              style: { width: 110 },
+              onChange: (e) => setDpsTxt(e.target.value),
+              onBlur: () => {
+                const n = parseFloat(dpsTxt);
+                guardar((b) => ({ ...b, customDps: Number.isFinite(n) ? Math.max(0, n) : 0 }));
+              },
+              onKeyDown: (e) => {
+                if (e.key === "Enter") e.target.blur();
+              }
+            }
+          )
+        ] }) : null,
+        /* @__PURE__ */ jsxs21("div", { style: S.campo, children: [
+          /* @__PURE__ */ jsx21("span", { style: S.etiqueta, children: t(lang, "guia.build.nombre") }),
+          /* @__PURE__ */ jsx21(
+            Input4,
+            {
+              value: build.name,
+              maxLength: 20,
+              placeholder: t(lang, "guia.build.nombrePh"),
+              style: { width: 170 },
+              onChange: (e) => guardar((b) => ({ ...b, name: e.target.value }))
+            }
+          )
+        ] })
+      ] }),
+      errorG ? /* @__PURE__ */ jsx21("div", { role: "alert", style: S.aviso, children: errorG }) : null
+    ] }),
+    /* @__PURE__ */ jsxs21(Tarjeta, { titulo: t(lang, "guia.datos.titulo"), extra: /* @__PURE__ */ jsx21(Origen, { f: "curado", lang }), children: [
+      build.simc ? /* @__PURE__ */ jsx21(SimcCard, { simc: build.simc, G, lang }) : null,
+      /* @__PURE__ */ jsxs21("div", { style: { display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }, children: [
+        /* @__PURE__ */ jsx21(Button7, { variant: build.simc ? "outline" : "default", size: "xs", onClick: () => setSimcOpen((o) => !o), children: build.simc ? t(lang, "guia.simc.importarOtro") : t(lang, "guia.simc.boton") }),
+        build.simc ? /* @__PURE__ */ jsx21(Button7, { variant: "ghost", size: "xs", onClick: () => guardar((b) => ({ ...b, simc: null })), children: t(lang, "guia.simc.quitar") }) : /* @__PURE__ */ jsx21("span", { style: S.sub, children: t(lang, "guia.simc.ayuda") })
+      ] }),
+      simcOpen ? /* @__PURE__ */ jsxs21("div", { style: { marginTop: 10 }, children: [
+        /* @__PURE__ */ jsx21("p", { style: { ...S.sub, margin: "0 0 6px" }, children: t(lang, "guia.simc.instrucciones") }),
+        /* @__PURE__ */ jsx21(
+          "textarea",
+          {
+            value: simcTxt,
+            onChange: (e) => setSimcTxt(e.target.value),
+            placeholder: t(lang, "guia.simc.vacio"),
+            style: {
+              width: "100%",
+              minHeight: 150,
+              resize: "vertical",
+              boxSizing: "border-box",
+              background: C.fondo3,
+              color: C.texto,
+              border: `1px solid ${C.borde2}`,
+              borderRadius: 6,
+              padding: 8,
+              fontFamily: 'Consolas,"Cascadia Mono",monospace',
+              fontSize: 12
+            }
+          }
+        ),
+        simcErr ? /* @__PURE__ */ jsx21("div", { role: "alert", style: { ...S.aviso, marginTop: 6 }, children: simcErr }) : null,
+        simcNota ? /* @__PURE__ */ jsx21("div", { style: { ...S.sub, marginTop: 6 }, children: simcNota }) : null,
+        /* @__PURE__ */ jsxs21("div", { style: { display: "flex", gap: 8, marginTop: 8 }, children: [
+          /* @__PURE__ */ jsx21(Button7, { size: "xs", onClick: importarSimc, children: t(lang, "guia.simc.importar") }),
+          /* @__PURE__ */ jsx21(Button7, { variant: "ghost", size: "xs", onClick: () => {
+            setSimcOpen(false);
+            setSimcErr("");
+          }, children: t(lang, "guia.simc.cancelar") })
+        ] })
+      ] }) : null,
+      !simcOpen && simcNota ? /* @__PURE__ */ jsx21("div", { style: { ...S.sub, marginTop: 6 }, children: simcNota }) : null
+    ] }),
+    /* @__PURE__ */ jsx21("div", { style: { display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }, children: /* @__PURE__ */ jsx21(
+      SegmentedControl5,
+      {
+        value: sub,
+        onChange: cambiarSub,
+        options: SUBTABS.map((s) => ({ id: s, label: t(lang, "guia.sub." + s) }))
+      }
+    ) }),
+    /* @__PURE__ */ jsx21(Vista, { v, lang })
+  ] });
 }
 
 // src/vistas/legacy.jsx
-import { jsx as jsx17 } from "react/jsx-runtime";
-function VistaLegacy({ lang }) {
-  return /* @__PURE__ */ jsx17(Tarjeta, { titulo: t(lang, "tab.legacy"), children: /* @__PURE__ */ jsx17("p", { children: t(lang, "pendiente") }) });
+import { Fragment as Fragment18, jsx as jsx22, jsxs as jsxs22 } from "react/jsx-runtime";
+agregarTextos({
+  "guia.leg.titulo": "Legacy — puntos de cuenta",
+  "guia.leg.sub": "WoW: Forever · 65 pts ganables · 16 por personaje",
+  "guia.leg.desbloqueadoPre": "A nivel {lvl} el panel ya debería estar desbloqueado si algún personaje de la cuenta pasó de 25 — ábrelo con",
+  "guia.leg.desbloqueadoPost": "(Options → Keybindings).",
+  "guia.leg.proximos": "Tus próximos puntos",
+  "guia.leg.aNivel": "a nivel {lvl} · {clase}",
+  "guia.leg.sinClase": "tu clase",
+  "guia.leg.hitosClase": "— hitos de clase (1 pt c/u, primera vez)",
+  "guia.leg.nivel": "nivel {m}",
+  "guia.leg.yaGanado": " · ya deberías tenerlo ganado",
+  "guia.leg.teFalta": " · te falta",
+  "guia.leg.spelunker": "Spelunker",
+  "guia.leg.spelunkerD": "sets de dungeons por tier (3 pts)",
+  "guia.leg.oficios": "Oficios de craft",
+  "guia.leg.oficiosD": "150/225/300 skill = 1 pt c/u (solo los 6 crafts)",
+  "guia.leg.pvp": "PvP",
+  "guia.leg.pvpD": "rangos de honor + reputaciones BG + Field of Honor (12 pts)",
+  "guia.leg.raids": "Raids",
+  "guia.leg.raidsD": "Hyjal Summit · Barrow Deeps · Onyxia (3 pts, lvl 60)",
+  "guia.leg.aventura": "Aventura",
+  "guia.leg.aventuraD": "Valthalak (BRM) + Explore Azeroth (2 pts)",
+  "guia.leg.notaBaja": "El panel se abre al llegar a nivel 25 — los puntos se acumulan igual a nivel cuenta. Recolección <b>no</b> da puntos directos; alimenta el árbol Professions (ver abajo).",
+  "guia.leg.notaAlta": "A nivel {lvl}: revisá el panel (Y) — los hitos de clase ya cumplidos deberían figurar como ganados. Recolección <b>no</b> da puntos directos; alimenta el árbol Professions (ver abajo).",
+  "guia.leg.progress": "Progress Track",
+  "guia.leg.progressSub": "recompensas por puntos ganados (cuenta)",
+  "guia.leg.challenges": "Legacy Challenges",
+  "guia.leg.loQuePaga": "lo que paga puntos",
+  "guia.leg.ranks": "{n} ranks",
+  "guia.leg.req": "req:",
+  "guia.leg.recoleccion": "Recolección y Legacy",
+  "guia.leg.recoleccionSub": "Herbalism · Mining · Skinning",
+  "guia.leg.recoleccionTxt": "Herbalism, Mining y Skinning <b>no otorgan Legacy Points</b>: no hay challenges de recolección (solo los 6 crafts pagan por skill). Lo que sí hacen es alimentar el árbol <b>Professions</b> — empezá por <b>Bountiful Harvest</b>.",
+  "guia.leg.bountiful": "Bountiful Harvest",
+  "guia.leg.tuSkinning": "tu Skinning suma",
+  "guia.leg.perkArbol": "perk del árbol",
+  "guia.leg.bountifulTxt": "5 rangos · +20/40/60/80/100% escasos · libre",
+  "guia.leg.tierNota": "Ojo: a nivel {lvl} tu tabla de escasos es el <b>{tier}</b> — los tiers dependen del nivel del personaje (≤25 → tier 1, ≥26 → tier 2).{items} El perk multiplica el drop de la tabla que te toca.",
+  "guia.leg.tierItems1": " Te toca Pristine Leather / Frilled Lichen / Pyrite.",
+  "guia.leg.tierItems2": " Te toca Pristine Hide / Rosecap / Bauxite; Pristine Leather y Frilled Lichen ya no te caen (van a un alt ≤25).",
+  "guia.leg.tierItems3": " Probablemente Pristine Scale / Stranglevine / Pitchblende.",
+  "guia.leg.scarce": "Materiales escasos (Scarce)",
+  "guia.leg.scarceSub": "bonus drops de nodos/menas/cadáveres normales",
+  "guia.leg.scarceCols": "GATHERED · TIER · SE CONVIERTE · RECETAS · NOTA",
+  "guia.leg.ilvl": "ilvl {n}",
+  "guia.leg.dondeFarmear": "— dónde farmear",
+  "guia.leg.tenesProf": "tenés esta profesión",
+  "guia.leg.porNivel": "por nivel",
+  "guia.leg.tuNivel": "tu nivel",
+  "guia.leg.nv": "nv {a}–{b}",
+  "guia.leg.tag.gather": "recolección",
+  "guia.leg.tag.skill": "skill",
+  "guia.leg.tag.craft": "craft",
+  "guia.leg.tag.fish": "pesca",
+  "guia.leg.tag.vendor": "vendors",
+  "guia.leg.tag.crate": "crates",
+  "guia.leg.tag.xp": "descanso",
+  "guia.leg.tag.talent": "talentos",
+  "guia.leg.tag.combat": "combate",
+  "guia.leg.tag.camp": "camp",
+  "guia.leg.tag.heal": "ventas",
+  "guia.leg.tag.pvp": "pvp",
+  "guia.leg.tag.travel": "viaje",
+  "guia.leg.tag.party": "party",
+  "guia.leg.tag.dead": "muerte",
+  "guia.leg.tag.death": "durabilidad",
+  "guia.leg.tag.reagent": "reagents",
+  "guia.leg.tag.rep": "rep",
+  "guia.leg.tag.food": "comida"
+}, {
+  "guia.leg.titulo": "Legacy — account points",
+  "guia.leg.sub": "WoW: Forever · 65 earnable pts · 16 per character",
+  "guia.leg.desbloqueadoPre": "At level {lvl} the panel should already be unlocked if any character on the account passed 25 — open it with",
+  "guia.leg.desbloqueadoPost": "(Options → Keybindings).",
+  "guia.leg.proximos": "Your next points",
+  "guia.leg.aNivel": "at level {lvl} · {clase}",
+  "guia.leg.sinClase": "your class",
+  "guia.leg.hitosClase": "— class milestones (1 pt each, first time)",
+  "guia.leg.nivel": "level {m}",
+  "guia.leg.yaGanado": " · you should already have it",
+  "guia.leg.teFalta": " · you are missing it",
+  "guia.leg.spelunker": "Spelunker",
+  "guia.leg.spelunkerD": "dungeon sets per tier (3 pts)",
+  "guia.leg.oficios": "Crafting trades",
+  "guia.leg.oficiosD": "150/225/300 skill = 1 pt each (only the 6 crafts)",
+  "guia.leg.pvp": "PvP",
+  "guia.leg.pvpD": "honor ranks + BG reputations + Field of Honor (12 pts)",
+  "guia.leg.raids": "Raids",
+  "guia.leg.raidsD": "Hyjal Summit · Barrow Deeps · Onyxia (3 pts, lv 60)",
+  "guia.leg.aventura": "Adventure",
+  "guia.leg.aventuraD": "Valthalak (BRM) + Explore Azeroth (2 pts)",
+  "guia.leg.notaBaja": "The panel opens at level 25 — points still accumulate account-wide. Gathering gives <b>no</b> direct points; it feeds the Professions tree (below).",
+  "guia.leg.notaAlta": "At level {lvl}: check the panel (Y) — completed class milestones should show as earned. Gathering gives <b>no</b> direct points; it feeds the Professions tree (below).",
+  "guia.leg.progress": "Progress Track",
+  "guia.leg.progressSub": "rewards per points earned (account)",
+  "guia.leg.challenges": "Legacy Challenges",
+  "guia.leg.loQuePaga": "what pays points",
+  "guia.leg.ranks": "{n} ranks",
+  "guia.leg.req": "req:",
+  "guia.leg.recoleccion": "Gathering and Legacy",
+  "guia.leg.recoleccionSub": "Herbalism · Mining · Skinning",
+  "guia.leg.recoleccionTxt": "Herbalism, Mining and Skinning <b>do not grant Legacy Points</b>: there are no gathering challenges (only the 6 crafts pay by skill). What they do is feed the <b>Professions</b> tree — start with <b>Bountiful Harvest</b>.",
+  "guia.leg.bountiful": "Bountiful Harvest",
+  "guia.leg.tuSkinning": "your Skinning counts",
+  "guia.leg.perkArbol": "tree perk",
+  "guia.leg.bountifulTxt": "5 ranks · +20/40/60/80/100% scarce · free",
+  "guia.leg.tierNota": "Heads up: at level {lvl} your scarce table is <b>{tier}</b> — tiers depend on character level (≤25 → tier 1, ≥26 → tier 2).{items} The perk multiplies the drop rate of your table.",
+  "guia.leg.tierItems1": " You get Pristine Leather / Frilled Lichen / Pyrite.",
+  "guia.leg.tierItems2": " You get Pristine Hide / Rosecap / Bauxite; Pristine Leather and Frilled Lichen no longer drop (they go to an alt ≤25).",
+  "guia.leg.tierItems3": " Probably Pristine Scale / Stranglevine / Pitchblende.",
+  "guia.leg.scarce": "Scarce materials",
+  "guia.leg.scarceSub": "bonus drops from normal nodes/ores/corpses",
+  "guia.leg.scarceCols": "GATHERED · TIER · CONVERTS TO · RECIPES · NOTE",
+  "guia.leg.ilvl": "ilvl {n}",
+  "guia.leg.dondeFarmear": "— where to farm",
+  "guia.leg.tenesProf": "you have this profession",
+  "guia.leg.porNivel": "by level",
+  "guia.leg.tuNivel": "your level",
+  "guia.leg.nv": "lv {a}–{b}",
+  "guia.leg.tag.gather": "gathering",
+  "guia.leg.tag.skill": "skill",
+  "guia.leg.tag.craft": "craft",
+  "guia.leg.tag.fish": "fishing",
+  "guia.leg.tag.vendor": "vendors",
+  "guia.leg.tag.crate": "crates",
+  "guia.leg.tag.xp": "rest",
+  "guia.leg.tag.talent": "talents",
+  "guia.leg.tag.combat": "combat",
+  "guia.leg.tag.camp": "camp",
+  "guia.leg.tag.heal": "healing",
+  "guia.leg.tag.pvp": "pvp",
+  "guia.leg.tag.travel": "travel",
+  "guia.leg.tag.party": "party",
+  "guia.leg.tag.dead": "death",
+  "guia.leg.tag.death": "durability",
+  "guia.leg.tag.reagent": "reagents",
+  "guia.leg.tag.rep": "rep",
+  "guia.leg.tag.food": "food"
+});
+var GOLD = { borderLeft: `3px solid ${C.amarillo}` };
+var tagTxt = (lang, tag) => {
+  const k = "guia.leg.tag." + tag;
+  const v = t(lang, k);
+  return v === k ? tag : v;
+};
+var MILESTONES = [[25, "Novice"], [45, "Experienced"], [60, "Master"]];
+var PROF_META = [
+  ["skin", "393", "skull"],
+  ["herb", "182", "star"],
+  ["mine", "186", "pin"]
+];
+function VistaLegacy({ estado, perfil, lang }) {
+  const L = LEGACY || {};
+  const build = leerBuild2(estado && estado.build, {});
+  const farmProf = normalizeFarm(build.farm).prof || {};
+  const ids = new Set(perfil && perfil.profesiones || []);
+  const profs = {
+    skin: !!(farmProf.skin || ids.has(393)),
+    herb: !!(farmProf.herb || ids.has(182)),
+    mine: !!(farmProf.mine || ids.has(186))
+  };
+  const lvl = validLevel(perfil && perfil.nivel);
+  const claseDato = perfil && perfil.clase != null ? D.personaje.clases[String(perfil.clase)] : null;
+  const clsName = claseDato ? nombre(claseDato.n, lang) : t(lang, "guia.leg.sinClase");
+  const fac = perfil && perfil.faccion === "horda" ? "h" : perfil && perfil.faccion === "alianza" ? "a" : null;
+  const sys = L.sys || [], progress = L.progress || [], challenges = L.challenges || [], perks = L.perks || {}, scarce = L.scarce || [], gather = L.gather || {};
+  const origen = /* @__PURE__ */ jsx22(Origen, { f: "curado", lang });
+  const nombreProf = (id, alt) => {
+    const p = D.profesiones && D.profesiones.profesiones && D.profesiones.profesiones[id];
+    return p ? nombre(p.n, lang) : alt;
+  };
+  return /* @__PURE__ */ jsxs22(Fragment18, { children: [
+    /* @__PURE__ */ jsxs22(Tarjeta, { estilo: GOLD, titulo: /* @__PURE__ */ jsxs22("span", { style: { display: "inline-flex", alignItems: "center", gap: 8 }, children: [
+      /* @__PURE__ */ jsx22(Icono, { n: "coin", size: 14 }),
+      t(lang, "guia.leg.titulo"),
+      /* @__PURE__ */ jsx22("span", { style: P.muted, children: t(lang, "guia.leg.sub") })
+    ] }), extra: origen, children: [
+      sys.map((s, i) => /* @__PURE__ */ jsxs22("div", { style: { ...P.mst, ...i === sys.length - 1 ? P.mstUlt : {} }, children: [
+        /* @__PURE__ */ jsx22("span", { style: P.tdot }),
+        /* @__PURE__ */ jsx22("span", { style: P.mstTxt, children: /* @__PURE__ */ jsx22(TextoRico, { html: s }) })
+      ] }, i)),
+      /* @__PURE__ */ jsx22("div", { style: { ...P.tip, marginTop: 8 }, children: lvl < 25 ? /* @__PURE__ */ jsx22(TextoRico, { html: L.now && L.now.locked || "" }) : /* @__PURE__ */ jsxs22(Fragment18, { children: [
+        t(lang, "guia.leg.desbloqueadoPre", { lvl }),
+        " ",
+        /* @__PURE__ */ jsx22("b", { children: "Y" }),
+        " ",
+        t(lang, "guia.leg.desbloqueadoPost")
+      ] }) })
+    ] }),
+    /* @__PURE__ */ jsxs22(Tarjeta, { titulo: /* @__PURE__ */ jsxs22("span", { style: { display: "inline-flex", alignItems: "center", gap: 8 }, children: [
+      /* @__PURE__ */ jsx22(Icono, { n: "star", size: 14 }),
+      t(lang, "guia.leg.proximos"),
+      /* @__PURE__ */ jsx22("span", { style: P.muted, children: t(lang, "guia.leg.aNivel", { lvl, clase: clsName }) })
+    ] }), extra: origen, children: [
+      /* @__PURE__ */ jsx22("div", { style: { ...P.loot, borderBottom: "none", paddingBottom: 2 }, children: /* @__PURE__ */ jsxs22("span", { children: [
+        /* @__PURE__ */ jsx22("b", { children: clsName }),
+        " ",
+        /* @__PURE__ */ jsx22("span", { style: P.muted, children: t(lang, "guia.leg.hitosClase") })
+      ] }) }),
+      MILESTONES.map(([m, label]) => {
+        const got = lvl >= m;
+        return /* @__PURE__ */ jsxs22("div", { style: P.loot, children: [
+          /* @__PURE__ */ jsxs22("span", { style: got ? P.lootOwn : {}, children: [
+            /* @__PURE__ */ jsxs22("b", { children: [
+              label,
+              " ",
+              clsName
+            ] }),
+            " ",
+            /* @__PURE__ */ jsxs22("span", { style: P.muted, children: [
+              "— ",
+              t(lang, "guia.leg.nivel", { m }),
+              got ? t(lang, "guia.leg.yaGanado") : t(lang, "guia.leg.teFalta")
+            ] })
+          ] }),
+          /* @__PURE__ */ jsx22(Placa, { tono: got ? "now" : "soon", children: got ? "OK" : "lvl " + m })
+        ] }, m);
+      }),
+      [
+        [t(lang, "guia.leg.spelunker"), t(lang, "guia.leg.spelunkerD"), "dgn"],
+        [t(lang, "guia.leg.oficios"), t(lang, "guia.leg.oficiosD"), "craft"],
+        [t(lang, "guia.leg.pvp"), t(lang, "guia.leg.pvpD"), "pvp"],
+        [t(lang, "guia.leg.raids"), t(lang, "guia.leg.raidsD"), "raid"],
+        [t(lang, "guia.leg.aventura"), t(lang, "guia.leg.aventuraD"), "world"]
+      ].map(([n, d, tag], i, arr) => /* @__PURE__ */ jsxs22("div", { style: { ...P.loot, ...i === arr.length - 1 ? P.lootSinBorde : {} }, children: [
+        /* @__PURE__ */ jsxs22("span", { children: [
+          /* @__PURE__ */ jsx22("b", { children: n }),
+          " ",
+          /* @__PURE__ */ jsxs22("span", { style: P.muted, children: [
+            "— ",
+            d
+          ] })
+        ] }),
+        /* @__PURE__ */ jsx22(Placa, { tono: "soon", children: tag })
+      ] }, tag)),
+      /* @__PURE__ */ jsx22("p", { style: { ...P.tip, margin: "8px 0 0" }, children: /* @__PURE__ */ jsx22(TextoRico, { html: lvl < 25 ? t(lang, "guia.leg.notaBaja") : t(lang, "guia.leg.notaAlta", { lvl }) }) })
+    ] }),
+    /* @__PURE__ */ jsxs22(Tarjeta, { titulo: /* @__PURE__ */ jsxs22("span", { style: { display: "inline-flex", alignItems: "center", gap: 8 }, children: [
+      /* @__PURE__ */ jsx22(Icono, { n: "pin", size: 14 }),
+      t(lang, "guia.leg.progress"),
+      /* @__PURE__ */ jsx22("span", { style: P.muted, children: t(lang, "guia.leg.progressSub") })
+    ] }), extra: origen, children: [
+      progress.map((p, i) => /* @__PURE__ */ jsx22("div", { style: { ...P.loot, ...i === progress.length - 1 ? P.lootSinBorde : {} }, children: /* @__PURE__ */ jsxs22("span", { children: [
+        /* @__PURE__ */ jsxs22("b", { children: [
+          p[0],
+          " pts"
+        ] }),
+        " — ",
+        p[1],
+        " ",
+        /* @__PURE__ */ jsx22("span", { style: P.muted, children: p[2] })
+      ] }) }, i)),
+      L.progressNote ? /* @__PURE__ */ jsx22("p", { style: { ...P.tip, margin: "6px 0 0" }, children: L.progressNote }) : null
+    ] }),
+    /* @__PURE__ */ jsx22(Tarjeta, { titulo: /* @__PURE__ */ jsxs22("span", { style: { display: "inline-flex", alignItems: "center", gap: 8 }, children: [
+      /* @__PURE__ */ jsx22(Icono, { n: "scroll", size: 14 }),
+      t(lang, "guia.leg.challenges"),
+      /* @__PURE__ */ jsxs22("span", { style: P.muted, children: [
+        t(lang, "guia.leg.loQuePaga"),
+        " · ",
+        L.challengesNote || ""
+      ] })
+    ] }), extra: origen }),
+    challenges.map((c) => /* @__PURE__ */ jsxs22(
+      Detalle,
+      {
+        titulo: c.name,
+        meta: `~${c.pts} pts · ${c.desc || ""}`,
+        extra: origen,
+        children: [
+          (c.rows || []).map((r, i) => /* @__PURE__ */ jsx22("div", { style: { ...P.loot, ...i === (c.rows || []).length - 1 ? P.lootSinBorde : {} }, children: /* @__PURE__ */ jsxs22("span", { children: [
+            /* @__PURE__ */ jsx22("b", { children: r[0] }),
+            " ",
+            /* @__PURE__ */ jsxs22("span", { style: P.muted, children: [
+              "— ",
+              /* @__PURE__ */ jsx22(TextoRico, { html: r[1] })
+            ] })
+          ] }) }, i)),
+          c.note ? /* @__PURE__ */ jsx22("p", { style: { ...P.tip, margin: "6px 0 0" }, children: /* @__PURE__ */ jsx22(TextoRico, { html: c.note }) }) : null
+        ]
+      },
+      c.id || c.name
+    )),
+    Object.entries(perks).map(([pk, Pk]) => {
+      const total = (Pk.perks || []).reduce((a, x) => a + (x.r || 0), 0);
+      return /* @__PURE__ */ jsxs22(
+        Detalle,
+        {
+          abierto: pk === "prof",
+          estilo: pk === "prof" ? { borderLeft: `3px solid ${C.verde}` } : {},
+          titulo: /* @__PURE__ */ jsxs22("span", { style: { display: "inline-flex", alignItems: "center", gap: 8 }, children: [
+            /* @__PURE__ */ jsx22(Icono, { n: "star", size: 14 }),
+            Pk.name
+          ] }),
+          meta: `${Pk.sub || ""} · ${t(lang, "guia.leg.ranks", { n: total })}`,
+          extra: origen,
+          children: [
+            (Pk.perks || []).map((p, i) => /* @__PURE__ */ jsx22("div", { style: { ...P.loot, ...i === (Pk.perks || []).length - 1 ? P.lootSinBorde : {} }, children: /* @__PURE__ */ jsxs22("div", { children: [
+              /* @__PURE__ */ jsx22("b", { children: p.n }),
+              " ",
+              /* @__PURE__ */ jsxs22(Placa, { tono: p.tag === "gather" ? "now" : "plain", estilo: { marginLeft: 0 }, children: [
+                tagTxt(lang, p.tag),
+                " · ",
+                p.r,
+                "r"
+              ] }),
+              p.pre ? /* @__PURE__ */ jsxs22(Placa, { tono: "soon", children: [
+                t(lang, "guia.leg.req"),
+                " ",
+                p.pre
+              ] }) : null,
+              /* @__PURE__ */ jsx22("div", { style: { ...P.muted, marginTop: 2 }, children: /* @__PURE__ */ jsx22(TextoRico, { html: p.fx }) })
+            ] }) }, i)),
+            L.perksNote ? /* @__PURE__ */ jsx22("p", { style: { ...P.tip, margin: "6px 0 0" }, children: L.perksNote }) : null
+          ]
+        },
+        pk
+      );
+    }),
+    /* @__PURE__ */ jsxs22(Tarjeta, { estilo: GOLD, titulo: /* @__PURE__ */ jsxs22("span", { style: { display: "inline-flex", alignItems: "center", gap: 8 }, children: [
+      /* @__PURE__ */ jsx22(Icono, { n: "star", size: 14 }),
+      t(lang, "guia.leg.recoleccion"),
+      /* @__PURE__ */ jsxs22("span", { style: P.muted, children: [
+        nombreProf("182", "Herbalism"),
+        " · ",
+        nombreProf("186", "Mining"),
+        " · ",
+        nombreProf("393", "Skinning")
+      ] })
+    ] }), extra: origen, children: [
+      /* @__PURE__ */ jsxs22("div", { style: { ...P.mst, marginBottom: 4 }, children: [
+        /* @__PURE__ */ jsx22("span", { style: P.tdot }),
+        /* @__PURE__ */ jsx22("span", { style: P.mstTxt, children: /* @__PURE__ */ jsx22(TextoRico, { html: t(lang, "guia.leg.recoleccionTxt") }) })
+      ] }),
+      /* @__PURE__ */ jsxs22("div", { style: { ...P.loot, borderBottom: "none" }, children: [
+        /* @__PURE__ */ jsxs22("span", { children: [
+          /* @__PURE__ */ jsx22("b", { children: t(lang, "guia.leg.bountiful") }),
+          " ",
+          /* @__PURE__ */ jsx22(Placa, { tono: "now", children: profs.skin ? t(lang, "guia.leg.tuSkinning") : t(lang, "guia.leg.perkArbol") })
+        ] }),
+        /* @__PURE__ */ jsx22("span", { style: P.muted, children: t(lang, "guia.leg.bountifulTxt") })
+      ] }),
+      /* @__PURE__ */ jsx22("p", { style: { ...P.tip, margin: "8px 0 0" }, children: /* @__PURE__ */ jsx22(TextoRico, { html: t(lang, "guia.leg.tierNota", {
+        lvl,
+        tier: lvl <= 25 ? "tier 1" : lvl < 46 ? "tier 2" : "tier 3 (aprox)",
+        items: t(lang, lvl <= 25 ? "guia.leg.tierItems1" : lvl < 46 ? "guia.leg.tierItems2" : "guia.leg.tierItems3")
+      }) }) })
+    ] }),
+    /* @__PURE__ */ jsxs22(Tarjeta, { titulo: /* @__PURE__ */ jsxs22("span", { style: { display: "inline-flex", alignItems: "center", gap: 8 }, children: [
+      /* @__PURE__ */ jsx22(Icono, { n: "coin", size: 14 }),
+      t(lang, "guia.leg.scarce"),
+      /* @__PURE__ */ jsx22("span", { style: P.muted, children: t(lang, "guia.leg.scarceSub") })
+    ] }), extra: origen, children: [
+      /* @__PURE__ */ jsx22("div", { style: { ...P.loot, borderBottom: "none", paddingBottom: 2 }, children: /* @__PURE__ */ jsx22("span", { style: { ...P.muted, fontSize: 11 }, children: t(lang, "guia.leg.scarceCols") }) }),
+      scarce.map((s, i) => /* @__PURE__ */ jsx22("div", { style: { ...P.loot, ...i === scarce.length - 1 ? P.lootSinBorde : {} }, children: /* @__PURE__ */ jsxs22("div", { children: [
+        /* @__PURE__ */ jsx22("b", { children: s[0] }),
+        " ",
+        /* @__PURE__ */ jsx22(Placa, { tono: "plain", estilo: { marginLeft: 0 }, children: s[1] }),
+        " ",
+        /* @__PURE__ */ jsx22(Placa, { tono: "soon", children: t(lang, "guia.leg.ilvl", { n: s[2] }) }),
+        /* @__PURE__ */ jsxs22("div", { style: { ...P.muted, marginTop: 2 }, children: [
+          "→ ",
+          s[3],
+          " · ",
+          s[4]
+        ] }),
+        /* @__PURE__ */ jsx22("div", { style: { ...P.muted, fontSize: 11 }, children: s[5] })
+      ] }) }, i)),
+      L.scarceNote ? /* @__PURE__ */ jsx22("p", { style: { ...P.tip, margin: "6px 0 0" }, children: L.scarceNote }) : null
+    ] }),
+    PROF_META.map(([pk, id, ic]) => {
+      const has = !!profs[pk];
+      const rows = (gather[pk] || []).filter((e) => !e.fac || e.fac === "both" || e.fac === fac);
+      return /* @__PURE__ */ jsxs22(Tarjeta, { titulo: /* @__PURE__ */ jsxs22("span", { style: { display: "inline-flex", alignItems: "center", gap: 8, flexWrap: "wrap" }, children: [
+        /* @__PURE__ */ jsx22(Icono, { n: ic, size: 14 }),
+        nombreProf(id, pk),
+        t(lang, "guia.leg.dondeFarmear"),
+        /* @__PURE__ */ jsxs22("span", { style: P.muted, children: [
+          has ? /* @__PURE__ */ jsx22("b", { style: { color: C.verde }, children: t(lang, "guia.leg.tenesProf") }) : null,
+          t(lang, "guia.leg.porNivel")
+        ] })
+      ] }), extra: origen, children: [
+        rows.map((e, i) => {
+          const inR = lvl >= e.lvl[0] && lvl <= e.lvl[1];
+          return /* @__PURE__ */ jsxs22("div", { style: {
+            ...P.loot,
+            ...i === rows.length - 1 ? P.lootSinBorde : {},
+            ...inR ? { borderLeft: `2px solid ${C.verde}`, paddingLeft: 8 } : {}
+          }, children: [
+            /* @__PURE__ */ jsxs22("div", { children: [
+              /* @__PURE__ */ jsx22("b", { children: e.what }),
+              " ",
+              /* @__PURE__ */ jsxs22("span", { style: P.muted, children: [
+                "· ",
+                t(lang, "guia.leg.nv", { a: e.lvl[0], b: e.lvl[1] })
+              ] }),
+              /* @__PURE__ */ jsx22("div", { style: { ...P.muted, marginTop: 2 }, children: e.zones }),
+              e.note ? /* @__PURE__ */ jsx22("div", { style: { ...P.muted, fontSize: 11, marginTop: 1 }, children: e.note }) : null
+            ] }),
+            inR ? /* @__PURE__ */ jsx22(Placa, { tono: "now", children: t(lang, "guia.leg.tuNivel") }) : null
+          ] }, i);
+        }),
+        !rows.length ? /* @__PURE__ */ jsx22("div", { style: P.muted, children: "—" }) : null
+      ] }, pk);
+    }),
+    L.gatherNote ? /* @__PURE__ */ jsx22("p", { style: { ...P.tip, margin: 0 }, children: L.gatherNote }) : null
+  ] });
 }
 
 // src/app.jsx
-import { jsx as jsx18, jsxs as jsxs16 } from "react/jsx-runtime";
+import { jsx as jsx23, jsxs as jsxs23 } from "react/jsx-runtime";
 var PESTANAS = [
   ["personaje", VistaPersonaje],
   ["clase", VistaClase],
@@ -9094,7 +11934,7 @@ var Contencion = class extends Component {
   }
   render() {
     if (!this.state.error) return this.props.children;
-    return /* @__PURE__ */ jsx18("div", { role: "alert", style: S.aviso, children: String(this.state.error && this.state.error.message || this.state.error) });
+    return /* @__PURE__ */ jsx23("div", { role: "alert", style: S.aviso, children: String(this.state.error && this.state.error.message || this.state.error) });
   }
 };
 async function guardarConfirmado(ctx, clave, valor) {
@@ -9113,15 +11953,15 @@ function perfilInicial(guardado, build) {
   return { perfil: m.perfil, ok: validarPerfil(m.perfil, D.personaje).ok, errores: [], razaSupuesta: m.razaSupuesta };
 }
 function App({ ctx, almacen }) {
-  const [estado, setEstado] = useState8(null);
-  const [error, setError] = useState8("");
-  const [perfil, setPerfil] = useState8(null);
-  const [razaSupuesta, setRazaSupuesta] = useState8(false);
-  const [lang, setLang] = useState8(() => ctx.storage.get("idioma", "es") === "en" ? "en" : "es");
-  const [pestana, setPestana] = useState8(() => ctx.storage.get("pestana", "personaje"));
-  const [vuelta, setVuelta] = useState8(0);
-  const recargar = useCallback2(() => setVuelta((v) => v + 1), []);
-  useEffect3(() => {
+  const [estado, setEstado] = useState11(null);
+  const [error, setError] = useState11("");
+  const [perfil, setPerfil] = useState11(null);
+  const [razaSupuesta, setRazaSupuesta] = useState11(false);
+  const [lang, setLang] = useState11(() => ctx.storage.get("idioma", "es") === "en" ? "en" : "es");
+  const [pestana, setPestana] = useState11(() => ctx.storage.get("pestana", "personaje"));
+  const [vuelta, setVuelta] = useState11(0);
+  const recargar = useCallback3(() => setVuelta((v) => v + 1), []);
+  useEffect5(() => {
     let vivo = true;
     setError("");
     almacen.read().then((v) => {
@@ -9140,7 +11980,7 @@ function App({ ctx, almacen }) {
       vivo = false;
     };
   }, [almacen, ctx, vuelta]);
-  const guardarPerfil = useCallback2(async (nuevo) => {
+  const guardarPerfil = useCallback3(async (nuevo) => {
     const r = validarPerfil(nuevo, D.personaje);
     setPerfil(r.perfil);
     setRazaSupuesta(false);
@@ -9162,7 +12002,7 @@ function App({ ctx, almacen }) {
     }
   };
   const listo = perfil && validarPerfil(perfil, D.personaje).ok;
-  const visibles = useMemo12(() => PESTANAS.filter(([id]) => id === "personaje" || id === "legacy" || listo && (id !== "guia" || guiaCurada(perfil))), [listo, perfil]);
+  const visibles = useMemo13(() => PESTANAS.filter(([id]) => id === "personaje" || id === "legacy" || listo && (id !== "guia" || guiaCurada(perfil))), [listo, perfil]);
   const activa = visibles.some(([id]) => id === pestana) ? pestana : "personaje";
   const Vista = (visibles.find(([id]) => id === activa) || PESTANAS[0])[1];
   const resumen = listo ? [
@@ -9171,18 +12011,18 @@ function App({ ctx, almacen }) {
     t(lang, "clase.nivel") + " " + perfil.nivel,
     nombre(D.personaje.facciones[perfil.faccion].n, lang)
   ].join(" · ") : t(lang, "perfil.vacio");
-  return /* @__PURE__ */ jsxs16("div", { style: S.pagina, children: [
-    /* @__PURE__ */ jsxs16("div", { style: S.cabecera, children: [
-      /* @__PURE__ */ jsx18("strong", { children: t(lang, "app") }),
-      /* @__PURE__ */ jsx18("span", { style: { ...S.sub, flex: 1 }, children: resumen }),
-      /* @__PURE__ */ jsx18(SegmentedControl4, { value: lang, onChange: cambiarLang, options: [{ id: "es", label: "ES" }, { id: "en", label: "EN" }] }),
-      /* @__PURE__ */ jsx18(Button6, { variant: "outline", size: "xs", onClick: async () => {
+  return /* @__PURE__ */ jsxs23("div", { style: S.pagina, children: [
+    /* @__PURE__ */ jsxs23("div", { style: S.cabecera, children: [
+      /* @__PURE__ */ jsx23("strong", { children: t(lang, "app") }),
+      /* @__PURE__ */ jsx23("span", { style: { ...S.sub, flex: 1 }, children: resumen }),
+      /* @__PURE__ */ jsx23(SegmentedControl6, { value: lang, onChange: cambiarLang, options: [{ id: "es", label: "ES" }, { id: "en", label: "EN" }] }),
+      /* @__PURE__ */ jsx23(Button8, { variant: "outline", size: "xs", onClick: async () => {
         await almacen.reset();
         recargar();
       }, children: t(lang, "reintentar") })
     ] }),
-    /* @__PURE__ */ jsx18("div", { style: { padding: "6px 16px 0" }, children: /* @__PURE__ */ jsx18(Tabs, { value: activa, onValueChange: cambiarPestana, children: /* @__PURE__ */ jsx18(TabsList, { children: visibles.map(([id]) => /* @__PURE__ */ jsx18(TabsTrigger, { value: id, children: t(lang, "tab." + id) }, id)) }) }) }),
-    /* @__PURE__ */ jsx18("div", { style: S.cuerpo, children: error ? /* @__PURE__ */ jsx18("div", { role: "alert", style: S.aviso, children: error }) : !estado || !perfil ? /* @__PURE__ */ jsx18("p", { role: "status", style: S.sub, children: t(lang, "cargando") }) : /* @__PURE__ */ jsx18(Contencion, { children: /* @__PURE__ */ jsx18(
+    /* @__PURE__ */ jsx23("div", { style: { padding: "6px 16px 0" }, children: /* @__PURE__ */ jsx23(Tabs, { value: activa, onValueChange: cambiarPestana, children: /* @__PURE__ */ jsx23(TabsList, { children: visibles.map(([id]) => /* @__PURE__ */ jsx23(TabsTrigger, { value: id, children: t(lang, "tab." + id) }, id)) }) }) }),
+    /* @__PURE__ */ jsx23("div", { style: S.cuerpo, children: error ? /* @__PURE__ */ jsx23("div", { role: "alert", style: S.aviso, children: error }) : !estado || !perfil ? /* @__PURE__ */ jsx23("p", { role: "status", style: S.sub, children: t(lang, "cargando") }) : /* @__PURE__ */ jsx23(Contencion, { children: /* @__PURE__ */ jsx23(
       Vista,
       {
         ctx,
@@ -9200,7 +12040,7 @@ function App({ ctx, almacen }) {
 }
 
 // src/plugin.src.jsx
-import { jsx as jsx19 } from "react/jsx-runtime";
+import { jsx as jsx24 } from "react/jsx-runtime";
 var RUTA = "/wow-forever";
 var plugin_src_default = {
   id: "wow-hunter-guide",
@@ -9212,7 +12052,7 @@ var plugin_src_default = {
     const almacen = createStore(ctx);
     ctx.registerMany([
       { id: "nav", area: SIDEBAR_NAV_AREA, order: 73, data: { path: RUTA, label: "WoW Forever", codicon: "target" } },
-      { id: "route", area: ROUTES_AREA, data: { path: RUTA }, render: () => /* @__PURE__ */ jsx19(App, { ctx, almacen }) },
+      { id: "route", area: ROUTES_AREA, data: { path: RUTA }, render: () => /* @__PURE__ */ jsx24(App, { ctx, almacen }) },
       { id: "open", area: PALETTE_AREA, data: {
         id: "wow-forever.open",
         label: "WoW Forever: abrir guía y mercado",

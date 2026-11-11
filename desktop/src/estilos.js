@@ -60,4 +60,15 @@ export const CLASES_RICAS = {
   muted: { color: C.texto3, fontSize: 12 },
   tip: { color: C.texto2, fontSize: 12 },
   sub: { color: C.texto3, fontWeight: 400, fontSize: 12 },
+  // Filas de hitos: <div class="mst"><span class="tdot"></span><span class="txt">…</span></div>
+  mst: { display: 'flex', gap: 8, alignItems: 'baseline', padding: '2px 0' },
+  tdot: { display: 'inline-block', width: 6, height: 6, borderRadius: 3, background: C.acento, flexShrink: 0 },
+  txt: { flex: 1 },
+  // Calidad de ítem en el texto curado.
+  'q-poor': { color: CALIDAD[0] }, 'q-common': { color: CALIDAD[1] }, 'q-uncommon': { color: CALIDAD[2] },
+  'q-rare': { color: CALIDAD[3] }, 'q-epic': { color: CALIDAD[4] }, 'q-legendary': { color: CALIDAD[5] },
+  // Marcas de continente.
+  badge: S.chip,
+  locK: { borderColor: C.verde, color: C.verde },
+  locE: { borderColor: C.azul, color: C.azul },
 }
