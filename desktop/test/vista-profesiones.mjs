@@ -32,8 +32,9 @@ check('Herrería es la profesión por defecto (primera del perfil)', await p.eva
   document.querySelector('#wf-profesion').value === '164'))
 check('ve entrenadores de la Horda (Herrería)', await p.getByText('Brikk Keencraft').count() > 0
   && await p.getByText('Karn Stonehoof').count() > 0)
-check('los entrenadores muestran zona y coordenadas', await p.getByText('Mulgore').count() > 0
-  && await p.getByText('30%, 97.2%').count() > 0)
+// Snarl (herrería) está en Orgrimmar, no en Azshara: el NPC va a la zona más chica que lo contiene.
+check('los entrenadores muestran zona y coordenadas', await p.getByText('Orgrimmar').count() > 0
+  && await p.getByText('79.6%, 23.3%').count() > 0 && await p.getByText('Cima del Trueno').count() > 0)
 check('la tarjeta de plan existe y se marca como estimación', await p.getByText('Plan de subida').count() > 0
   && await p.getByText(/Estimación/).count() > 0)
 

@@ -2247,6 +2247,2594 @@ var require_guide_legacy = __commonJS({
   }
 });
 
+// ../standalone/market.js
+var require_market = __commonJS({
+  "../standalone/market.js"(exports, module) {
+    (function() {
+      "use strict";
+      function HunterMarketFactory() {
+        "use strict";
+        var MAX_BYTES = 8 * 1024 * 1024;
+        var DEPTH_LIMIT = 32;
+        var ENTRIES_LIMIT = 25e4;
+        var DAY_MIN = 0;
+        var DAY_MAX = 1e5;
+        var WARN_CAP = 1e3;
+        var MAX_SAFE = 9007199254740991;
+        function fail(msg) {
+          throw new Error(msg);
+        }
+        function failAt(msg, pos) {
+          throw new Error(msg + " (offset " + (pos | 0) + ")");
+        }
+        function LuaStr(raw, pos) {
+          this.raw = raw;
+          this.pos = pos;
+        }
+        function LuaTable(pos) {
+          this.pos = pos;
+          this.entries = [];
+          this.index = /* @__PURE__ */ new Map();
+        }
+        LuaTable.prototype.set = function(key, val, pos) {
+          var c = canonKey(key, pos);
+          if (this.index.has(c)) failAt("duplicate key", pos);
+          this.index.set(c, val);
+          this.entries.push([key, val]);
+        };
+        LuaTable.prototype.get = function(name) {
+          var v = this.index.get("s:" + name);
+          return v === void 0 ? void 0 : v;
+        };
+        function guardKeyText(text2, pos) {
+          if (text2 === "__proto__" || text2 === "prototype" || text2 === "constructor") {
+            failAt("invalid key", pos);
+          }
+        }
+        function canonKey(k, pos) {
+          if (k instanceof LuaStr) {
+            var s = utf8(k.raw);
+            guardKeyText(s, k.pos);
+            return "s:" + s;
+          }
+          if (typeof k === "number") return "#" + k;
+          if (typeof k === "boolean") return "b:" + k;
+          if (k === null) return "nil:";
+          failAt("unsupported key", pos);
+        }
+        function utf8(bytes) {
+          var out = "";
+          var i = 0;
+          var n = bytes.length;
+          while (i < n) {
+            var b0 = bytes[i++];
+            if (b0 < 128) {
+              out += String.fromCharCode(b0);
+              continue;
+            }
+            var cp;
+            var extra;
+            if (b0 >= 194 && b0 <= 223) {
+              cp = b0 & 31;
+              extra = 1;
+            } else if (b0 >= 224 && b0 <= 239) {
+              cp = b0 & 15;
+              extra = 2;
+            } else if (b0 >= 240 && b0 <= 244) {
+              cp = b0 & 7;
+              extra = 3;
+            } else {
+              out += "�";
+              continue;
+            }
+            var ok = true;
+            for (var k = 0; k < extra; k++) {
+              if (i >= n) {
+                ok = false;
+                break;
+              }
+              var bx = bytes[i];
+              if ((bx & 192) !== 128) {
+                ok = false;
+                break;
+              }
+              cp = cp << 6 | bx & 63;
+              i++;
+            }
+            if (!ok) {
+              out += "�";
+              continue;
+            }
+            if (cp > 65535) {
+              cp -= 65536;
+              out += String.fromCharCode(55296 + (cp >> 10), 56320 + (cp & 1023));
+            } else {
+              out += String.fromCharCode(cp);
+            }
+          }
+          return out;
+        }
+        function utf8bytes(s) {
+          var out = [];
+          for (var i = 0; i < s.length; i++) {
+            var c = s.charCodeAt(i);
+            if (c < 128) out.push(c);
+            else if (c < 2048) out.push(192 | c >> 6, 128 | c & 63);
+            else out.push(224 | c >> 12, 128 | c >> 6 & 63, 128 | c & 63);
+          }
+          return Uint8Array.from(out);
+        }
+        function halfToNum(h) {
+          var sign = h & 32768 ? -1 : 1;
+          var exp = h >> 10 & 31;
+          var frac = h & 1023;
+          if (exp === 0) return sign * Math.pow(2, -14) * (frac / 1024);
+          if (exp === 31) return frac ? NaN : sign * Infinity;
+          return sign * Math.pow(2, exp - 15) * (1 + frac / 1024);
+        }
+        function isDigit(c) {
+          return c >= 48 && c <= 57;
+        }
+        function isHex(c) {
+          return c >= 48 && c <= 57 || c >= 65 && c <= 70 || c >= 97 && c <= 102;
+        }
+        function hexVal(c) {
+          if (c >= 48 && c <= 57) return c - 48;
+          if (c >= 65 && c <= 70) return c - 65 + 10;
+          if (c >= 97 && c <= 102) return c - 97 + 10;
+          return -1;
+        }
+        function isNameStart(c) {
+          return c >= 65 && c <= 90 || c >= 97 && c <= 122 || c === 95;
+        }
+        function isNameChar(c) {
+          return isNameStart(c) || isDigit(c);
+        }
+        function LuaReader(b) {
+          this.b = b;
+          this.p = 0;
+          this.n = b.length;
+          this.entries = 0;
+        }
+        LuaReader.prototype.skip = function() {
+          var b = this.b;
+          var n = this.n;
+          for (; ; ) {
+            while (this.p < n) {
+              var c = b[this.p];
+              if (c === 32 || c === 9 || c === 10 || c === 13) this.p++;
+              else break;
+            }
+            if (b[this.p] === 45 && b[this.p + 1] === 45) {
+              this.p += 2;
+              if (b[this.p] === 91 && b[this.p + 1] === 91) {
+                this.p += 2;
+                while (this.p < n && !(b[this.p] === 93 && b[this.p + 1] === 93)) this.p++;
+                this.p = Math.min(n, this.p + 2);
+              } else {
+                while (this.p < n && b[this.p] !== 10) this.p++;
+              }
+              continue;
+            }
+            break;
+          }
+        };
+        LuaReader.prototype.readName = function() {
+          var s = this.p;
+          if (!isNameStart(this.b[this.p])) failAt("malformed data", this.p);
+          this.p++;
+          while (isNameChar(this.b[this.p])) this.p++;
+          return utf8(this.b.subarray(s, this.p));
+        };
+        LuaReader.prototype.readNumber = function() {
+          var b = this.b;
+          var start = this.p;
+          if (b[this.p] === 45) this.p++;
+          if (b[this.p] === 48 && (b[this.p + 1] === 120 || b[this.p + 1] === 88)) {
+            this.p += 2;
+            var hs = this.p;
+            while (isHex(b[this.p])) this.p++;
+            if (this.p === hs) failAt("malformed data", start);
+            var hv = parseInt(utf8(b.subarray(hs, this.p)), 16);
+            if (!isFinite(hv)) failAt("malformed data", start);
+            return hv;
+          }
+          var ds = this.p;
+          while (isDigit(b[this.p])) this.p++;
+          if (b[this.p] === 46) {
+            this.p++;
+            while (isDigit(b[this.p])) this.p++;
+          }
+          if (b[this.p] === 101 || b[this.p] === 69) {
+            this.p++;
+            if (b[this.p] === 43 || b[this.p] === 45) this.p++;
+            while (isDigit(b[this.p])) this.p++;
+          }
+          if (this.p === ds && b[start] !== 46) failAt("malformed data", start);
+          var num6 = Number(utf8(b.subarray(start, this.p)));
+          if (!isFinite(num6)) failAt("malformed data", start);
+          return num6;
+        };
+        LuaReader.prototype.readString = function() {
+          var b = this.b;
+          var n = this.n;
+          var start = this.p;
+          var q = b[this.p++];
+          var out = [];
+          while (this.p < n) {
+            var c = b[this.p++];
+            if (c === q) return new LuaStr(Uint8Array.from(out), start);
+            if (c !== 92) {
+              out.push(c);
+              continue;
+            }
+            if (this.p >= n) break;
+            var e = b[this.p++];
+            if (e === 110) out.push(10);
+            else if (e === 114) out.push(13);
+            else if (e === 116) out.push(9);
+            else if (e === 97) out.push(7);
+            else if (e === 98) out.push(8);
+            else if (e === 102) out.push(12);
+            else if (e === 118) out.push(11);
+            else if (e === 92) out.push(92);
+            else if (e === 34) out.push(34);
+            else if (e === 39) out.push(39);
+            else if (e === 10) out.push(10);
+            else if (e === 13) {
+              if (b[this.p] === 10) this.p++;
+              out.push(10);
+            } else if (isDigit(e)) {
+              var v = e - 48;
+              var count = 1;
+              while (count < 3 && isDigit(b[this.p])) {
+                v = v * 10 + (b[this.p] - 48);
+                this.p++;
+                count++;
+              }
+              if (v > 255) failAt("malformed data", start);
+              out.push(v);
+            } else if (e === 120) {
+              var h1 = hexVal(b[this.p]);
+              if (h1 < 0) failAt("malformed data", start);
+              this.p++;
+              var h2 = hexVal(b[this.p]);
+              if (h2 >= 0) {
+                h1 = h1 * 16 + h2;
+                this.p++;
+              }
+              out.push(h1 & 255);
+            } else if (e === 122) {
+              while (this.p < n && (b[this.p] === 32 || b[this.p] === 9 || b[this.p] === 10 || b[this.p] === 13))
+                this.p++;
+            } else {
+              out.push(e);
+            }
+          }
+          failAt("malformed data", start);
+        };
+        LuaReader.prototype.longString = function() {
+          var start = this.p;
+          this.p++;
+          var eq = 0;
+          while (this.b[this.p] === 61) {
+            eq++;
+            this.p++;
+          }
+          if (this.b[this.p] !== 91) failAt("malformed data", start);
+          this.p++;
+          if (this.b[this.p] === 10) this.p++;
+          var out = [];
+          for (; ; ) {
+            if (this.p >= this.n) failAt("malformed data", start);
+            if (this.b[this.p] === 93) {
+              var save = this.p;
+              this.p++;
+              var k = 0;
+              while (k < eq && this.b[this.p] === 61) {
+                k++;
+                this.p++;
+              }
+              if (k === eq && this.b[this.p] === 93) {
+                this.p++;
+                return new LuaStr(Uint8Array.from(out), start);
+              }
+              this.p = save + 1;
+              out.push(93);
+            } else {
+              out.push(this.b[this.p++]);
+            }
+          }
+        };
+        LuaReader.prototype.value = function(depth) {
+          if (depth > DEPTH_LIMIT) failAt("nesting too deep", this.p);
+          this.skip();
+          var c = this.b[this.p];
+          if (c === 123) return this.table(depth);
+          if (c === 34 || c === 39) return this.readString();
+          if (c === 91 && (this.b[this.p + 1] === 91 || this.b[this.p + 1] === 61)) {
+            return this.longString();
+          }
+          if (c === 45 || isDigit(c) || c === 46) return this.readNumber();
+          if (isNameStart(c)) {
+            var name = this.readName();
+            if (name === "true") return true;
+            if (name === "false") return false;
+            if (name === "nil") return null;
+            failAt("unsupported expression", this.p);
+          }
+          failAt("malformed data", this.p);
+        };
+        LuaReader.prototype.addEntry = function(t2, key, val, pos) {
+          this.entries++;
+          if (this.entries > ENTRIES_LIMIT) failAt("too many entries", this.p);
+          t2.set(key, val, pos);
+        };
+        LuaReader.prototype.table = function(depth) {
+          var pos = this.p;
+          this.p++;
+          var t2 = new LuaTable(pos);
+          var idx = 1;
+          this.skip();
+          if (this.b[this.p] === 125) {
+            this.p++;
+            return t2;
+          }
+          for (; ; ) {
+            this.skip();
+            if (this.b[this.p] === 125) {
+              this.p++;
+              break;
+            }
+            if (this.b[this.p] === 91) {
+              this.p++;
+              var key = this.value(depth + 1);
+              this.skip();
+              if (this.b[this.p] !== 93) failAt("malformed data", this.p);
+              this.p++;
+              this.skip();
+              if (this.b[this.p] !== 61) failAt("malformed data", this.p);
+              this.p++;
+              var val = this.value(depth + 1);
+              this.addEntry(t2, key, val, pos);
+            } else if (isNameStart(this.b[this.p])) {
+              var save = this.p;
+              var name = this.readName();
+              this.skip();
+              if (this.b[this.p] === 61) {
+                this.p++;
+                var v2 = this.value(depth + 1);
+                this.addEntry(t2, new LuaStr(utf8bytes(name), save), v2, pos);
+              } else {
+                this.p = save;
+                var v3 = this.value(depth + 1);
+                this.addEntry(t2, idx++, v3, pos);
+              }
+            } else {
+              var v4 = this.value(depth + 1);
+              this.addEntry(t2, idx++, v4, pos);
+            }
+            this.skip();
+            if (this.b[this.p] === 44 || this.b[this.p] === 59) {
+              this.p++;
+              continue;
+            }
+            if (this.b[this.p] === 125) {
+              this.p++;
+              break;
+            }
+            failAt("malformed data", this.p);
+          }
+          return t2;
+        };
+        LuaReader.prototype.globals = function() {
+          var list = [];
+          this.skip();
+          while (this.p < this.n) {
+            this.skip();
+            if (this.p >= this.n) break;
+            if (this.b[this.p] === 59) {
+              this.p++;
+              continue;
+            }
+            var name = this.readName();
+            this.skip();
+            if (this.b[this.p] !== 61) failAt("malformed data", this.p);
+            this.p++;
+            var val = this.value(0);
+            list.push({ name, value: val });
+            this.skip();
+          }
+          return list;
+        };
+        function CborReader(b) {
+          this.b = b;
+          this.p = 0;
+          this.n = b.length;
+          this.entries = 0;
+        }
+        CborReader.prototype.need = function(k) {
+          if (this.p + k > this.n) failAt("cbor truncated", this.p);
+        };
+        CborReader.prototype.u8 = function() {
+          this.need(1);
+          return this.b[this.p++];
+        };
+        CborReader.prototype.uint = function(k) {
+          this.need(k);
+          var v = 0;
+          for (var i = 0; i < k; i++) v = v * 256 + this.b[this.p + i];
+          this.p += k;
+          return v;
+        };
+        CborReader.prototype.len = function(mt) {
+          if (mt < 24) return mt;
+          if (mt === 24) return this.uint(1);
+          if (mt === 25) return this.uint(2);
+          if (mt === 26) return this.uint(4);
+          if (mt === 27) {
+            var hi = this.uint(4);
+            var lo = this.uint(4);
+            if (hi > 2097151) failAt("cbor length overflow", this.p);
+            return hi * 4294967296 + lo;
+          }
+          failAt("unsupported cbor", this.p);
+        };
+        CborReader.prototype.float = function(k) {
+          this.need(k);
+          var view = new DataView(this.b.buffer, this.b.byteOffset + this.p, k);
+          var v;
+          if (k === 8) v = view.getFloat64(0, false);
+          else if (k === 4) v = view.getFloat32(0, false);
+          else v = halfToNum(view.getUint16(0, false));
+          this.p += k;
+          if (!isFinite(v)) failAt("non-finite number", this.p);
+          return v;
+        };
+        CborReader.prototype.value = function(depth) {
+          if (depth > DEPTH_LIMIT) failAt("nesting too deep", this.p);
+          var ib = this.u8();
+          var mt = ib >> 5;
+          var av = ib & 31;
+          if (mt === 0) {
+            var iv = this.len(av);
+            if (iv > MAX_SAFE) failAt("number overflow", this.p);
+            return iv;
+          }
+          if (mt === 1) {
+            var nv = this.len(av);
+            if (nv > MAX_SAFE) failAt("number overflow", this.p);
+            return -1 - nv;
+          }
+          if (mt === 2 || mt === 3) {
+            var sp = this.p;
+            var L = this.len(av);
+            this.need(L);
+            var raw = this.b.subarray(this.p, this.p + L);
+            this.p += L;
+            return new LuaStr(Uint8Array.from(raw), sp);
+          }
+          if (mt === 4) {
+            var LA = this.len(av);
+            this.entries += LA;
+            if (this.entries > ENTRIES_LIMIT) failAt("too many entries", this.p);
+            var arr = new LuaTable(this.p);
+            for (var i = 0; i < LA; i++) arr.set(i + 1, this.value(depth + 1), this.p);
+            return arr;
+          }
+          if (mt === 5) {
+            var LM = this.len(av);
+            this.entries += LM;
+            if (this.entries > ENTRIES_LIMIT) failAt("too many entries", this.p);
+            var map = new LuaTable(this.p);
+            for (var j = 0; j < LM; j++) {
+              var key = this.value(depth + 1);
+              var val = this.value(depth + 1);
+              map.set(key, val, this.p);
+            }
+            return map;
+          }
+          if (mt === 6) {
+            this.len(av);
+            return this.value(depth + 1);
+          }
+          if (mt === 7) {
+            if (av === 20) return false;
+            if (av === 21) return true;
+            if (av === 22 || av === 23) return null;
+            if (av === 24) {
+              this.u8();
+              return null;
+            }
+            if (av === 25) return this.float(2);
+            if (av === 26) return this.float(4);
+            if (av === 27) return this.float(8);
+            return null;
+          }
+          failAt("unsupported cbor", this.p);
+        };
+        function keyToString(k) {
+          if (k instanceof LuaStr) return utf8(k.raw);
+          if (typeof k === "number") return String(k);
+          if (typeof k === "boolean") return String(k);
+          return null;
+        }
+        function dayKey(x) {
+          if (typeof x === "number") return Number.isInteger(x) ? x : null;
+          if (x instanceof LuaStr) {
+            var s = utf8(x.raw);
+            if (!/^[0-9]+$/.test(s)) return null;
+            var d = Number(s);
+            return Number.isSafeInteger(d) ? d : null;
+          }
+          return null;
+        }
+        function validPrice(v) {
+          return typeof v === "number" && Number.isSafeInteger(v) && v > 0;
+        }
+        function validQty(v) {
+          return typeof v === "number" && Number.isSafeInteger(v) && v >= 0;
+        }
+        function lookupDay(t2, d) {
+          var want = String(d);
+          var e = t2.entries;
+          for (var i = 0; i < e.length; i++) {
+            var k = e[i][0];
+            if (k instanceof LuaStr) {
+              if (utf8(k.raw) === want) return e[i][1];
+            } else if (typeof k === "number" && k === d) {
+              return e[i][1];
+            }
+          }
+          return void 0;
+        }
+        function realmVersion(t2) {
+          var v = t2.get("version");
+          if (v === void 0) return void 0;
+          if (typeof v === "number") return v;
+          if (v instanceof LuaStr) {
+            var s = utf8(v.raw);
+            return /^[0-9]+$/.test(s) ? Number(s) : NaN;
+          }
+          return NaN;
+        }
+        function buildItem(keyText, item2, warnings) {
+          if (!(item2 instanceof LuaTable)) return null;
+          var m = item2.get("m");
+          if (!validPrice(m)) {
+            warn(warnings, "item skipped: invalid price at offset " + item2.pos);
+            return null;
+          }
+          var hT = item2.get("h");
+          var lT = item2.get("l");
+          var aT = item2.get("a");
+          var hist = [];
+          var observed = null;
+          if (hT instanceof LuaTable) {
+            for (var i = 0; i < hT.entries.length; i++) {
+              var day = dayKey(hT.entries[i][0]);
+              var high = hT.entries[i][1];
+              if (day === null || day < DAY_MIN || day > DAY_MAX) {
+                warn(warnings, "day skipped at offset " + hT.pos);
+                continue;
+              }
+              if (!validPrice(high)) {
+                warn(warnings, "price skipped at offset " + hT.pos);
+                continue;
+              }
+              var low = high;
+              if (lT instanceof LuaTable) {
+                var lv = lookupDay(lT, day);
+                if (lv !== void 0) {
+                  if (validPrice(lv)) low = lv;
+                  else warn(warnings, "low skipped at offset " + lT.pos);
+                }
+              }
+              var avail = null;
+              if (aT instanceof LuaTable) {
+                var av = lookupDay(aT, day);
+                if (av !== void 0) {
+                  if (validQty(av)) avail = av;
+                  else warn(warnings, "quantity skipped at offset " + aT.pos);
+                }
+              }
+              hist.push({ day, low, high, available: avail });
+              if (observed === null || day > observed) observed = day;
+            }
+          } else if (hT !== void 0) {
+            warn(warnings, "item skipped: malformed history at offset " + item2.pos);
+            return null;
+          }
+          hist.sort(function(x, y) {
+            return x.day - y.day;
+          });
+          var itemId = null;
+          if (/^[0-9]+$/.test(keyText)) {
+            var n = Number(keyText);
+            if (Number.isSafeInteger(n) && n > 0) itemId = n;
+          }
+          return {
+            sourceKey: keyText,
+            itemId,
+            unitPriceCopper: m,
+            observedDay: observed,
+            history: hist
+          };
+        }
+        function warn(list, msg) {
+          if (list.length < WARN_CAP) list.push(msg);
+        }
+        function toBytes(input) {
+          if (input instanceof Uint8Array) return input;
+          if (typeof ArrayBuffer !== "undefined" && input instanceof ArrayBuffer) {
+            return new Uint8Array(input);
+          }
+          if (input && typeof ArrayBuffer !== "undefined" && ArrayBuffer.isView(input)) {
+            return new Uint8Array(input.buffer, input.byteOffset, input.byteLength);
+          }
+          fail("invalid input");
+        }
+        function parseAuctionator(input) {
+          var bytes = toBytes(input);
+          if (bytes.length > MAX_BYTES) fail("input exceeds maximum size");
+          var warnings = [];
+          var snapshot = {
+            schemaVersion: 1,
+            importedAt: (/* @__PURE__ */ new Date()).toISOString(),
+            sourceVersion: 8,
+            realms: [],
+            warnings
+          };
+          var globals = new LuaReader(bytes).globals();
+          var db;
+          for (var g = 0; g < globals.length; g++) {
+            if (globals[g].name === "AUCTIONATOR_PRICE_DATABASE") db = globals[g].value;
+          }
+          if (db === void 0 || db === null) {
+            warn(warnings, "no price database found");
+            return snapshot;
+          }
+          if (!(db instanceof LuaTable)) fail("unexpected price database");
+          if (db.get("__dbversion") !== 8) fail("unsupported database version");
+          for (var e = 0; e < db.entries.length; e++) {
+            var key = keyToString(db.entries[e][0]);
+            var val = db.entries[e][1];
+            if (key === "__dbversion") continue;
+            if (key === null) {
+              warn(warnings, "realm skipped at offset " + db.pos);
+              continue;
+            }
+            var realmTable = val;
+            if (val instanceof LuaStr) {
+              var cr = new CborReader(val.raw);
+              realmTable = cr.value(0);
+              if (cr.p !== val.raw.length) failAt("cbor trailing data", cr.p);
+            }
+            if (!(realmTable instanceof LuaTable)) {
+              warn(warnings, "realm skipped at offset " + db.pos);
+              continue;
+            }
+            if (realmVersion(realmTable) !== 2) {
+              warn(warnings, "realm skipped: unsupported version at offset " + realmTable.pos);
+              continue;
+            }
+            var items = [];
+            for (var q = 0; q < realmTable.entries.length; q++) {
+              var ik = keyToString(realmTable.entries[q][0]);
+              var iv = realmTable.entries[q][1];
+              if (ik === "version") continue;
+              if (ik === null) {
+                warn(warnings, "entry skipped at offset " + realmTable.pos);
+                continue;
+              }
+              if (!(iv instanceof LuaTable)) {
+                warn(warnings, "entry skipped: malformed at offset " + realmTable.pos);
+                continue;
+              }
+              var built = buildItem(ik, iv, warnings);
+              if (built) items.push(built);
+            }
+            snapshot.realms.push({ name: key, items });
+          }
+          return snapshot;
+        }
+        return { parseAuctionator, MAX_BYTES };
+      }
+      var HunterMarket2 = HunterMarketFactory();
+      HunterMarket2.workerSource = "(function(){'use strict';var M=(" + HunterMarketFactory.toString() + ")();self.onmessage=function(ev){var out;try{var data=ev&&ev.data;var bytes;if(typeof ArrayBuffer!=='undefined'&&data instanceof ArrayBuffer){bytes=new Uint8Array(data);}else if(typeof ArrayBuffer!=='undefined'&&ArrayBuffer.isView(data)){bytes=new Uint8Array(data.buffer,data.byteOffset,data.byteLength);}else{throw new Error('invalid input');}out={ok:true,snapshot:M.parseAuctionator(bytes)};}catch(err){var msg=(err&&typeof err.message==='string'&&err.message)?err.message.slice(0,200):'parse failed';msg=msg.replace(/[\\r\\n]+/g,' ');out={ok:false,error:msg};}self.postMessage(out);};})();";
+      var root = typeof globalThis !== "undefined" ? globalThis : typeof self !== "undefined" ? self : this;
+      if (typeof module === "object" && module && module.exports) module.exports = HunterMarket2;
+      else if (root) root.HunterMarket = HunterMarket2;
+    })();
+  }
+});
+
+// ../standalone/market-history.js
+var require_market_history = __commonJS({
+  "../standalone/market-history.js"(exports, module) {
+    (function() {
+      "use strict";
+      var SCHEMA = 1;
+      var DAY_MIN = 0;
+      var DAY_MAX = 1e5;
+      var MAX_REALMS = 100;
+      var MAX_REALM_NAME = 300;
+      var MAX_ITEMS_PER_REALM = 1e5;
+      var MAX_SOURCE_KEY = 300;
+      var MAX_ROWS_PER_ITEM = 1e4;
+      var MAX_ENTRIES = 4e5;
+      var TREND_MIN_DAYS = 4;
+      var TREND_EPS = 0.05;
+      function isInt(v) {
+        return typeof v === "number" && Number.isSafeInteger(v);
+      }
+      function posInt(v) {
+        return isInt(v) && v > 0;
+      }
+      function nonNegInt(v) {
+        return isInt(v) && v >= 0;
+      }
+      function shortText(s, max) {
+        return typeof s === "string" && s.length > 0 && s.length <= max;
+      }
+      function entryToRow(h) {
+        if (h.high === h.low) {
+          return h.available === null || h.available === void 0 ? [h.day, h.low] : [h.day, h.low, h.available];
+        }
+        return [h.day, h.low, h.high, h.available === null || h.available === void 0 ? null : h.available];
+      }
+      function rowToEntry(r) {
+        if (r.length === 2) return { day: r[0], low: r[1], high: r[1], available: null };
+        if (r.length === 3) return { day: r[0], low: r[1], high: r[1], available: r[2] == null ? null : r[2] };
+        return { day: r[0], low: r[1], high: r[2], available: r[3] == null ? null : r[3] };
+      }
+      function rowsFromHistory(history) {
+        var out = [];
+        var list = Array.isArray(history) ? history : [];
+        for (var i = 0; i < list.length; i++) {
+          var h = list[i];
+          if (h && isInt(h.day) && posInt(h.low)) out.push(entryToRow(h));
+        }
+        return out;
+      }
+      function historyFromRows(rows) {
+        var out = new Array(rows.length);
+        for (var i = 0; i < rows.length; i++) out[i] = rowToEntry(rows[i]);
+        return out;
+      }
+      function byDayRow(a, b) {
+        return a[0] - b[0];
+      }
+      function mergeRows(oldR, newR) {
+        var out = [];
+        var i = 0;
+        var j = 0;
+        var a;
+        var b;
+        while (i < oldR.length && j < newR.length) {
+          a = oldR[i];
+          b = newR[j];
+          if (a[0] === b[0]) {
+            out.push(b);
+            i++;
+            j++;
+          } else if (a[0] < b[0]) {
+            out.push(a);
+            i++;
+          } else {
+            out.push(b);
+            j++;
+          }
+        }
+        while (i < oldR.length) out.push(oldR[i++]);
+        while (j < newR.length) out.push(newR[j++]);
+        return out;
+      }
+      function mergeEntries(oldHist, newHist) {
+        return historyFromRows(mergeRows(rowsFromHistory(oldHist), rowsFromHistory(newHist)));
+      }
+      function mergeSnapshots(prev, next) {
+        if (!prev || typeof prev !== "object") return next;
+        if (!next || typeof next !== "object") return prev;
+        var outRealms = [];
+        var prevByRealm = /* @__PURE__ */ new Map();
+        var pr = Array.isArray(prev.realms) ? prev.realms : [];
+        for (var p = 0; p < pr.length; p++) {
+          if (pr[p] && typeof pr[p].name === "string") prevByRealm.set(pr[p].name, pr[p]);
+        }
+        var nr = Array.isArray(next.realms) ? next.realms : [];
+        var seen = /* @__PURE__ */ new Set();
+        for (var q = 0; q < nr.length; q++) {
+          var realm = nr[q];
+          if (!realm || typeof realm.name !== "string") continue;
+          seen.add(realm.name);
+          var prevRealm = prevByRealm.get(realm.name);
+          var prevItems = prevRealm && Array.isArray(prevRealm.items) ? prevRealm.items : [];
+          var prevByKey = /* @__PURE__ */ new Map();
+          for (var x = 0; x < prevItems.length; x++) {
+            if (prevItems[x] && typeof prevItems[x].sourceKey === "string") {
+              prevByKey.set(prevItems[x].sourceKey, prevItems[x]);
+            }
+          }
+          var items = [];
+          var ni = Array.isArray(realm.items) ? realm.items : [];
+          var nextKeys = /* @__PURE__ */ new Set();
+          for (var y = 0; y < ni.length; y++) {
+            var item2 = ni[y];
+            if (!item2 || typeof item2.sourceKey !== "string") continue;
+            nextKeys.add(item2.sourceKey);
+            var old = prevByKey.get(item2.sourceKey);
+            if (!old) {
+              items.push(item2);
+              continue;
+            }
+            items.push({
+              sourceKey: item2.sourceKey,
+              itemId: item2.itemId !== void 0 ? item2.itemId : old.itemId,
+              unitPriceCopper: item2.unitPriceCopper !== void 0 ? item2.unitPriceCopper : old.unitPriceCopper,
+              observedDay: item2.observedDay !== void 0 ? item2.observedDay : old.observedDay,
+              history: mergeEntries(old.history, item2.history)
+            });
+          }
+          for (var z = 0; z < prevItems.length; z++) {
+            var po = prevItems[z];
+            if (po && typeof po.sourceKey === "string" && !nextKeys.has(po.sourceKey)) {
+              items.push(po);
+            }
+          }
+          outRealms.push({ name: realm.name, items });
+        }
+        for (var w = 0; w < pr.length; w++) {
+          if (pr[w] && typeof pr[w].name === "string" && !seen.has(pr[w].name)) {
+            outRealms.push({ name: pr[w].name, items: Array.isArray(pr[w].items) ? pr[w].items.slice() : [] });
+          }
+        }
+        return {
+          schemaVersion: next.schemaVersion !== void 0 ? next.schemaVersion : prev.schemaVersion,
+          importedAt: next.importedAt !== void 0 ? next.importedAt : prev.importedAt,
+          sourceVersion: next.sourceVersion !== void 0 ? next.sourceVersion : prev.sourceVersion,
+          realms: outRealms,
+          warnings: Array.isArray(next.warnings) ? next.warnings : Array.isArray(prev.warnings) ? prev.warnings : []
+        };
+      }
+      function medianOf(sorted) {
+        var n = sorted.length;
+        return n % 2 ? sorted[(n - 1) / 2] : Math.round((sorted[n / 2 - 1] + sorted[n / 2]) / 2);
+      }
+      function priceStats(input) {
+        var hist = Array.isArray(input) ? input : input && input.history;
+        var list = Array.isArray(hist) ? hist : [];
+        var entries = [];
+        for (var i = 0; i < list.length; i++) {
+          var h = list[i];
+          var e = Array.isArray(h) ? rowToEntry(h) : h;
+          if (e && isInt(e.day) && posInt(e.low)) entries.push(e);
+        }
+        entries.sort(function(a, b) {
+          return a.day - b.day;
+        });
+        var n = entries.length;
+        if (!n) return { minLow: null, medianaLow: null, avgLow: null, tendencia: null, diasMuestra: 0 };
+        var min = Infinity;
+        var sum = 0;
+        var lows = new Array(n);
+        for (var j = 0; j < n; j++) {
+          var low = entries[j].low;
+          lows[j] = low;
+          if (low < min) min = low;
+          sum += low;
+        }
+        lows.sort(function(a, b) {
+          return a - b;
+        });
+        var tendencia = "sin-datos";
+        if (n >= TREND_MIN_DAYS) {
+          var half = Math.floor(n / 2);
+          var oldLows = entries.slice(0, half).map(function(e2) {
+            return e2.low;
+          }).sort(function(a, b) {
+            return a - b;
+          });
+          var newLows = entries.slice(n - half).map(function(e2) {
+            return e2.low;
+          }).sort(function(a, b) {
+            return a - b;
+          });
+          var mo = medianOf(oldLows);
+          var mn = medianOf(newLows);
+          if (mn > mo * (1 + TREND_EPS)) tendencia = "sube";
+          else if (mn < mo * (1 - TREND_EPS)) tendencia = "baja";
+          else tendencia = "estable";
+        }
+        return {
+          minLow: min,
+          medianaLow: medianOf(lows),
+          avgLow: Math.round(sum / n),
+          tendencia,
+          diasMuestra: n
+        };
+      }
+      function trimSnapshotHistory(snapshot, keepDays) {
+        if (!snapshot || !Array.isArray(snapshot.realms)) return snapshot;
+        var k = Math.max(1, Math.floor(keepDays) || 1);
+        var changed = false;
+        var realms = snapshot.realms.map(function(realm) {
+          if (!realm || !Array.isArray(realm.items)) return realm;
+          var rChanged = false;
+          var items = realm.items.map(function(item2) {
+            var h = item2 && item2.history;
+            if (!Array.isArray(h) || h.length < 2) return item2;
+            var lastDay = h[h.length - 1].day;
+            var cut = lastDay - k + 1;
+            if (h[0].day >= cut) return item2;
+            var kept = h.filter(function(e) {
+              return e.day >= cut;
+            });
+            rChanged = true;
+            changed = true;
+            return { sourceKey: item2.sourceKey, itemId: item2.itemId, unitPriceCopper: item2.unitPriceCopper, observedDay: item2.observedDay, history: kept };
+          });
+          return rChanged ? { name: realm.name, items } : realm;
+        });
+        return changed ? { schemaVersion: snapshot.schemaVersion, importedAt: snapshot.importedAt, sourceVersion: snapshot.sourceVersion, realms, warnings: snapshot.warnings } : snapshot;
+      }
+      function emptyStore() {
+        return { v: SCHEMA, realms: {} };
+      }
+      function validRow(r) {
+        if (!Array.isArray(r) || r.length < 2 || r.length > 4) return false;
+        if (!isInt(r[0]) || r[0] < DAY_MIN || r[0] > DAY_MAX) return false;
+        if (!posInt(r[1])) return false;
+        if (r.length === 2) return true;
+        if (r.length === 3) {
+          var a3 = r[2];
+          return a3 == null ? true : nonNegInt(a3);
+        }
+        if (!posInt(r[2]) || r[2] < r[1]) return false;
+        var a4 = r[3];
+        return a4 == null ? true : nonNegInt(a4);
+      }
+      function validStore(s) {
+        if (!s || typeof s !== "object" || Array.isArray(s)) return false;
+        if (s.v !== SCHEMA) return false;
+        var realms = s.realms;
+        if (!realms || typeof realms !== "object" || Array.isArray(realms)) return false;
+        var rnames = Object.keys(realms);
+        if (rnames.length > MAX_REALMS) return false;
+        var total = 0;
+        for (var i = 0; i < rnames.length; i++) {
+          var rn = rnames[i];
+          if (!shortText(rn, MAX_REALM_NAME)) return false;
+          var r = realms[rn];
+          if (!r || typeof r !== "object" || Array.isArray(r)) return false;
+          var rkeys = Object.keys(r);
+          if (rkeys.length !== 1 || rkeys[0] !== "items") return false;
+          var items = r.items;
+          if (!items || typeof items !== "object" || Array.isArray(items)) return false;
+          var keys = Object.keys(items);
+          if (keys.length > MAX_ITEMS_PER_REALM) return false;
+          for (var j = 0; j < keys.length; j++) {
+            var k = keys[j];
+            if (!shortText(k, MAX_SOURCE_KEY)) return false;
+            var rows = items[k];
+            if (!Array.isArray(rows) || rows.length > MAX_ROWS_PER_ITEM) return false;
+            total += rows.length;
+            if (total > MAX_ENTRIES) return false;
+            var prevDay = -1;
+            for (var m = 0; m < rows.length; m++) {
+              var row = rows[m];
+              if (!validRow(row)) return false;
+              if (row[0] <= prevDay) return false;
+              prevDay = row[0];
+            }
+          }
+        }
+        return true;
+      }
+      function storeFromSnapshot(snapshot) {
+        var store = emptyStore();
+        var realms = snapshot && Array.isArray(snapshot.realms) ? snapshot.realms : [];
+        for (var i = 0; i < realms.length; i++) {
+          var realm = realms[i];
+          if (!realm || typeof realm.name !== "string") continue;
+          var items = Array.isArray(realm.items) ? realm.items : [];
+          var sRealm = store.realms[realm.name];
+          if (!sRealm) {
+            sRealm = { items: {} };
+            store.realms[realm.name] = sRealm;
+          }
+          for (var j = 0; j < items.length; j++) {
+            var item2 = items[j];
+            if (!item2 || typeof item2.sourceKey !== "string") continue;
+            var rows = rowsFromHistory(item2.history);
+            if (!rows.length) continue;
+            rows.sort(byDayRow);
+            var ex = sRealm.items[item2.sourceKey];
+            sRealm.items[item2.sourceKey] = ex ? mergeRows(ex, rows) : rows;
+          }
+        }
+        return store;
+      }
+      function storeMerge(store, snapshot) {
+        var out = emptyStore();
+        var oldRealms = store && store.realms && typeof store.realms === "object" ? store.realms : {};
+        var oldNames = Object.keys(oldRealms);
+        for (var i = 0; i < oldNames.length; i++) {
+          var rn = oldNames[i];
+          var r = oldRealms[rn];
+          if (!r || typeof r !== "object" || !r.items || typeof r.items !== "object") continue;
+          var copy = { items: {} };
+          var keys = Object.keys(r.items);
+          for (var j = 0; j < keys.length; j++) copy.items[keys[j]] = r.items[keys[j]];
+          out.realms[rn] = copy;
+        }
+        var realms = snapshot && Array.isArray(snapshot.realms) ? snapshot.realms : [];
+        for (var q = 0; q < realms.length; q++) {
+          var realm = realms[q];
+          if (!realm || typeof realm.name !== "string") continue;
+          var items = Array.isArray(realm.items) ? realm.items : [];
+          var sRealm = out.realms[realm.name];
+          if (!sRealm) {
+            sRealm = { items: {} };
+            out.realms[realm.name] = sRealm;
+          }
+          for (var y = 0; y < items.length; y++) {
+            var item2 = items[y];
+            if (!item2 || typeof item2.sourceKey !== "string") continue;
+            var rows = rowsFromHistory(item2.history);
+            if (!rows.length) continue;
+            rows.sort(byDayRow);
+            var ex = sRealm.items[item2.sourceKey];
+            sRealm.items[item2.sourceKey] = ex ? mergeRows(ex, rows) : rows;
+          }
+        }
+        return out;
+      }
+      function applyStore(snapshot, store) {
+        if (!snapshot || !validStore(store)) return snapshot;
+        var changed = false;
+        var realms = snapshot.realms.map(function(realm) {
+          var sRealm = realm && store.realms[realm.name];
+          if (!sRealm) return realm;
+          var rChanged = false;
+          var items = realm.items.map(function(item2) {
+            var rows = item2 && sRealm.items[item2.sourceKey];
+            if (!rows || !rows.length) return item2;
+            var merged = mergeRows(rows, rowsFromHistory(item2.history).sort(byDayRow));
+            var hist = historyFromRows(merged);
+            var same = hist.length === item2.history.length;
+            if (same) {
+              for (var i = 0; i < hist.length; i++) {
+                var a = hist[i];
+                var b = item2.history[i];
+                if (a.day !== b.day || a.low !== b.low || a.high !== b.high || a.available !== b.available) {
+                  same = false;
+                  break;
+                }
+              }
+            }
+            if (same) return item2;
+            rChanged = true;
+            changed = true;
+            return { sourceKey: item2.sourceKey, itemId: item2.itemId, unitPriceCopper: item2.unitPriceCopper, observedDay: item2.observedDay, history: hist };
+          });
+          return rChanged ? { name: realm.name, items } : realm;
+        });
+        return changed ? { schemaVersion: snapshot.schemaVersion, importedAt: snapshot.importedAt, sourceVersion: snapshot.sourceVersion, realms, warnings: snapshot.warnings } : snapshot;
+      }
+      function utf8Len(s) {
+        if (typeof TextEncoder !== "undefined") return new TextEncoder().encode(s).length;
+        return s.length;
+      }
+      function byteSize(v) {
+        return utf8Len(JSON.stringify(v));
+      }
+      function fitStore(store, maxBytes) {
+        if (!validStore(store)) throw new Error("invalid history store");
+        var max = Math.max(256, Math.floor(maxBytes));
+        if (byteSize(store) <= max) return store;
+        var daySet = {};
+        var rnames = Object.keys(store.realms);
+        for (var i = 0; i < rnames.length; i++) {
+          var items = store.realms[rnames[i]].items;
+          var keys = Object.keys(items);
+          for (var j = 0; j < keys.length; j++) {
+            var rows = items[keys[j]];
+            for (var m = 0; m < rows.length; m++) daySet[rows[m][0]] = true;
+          }
+        }
+        var days = Object.keys(daySet).map(Number).sort(function(a, b) {
+          return a - b;
+        });
+        function buildFromDay(cutoff2) {
+          var out = { v: SCHEMA, realms: {} };
+          if (cutoff2 === null) return out;
+          for (var a = 0; a < rnames.length; a++) {
+            var rn = rnames[a];
+            var srcItems = store.realms[rn].items;
+            var ni = null;
+            var ks = Object.keys(srcItems);
+            for (var b = 0; b < ks.length; b++) {
+              var rows2 = srcItems[ks[b]];
+              var lo = 0;
+              var hi = rows2.length;
+              while (lo < hi) {
+                var mid = lo + hi >> 1;
+                if (rows2[mid][0] < cutoff2) lo = mid + 1;
+                else hi = mid;
+              }
+              if (lo >= rows2.length) continue;
+              if (!ni) ni = {};
+              ni[ks[b]] = rows2.slice(lo);
+            }
+            if (ni) out.realms[rn] = { items: ni };
+          }
+          return out;
+        }
+        var loI = 0;
+        var hiI = days.length;
+        while (loI < hiI) {
+          var midI = loI + hiI >> 1;
+          var cutoff = midI === days.length ? null : days[midI];
+          if (byteSize(buildFromDay(cutoff)) <= max) hiI = midI;
+          else loI = midI + 1;
+        }
+        var result = buildFromDay(loI === days.length ? null : days[loI]);
+        if (byteSize(result) <= max) return result;
+        var flat = [];
+        var srnames = Object.keys(result.realms).sort();
+        for (var c = 0; c < srnames.length; c++) {
+          var sitems = result.realms[srnames[c]].items;
+          var skeys = Object.keys(sitems).sort();
+          for (var d = 0; d < skeys.length; d++) flat.push([srnames[c], skeys[d]]);
+        }
+        function buildPrefix(n) {
+          var out2 = { v: SCHEMA, realms: {} };
+          for (var e = 0; e < n; e++) {
+            var rn2 = flat[e][0];
+            var k2 = flat[e][1];
+            if (!out2.realms[rn2]) out2.realms[rn2] = { items: {} };
+            out2.realms[rn2].items[k2] = result.realms[rn2].items[k2];
+          }
+          return out2;
+        }
+        var loN = 0;
+        var hiN = flat.length;
+        while (loN < hiN) {
+          var midN = loN + hiN >> 1;
+          if (byteSize(buildPrefix(midN)) <= max) loN = midN + 1;
+          else hiN = midN;
+        }
+        return buildPrefix(loN);
+      }
+      var HunterHistory2 = {
+        SCHEMA,
+        entryToRow,
+        rowToEntry,
+        mergeRows,
+        mergeEntries,
+        mergeSnapshots,
+        priceStats,
+        trimSnapshotHistory,
+        emptyStore,
+        validStore,
+        storeFromSnapshot,
+        storeMerge,
+        applyStore,
+        fitStore,
+        byteSize
+      };
+      var root = typeof globalThis !== "undefined" ? globalThis : typeof self !== "undefined" ? self : this;
+      if (typeof module === "object" && module && module.exports) module.exports = HunterHistory2;
+      else if (root) root.HunterHistory = HunterHistory2;
+    })();
+  }
+});
+
+// ../standalone/market-deals.js
+var require_market_deals = __commonJS({
+  "../standalone/market-deals.js"(exports, module) {
+    (function() {
+      "use strict";
+      var MIN_DAYS = 2;
+      var OFFER_PCT = 0.2;
+      var OVER_PCT = 0.2;
+      var HIGH_DAYS = 7;
+      var MID_DAYS = 4;
+      var THIN_AVAIL = 2;
+      var CONF_W = { alta: 1, media: 0.8, baja: 0.55 };
+      var TREND_W = { sube: 1.15, baja: 0.9, estable: 1, "sin-datos": 1 };
+      var CONF_NAME = { 0: "baja", 1: "media", 2: "alta" };
+      function histLib() {
+        if (typeof module === "object" && module && module.exports) {
+          try {
+            return require_market_history();
+          } catch (e) {
+          }
+        }
+        var root2 = typeof globalThis !== "undefined" ? globalThis : typeof self !== "undefined" ? self : this;
+        return root2 && root2.HunterHistory ? root2.HunterHistory : null;
+      }
+      function numOpt(v, d) {
+        return typeof v === "number" && isFinite(v) ? v : d;
+      }
+      function intOpt(v, d) {
+        return Number.isSafeInteger(v) && v > 0 ? v : d;
+      }
+      function entryParts(e) {
+        if (Array.isArray(e)) {
+          if (e.length < 2 || !Number.isSafeInteger(e[0])) return null;
+          var avail = null;
+          if (e.length === 3) avail = e[2] == null ? null : e[2];
+          else if (e.length >= 4) avail = e[3] == null ? null : e[3];
+          return { day: e[0], available: avail };
+        }
+        if (e && typeof e === "object" && Number.isSafeInteger(e.day)) {
+          return { day: e.day, available: e.available == null ? null : e.available };
+        }
+        return null;
+      }
+      function lastAvailable(item2) {
+        var h = item2 && item2.history;
+        var list = Array.isArray(h) ? h : [];
+        var observed = item2.observedDay;
+        var best = null;
+        for (var i = 0; i < list.length; i++) {
+          var p = entryParts(list[i]);
+          if (!p || p.available === null) continue;
+          if (observed !== null && observed !== void 0 && p.day === observed) return p.available;
+          if (!best || p.day > best.day) best = { day: p.day, available: p.available };
+        }
+        return best ? best.available : null;
+      }
+      function empty(days) {
+        return {
+          kind: "sin-datos",
+          score: null,
+          discount: null,
+          confidence: "ninguna",
+          days: days | 0,
+          medianaLow: null,
+          minLow: null,
+          available: null,
+          ratio: null,
+          reasons: []
+        };
+      }
+      function dealInfo(item2, opts) {
+        var o = opts || {};
+        var offerPct = numOpt(o.offerPct, OFFER_PCT);
+        var overPct = numOpt(o.overPct, OVER_PCT);
+        var minDays = intOpt(o.minDays, MIN_DAYS);
+        if (!item2 || typeof item2 !== "object") return empty(0);
+        var cur = item2.unitPriceCopper;
+        if (!Number.isSafeInteger(cur) || cur <= 0) return empty(0);
+        var H = histLib();
+        if (!H || typeof H.priceStats !== "function") return empty(0);
+        var st = H.priceStats(item2);
+        if (!st) return empty(0);
+        var days = st.diasMuestra | 0;
+        if (!st.medianaLow || st.medianaLow <= 0 || days < minDays) {
+          var out0 = empty(days);
+          out0.medianaLow = st.medianaLow;
+          out0.minLow = st.minLow;
+          return out0;
+        }
+        var avail = lastAvailable(item2);
+        var ratio = cur / st.medianaLow;
+        var discount = (st.medianaLow - cur) / st.medianaLow;
+        var EPS = 1e-9;
+        var base = days >= HIGH_DAYS ? 2 : days >= MID_DAYS ? 1 : 0;
+        var liq = avail !== null && avail <= THIN_AVAIL ? -1 : 0;
+        var lvl = Math.max(0, Math.min(2, base + liq));
+        var confidence = CONF_NAME[lvl];
+        var out = {
+          kind: "estable",
+          score: null,
+          discount,
+          confidence,
+          days,
+          medianaLow: st.medianaLow,
+          minLow: st.minLow,
+          available: avail,
+          ratio,
+          reasons: []
+        };
+        var pct2 = Math.round(Math.abs(discount) * 100);
+        if (discount >= offerPct - EPS) {
+          out.kind = "oferta";
+          out.reasons.push("Precio actual " + pct2 + "% bajo la mediana histórica (approx).");
+        } else if (discount <= -overPct + EPS) {
+          out.kind = "sobreprecio";
+          out.reasons.push("Precio actual " + pct2 + "% sobre la mediana histórica (approx).");
+        } else {
+          out.reasons.push("Precio cercano a la mediana histórica (approx).");
+        }
+        if (confidence !== "alta") {
+          out.reasons.push("Confianza " + confidence + " (" + days + " día" + (days === 1 ? "" : "s") + " de muestra" + (avail !== null && avail <= THIN_AVAIL ? ", pocas ofertas ese día" : "") + ").");
+        }
+        out.score = discount * (CONF_W[confidence] || 0.55) * (TREND_W[st.tendencia] || 1);
+        return out;
+      }
+      var HunterDeals2 = {
+        MIN_DAYS,
+        OFFER_PCT,
+        OVER_PCT,
+        HIGH_DAYS,
+        MID_DAYS,
+        THIN_AVAIL,
+        dealInfo
+      };
+      var root = typeof globalThis !== "undefined" ? globalThis : typeof self !== "undefined" ? self : this;
+      if (typeof module === "object" && module && module.exports) module.exports = HunterDeals2;
+      else if (root) root.HunterDeals = HunterDeals2;
+    })();
+  }
+});
+
+// ../standalone/market-chart.js
+var require_market_chart = __commonJS({
+  "../standalone/market-chart.js"(exports, module) {
+    (function() {
+      "use strict";
+      var EPOCH2 = Date.UTC(2020, 0, 1), DAY = 864e5;
+      function esc(s) {
+        return String(s == null ? "" : s).replace(/[&<>"']/g, function(c) {
+          return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+        });
+      }
+      function toPoint(h) {
+        var day, low;
+        if (Array.isArray(h)) {
+          if (h.length < 2) return null;
+          day = h[0];
+          low = h[1];
+        } else if (h && typeof h === "object") {
+          day = h.day;
+          low = h.low;
+        } else return null;
+        if (!Number.isSafeInteger(day) || !Number.isSafeInteger(low) || low <= 0) return null;
+        return { day, low };
+      }
+      function points(history) {
+        var list = Array.isArray(history) ? history : [];
+        var byDay = /* @__PURE__ */ new Map();
+        for (var i = 0; i < list.length; i++) {
+          var p = toPoint(list[i]);
+          if (!p) continue;
+          var prev = byDay.get(p.day);
+          if (prev === void 0 || p.low > prev) byDay.set(p.day, p.low);
+        }
+        var days = Array.from(byDay.keys()).sort(function(a, b) {
+          return a - b;
+        });
+        return days.map(function(d) {
+          return { day: d, low: byDay.get(d) };
+        });
+      }
+      function pad22(n) {
+        return (n < 10 ? "0" : "") + n;
+      }
+      function fmtDay(day) {
+        var d = new Date(EPOCH2 + day * DAY);
+        return pad22(d.getUTCDate()) + "/" + pad22(d.getUTCMonth() + 1) + "/" + d.getUTCFullYear();
+      }
+      function fmtCopper(c) {
+        c = Math.round(c);
+        if (c >= 1e4) {
+          var g = c / 1e4;
+          return (g >= 100 ? Math.round(g) : Math.round(g * 10) / 10) + "g";
+        }
+        if (c >= 100) return Math.round(c / 100) + "s";
+        return c + "c";
+      }
+      function niceStep(raw) {
+        if (!(raw > 0) || !isFinite(raw)) return 1;
+        var p = Math.pow(10, Math.floor(Math.log10(raw))), n = raw / p;
+        return (n <= 1 ? 1 : n <= 2 ? 2 : n <= 5 ? 5 : 10) * p;
+      }
+      function medianOf(vals) {
+        var s = vals.slice().sort(function(a, b) {
+          return a - b;
+        });
+        var n = s.length;
+        return n % 2 ? s[(n - 1) / 2] : Math.round((s[n / 2 - 1] + s[n / 2]) / 2);
+      }
+      var C2 = {
+        line: "var(--gold,#c9aa68)",
+        end: "var(--gold2,#f8b700)",
+        area: "var(--gold,#c9aa68)",
+        dim: "var(--dim,#8a8272)",
+        axis: "var(--border2,#4a3d24)",
+        grid: "var(--border,#33291a)"
+      };
+      function render(pts, o) {
+        var W = o.w, H = o.h, P = o.pad;
+        var n = pts.length;
+        var lows = pts.map(function(p) {
+          return p.low;
+        });
+        var lo = Math.min.apply(null, lows), hi = Math.max.apply(null, lows);
+        var cur = o.current != null && Number.isFinite(o.current) && o.current > 0 ? o.current : null;
+        if (hi <= lo) {
+          var pad = Math.max(1, Math.round(lo * 0.05));
+          lo -= pad;
+          hi += pad;
+        }
+        var x0 = P.l, x1 = W - P.r, y0 = P.t, y1 = H - P.b;
+        var plotW = Math.max(1, x1 - x0), plotH = Math.max(1, y1 - y0);
+        var dMin = pts[0].day, dMax = pts[n - 1].day;
+        var sx = function(d) {
+          return dMax > dMin ? x0 + (d - dMin) / (dMax - dMin) * plotW : x0 + plotW / 2;
+        };
+        var sy = function(v2) {
+          return y1 - (v2 - lo) / (hi - lo) * plotH;
+        };
+        var f12 = function(v2) {
+          return Math.round(v2 * 10) / 10;
+        };
+        var parts = [];
+        parts.push('<svg class="mchart" viewBox="0 0 ' + W + " " + H + '" role="img" style="width:100%;height:auto;display:block"><title>' + esc(o.title) + "</title>");
+        var coords = pts.map(function(p) {
+          return f12(sx(p.day)) + "," + f12(sy(p.low));
+        });
+        var firstX = coords[0].split(",")[0], lastX = coords[n - 1].split(",")[0];
+        parts.push('<path d="M' + coords.join(" L") + " L" + lastX + "," + y1 + " L" + firstX + "," + y1 + ' Z" style="fill:' + C2.area + ';fill-opacity:.10"/>');
+        parts.push('<path d="M' + coords.join(" L") + '" fill="none" stroke-linejoin="round" stroke-linecap="round" style="stroke:' + C2.line + ';stroke-width:1.6"/>');
+        var med = medianOf(lows);
+        if (med > lo && med < hi) {
+          parts.push('<line x1="' + x0 + '" y1="' + f12(sy(med)) + '" x2="' + x1 + '" y2="' + f12(sy(med)) + '" stroke-dasharray="4 3" style="stroke:' + C2.dim + ';stroke-width:1"/>');
+        }
+        if (cur != null && cur >= lo && cur <= hi && dMax > dMin) {
+          parts.push('<circle cx="' + f12(sx(dMax)) + '" cy="' + f12(sy(cur)) + '" r="3" style="fill:' + C2.end + '"/>');
+        }
+        parts.push('<circle cx="' + lastX + '" cy="' + coords[n - 1].split(",")[1] + '" r="3" style="fill:' + C2.end + '"/>');
+        if (o.axes) {
+          var step = niceStep((hi - lo) / 4);
+          var firstTick = Math.ceil(lo / step) * step;
+          parts.push('<line x1="' + x0 + '" y1="' + y0 + '" x2="' + x0 + '" y2="' + y1 + '" style="stroke:' + C2.axis + '"/>');
+          parts.push('<line x1="' + x0 + '" y1="' + y1 + '" x2="' + x1 + '" y2="' + y1 + '" style="stroke:' + C2.axis + '"/>');
+          var seen = {};
+          for (var k = 0; k < 6; k++) {
+            var v = Math.round((firstTick + k * step) * 100) / 100;
+            if (v > hi || seen[v]) break;
+            seen[v] = true;
+            var ty = f12(sy(v));
+            parts.push('<line x1="' + (x0 - 4) + '" y1="' + ty + '" x2="' + x0 + '" y2="' + ty + '" style="stroke:' + C2.axis + '"/>');
+            parts.push('<text x="' + (x0 - 7) + '" y="' + f12(ty + 3) + '" font-size="9.5" text-anchor="end" style="fill:' + C2.dim + '">' + esc(fmtCopper(v)) + "</text>");
+          }
+          var xIdx = {};
+          for (var i = 0; i <= 4; i++) {
+            var idx = Math.round(i * (n - 1) / 4);
+            if (xIdx[idx]) continue;
+            xIdx[idx] = true;
+            var px = f12(sx(pts[idx].day));
+            parts.push('<line x1="' + px + '" y1="' + y1 + '" x2="' + px + '" y2="' + (y1 + 4) + '" style="stroke:' + C2.axis + '"/>');
+            parts.push('<text x="' + px + '" y="' + (y1 + 15) + '" font-size="9.5" text-anchor="middle" style="fill:' + C2.dim + '">' + esc(fmtDay(pts[idx].day)) + "</text>");
+          }
+        }
+        parts.push("</svg>");
+        return parts.join("");
+      }
+      function priceChart(history, opts) {
+        var o = opts || {};
+        var pts = points(history);
+        if (!pts.length) return "";
+        return render(pts, {
+          w: o.w || 720,
+          h: o.h || 210,
+          pad: o.pad || { l: 52, r: 12, t: 12, b: 30 },
+          axes: o.axes !== false,
+          current: o.current,
+          title: o.title || "Historial del precio mínimo diario (aprox, ofertas anunciadas)"
+        });
+      }
+      function sparkline(history, opts) {
+        var o = opts || {};
+        var pts = points(history);
+        if (pts.length < 2) return "";
+        return render(pts, {
+          w: o.w || 150,
+          h: o.h || 34,
+          pad: o.pad || { l: 4, r: 4, t: 5, b: 5 },
+          axes: false,
+          current: null,
+          title: o.title || "Tendencia del mínimo diario (aprox)"
+        });
+      }
+      var HunterChart2 = { priceChart, sparkline, fmtCopper, fmtDay };
+      var root = typeof globalThis !== "undefined" ? globalThis : typeof self !== "undefined" ? self : this;
+      if (typeof module === "object" && module && module.exports) module.exports = HunterChart2;
+      else if (root) root.HunterChart = HunterChart2;
+    })();
+  }
+});
+
+// ../standalone/market-farm.js
+var require_market_farm = __commonJS({
+  "../standalone/market-farm.js"(exports, module) {
+    var ENV = typeof module === "object" && module && module.exports ? {} : window;
+    (() => {
+      "use strict";
+      const AH_CUT = 0.05;
+      const KILL_SEC = { normal: 20, elite: 45, rareelite: 60, rare: 30, boss: 90 };
+      const GATHER_SEC = 10, TRAVEL_SEC = { mob: 15, object: 45 };
+      const RARE_K = 0.2, RARE_ZONE_MAX = 1, CHEST_OPEN_RATE = 0.05, CHEST_ZONE_MAX = 4;
+      const OUTLIER_VENDOR_MULT = 50, OUTLIER_MAX_AVAIL = 2;
+      const COMP = { low: 1, med: 0.75, high: 0.45 }, COMP_ORDER2 = ["low", "med", "high"];
+      const COMP_LABEL2 = { low: "baja", med: "media", high: "alta" };
+      const CLASS_BIT = { warrior: 1, hunter: 4, shaman: 64 };
+      const CLS_NAME = { hunter: "Cazador", warrior: "Guerrero", shaman: "Chamán" };
+      const WEAPON_SETS = { hunter: [0, 1, 2, 3, 6, 7, 8, 10, 13, 15, 16, 18], warrior: [0, 1, 2, 3, 4, 5, 6, 7, 8, 10, 13, 15, 16, 18], shaman: [0, 1, 4, 5, 10, 13, 15] };
+      const PREF_SUBS = { hunter: { bow: [2], gun: [3] }, shaman: { axe: [0, 1], mace: [4, 5], dagger: [15] }, warrior: { "2h": [1, 5, 8, 6, 10], "1h": [0, 4, 7, 13, 15] } };
+      const MOB_KINDS = { mob: 1, skin: 1, pick: 1, "rare-obs": 1 };
+      const isRareKind = (s) => s.kind === "rare-obs" || s.rank === "rare" || s.rank === "rareelite";
+      const EPOCH2 = Date.UTC(2020, 0, 1), DAY = 864e5;
+      const today = () => Math.floor((Date.now() - EPOCH2) / DAY);
+      const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+      const money = (c) => `${Math.floor(c / 1e4)}g ${Math.floor(c % 1e4 / 100)}s ${c % 100}c`;
+      const gphF = (c) => {
+        c = Math.round(c);
+        const g = Math.floor(c / 1e4), s = Math.floor(c % 1e4 / 100);
+        return g ? `${g}g ${s}s` : `${s}s ${c % 100}c`;
+      };
+      const pctF = (c) => c >= 0.095 ? `${Math.round(c * 100)}%` : `${(c * 100).toFixed(1).replace(/\.0$/, "")}%`;
+      const normTxt = (s) => String(s || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]/g, "");
+      const normWords = (s) => String(s || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").split(/[^a-z0-9]+/).filter(Boolean);
+      const ZONE_TOKENS = {
+        "Durotar": ["durotar"],
+        "Mulgore": ["mulgore"],
+        "The Barrens": ["barrens"],
+        "Alterac Mountains": ["alterac"],
+        "Arathi Highlands": ["arathi"],
+        "Badlands": ["badlands"],
+        "Blasted Lands": ["blasted"],
+        "Tirisfal Glades": ["tirisfal"],
+        "Silverpine Forest": ["silverpine"],
+        "Western Plaguelands": ["wpl", "westernplaguelands"],
+        "Eastern Plaguelands": ["epl", "easternplaguelands"],
+        "Hillsbrad Foothills": ["hillsbrad"],
+        "The Hinterlands": ["hinterlands"],
+        "Dun Morogh": ["morogh"],
+        "Searing Gorge": ["searing"],
+        "Burning Steppes": ["burningsteppes", "burning"],
+        "Elwynn Forest": ["elwynn"],
+        "Deadwind Pass": ["deadwind"],
+        "Duskwood": ["duskwood"],
+        "Loch Modan": ["modan", "lochmodan"],
+        "Redridge Mountains": ["redridge"],
+        "Stranglethorn Vale": ["stranglethorn", "stv"],
+        "Swamp of Sorrows": ["sorrows", "swampofsorrows"],
+        "Westfall": ["westfall"],
+        "Wetlands": ["wetlands"],
+        "Teldrassil": ["teldrassil"],
+        "Darkshore": ["darkshore"],
+        "Ashenvale": ["ashenvale"],
+        "Thousand Needles": ["needles", "thousandneedles"],
+        "Stonetalon Mountains": ["stonetalon"],
+        "Desolace": ["desolace"],
+        "Feralas": ["feralas"],
+        "Dustwallow Marsh": ["dustwallow"],
+        "Tanaris": ["tanaris"],
+        "Azshara": ["azshara"],
+        "Felwood": ["felwood"],
+        "Un'Goro Crater": ["ungoro"],
+        "Silithus": ["silithus"],
+        "Winterspring": ["winterspring"],
+        "Moonglade": ["moonglade"]
+      };
+      const ZONE_STOP = /* @__PURE__ */ new Set(["the", "of", "mountains", "mountain", "isle", "crater", "vale", "highlands", "marsh", "glades", "forest", "forests", "pass", "lair", "keep", "deeps", "barrow"]);
+      function zoneTokens(name) {
+        if (ZONE_TOKENS[name]) return ZONE_TOKENS[name].map(normTxt);
+        const words = normWords(name);
+        const keep = words.filter((w) => w.length >= 5 && !ZONE_STOP.has(w));
+        return keep.length ? keep : [normTxt(name)];
+      }
+      function zoneInHub(name, hub) {
+        const h = normTxt(hub);
+        if (!h) return false;
+        return zoneTokens(name).some((t2) => t2 && h.includes(t2));
+      }
+      const TRAVEL = {
+        "Elwynn Forest": { h: [55, 0], a: [8, 1] },
+        "Westfall": { h: [55, 0], a: [10, 1] },
+        "Redridge Mountains": { h: [25, 0], a: [12, 1] },
+        "Duskwood": { h: [35, 0], a: [20, 0] },
+        "Loch Modan": { h: [40, 0], a: [8, 1] },
+        "Wetlands": { h: [45, 0], a: [10, 1] },
+        "Hillsbrad Foothills": { h: [30, 0], a: [10, 1] },
+        "Swamp of Sorrows": { h: [40, 0], a: [15, 1] },
+        "Tirisfal Glades": { h: [8, 1], a: [45, 0] },
+        "Silverpine Forest": { h: [15, 0], a: [50, 0] },
+        "Alterac Mountains": { h: [35, 0], a: [35, 0] },
+        "Arathi Highlands": { h: [35, 0], a: [30, 0] },
+        "Badlands": { h: [10, 1], a: [25, 0] },
+        "Searing Gorge": { h: [30, 0], a: [15, 1] },
+        "Burning Steppes": { h: [35, 0], a: [25, 0] },
+        "Blasted Lands": { h: [40, 0], a: [35, 0] },
+        "Western Plaguelands": { h: [40, 0], a: [40, 0] },
+        "Eastern Plaguelands": { h: [45, 0], a: [45, 0] },
+        "The Hinterlands": { h: [40, 0], a: [35, 0] },
+        "Deadwind Pass": { h: [50, 0], a: [50, 0] },
+        "Stranglethorn Vale": { h: [35, 0], a: [35, 0] },
+        "Durotar": { h: [8, 1], a: [45, 0] },
+        "Mulgore": { h: [8, 1], a: [45, 0] },
+        "The Barrens": { h: [10, 1], a: [12, 1] },
+        "Ashenvale": { h: [15, 0], a: [12, 1] },
+        "Darkshore": { h: [50, 0], a: [10, 1] },
+        "Teldrassil": { h: [55, 0], a: [8, 1] },
+        "Thousand Needles": { h: [18, 0], a: [20, 0] },
+        "Stonetalon Mountains": { h: [20, 0], a: [22, 0] },
+        "Desolace": { h: [22, 0], a: [25, 0] },
+        "Feralas": { h: [25, 0], a: [25, 0] },
+        "Dustwallow Marsh": { h: [40, 0], a: [15, 1] },
+        "Tanaris": { h: [30, 0], a: [30, 0] },
+        "Azshara": { h: [30, 0], a: [35, 0] },
+        "Felwood": { h: [35, 0], a: [38, 0] },
+        "Un'Goro Crater": { h: [40, 0], a: [42, 0] },
+        "Silithus": { h: [45, 0], a: [45, 0] },
+        "Winterspring": { h: [42, 0], a: [45, 0] },
+        "Moonglade": { h: [30, 0], a: [32, 0] },
+        "Dun Morogh": { h: [50, 0], a: [8, 1] }
+      };
+      function travelFor(zname, fac, hubZones, sessionH) {
+        const t2 = TRAVEL[zname];
+        if (!t2) return { min: 0, fp: true, hub: false, factor: 1 };
+        const side = fac === "alliance" ? "a" : "h", [min, fp] = t2[side] || [0, 1];
+        const hub = zoneInHub(zname, hubZones), eff = Math.round(min * (hub ? 0.5 : 1));
+        const hrs = Number(sessionH) || 2, factor = eff > 0 ? hrs / (hrs + eff / 60) : 1;
+        return { min: eff, fp: !!fp, hub, factor };
+      }
+      let IX = null;
+      function zoneSpawnPairs(main, others) {
+        const zm = {};
+        for (const p of others || []) if (p && p[0]) zm[p[0]] = p[1];
+        if (main && main[0]) zm[main[0]] = main[1];
+        return Object.entries(zm);
+      }
+      function index() {
+        if (IX) return IX;
+        const d = ENV.HunterDropData;
+        const ix = {
+          hasData: !!(d && d.zones && d.mobs && d.objects && d.items),
+          zones: d?.zones || {},
+          mobs: d?.mobs || {},
+          objects: d?.objects || {},
+          items: d?.items || {},
+          zoneByName: {},
+          byZoneM: {},
+          byZoneO: {},
+          mobItems: {},
+          objItems: {},
+          mobZoneSpawns: {},
+          objZoneSpawns: {},
+          zoneItems: {},
+          zoneSrcCache: /* @__PURE__ */ new Map(),
+          srcCache: /* @__PURE__ */ new Map(),
+          privItemSrc: {},
+          privRaresByZone: {},
+          privChestsByZone: {}
+        };
+        if (ix.hasData) {
+          for (const [zk, z] of Object.entries(ix.zones)) if (z && z[0]) ix.zoneByName[z[0]] = zk;
+          for (const [id, m] of Object.entries(ix.mobs)) {
+            const zm = Object.fromEntries(zoneSpawnPairs([m[4], m[5]], m[8]));
+            ix.mobZoneSpawns[id] = zm;
+            for (const zk of Object.keys(zm)) if (zk) (ix.byZoneM[zk] = ix.byZoneM[zk] || /* @__PURE__ */ new Set()).add(id);
+          }
+          for (const [id, o] of Object.entries(ix.objects)) {
+            const zm = Object.fromEntries(zoneSpawnPairs([o[2], o[3]], o[5]));
+            ix.objZoneSpawns[id] = zm;
+            for (const zk of Object.keys(zm)) if (zk) (ix.byZoneO[zk] = ix.byZoneO[zk] || /* @__PURE__ */ new Set()).add(id);
+          }
+          for (const [id, it] of Object.entries(ix.items)) for (const s of it[10] || []) {
+            const sid = String(s[1]);
+            if (s[0] === "o") (ix.objItems[sid] = ix.objItems[sid] || /* @__PURE__ */ new Set()).add(id);
+            else if (s[0] === "m" || s[0] === "s" || s[0] === "p") (ix.mobItems[sid] = ix.mobItems[sid] || /* @__PURE__ */ new Set()).add(id);
+          }
+          for (const [zk, set] of Object.entries(ix.byZoneM)) for (const mid of set) for (const iid of ix.mobItems[mid] || []) (ix.zoneItems[zk] = ix.zoneItems[zk] || /* @__PURE__ */ new Set()).add(iid);
+          for (const [zk, set] of Object.entries(ix.byZoneO)) for (const oid of set) for (const iid of ix.objItems[oid] || []) (ix.zoneItems[zk] = ix.zoneItems[zk] || /* @__PURE__ */ new Set()).add(iid);
+        }
+        const p = ENV.HunterDropDataPrivate;
+        if (p) {
+          for (const [nid, r] of Object.entries(p.rares || {})) {
+            const [name, level, spots, loot] = r || [];
+            for (const [ui, spotN] of Object.entries(spots || {})) {
+              if (ui === "0") continue;
+              const zk = String(ui);
+              const ent = { npcId: nid, name, level, spots: spotN, srcs: [] };
+              for (const [iid, ch] of Object.entries(loot || {})) {
+                const src = { kind: "rare-obs", id: nid, name, zoneKey: zk, lvlMin: level, lvlMax: level, rank: "rare", spawns: spotN, respawnSec: null, sides: "ah", chance: (ch || 0) / 100, avgCount: 1, objKind: null, origin: "rarescanner" };
+                ent.srcs.push({ iid, src });
+                (ix.privItemSrc[iid] = ix.privItemSrc[iid] || []).push(src);
+              }
+              (ix.privRaresByZone[zk] = ix.privRaresByZone[zk] || []).push(ent);
+            }
+          }
+          for (const [oid, c] of Object.entries(p.containers || {})) {
+            const [name, spots, loot] = c || [];
+            for (const [ui, spotN] of Object.entries(spots || {})) {
+              if (ui === "0") continue;
+              const zk = String(ui);
+              const ent = { objId: oid, name, spots: spotN, srcs: [] };
+              for (const [iid, ch] of Object.entries(loot || {})) {
+                const src = { kind: "chest-obs", id: oid, name, zoneKey: zk, lvlMin: null, lvlMax: null, rank: null, spawns: spotN, respawnSec: null, sides: "ah", chance: (ch || 0) / 100, avgCount: 1, objKind: "chest", origin: "rarescanner" };
+                ent.srcs.push({ iid, src });
+                (ix.privItemSrc[iid] = ix.privItemSrc[iid] || []).push(src);
+              }
+              (ix.privChestsByZone[zk] = ix.privChestsByZone[zk] || []).push(ent);
+            }
+          }
+        }
+        for (const [zk, ents] of Object.entries(ix.privRaresByZone)) for (const ent of ents) for (const e of ent.srcs) (ix.zoneItems[zk] = ix.zoneItems[zk] || /* @__PURE__ */ new Set()).add(e.iid);
+        for (const [zk, ents] of Object.entries(ix.privChestsByZone)) for (const ent of ents) for (const e of ent.srcs) (ix.zoneItems[zk] = ix.zoneItems[zk] || /* @__PURE__ */ new Set()).add(e.iid);
+        IX = ix;
+        return ix;
+      }
+      function pubNorm(s) {
+        const t2 = s[0], rid = String(s[1]);
+        if (t2 === "o") {
+          const o = IX.objects[rid];
+          if (!o) return [];
+          return zoneSpawnPairs([o[2], o[3]], o[5]).map(([zk, sp]) => ({ kind: "object", id: rid, name: o[0], zoneKey: zk, lvlMin: null, lvlMax: null, rank: null, spawns: sp, respawnSec: o[4], sides: "ah", chance: s[2] / 100, avgCount: (s[3] + s[4]) / 2, objKind: o[1], origin: "cmangos" }));
+        }
+        const m = IX.mobs[rid];
+        if (!m) return [];
+        return zoneSpawnPairs([m[4], m[5]], m[8]).map(([zk, sp]) => ({ kind: t2 === "m" ? "mob" : t2 === "s" ? "skin" : "pick", id: rid, name: m[0], zoneKey: zk, lvlMin: m[1], lvlMax: m[2], rank: m[3], spawns: sp, respawnSec: m[6], sides: m[7] || "ah", chance: s[2] / 100, avgCount: (s[3] + s[4]) / 2, objKind: null, origin: "cmangos" }));
+      }
+      function normSources(itemId) {
+        let c = IX.srcCache.get(itemId);
+        if (c) return c;
+        const out = [], dd = IX.items[itemId];
+        if (dd) for (const s of dd[10] || []) out.push(...pubNorm(s));
+        for (const s of IX.privItemSrc[itemId] || []) out.push(s);
+        IX.srcCache.set(itemId, out);
+        return out;
+      }
+      function zoneQualSrcs(zk) {
+        let m = IX.zoneSrcCache.get(zk);
+        if (m) return m;
+        m = /* @__PURE__ */ new Map();
+        for (const iid of IX.zoneItems[zk] || []) {
+          const arr = [];
+          for (const s of normSources(iid)) {
+            if (s.zoneKey !== zk) continue;
+            if (s.chance >= 5e-3 || isRareKind(s)) arr.push(s);
+          }
+          if (arr.length) m.set(iid, arr);
+        }
+        IX.zoneSrcCache.set(zk, m);
+        return m;
+      }
+      let SESS = null;
+      function session(items) {
+        if (SESS && SESS.items === items) return SESS;
+        const scan = /* @__PURE__ */ new Map(), liq = /* @__PURE__ */ new Map(), info = /* @__PURE__ */ new Map(), t2 = today();
+        for (const it of items || []) {
+          if (!it || !Number.isSafeInteger(it.itemId) || it.itemId <= 0) continue;
+          const iid = String(it.itemId);
+          if (scan.has(iid)) continue;
+          scan.set(iid, it);
+          const h = Array.isArray(it.history) ? it.history.find((x) => x.day === it.observedDay) : null;
+          const avail = h && h.available != null ? h.available : 0;
+          let L = Math.min(1, Math.max(0.15, Math.log10(1 + avail) / Math.log10(21)));
+          const recent = it.observedDay != null && it.observedDay <= t2 && t2 - it.observedDay <= 3;
+          if (!recent) L *= 0.5;
+          liq.set(iid, L);
+          const dd = IX.items[iid], cat = ENV.HunterMarketCatalog?.items?.[iid];
+          info.set(iid, { name: cat?.name || dd?.[0] || `Ítem #${it.itemId}`, quality: dd ? dd[1] : 0, icls: dd ? dd[2] : -1, sub: dd ? dd[3] : -1, req: dd ? dd[5] : 0, allow: dd ? dd[8] : -1 });
+        }
+        SESS = { items, scan, liq, info, drops: /* @__PURE__ */ new Map(), vendorCache: /* @__PURE__ */ new Map(), profCache: /* @__PURE__ */ new Map() };
+        return SESS;
+      }
+      function mobDrops(mid, zk, sess) {
+        const key = "m" + mid + "|" + zk;
+        let d = sess.drops.get(key);
+        if (d) return d;
+        d = [];
+        for (const iid of IX.mobItems[mid] || []) {
+          const it = sess.scan.get(iid);
+          if (!it) continue;
+          const srcs = normSources(iid).filter((x) => x.id === mid && x.zoneKey === zk && (x.kind === "mob" || x.kind === "skin" || x.kind === "pick"));
+          if (srcs.length) d.push({ iid, it, srcs });
+        }
+        sess.drops.set(key, d);
+        return d;
+      }
+      function objDrops(oid, zk, sess) {
+        const key = "o" + oid + "|" + zk;
+        let d = sess.drops.get(key);
+        if (d) return d;
+        d = [];
+        for (const iid of IX.objItems[oid] || []) {
+          const it = sess.scan.get(iid);
+          if (!it) continue;
+          const srcs = normSources(iid).filter((x) => x.kind === "object" && x.id === oid && x.zoneKey === zk);
+          if (srcs.length) d.push({ iid, it, srcs });
+        }
+        sess.drops.set(key, d);
+        return d;
+      }
+      function entDrops(ent, sess) {
+        let d = sess.drops.get(ent);
+        if (d) return d;
+        d = [];
+        for (const e of ent.srcs || []) {
+          const it = sess.scan.get(e.iid);
+          if (it) d.push({ iid: e.iid, it, srcs: [e.src] });
+        }
+        sess.drops.set(ent, d);
+        return d;
+      }
+      function normalizeSettings(s) {
+        s = s || {};
+        const zc = {};
+        if (s.zoneComp && typeof s.zoneComp === "object") {
+          for (const k of Object.keys(s.zoneComp)) if (COMP_ORDER2.includes(s.zoneComp[k])) zc[k] = s.zoneComp[k];
+        }
+        const p = s.prof || {}, n = Number(s.n);
+        return {
+          comp: COMP_ORDER2.includes(s.comp) ? s.comp : "auto",
+          zoneComp: zc,
+          gph: Number.isFinite(+s.gph) && +s.gph > 0 ? Math.min(1e3, +s.gph) : 5,
+          prof: { skin: !!p.skin, herb: !!p.herb, mine: !!p.mine },
+          group: !!s.group,
+          pvp: s.pvp !== false,
+          n: Number.isInteger(n) && n >= 3 && n <= 8 ? n : 5,
+          session: [1, 2, 4].includes(+s.session) ? +s.session : 2
+        };
+      }
+      function eligible(src, profile, settings) {
+        const lvl = profile.level || 12, side = profile.fac === "alliance" ? "a" : "h";
+        if (!(src.sides || "ah").includes(side)) return { ok: false, reason: `Solo ${side === "a" ? "la Alianza" : "la Horda"} puede farmear esta fuente` };
+        if (src.kind === "pick") return { ok: false, reason: "Pillosidad: tu clase no la usa" };
+        if (src.kind === "object" && src.objKind === "fish") return { ok: false, reason: "Pesca: no cuenta como farmeo" };
+        if (src.kind === "skin" && !settings.prof.skin) return { ok: false, reason: "Requiere Prof. Piel" };
+        if (src.kind === "object" && src.objKind === "herb" && !settings.prof.herb) return { ok: false, reason: "Requiere Prof. Hierbas" };
+        if (src.kind === "object" && src.objKind === "ore" && !settings.prof.mine) return { ok: false, reason: "Requiere Prof. Minería" };
+        const lmax = src.lvlMax == null ? lvl : src.lvlMax;
+        if (lmax > lvl + 3) return { ok: false, reason: `Mob nv ${lmax}: muy alto para tu nivel ${lvl}` };
+        if (typeof src.zoneKey === "string" && src.zoneKey.charCodeAt(0) === 105 && !settings.group) return { ok: false, reason: "Instancia: requiere grupo" };
+        if (MOB_KINDS[src.kind]) {
+          const rank2 = src.rank || "normal";
+          let solo = lmax <= lvl + 2;
+          if (rank2 === "elite" || rank2 === "rareelite") solo = lmax <= lvl - 5;
+          else if (rank2 === "boss") solo = lmax <= lvl - 10;
+          if (!solo && !settings.group) return { ok: false, reason: `Requiere grupo (mob nv ${lmax}, vos nv ${lvl})` };
+        }
+        return { ok: true, reason: "" };
+      }
+      function rate(src, level) {
+        if (isRareKind(src)) return RARE_K;
+        if (src.kind === "object" || src.kind === "chest-obs") {
+          if (src.objKind === "chest" || src.kind === "chest-obs") return Math.min(CHEST_ZONE_MAX, CHEST_OPEN_RATE * (src.spawns || 0));
+          return Math.min(3600 / (GATHER_SEC + TRAVEL_SEC.object), (src.spawns || 0) * 3600 / Math.max(src.respawnSec || 60, 60));
+        }
+        const rank2 = src.rank || "normal";
+        const lmin = src.lvlMin == null ? level : src.lvlMin, lmax = src.lvlMax == null ? level : src.lvlMax, mobAvg = (lmin + lmax) / 2;
+        const base = KILL_SEC[rank2] || KILL_SEC.normal;
+        const ks = base * (1 + 0.08 * Math.max(0, mobAvg - level)) * Math.max(0.5, 1 - 0.03 * Math.max(0, level - mobAvg));
+        return Math.min(3600 / (ks + TRAVEL_SEC.mob), (src.spawns || 0) * 3600 / Math.max(src.respawnSec || 60, 60));
+      }
+      function refPrice(it) {
+        const h = Array.isArray(it?.history) ? it.history.find((x) => x.day === it.observedDay) : null;
+        const avail = h && h.available != null ? h.available : 0;
+        const sell = IX.items[String(it?.itemId)]?.[9] || 0, price = it?.unitPriceCopper || 0;
+        if (avail <= OUTLIER_MAX_AVAIL && sell > 0 && price > OUTLIER_VENDOR_MULT * sell) return { price: OUTLIER_VENDOR_MULT * sell, doubtful: true };
+        return { price, doubtful: false };
+      }
+      function metrics(src, it, settings, level) {
+        const K = rate(src, level), u = src.chance * (src.avgCount || 1);
+        const rp = refPrice(it), sell0 = IX.items[String(it?.itemId)]?.[9] || 0;
+        const vendorFloor = rp.price <= 0 && sell0 > 0;
+        const net = vendorFloor ? sell0 : Math.floor(rp.price * (1 - AH_CUT));
+        const gph = K * u * net, denom = K * u;
+        const farmCost = denom > 0 ? (settings.gph || 5) * 1e4 / denom : Infinity;
+        const margin = net - farmCost;
+        const roi = farmCost > 0 && isFinite(farmCost) ? margin / farmCost : null;
+        return { K, u, net, gph, farmCostPerUnit: farmCost, margin, roi, doubtful: rp.doubtful, vendorFloor };
+      }
+      function vendorGph(zk, level, profile, settings, sess) {
+        const key = [zk, level, profile.fac || "", settings.prof.skin ? 1 : 0, settings.prof.herb ? 1 : 0, settings.prof.mine ? 1 : 0, settings.group ? 1 : 0].join("|");
+        const hit = sess.vendorCache.get(key);
+        if (hit != null) return hit;
+        const vals = [];
+        const addEnt = (id, isObj) => {
+          const per = /* @__PURE__ */ new Map();
+          let anySrc = null;
+          for (const iid of (isObj ? IX.objItems[id] : IX.mobItems[id]) || []) {
+            if (sess.scan.has(iid)) continue;
+            const sell = IX.items[iid]?.[9] || 0;
+            if (sell <= 0) continue;
+            for (const s of normSources(iid)) {
+              const ok = isObj ? s.kind === "object" && s.id === id && s.zoneKey === zk : s.id === id && s.zoneKey === zk && (s.kind === "mob" || s.kind === "skin" || s.kind === "pick");
+              if (!ok || !eligible(s, profile, settings).ok) continue;
+              const ch = s.chance * (s.avgCount || 1);
+              if (ch <= 0) continue;
+              const k = s.kind + "|" + iid, cur = per.get(k);
+              if (cur) {
+                if (ch > cur.ch) cur.ch = ch;
+                continue;
+              }
+              per.set(k, { ch, sell });
+              if (!anySrc || s.chance > anySrc.chance) anySrc = s;
+            }
+          }
+          if (!anySrc || !per.size) return;
+          const r = rate(anySrc, level);
+          let v2 = 0;
+          for (const p of per.values()) v2 += r * p.ch * p.sell;
+          if (v2 > 0) vals.push(v2);
+        };
+        for (const mid of IX.byZoneM[zk] || []) addEnt(mid, false);
+        for (const oid of IX.byZoneO[zk] || []) addEnt(oid, true);
+        vals.sort((a, b) => b - a);
+        const v = Math.round((vals[0] || 0) + 0.5 * (vals[1] || 0) + 0.25 * (vals[2] || 0));
+        sess.vendorCache.set(key, v);
+        return v;
+      }
+      const PROF_KINDS = { skin: "Piel", herb: "Hierbas", mine: "Minería" };
+      function profGph(zk, kind, level, profile, settings, sess) {
+        const key = "pf|" + [zk, kind, level, profile.fac || "", settings.group ? 1 : 0].join("|");
+        const hit = sess.profCache.get(key);
+        if (hit != null) return hit;
+        const wantObj = kind === "herb" ? "herb" : kind === "mine" ? "ore" : null;
+        const vals = [], itemVal = /* @__PURE__ */ new Map();
+        const addEnt = (id, isObj) => {
+          const per = /* @__PURE__ */ new Map();
+          let anySrc = null;
+          for (const iid of (isObj ? IX.objItems[id] : IX.mobItems[id]) || []) {
+            const dd = IX.items[iid], sell = dd?.[9] || 0;
+            if (sell <= 0) continue;
+            if ((dd?.[6] || 0) > level + 10) continue;
+            const it = sess.scan.get(iid), rp = it ? refPrice(it) : null;
+            const ah = rp && rp.price > 0 ? Math.floor(rp.price * (1 - AH_CUT)) : 0;
+            const unit = Math.max(ah, sell);
+            if (unit <= 0) continue;
+            for (const s of normSources(iid)) {
+              const okProf = isObj ? s.kind === "object" && s.objKind === wantObj : s.kind === "skin";
+              if (!okProf || s.id !== id || s.zoneKey !== zk) continue;
+              if (!eligible(s, profile, settings).ok) continue;
+              const ch = s.chance * (s.avgCount || 1);
+              if (ch <= 0) continue;
+              const k = kind + "|" + iid, cur = per.get(k);
+              if (cur) {
+                if (ch > cur.ch) cur.ch = ch;
+                continue;
+              }
+              per.set(k, { ch, unit, iid });
+              if (!anySrc || s.chance > anySrc.chance) anySrc = s;
+            }
+          }
+          if (!anySrc || !per.size) return;
+          const r = rate(anySrc, level);
+          let v = 0;
+          for (const p of per.values()) {
+            const c = r * p.ch * p.unit;
+            v += c;
+            itemVal.set(p.iid, (itemVal.get(p.iid) || 0) + c);
+          }
+          if (v > 0) vals.push(v);
+        };
+        if (kind === "skin") {
+          for (const mid of IX.byZoneM[zk] || []) addEnt(mid, false);
+        } else for (const oid of IX.byZoneO[zk] || []) {
+          const o = IX.objects[oid];
+          if (o && o[1] === wantObj) addEnt(oid, true);
+        }
+        vals.sort((a, b) => b - a);
+        const gph = Math.round((vals[0] || 0) + 0.5 * (vals[1] || 0) + 0.25 * (vals[2] || 0));
+        const items = [...itemVal.entries()].sort((a, b) => b[1] - a[1]).slice(0, 3).map(([iid]) => IX.items[iid]?.[0] || `#${iid}`);
+        const res = { gph, items };
+        sess.profCache.set(key, res);
+        return res;
+      }
+      const PROF_ORDER = ["skin", "herb", "mine"];
+      function profRecommendations(items, profile, settings) {
+        index();
+        const sess = session(items), level = profile.level || 12, out = [];
+        for (const kind of PROF_ORDER) {
+          if (!settings.prof[kind]) continue;
+          const zones = [];
+          for (const zk of candidateZones(level, settings)) {
+            const r = profGph(zk, kind, level, profile, settings, sess);
+            if (r.gph <= 0) continue;
+            const z = IX.zones[zk], risk = riskFor(z?.[2], profile, settings);
+            const travel = travelFor(z?.[0], profile.fac, profile.hubZones, settings.session);
+            zones.push({ zoneKey: zk, name: zoneName(zk), gph: Math.round(r.gph * risk.mult * travel.factor), items: r.items });
+          }
+          zones.sort((a, b) => b.gph - a.gph);
+          if (zones.length) out.push({ kind, name: PROF_KINDS[kind], zones: zones.slice(0, 3), along: kind === "skin" ? alongZones(profile, settings, sess, level) : null });
+        }
+        return out;
+      }
+      const ALONG_EFF = 0.5;
+      const ZONE_ALIAS = { "stv": "stranglethorn vale", "epl": "eastern plaguelands", "wpl": "western plaguelands", "1k needles": "thousand needles", "shimmering flats": "thousand needles", "un'goro": "un'goro crater", "dustwallow": "dustwallow marsh" };
+      const normZone = (s) => String(s || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+      function matchZoneToken(t2) {
+        const alias = ZONE_ALIAS[t2] || t2, hit = [];
+        for (const [zk, z] of Object.entries(IX.zones)) {
+          if (!z || !z[0]) continue;
+          const zn = normZone(z[0]).replace(/^the /, "");
+          if (zn && (zn.includes(alias) || alias.includes(zn))) hit.push([zk, zn.length]);
+        }
+        if (!hit.length) return null;
+        const best = Math.max(...hit.map((h) => h[1])), top = hit.filter((h) => h[1] === best).map((h) => h[0]);
+        return top.length === 1 ? top[0] : null;
+      }
+      function trafficZones(profile) {
+        index();
+        const G = ENV["GUIDE_" + String(profile.cls || "").toUpperCase()];
+        const fk = G ? Object.keys(G.factions || {}) : [], fac = fk.includes(profile.fac) ? profile.fac : null;
+        const routes = fac ? G.factions[fac]?.routes : null;
+        if (!routes) return /* @__PURE__ */ new Map();
+        const level = profile.level || 12, out = /* @__PURE__ */ new Map();
+        for (const bands of Object.values(routes)) {
+          for (const b of bands || []) {
+            if (!b || !(b.min <= level && level <= b.max)) continue;
+            const text2 = String(b.zones || "").replace(/\([^)]*\)/g, " ");
+            for (const seg of text2.split(/[\/→]/)) {
+              const t2 = normZone(seg).replace(/[^a-z' ]/g, " ").replace(/\s+/g, " ").trim();
+              if (t2.length < 4) continue;
+              const zk = matchZoneToken(t2);
+              if (zk == null) continue;
+              const cur = out.get(zk) || { zones: 0, bands: [] };
+              cur.zones++;
+              if (!cur.bands.includes(`${b.min}-${b.max}`)) cur.bands.push(`${b.min}-${b.max}`);
+              out.set(zk, cur);
+            }
+          }
+        }
+        return out;
+      }
+      function alongZones(profile, settings, sess, level) {
+        const traffic = trafficZones(profile);
+        if (!traffic.size) return [];
+        const zones = [];
+        for (const zk of candidateZones(level, settings)) {
+          if (!traffic.has(zk)) continue;
+          const r = profGph(zk, "skin", level, profile, settings, sess);
+          if (r.gph <= 0) continue;
+          const z = IX.zones[zk], risk = riskFor(z?.[2], profile, settings);
+          const travel = travelFor(z?.[0], profile.fac, profile.hubZones, settings.session);
+          zones.push({ zoneKey: zk, name: zoneName(zk), gph: Math.round(r.gph * ALONG_EFF * risk.mult * travel.factor), items: r.items, bands: traffic.get(zk).bands.join(", ") });
+        }
+        zones.sort((a, b) => b.gph - a.gph);
+        return zones.slice(0, 3);
+      }
+      function byZone(zoneKey) {
+        index();
+        const zk = String(zoneKey);
+        const mobs = [...IX.byZoneM[zk] || []], objects = [...IX.byZoneO[zk] || []], items = /* @__PURE__ */ new Set();
+        for (const id of mobs) for (const i of IX.mobItems[id] || []) items.add(i);
+        for (const id of objects) for (const i of IX.objItems[id] || []) items.add(i);
+        for (const r of IX.privRaresByZone[zk] || []) for (const e of r.srcs) items.add(e.iid);
+        for (const c of IX.privChestsByZone[zk] || []) for (const e of c.srcs) items.add(e.iid);
+        return { mobs, objects, items: [...items] };
+      }
+      function byMob(id) {
+        index();
+        const sid = String(id), out = new Set(IX.mobItems[sid] || []);
+        const r = ENV.HunterDropDataPrivate?.rares?.[sid];
+        if (r) for (const i of Object.keys(r[3] || {})) out.add(i);
+        return [...out];
+      }
+      function sources(itemId, profile, settings) {
+        index();
+        const id = typeof itemId === "number" ? String(itemId) : String(itemId || "");
+        if (!id || !IX.items[id] && !IX.privItemSrc[id]) return [];
+        return normSources(id).map((src) => {
+          const e = eligible(src, profile || {}, normalizeSettings(settings));
+          return { ...src, eligible: e.ok, reason: e.reason };
+        });
+      }
+      function itemMetrics(scanItem, profile, settings) {
+        const out = { best: null, gph: 0, roi: null, margin: null, farmable: false, sources: [] };
+        index();
+        const id = scanItem && scanItem.itemId;
+        if (!Number.isSafeInteger(id) || id <= 0 || !IX.hasData) return out;
+        out.doubtful = refPrice(scanItem).doubtful;
+        const level = profile && profile.level || 12, st = normalizeSettings(settings);
+        const all = normSources(String(id)).map((src) => {
+          const e = eligible(src, profile || {}, st);
+          return { ...src, eligible: e.ok, reason: e.reason, ...metrics(src, scanItem, st, level) };
+        });
+        const elig = all.filter((s) => s.eligible).sort((a, b) => b.gph - a.gph);
+        out.sources = all;
+        out.farmable = elig.length > 0;
+        if (elig.length) {
+          out.best = elig[0];
+          out.gph = elig[0].gph;
+          out.roi = elig[0].roi;
+          out.margin = elig[0].margin;
+        }
+        return out;
+      }
+      function matchStats(scanItems) {
+        index();
+        const items = scanItems || [], cat = ENV.HunterMarketCatalog?.items || {};
+        let matched = 0;
+        const byLayer = { public: 0, private: 0, catalog: 0 };
+        for (const it of items) {
+          const id = it && it.itemId;
+          if (!Number.isSafeInteger(id) || id <= 0) continue;
+          const k = String(id), pub = !!IX.items[k], priv = !!IX.privItemSrc[k], c = !!cat[k];
+          if (pub) byLayer.public++;
+          if (priv) byLayer.private++;
+          if (c) byLayer.catalog++;
+          if (pub || priv || c) matched++;
+        }
+        const total = items.length;
+        return { total, matched, pct: total ? Math.round(matched / total * 1e3) / 10 : 0, byLayer };
+      }
+      function candidateZones(level, settings) {
+        const privZones = /* @__PURE__ */ new Set();
+        for (const k of Object.keys(IX.privRaresByZone)) if (IX.zones[k]) privZones.add(k);
+        for (const k of Object.keys(IX.privChestsByZone)) if (IX.zones[k]) privZones.add(k);
+        const out = [];
+        for (const [zk, z] of Object.entries(IX.zones)) {
+          if (!z) continue;
+          if (z[2] === "city" && !privZones.has(zk)) continue;
+          const inst = z[2] === "instance" || zk.charCodeAt(0) === 105;
+          if (inst && !settings.group) continue;
+          const zmin = z[3], zmax = z[4];
+          if (zmin == null && zmax == null) continue;
+          if (zmax != null && zmax < level - 10) continue;
+          if (zmin != null && zmin > level + 5) continue;
+          out.push(zk);
+        }
+        return out;
+      }
+      function compFor(zk, zname, settings, profile) {
+        const ov = settings.zoneComp[zk];
+        if (ov) return { comp: ov, why: "manual para esta zona" };
+        if (settings.comp !== "auto") return { comp: settings.comp, why: "manual global" };
+        const hour = (/* @__PURE__ */ new Date()).getHours(), hub = zoneInHub(zname, profile.hubZones), peak = hour >= 18 && hour <= 23;
+        const comp = COMP_ORDER2[Math.min(2, 1 + (hub ? 1 : 0) + (peak ? 1 : 0))];
+        const why = "auto" + (hub && peak ? " (hub de tu guía + horario pico)" : hub ? " (hub de tu guía)" : peak ? " (horario pico)" : "");
+        return { comp, why };
+      }
+      function riskFor(zfac, profile, settings) {
+        const own = profile.fac === "alliance" ? "alliance" : "horde";
+        let level = "baja", mult = 1, note = "";
+        if (zfac === "instance") {
+          level = "baja";
+        } else if (zfac === own) {
+          level = "baja";
+        } else if (zfac === "contested") {
+          level = "media";
+          mult = 0.85;
+          note = "Zona disputada: posible encuentro con la facción rival";
+        } else if (zfac === "alliance" || zfac === "horde") {
+          level = "alta";
+          mult = 0.6;
+          note = "Territorio de la facción rival: riesgo alto";
+        }
+        if (settings.pvp === false) mult = 1;
+        return { level, mult, note };
+      }
+      function usefulGear(inf, cls, level, pref) {
+        const ws = WEAPON_SETS[cls];
+        if (inf.icls === 2) {
+          if (!ws || !ws.includes(inf.sub)) return { ok: false };
+          const ps = PREF_SUBS[cls] && PREF_SUBS[cls][pref];
+          return { ok: true, preferred: !!(ps && ps.includes(inf.sub)) };
+        }
+        if (inf.icls === 4) {
+          const s = inf.sub;
+          if (s === 0 || s === 1) return { ok: true, preferred: false };
+          const mail = s === 3 && level >= 40, plate = s === 4 && level >= 40;
+          if (cls === "hunter") return s === 2 || mail ? { ok: true, preferred: false } : { ok: false };
+          if (cls === "warrior") return mail || plate || s === 6 ? { ok: true, preferred: false } : { ok: false };
+          if (cls === "shaman") return s === 2 || mail || s === 6 ? { ok: true, preferred: false } : { ok: false };
+          return { ok: false };
+        }
+        return { ok: false };
+      }
+      function zoneEntry(zk, level, cls, profile, settings, sess) {
+        const z = IX.zones[zk];
+        if (!z) return null;
+        const [zname, , zfac, zmin, zmax] = z;
+        const camps = [], itemZone = /* @__PURE__ */ new Map(), rares = /* @__PURE__ */ new Map(), chests = /* @__PURE__ */ new Map();
+        let chestSpots = 0;
+        const mobSp = (mid, fb) => {
+          const zm = IX.mobZoneSpawns[mid];
+          return zm && zm[zk] != null ? zm[zk] : fb;
+        };
+        const objSp = (oid, fb) => {
+          const zm = IX.objZoneSpawns[oid];
+          return zm && zm[zk] != null ? zm[zk] : fb;
+        };
+        const processDrops = (drops) => {
+          let cv = 0, ev = 0;
+          for (const d of drops) {
+            for (const src of d.srcs) {
+              const e = eligible(src, profile, settings);
+              if (!e.ok) continue;
+              const m = metrics(src, d.it, settings, level), base = m.u * m.net * sess.liq.get(d.iid), v = m.K * base;
+              cv += v;
+              ev += base;
+              let a = itemZone.get(d.iid);
+              if (!a) {
+                a = { v: 0, src: null };
+                itemZone.set(d.iid, a);
+              }
+              a.v += v;
+              if (!a.src || v > a.src.v) a.src = { v, src };
+            }
+          }
+          return { cv, ev };
+        };
+        for (const mid of IX.byZoneM[zk] || []) {
+          const mob = IX.mobs[mid];
+          if (!mob) continue;
+          const drops = mobDrops(mid, zk, sess), r = processDrops(drops);
+          if (mob[3] === "rare" || mob[3] === "rareelite") {
+            const rep = { kind: "mob", id: mid, name: mob[0], zoneKey: zk, lvlMin: mob[1], lvlMax: mob[2], rank: mob[3], spawns: mobSp(mid, mob[5]), respawnSec: mob[6], sides: mob[7] || "ah", chance: 0, avgCount: 1, objKind: null };
+            const e0 = eligible(rep, profile, settings).ok, cur = rares.get(mid) || { name: mob[0], ev: 0, scan: false, elig: false };
+            cur.ev += r.ev;
+            cur.scan = cur.scan || drops.length > 0;
+            cur.elig = cur.elig || e0;
+            rares.set(mid, cur);
+          } else camps.push({ id: mid, name: mob[0], kind: "mob", value: r.cv, lvlMin: mob[1], lvlMax: mob[2], spawns: mobSp(mid, mob[5]), rank: mob[3] });
+        }
+        for (const oid of IX.byZoneO[zk] || []) {
+          const obj = IX.objects[oid];
+          if (!obj) continue;
+          const isChest = obj[1] === "chest";
+          const r = processDrops(objDrops(oid, zk, sess));
+          if (isChest) {
+            const spots = objSp(oid, obj[3] || 0);
+            chestSpots += spots;
+            const c = chests.get("o" + oid) || { name: obj[0], ev: 0, spots: 0 };
+            c.ev += r.ev;
+            c.spots += spots;
+            chests.set("o" + oid, c);
+          } else camps.push({ id: oid, name: obj[0], kind: "object", value: r.cv, lvlMin: null, lvlMax: null, spawns: objSp(oid, obj[3] || 0), objKind: obj[1] });
+        }
+        for (const ent of IX.privRaresByZone[zk] || []) {
+          const drops = entDrops(ent, sess), r = processDrops(drops);
+          const rep = ent.srcs[0]?.src, e0 = rep ? eligible(rep, profile, settings).ok : false;
+          const cur = rares.get(ent.npcId) || { name: ent.name, ev: 0, scan: false, elig: false };
+          cur.ev += r.ev;
+          cur.scan = cur.scan || drops.length > 0;
+          cur.elig = cur.elig || e0;
+          rares.set(ent.npcId, cur);
+        }
+        for (const ent of IX.privChestsByZone[zk] || []) {
+          const r = processDrops(entDrops(ent, sess));
+          chestSpots += ent.spots || 0;
+          const c = chests.get("c" + ent.objId) || { name: ent.name, ev: 0, spots: 0 };
+          c.ev += r.ev;
+          c.spots += ent.spots || 0;
+          chests.set("c" + ent.objId, c);
+        }
+        camps.sort((a, b) => b.value - a.value);
+        const cvals = camps.map((c) => c.value);
+        const zoneBase = (cvals[0] || 0) + 0.5 * (cvals[1] || 0) + 0.25 * (cvals[2] || 0);
+        const eligRares = [...rares.values()].filter((r) => r.elig);
+        let rareValue = 0, rareEVmax = 0;
+        if (eligRares.length) {
+          const mean = eligRares.reduce((s, r) => s + r.ev, 0) / eligRares.length;
+          rareValue = Math.min(RARE_ZONE_MAX, RARE_K * eligRares.length) * mean;
+          for (const r of eligRares) if (r.ev > rareEVmax) rareEVmax = r.ev;
+        }
+        let chestValue = 0, chestEVmean = 0;
+        if (chestSpots > 0) {
+          let w = 0, we = 0;
+          for (const c of chests.values()) {
+            w += c.spots;
+            we += c.ev * c.spots;
+          }
+          chestEVmean = we / chestSpots;
+          chestValue = Math.min(CHEST_ZONE_MAX, CHEST_OPEN_RATE * chestSpots) * chestEVmean;
+        }
+        const rareScan = [...rares.values()].filter((r) => r.scan).length;
+        const useful = [];
+        for (const [iid, srcs] of zoneQualSrcs(zk)) {
+          const dd = IX.items[iid];
+          if (!dd) continue;
+          let best = null;
+          for (const s of srcs) {
+            if (!eligible(s, profile, settings).ok) continue;
+            if (!best || s.chance > best.chance) best = s;
+          }
+          if (!best) continue;
+          const quality = dd[1], icls = dd[2], sub = dd[3], req = dd[5], allow = dd[8];
+          if (quality < 2) continue;
+          if (req == null || req < level - 2 || req > level + 5) continue;
+          if (allow !== -1 && !(allow & CLASS_BIT[cls])) continue;
+          const g = usefulGear({ icls, sub }, cls, level, profile.pref || "any");
+          if (!g.ok) continue;
+          const cat = ENV.HunterMarketCatalog?.items?.[iid];
+          useful.push({ iid: +iid, name: cat?.name || dd[0] || `Ítem #${iid}`, srcName: best.name, preferred: g.preferred, isRare: isRareKind(best), v: itemZone.get(iid)?.v || 0, hist: sess.scan.get(iid)?.history || [], price: sess.scan.get(iid)?.unitPriceCopper });
+        }
+        useful.sort((a, b) => b.v - a.v || Number(b.isRare) - Number(a.isRare) || a.name.localeCompare(b.name));
+        const usefulBonus = Math.min(0.2, 0.02 * useful.length);
+        const ahTotal = zoneBase + rareValue + chestValue;
+        const vendorValue = vendorGph(zk, level, profile, settings, sess);
+        const total = ahTotal + vendorValue;
+        const risk = riskFor(zfac, profile, settings), comp = compFor(zk, zname, settings, profile);
+        const travel = travelFor(zname, profile.fac, profile.hubZones, settings.session);
+        const score = (ahTotal * (1 + usefulBonus) + vendorValue) * risk.mult * COMP[comp.comp] * travel.factor;
+        if (!(score > 0) || !isFinite(score)) return null;
+        const topItems = [...itemZone.entries()].filter(([, a]) => a.v > 0).sort((a, b) => b[1].v - a[1].v).slice(0, 3).map(([iid, a]) => {
+          const inf = sess.info.get(iid), scanIt = sess.scan.get(iid);
+          return { itemId: +iid, name: inf.name, price: scanIt.unitPriceCopper, chance: a.src.src.chance, doubtful: refPrice(scanIt).doubtful, source: a.src.src, hist: scanIt.history || [] };
+        });
+        const clsName = CLS_NAME[cls] || cls, isInst = zfac === "instance" || zk.charCodeAt(0) === 105;
+        const reasons = [];
+        const topCamp = camps.find((c) => c.value > 0);
+        if (topCamp) reasons.push(`Camp principal: ${topCamp.name} nv ${topCamp.lvlMin ?? "?"}–${topCamp.lvlMax ?? "?"} · ${topCamp.spawns} spawns · ~${gphF(topCamp.value)}/h approx`);
+        if (rares.size) reasons.push(`${rares.size} rareza${rares.size > 1 ? "s" : ""} en zona (${rareScan} con ítems de tu scan)`);
+        if (chestSpots) reasons.push(`${chestSpots} puntos de cofre conocidos (no simultáneos)`);
+        if (useful.length) reasons.push(`${useful.length} ítem${useful.length > 1 ? "s" : ""} útil${useful.length > 1 ? "es" : ""} para ${clsName}`);
+        reasons.push(risk.note || (isInst ? "Riesgo bajo: instancia" : "Riesgo bajo: territorio propio"));
+        reasons.push(`Competencia ${COMP_LABEL2[comp.comp]} — ${comp.why}`);
+        if (travel.min) reasons.push(`Traslado ~${travel.min} min ida y vuelta${travel.hub ? " (tu ruta de nivel pasa por la zona)" : ""}${travel.fp ? "" : " — la facción no tiene vuelo propio acá"}`);
+        if (isInst) reasons.push("Requiere grupo");
+        return {
+          zoneKey: zk,
+          name: zname,
+          score,
+          gph: total,
+          zoneBase,
+          rareValue,
+          chestValue,
+          rareEVmax,
+          chestEVmean,
+          vendorGph: vendorValue,
+          travel,
+          levels: [zmin, zmax],
+          topItems,
+          camps: camps.filter((c) => c.value > 0).slice(0, 3).map((c) => ({ id: c.id, name: c.name, gph: c.value, lvlMin: c.lvlMin, lvlMax: c.lvlMax, spawns: c.spawns, kind: c.kind, objKind: c.objKind })),
+          rareCount: rares.size,
+          rareScan,
+          chestCount: chestSpots,
+          usefulCount: useful.length,
+          usefulIds: useful.map((u) => u.iid),
+          useful: useful.slice(0, 3).map((u) => ({ itemId: u.iid, name: u.name, srcName: u.srcName, preferred: u.preferred, isRare: u.isRare })),
+          risk,
+          comp,
+          reasons
+        };
+      }
+      function rank(scanItems, profile, settings) {
+        index();
+        const res = { A: null, B: [], all: [] };
+        if (!IX.hasData) return res;
+        profile = profile || {};
+        settings = normalizeSettings(settings);
+        const sess = session(scanItems || []);
+        if (!sess.scan.size) return res;
+        const level = profile.level || 12, cls = profile.cls || "hunter";
+        const entries = [];
+        for (const zk of candidateZones(level, settings)) {
+          const e = zoneEntry(zk, level, cls, profile, settings, sess);
+          if (e) entries.push(e);
+        }
+        entries.sort((a, b) => b.score - a.score || a.name.localeCompare(b.name));
+        res.all = entries;
+        res.A = entries[0] || null;
+        res.B = entries.slice(1, 1 + settings.n);
+        return res;
+      }
+      function progression(scanItems, profile, settings) {
+        index();
+        const out = [], lvl = profile?.level || 12;
+        if (lvl >= 60 || !IX.hasData) return out;
+        for (const d of [5, 10, 15, 20]) {
+          const T = lvl + d;
+          if (T > 60) break;
+          const r = rank(scanItems, { ...profile, level: T }, settings);
+          if (r.A) out.push({ level: T, zoneKey: r.A.zoneKey, name: r.A.name, gph: r.A.gph, camp: r.A.camps[0]?.name || "" });
+          if (out.length >= 4) break;
+        }
+        return out;
+      }
+      const GUIDE_FARMS = [
+        { lvl: [15, 22], zones: ["Redridge Mountains"], camp: "Condors cerca de Three Corners", drops: "Tough Condor Meat · Goretusk Snout", est: "quest items ~1g/h", note: "La gente paga por saltarse la zona — AH siempre" },
+        { lvl: [18, 28], zones: ["Stranglethorn Vale"], camp: "Costa de Booty Bay / aguas de Nesingwary", drops: "Blue Pearl (almejas gigantes)", est: "volumen por hora", note: 'La quest "Buceo de perlas" tiene demanda' },
+        { lvl: [20, 30], zones: ["Wetlands"], camp: "Costa norte · campos de gnolls · whelps", drops: "Iridescent Pearl · Small Flame Sac", est: "~5-8s/h vendor+AH", note: "Perlas iridiscentes = mats para crafts BoP de Forever (demanda real)" },
+        { lvl: [25, 35], zones: ["Badlands"], camp: "Elementales de roca · entrada de Uldaman", drops: "Dust/Salt/Elemental Earth (vendor)", est: "~10g/h vendor sin competencia", note: "Punto bajo: elementales menores nv 37-39" },
+        { lvl: [30, 40], zones: ["Swamp of Sorrows"], camp: "Campos de Swamp Jaguar", drops: "Long Soft Tail · Bristly Whisker", est: "~10-12g/h con mount", note: "Cola y bigote caen casi siempre — oro puro + skinning encima" },
+        { lvl: [34, 45], zones: ["Badlands", "Swamp of Sorrows"], camp: "Nidos de whelps (Adolescent/Dreaming/Scalding)", drops: "Small Flame Sac · cría de dragón oscuro (pet BoU)", est: "batido picante = demanda de flame sacs", note: "El pet BoU es inversión, no ingreso directo" }
+      ];
+      const GUIDE_PRINCIPLES = [
+        "Skinning: vendor hasta ~20-25; después AH solo si hay demanda real en tu servidor",
+        "Quest items y páginas de libro → AH siempre: la gente paga por saltarse contenido",
+        "No listar materiales de craft baratos en AH — el margen no paga el slot",
+        "Shadowgem: farmeable en zonas bajas o comprar ~10-15 y vender en el pico 20-25",
+        "Volumen > margen unitario: perlas y páginas valen por hora, no por unidad",
+        "Todo es aproximado: drop rates de referencia Classic 1.12, no observados en Forever"
+      ];
+      function spotsFor(level) {
+        const hit = GUIDE_FARMS.filter((s) => level + 2 >= s.lvl[0] && level - 2 <= s.lvl[1]);
+        return hit.length ? hit : GUIDE_FARMS.filter((s) => s.lvl[0] > level).slice(0, 2);
+      }
+      let GK = { lvl: -1, set: /* @__PURE__ */ new Set() };
+      function guideZoneKeys(level) {
+        if (GK.lvl !== level) {
+          const set = /* @__PURE__ */ new Set();
+          index();
+          for (const s of spotsFor(level)) for (const zn of s.zones) {
+            const zk = IX.zoneByName[zn];
+            if (zk) set.add(zk);
+          }
+          GK = { lvl: level, set };
+        }
+        return GK.set;
+      }
+      function profCardHTML(profs) {
+        let h = `<div class="card"><h3>Por tu profesión <span class="sub">mejores zonas para tus oficios · approx</span></h3>`;
+        for (const p of profs) {
+          h += `<div class="farm-sec"><h5>${esc(p.name)}</h5><ul>${p.zones.map((z) => `<li><b>${esc(z.name)}</b> <span class="muted">· ~${esc(gphF(z.gph))}/h en materiales${z.items.length ? " · " + z.items.map(esc).join(" · ") : ""}</span></li>`).join("")}</ul></div>`;
+          if (p.along && p.along.length) h += `<div class="farm-sec"><h5>Skin-along · lo que otros cazan</h5><ul>${p.along.map((z) => `<li><b>${esc(z.name)}</b> <span class="muted">· ~${esc(gphF(z.gph))}/h en materiales${z.items.length ? " · " + z.items.map(esc).join(" · ") : ""} · quests nv ${esc(z.bands)}</span></li>`).join("")}</ul>
+      <p class="tip">Skinneá todo lo que muera cerca tuyo: en zonas de misiones las bestias caen solas. Estimado al ~50% del farmeo propio — otros compiten por las mismas pieles.</p></div>`;
+        }
+        h += `<p class="tip">Materiales valorados a AH neto si están en tu scan, si no a precio de vendedor. El oficio se suma al farmeo normal — no reemplaza el oro de monturas/ítems.</p></div>`;
+        return h;
+      }
+      function guideCardHTML(spots) {
+        let h = `<div class="card"><h3>Granjas de la guía <span class="sub">video + datos · estimaciones, no medidas</span></h3><div class="farm-sec"><ul>`;
+        for (const s of spots) h += `<li><b>${esc(s.camp)}</b> <span class="muted">· ${s.zones.map((z) => esc(zoneName(IX.zoneByName[z] || z))).join(" + ")} · nv ${s.lvl[0]}–${s.lvl[1]}</span><div class="muted">${esc(s.drops)} — ${esc(s.est)}</div>${s.note ? `<div class="muted" style="font-size:11.5px">${esc(s.note)}</div>` : ""}</li>`;
+        h += `</ul></div><details class="fold"><summary><span class="arrow">▶</span>Principios y errores comunes de la guía</summary><div class="fbody"><ul class="farm-reasons">${GUIDE_PRINCIPLES.map((p) => `<li>${esc(p)}</li>`).join("")}</ul></div></details></div>`;
+        return h;
+      }
+      const KIND_LABEL = { mob: "", skin: "Piel: ", pick: "Pillosidad: ", object: "Objeto: ", "rare-obs": "Rareza observada: ", "chest-obs": "Cofre observado: " };
+      function srcLabel(s) {
+        return `${KIND_LABEL[s.kind] || ""}${s.name || ""}${s.origin === "rarescanner" ? " · observado (RareScanner)" : ""}`;
+      }
+      function zoneName(zk) {
+        return IX.zones[String(zk)]?.[0] || String(zk);
+      }
+      const zoneSlugOf = (zn) => String(zn || "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+      function spotCoords(camp, zk) {
+        index();
+        const fd = ENV.HunterDropForever?.mobs;
+        const c = camp && camp.kind === "mob" && camp.id != null ? fd?.[camp.id] : null;
+        if (!c) return "";
+        return zoneSlugOf(zoneName(zk)) === c[2] ? ` · <span class="muted">${c[0]}, ${c[1]}</span>` : "";
+      }
+      function settingsHTML(s) {
+        const sel = (id, cur, opts) => `<label>${id === "farmComp" ? "Competencia" : id === "farmN" ? "Zonas extra" : "Oro/h de ref."}<select id="${id}">${opts.map((o) => `<option value="${o[0]}" ${String(cur) === o[0] ? "selected" : ""}>${o[1]}</option>`).join("")}</select></label>`;
+        return `<div class="market-toolbar">
+    ${sel("farmComp", s.comp, [["auto", "Auto"], ["low", "Baja"], ["med", "Media"], ["high", "Alta"]])}
+    <label>Oro/h de ref.<input id="farmGph" type="number" min="1" max="1000" step="1" value="${esc(s.gph)}"></label>
+    <label>Ciclo de farmeo<select id="farmSession">${[1, 2, 4].map((h) => `<option value="${h}" ${s.session === h ? "selected" : ""}>${h} h</option>`).join("")}</select></label>
+    <label class="chk"><input id="farmSkin" type="checkbox" ${s.prof.skin ? "checked" : ""}>Piel</label>
+    <label class="chk"><input id="farmHerb" type="checkbox" ${s.prof.herb ? "checked" : ""}>Hierbas</label>
+    <label class="chk"><input id="farmMine" type="checkbox" ${s.prof.mine ? "checked" : ""}>Minería</label>
+    <label class="chk"><input id="farmGroup" type="checkbox" ${s.group ? "checked" : ""}>Grupo</label>
+    <label class="chk"><input id="farmPvp" type="checkbox" ${s.pvp ? "checked" : ""}>PvP</label>
+    <label>Zonas extra<select id="farmN">${[3, 4, 5, 6, 7, 8].map((n) => `<option value="${n}" ${s.n === n ? "selected" : ""}>${n}</option>`).join("")}</select></label>
+  </div>`;
+      }
+      function priceMetricsHTML(hist, price) {
+        const ch = ENV.HunterChart?.sparkline ? ENV.HunterChart.sparkline(hist) : "";
+        const st = ENV.HunterHistory?.priceStats ? ENV.HunterHistory.priceStats(hist) : null;
+        if (!ch && !st?.diasMuestra) return "";
+        const tend = st ? { sube: "al alza", baja: "a la baja", estable: "estable", "sin-datos": "pocos datos" }[st.tendencia] || "" : "";
+        const bits = [];
+        if (st?.diasMuestra >= 2) bits.push(`<span class="badge ${st.tendencia === "sube" ? "soon" : st.tendencia === "baja" ? "down" : ""}">${esc(tend)} · ${st.diasMuestra}d</span>`);
+        if (st?.medianaLow != null) bits.push(`<span class="muted">med ${esc(money(st.medianaLow))}${price != null ? ` · hoy ${esc(money(price))}` : ""}</span>`);
+        return `<div class="farm-metrics">${ch ? `<span class="farm-spark">${ch}</span>` : ""}${bits.join("")}</div>`;
+      }
+      function cardHTML(e, rank2, profile, settings, profTop) {
+        const cur = settings.zoneComp[e.zoneKey] || "auto";
+        let h = `<div class="farm-card" data-zone="${esc(e.zoneKey)}" data-rank="${rank2}"><div class="farm-chead"><b>${rank2} · ${esc(e.name)}</b>`;
+        h += `<span class="badge">${esc("riesgo " + e.risk.level)}</span><span class="badge">competencia ${esc(COMP_LABEL2[e.comp.comp])}</span>`;
+        if (e.travel && e.travel.min) h += `<span class="badge">viaje ~${e.travel.min} min${e.travel.fp ? "" : " · sin vuelo"}${e.travel.hub ? " · tu ruta" : ""}</span>`;
+        if (e.vendorGph) h += `<span class="badge">≈${esc(gphF(e.vendorGph))}/h vendedor</span>`;
+        if (guideZoneKeys(profile.level || 12).has(e.zoneKey)) h += `<span class="badge">guía</span>`;
+        if (profTop && profTop.has(e.zoneKey)) h += `<span class="badge">tu prof</span>`;
+        h += `<span class="muted">nv ${e.levels[0]}–${e.levels[1]} · vos nv ${profile.level || 12}</span></div>`;
+        h += `<div class="muted">~${esc(gphF(e.gph))}/h approx antes de multiplicadores · ${e.rareCount} rarezas (${e.rareScan} con tu scan) · ${e.chestCount} puntos de cofre · ${e.usefulCount} útiles</div>`;
+        if (e.topItems.length) h += `<div class="farm-sec"><h5>Ítems de tu scan</h5><ul>${e.topItems.map((t2) => `<li>${esc(t2.name)} · ${esc(srcLabel(t2.source))} · zona ${esc(zoneName(t2.source.zoneKey))} · ${pctF(t2.chance)}${t2.doubtful ? ' <span class="badge soon">precio dudoso</span>' : ""}${priceMetricsHTML(t2.hist, t2.price)}</li>`).join("")}</ul></div>`;
+        if (e.useful.length) h += `<div class="farm-sec"><h5>Útiles para vos</h5><ul>${e.useful.map((u) => `<li>${esc(u.name)} <span class="muted">· ${esc(u.srcName || "")}</span>${u.preferred ? ' <span class="badge bow">tu arma preferida</span>' : ""}${u.isRare ? ' <span class="badge soon">rareza</span>' : ""}${priceMetricsHTML(u.hist, u.price)}</li>`).join("")}</ul></div>`;
+        if (e.camps.length) h += `<div class="farm-sec"><h5>Camps principales</h5><ul>${e.camps.map((c) => `<li>${esc(c.name)} · ${c.kind === "object" ? "recolección" : "mob"} · ~${esc(gphF(c.gph))}/h approx${spotCoords(c, e.zoneKey)}</li>`).join("")}</ul></div>`;
+        if (e.risk.note) h += `<div class="farm-note">${esc(e.risk.note)}</div>`;
+        h += `<div class="farm-ctl"><label>Competencia<select class="farm-comp" data-zone="${esc(e.zoneKey)}">${[["auto", "Auto"], ["low", "Baja"], ["med", "Media"], ["high", "Alta"]].map((o) => `<option value="${o[0]}" ${cur === o[0] ? "selected" : ""}>${o[1]}</option>`).join("")}</select></label>`;
+        h += `<button type="button" class="btn mini farm-copada" data-zone="${esc(e.zoneKey)}">Zona copada</button></div>`;
+        h += `<ul class="farm-reasons">${e.reasons.map((r) => `<li>${esc(r)}</li>`).join("")}</ul></div>`;
+        return h;
+      }
+      function footerHTML(items) {
+        const ms = matchStats(items), d = ENV.HunterDropData, priv = ENV.HunterDropDataPrivate, pd = priv?.source;
+        const L = [`Cobertura del scan: ${ms.matched}/${ms.total} ítems (${ms.pct}%) — capas: dataset público ${ms.byLayer.public}, ${priv ? "RareScanner" : "sin capa privada"} ${ms.byLayer.private}, catálogo ${ms.byLayer.catalog}.`];
+        const src = d?.source;
+        if (src) L.push(`${src.license || ""} · ${src.attribution || ""}`.trim());
+        if (pd) L.push(`Capa observada: ${pd.addon || "RareScanner"} — ${pd.license || "uso local privado"}.`);
+        L.push(priv ? "Estimaciones aproximadas: drop rates de referencia Classic 1.12 (CMaNGOS), no observados en Forever salvo 'observado (RareScanner)'. Coordenadas de mobs: DB comunitaria azeroth.wiki/forever. Sin datos de población: la competencia es tu selección + heurísticas." : "Estimaciones aproximadas: drop rates de referencia Classic 1.12 (CMaNGOS), no observados en Forever. Coordenadas de mobs: DB comunitaria azeroth.wiki/forever. Sin datos de población: la competencia es tu selección + heurísticas.");
+        return L.map((t2) => `<p class="tip">${esc(t2)}</p>`).join("");
+      }
+      function render(el, ctx) {
+        if (!el || !el.isConnected) return;
+        index();
+        const profile = ctx?.profile || {}, settings = normalizeSettings(ctx?.settings), items = ctx?.items || [];
+        let h = '<h3>Farmeo recomendado <span class="sub">aprox · Classic 1.12</span></h3>';
+        if (!IX.hasData) {
+          el.innerHTML = h + '<p class="muted">Dataset de drops no disponible.</p>';
+          return;
+        }
+        if (!items.length) {
+          el.innerHTML = h + '<p class="muted">Importá tu Auctionator.lua para ver recomendaciones de farmeo.</p>';
+          return;
+        }
+        h += settingsHTML(settings);
+        const profs = profRecommendations(items, profile, settings);
+        const profTop = new Set(profs.flatMap((p) => p.zones.map((z) => z.zoneKey)));
+        const res = rank(items, profile, settings);
+        if (res.A) h += `<div class="farm-cards">${cardHTML(res.A, "A", profile, settings, profTop) + res.B.map((b, i) => cardHTML(b, "B" + (i + 1), profile, settings, profTop)).join("")}</div>`;
+        else h += '<p class="muted">Ninguna zona puntúa con tu scan y nivel — revisá nivel, facción o el dataset.</p>';
+        if (profs.length) h += profCardHTML(profs);
+        const spots = spotsFor(profile.level || 12);
+        if (spots.length) h += guideCardHTML(spots);
+        const prog = progression(items, profile, settings);
+        if (prog.length) {
+          let prev = null, lis = "";
+          for (const p of prog) {
+            const same = prev && p.zoneKey === prev;
+            lis += `<li>A nivel ${p.level}–${p.level + 4}: ${same ? `seguí en ${esc(p.name)}` : `movete a ${esc(p.name)} (~${esc(gphF(p.gph))}/h approx${p.camp ? `, camp ${esc(p.camp)}` : ""})`}</li>`;
+            prev = p.zoneKey;
+          }
+          h += `<div class="farm-prog"><h5>Progresión</h5><ul id="farmProgress">${lis}</ul></div>`;
+        }
+        h += `<details class="fold"><summary><span class="arrow">▶</span>Fuentes, cobertura y licencia del dataset</summary><div class="fbody">${footerHTML(items)}</div></details>`;
+        el.innerHTML = h;
+        const changed = (f) => {
+          ctx?.saveFarm && ctx.saveFarm(f);
+          ctx?.refresh && ctx.refresh();
+        };
+        const q = (s) => el.querySelector(s);
+        q("#farmComp")?.addEventListener("change", (e) => changed({ ...settings, comp: e.target.value }));
+        q("#farmGph")?.addEventListener("change", (e) => {
+          const n = +e.target.value;
+          changed({ ...settings, gph: Number.isFinite(n) && n > 0 ? Math.min(1e3, n) : 5 });
+        });
+        q("#farmSession")?.addEventListener("change", (e) => {
+          const h2 = +e.target.value;
+          changed({ ...settings, session: [1, 2, 4].includes(h2) ? h2 : 2 });
+        });
+        for (const [id, key] of [["#farmSkin", "skin"], ["#farmHerb", "herb"], ["#farmMine", "mine"]])
+          q(id)?.addEventListener("change", (e) => changed({ ...settings, prof: { ...settings.prof, [key]: e.target.checked } }));
+        q("#farmGroup")?.addEventListener("change", (e) => changed({ ...settings, group: e.target.checked }));
+        q("#farmPvp")?.addEventListener("change", (e) => changed({ ...settings, pvp: e.target.checked }));
+        q("#farmN")?.addEventListener("change", (e) => {
+          const n = +e.target.value;
+          changed({ ...settings, n: n >= 3 && n <= 8 ? n : 5 });
+        });
+        el.querySelectorAll(".farm-comp").forEach((s) => s.addEventListener("change", (e) => {
+          const zk = e.target.dataset.zone, f = { ...settings, zoneComp: { ...settings.zoneComp } };
+          if (e.target.value === "auto") delete f.zoneComp[zk];
+          else f.zoneComp[zk] = e.target.value;
+          changed(f);
+        }));
+        el.querySelectorAll(".farm-copada").forEach((b) => b.addEventListener("click", () => {
+          changed({ ...settings, zoneComp: { ...settings.zoneComp, [b.dataset.zone]: "high" } });
+        }));
+      }
+      ENV.HunterFarm = {
+        index,
+        byZone,
+        byMob,
+        sources,
+        itemMetrics,
+        matchStats,
+        rank,
+        progression,
+        render,
+        travelFor,
+        profRecommendations,
+        trafficZones,
+        spotCoords,
+        fmt: { gph: gphF, pct: pctF, money, esc, zoneName, srcLabel }
+      };
+    })();
+    if (typeof module === "object" && module && module.exports) module.exports = Object.assign({ configure: (o) => Object.assign(ENV, o) }, ENV.HunterFarm);
+  }
+});
+
 // src/plugin.src.jsx
 import { host, PALETTE_AREA, ROUTES_AREA, SIDEBAR_NAV_AREA } from "@hermes/plugin-sdk";
 
@@ -2449,8 +5037,8 @@ function createStore(ctx) {
 }
 
 // src/app.jsx
-import { Component, useCallback, useEffect, useMemo, useState as useState3 } from "react";
-import { Button as Button3, SegmentedControl, Tabs, TabsList, TabsTrigger } from "@hermes/plugin-sdk";
+import { Component, useCallback as useCallback2, useEffect as useEffect3, useMemo as useMemo12, useState as useState8 } from "react";
+import { Button as Button6, SegmentedControl as SegmentedControl4, Tabs, TabsList, TabsTrigger } from "@hermes/plugin-sdk";
 
 // ../src/perfil.js
 var VERSION = 1;
@@ -2608,6 +5196,21 @@ function nombre(n, lang) {
   if (!n) return "";
   if (typeof n === "string") return n;
   return (lang === "en" ? n.en || n.es : n.es || n.en) || "";
+}
+function item(id) {
+  const f = items_default.items[String(id)];
+  if (!f) return null;
+  return {
+    id: Number(id),
+    n: { es: f[0] || f[1], en: f[1] || f[0] },
+    calidad: f[2],
+    nivelReq: f[3],
+    nivelItem: f[4],
+    venta: f[5],
+    clase: f[6],
+    subclase: f[7],
+    ligado: f[8]
+  };
 }
 function zona(id) {
   return id == null ? null : zonas_default.zonas[String(id)] || null;
@@ -2819,6 +5422,10 @@ function t(lang, clave, vars) {
   const s = (TEXTOS[lang] || ES)[clave] ?? ES[clave] ?? clave;
   return vars ? s.replace(/\{(\w+)\}/g, (m, k) => vars[k] ?? m) : s;
 }
+function agregarTextos(es, en) {
+  Object.assign(ES, es);
+  Object.assign(EN, en || {});
+}
 
 // src/vistas/personaje.jsx
 import { useState } from "react";
@@ -2854,6 +5461,21 @@ function Hueco({ children, lang }) {
 }
 function Aviso({ children }) {
   return /* @__PURE__ */ jsx("div", { role: "note", style: S.aviso, children });
+}
+function NombreItem({ id, lang, cantidad }) {
+  const it = item(id);
+  if (!it) return /* @__PURE__ */ jsxs("span", { style: { color: C.texto3 }, children: [
+    "#",
+    id
+  ] });
+  const otro = nombre(it.n, lang === "en" ? "es" : "en");
+  return /* @__PURE__ */ jsxs("span", { title: otro !== nombre(it.n, lang) ? otro : void 0, style: { color: CALIDAD[it.calidad] || C.texto }, children: [
+    nombre(it.n, lang) || "#" + id,
+    cantidad > 1 ? " ×" + cantidad : ""
+  ] });
+}
+function Dinero({ cobre }) {
+  return /* @__PURE__ */ jsx("span", { style: { fontVariantNumeric: "tabular-nums" }, children: dinero(cobre) });
 }
 
 // src/vistas/personaje.jsx
@@ -3047,43 +5669,3408 @@ function VistaClase({ perfil, lang }) {
 }
 
 // src/vistas/ruta.jsx
-import { jsx as jsx4 } from "react/jsx-runtime";
-function VistaRuta({ lang }) {
-  return /* @__PURE__ */ jsx4(Tarjeta, { titulo: t(lang, "tab.ruta"), children: /* @__PURE__ */ jsx4("p", { children: t(lang, "pendiente") }) });
+import { useMemo, useState as useState3 } from "react";
+
+// src/ruta-logica.js
+function faccionCodigo(faccion) {
+  return faccion === "alianza" ? "a" : faccion === "horda" ? "h" : null;
+}
+function misionDeFaccion(m, faccion) {
+  const c = faccionCodigo(faccion);
+  return !!c && !!m && (m.faccion === "ah" || m.faccion === c);
+}
+function misionParaPersonaje(m, perfil) {
+  if (Array.isArray(m.clases) && m.clases.length && !m.clases.includes(perfil.clase)) return false;
+  if (m.prof != null) {
+    const ps = [...perfil.profesiones || [], ...perfil.secundarias || []];
+    if (!ps.includes(m.prof)) return false;
+  }
+  return true;
+}
+function misionesDisponibles(misiones, perfil) {
+  const out = [];
+  for (const [id, m] of Object.entries(misiones || {})) {
+    if (!m || typeof m !== "object") continue;
+    if (!misionDeFaccion(m, perfil.faccion)) continue;
+    if (!((typeof m.min === "number" ? m.min : 1) <= perfil.nivel)) continue;
+    if (!misionParaPersonaje(m, perfil)) continue;
+    out.push([Number(id), m]);
+  }
+  return out.sort((a, b) => a[1].nivel - b[1].nivel || a[0] - b[0]);
+}
+function bandaActual(nivel) {
+  return { min: nivel - 2, max: nivel + 5 };
+}
+function mapasDeDungeons(dungeons) {
+  const s = /* @__PURE__ */ new Set();
+  for (const k of Object.keys(dungeons?.clasicos || {})) s.add(Number(k));
+  for (const k of Object.keys(dungeons?.forever || {})) s.add(Number(k));
+  return s;
+}
+function misionesDeBanda(misiones, perfil, dungeons) {
+  const b = bandaActual(perfil.nivel);
+  const mapas = mapasDeDungeons(dungeons);
+  const grupos = /* @__PURE__ */ new Map();
+  for (const par of misionesDisponibles(misiones, perfil)) {
+    const [id, m] = par;
+    if (typeof m.nivel !== "number" || m.nivel < b.min || m.nivel > b.max) continue;
+    let g;
+    if (m.dungeon != null && mapas.has(Number(m.dungeon))) g = { tipo: "dungeon", id: Number(m.dungeon) };
+    else if (m.zona != null) g = { tipo: "zona", id: Number(m.zona) };
+    else g = { tipo: "otra", id: null };
+    const k = g.tipo + ":" + (g.id ?? "");
+    if (!grupos.has(k)) grupos.set(k, { ...g, items: [] });
+    grupos.get(k).items.push(par);
+  }
+  const lista = [...grupos.values()];
+  const ORDEN_TIPO = { zona: 0, dungeon: 1, otra: 2 };
+  for (const g of lista) {
+    g.items.sort((a, b2) => a[1].nivel - b2[1].nivel || a[0] - b2[0]);
+    g.nivelMin = g.items[0][1].nivel;
+  }
+  lista.sort((a, b2) => a.nivelMin - b2.nivelMin || ORDEN_TIPO[a.tipo] - ORDEN_TIPO[b2.tipo] || (a.id ?? 0) - (b2.id ?? 0));
+  return lista;
+}
+function misionesDeDungeon(misiones, perfil, mapa) {
+  const out = [];
+  for (const [id, m] of Object.entries(misiones || {})) {
+    if (!m || Number(m.dungeon) !== Number(mapa)) continue;
+    if (!misionDeFaccion(m, perfil.faccion)) continue;
+    if (!misionParaPersonaje(m, perfil)) continue;
+    out.push([Number(id), m]);
+  }
+  return out.sort((a, b) => a[1].nivel - b[1].nivel || a[0] - b[0]);
+}
+function zonasDeNivel(zonas, faccion, nivel) {
+  const out = [];
+  for (const [id, z] of Object.entries(zonas?.zonas || {})) {
+    const nv = z.niveles;
+    if (!nv || typeof nv.min !== "number" || typeof nv.max !== "number") continue;
+    if (!(nv.min <= nivel && nivel <= nv.max)) continue;
+    if (z.faccion !== faccion && z.faccion !== "disputada") continue;
+    const mpz = zonas.misiones_por_zona?.[id]?.[faccion];
+    out.push({
+      id: Number(id),
+      n: z.n,
+      niveles: nv,
+      faccion: z.faccion,
+      continente: z.continente ?? null,
+      misiones: mpz && typeof mpz.n === "number" ? mpz.n : null
+    });
+  }
+  return out.sort((a, b) => a.niveles.min - b.niveles.min || a.niveles.max - b.niveles.max || a.id - b.id);
+}
+function zonasSinNiveles(zonas) {
+  const vistas = /* @__PURE__ */ new Set();
+  const out = [];
+  for (const [id, z] of Object.entries(zonas?.zonas || {})) {
+    if (z.niveles != null || z.faccion === "ciudad") continue;
+    const clave = z.n && (z.n.es || z.n.en) || String(id);
+    if (vistas.has(clave)) continue;
+    vistas.add(clave);
+    out.push({ id: Number(id), n: z.n, faccion: z.faccion, continente: z.continente ?? null });
+  }
+  out.sort((a, b) => String(a.n?.es || a.n?.en || "").localeCompare(String(b.n?.es || b.n?.en || ""), "es"));
+  return out;
+}
+function inicioDeRaza(personaje, raza) {
+  const r = personaje?.razas?.[String(raza)];
+  return r && r.inicio && r.inicio.zona != null ? r.inicio : null;
+}
+function listaDungeons(dungeons) {
+  const salida = [];
+  const jefes = (lista) => (lista || []).slice().sort((a, b) => (a.orden ?? 0) - (b.orden ?? 0)).map((j) => ({ encuentro: j.encuentro, orden: j.orden, npc: j.npc ?? null, n: j.n, botin: j.botin ?? null }));
+  for (const [id, d] of Object.entries(dungeons?.clasicos || {})) {
+    salida.push({
+      mapa: Number(id),
+      tipo: "clasico",
+      n: d.n,
+      f: d.f,
+      niveles: d.niveles ?? null,
+      jugadores: typeof d.jugadores === "number" && d.jugadores > 0 ? d.jugadores : null,
+      raid: d.raid === true,
+      jefes: jefes(d.jefes)
+    });
+  }
+  for (const [id, d] of Object.entries(dungeons?.forever || {})) {
+    salida.push({
+      mapa: Number(id),
+      tipo: "forever",
+      n: d.n,
+      f: d.f,
+      niveles: d.niveles ?? null,
+      jugadores: null,
+      raid: false,
+      jefes: jefes(d.jefes)
+    });
+  }
+  return salida;
+}
+function dungeonEnRango(d, nivel) {
+  const nv = d.niveles;
+  return !!nv && typeof nv.min === "number" && nivel >= nv.min - 5 && nivel <= nv.max + 5;
+}
+function dungeonsVisibles(lista, filtro, nivel) {
+  const ok = (d) => filtro === "raids" ? d.raid === true : filtro === "todos" ? true : dungeonEnRango(d, nivel);
+  return lista.filter(ok).sort((a, b) => (a.niveles?.min ?? 999) - (b.niveles?.min ?? 999) || (a.niveles?.max ?? 999) - (b.niveles?.max ?? 999) || a.mapa - b.mapa);
+}
+function infoItem(items, id) {
+  const f = items && items[String(id)];
+  if (!f) return null;
+  return { id: Number(id), calidad: f[2], clase: f[6], subclase: f[7] };
+}
+var ARMA_A_SKILLLINE = {
+  0: 44,
+  1: 172,
+  2: 45,
+  3: 46,
+  4: 54,
+  5: 160,
+  6: 229,
+  7: 43,
+  8: 55,
+  10: 136,
+  13: 473,
+  15: 173,
+  16: 176,
+  18: 226,
+  19: 228
+};
+var ARMADURA_A_SKILLLINE = { 1: 415, 2: 414, 3: 413, 4: 293, 6: 433 };
+var JOYERIA = "joyeria";
+function skilllineDeItem(info) {
+  if (!info) return null;
+  if (info.clase === 2) return ARMA_A_SKILLLINE[info.subclase] ?? null;
+  if (info.clase === 4) return info.subclase === 0 ? JOYERIA : ARMADURA_A_SKILLLINE[info.subclase] ?? null;
+  return null;
+}
+function esUtilParaClase(info, competencias) {
+  if (!info || typeof info.calidad !== "number" || info.calidad < 2) return false;
+  const sl = skilllineDeItem(info);
+  if (sl == null) return false;
+  if (sl === JOYERIA) return true;
+  return (competencias instanceof Set ? competencias : new Set(competencias || [])).has(sl);
+}
+function botinUtil(items, botin, competencias) {
+  return (botin || []).filter(([id]) => esUtilParaClase(infoItem(items, id), competencias));
+}
+function normalizarNombre(s) {
+  return String(s ?? "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, " ").trim();
+}
+var tokensDe = (s) => normalizarNombre(s).split(" ").filter(Boolean);
+var contieneTramo = (agujas, pajar) => {
+  if (!agujas.length || agujas.length > pajar.length) return false;
+  for (let i = 0; i + agujas.length <= pajar.length; i++) {
+    if (agujas.every((t2, j) => pajar[i + j] === t2)) return true;
+  }
+  return false;
+};
+var brutosDe = (n) => n && typeof n === "object" ? [n.en, n.es] : [n];
+function nombreDungeonCoincide(nombreCurado, nombreGenerado) {
+  const c = tokensDe(nombreCurado);
+  if (!c.length) return false;
+  return brutosDe(nombreGenerado).some((bruto) => {
+    const g = tokensDe(bruto);
+    return !!g.length && (contieneTramo(c, g) || contieneTramo(g, c));
+  });
+}
+function curadosPorDungeon(guiaDungeons, clasicos, forever) {
+  const mapa = /* @__PURE__ */ new Map();
+  const generados = [
+    ...Object.entries(clasicos || {}).map(([id, d]) => ({ mapa: Number(id), n: d.n })),
+    ...Object.entries(forever || {}).map(([id, d]) => ({ mapa: Number(id), n: d.n }))
+  ];
+  (guiaDungeons || []).forEach((d, indice) => {
+    for (const g of generados) {
+      if (nombreDungeonCoincide(d && d.n, g.n)) {
+        if (!mapa.has(g.mapa)) mapa.set(g.mapa, []);
+        mapa.get(g.mapa).push({ d, indice });
+        break;
+      }
+    }
+  });
+  return mapa;
+}
+function leerBuild(texto) {
+  try {
+    const v = texto ? JSON.parse(texto) : null;
+    return v && typeof v === "object" && !Array.isArray(v) ? v : {};
+  } catch {
+    return {};
+  }
+}
+function listaBuild(build, clave) {
+  const v = build && build[clave];
+  return Array.isArray(v) ? v.filter((x) => typeof x === "string") : [];
+}
+async function buildActual(almacen) {
+  const e = await almacen.read();
+  return leerBuild(e && e.build);
+}
+async function buildCambios(almacen, cambios) {
+  const viejo = await buildActual(almacen);
+  await almacen.build(JSON.stringify({ ...viejo, ...cambios }));
+}
+function alternarEnLista(lista, id, puesto) {
+  const s = new Set(lista);
+  if (puesto) s.add(id);
+  else s.delete(id);
+  return [...s];
+}
+
+// src/vistas/ruta/curada.jsx
+import { Checkbox as Checkbox2, SegmentedControl } from "@hermes/plugin-sdk";
+import { Fragment as Fragment5, jsx as jsx4, jsxs as jsxs4 } from "react/jsx-runtime";
+agregarTextos({
+  "ruta.curada": "Ruta curada",
+  "ruta.curadaSub": "Bandas escritas a mano en la guía de tu clase. Tilda los pasos que ya hiciste: se guardan solos.",
+  "ruta.nivel": "Nv {min}–{max}",
+  "ruta.aqui": "estás acá",
+  "ruta.pasos": "pasos",
+  "ruta.dungeons": "Dungeons",
+  "ruta.locK": "Kalimdor",
+  "ruta.locE": "Reinos del Este"
+}, {
+  "ruta.curada": "Curated route",
+  "ruta.curadaSub": "Bands written by hand in your class guide. Tick the steps you already did: they save themselves.",
+  "ruta.nivel": "Lv {min}–{max}",
+  "ruta.aqui": "you are here",
+  "ruta.pasos": "steps",
+  "ruta.dungeons": "Dungeons",
+  "ruta.locK": "Kalimdor",
+  "ruta.locE": "Eastern Kingdoms"
+});
+var estiloDetails = {
+  border: `1px solid ${C.borde}`,
+  borderRadius: 4,
+  background: C.fondo3
+};
+var estiloSummary = {
+  cursor: "pointer",
+  padding: "6px 8px",
+  display: "flex",
+  gap: 8,
+  alignItems: "baseline",
+  flexWrap: "wrap",
+  fontSize: 12
+};
+function CuradaRuta({ datos, build, pasos, onPaso, onGuardar, perfil, lang }) {
+  const routes = datos.routes || {};
+  const claves = Object.keys(routes);
+  const realm = claves.includes(build.realm) ? build.realm : claves[0];
+  const bandas = [...routes[realm]].sort((a, b) => (a.min ?? 0) - (b.min ?? 0));
+  const hitos = datos.milestones || [];
+  const nivel = perfil.nivel;
+  let idxActual = bandas.findIndex((b) => nivel >= b.min && nivel <= b.max);
+  if (idxActual < 0) {
+    for (let i = bandas.length - 1; i >= 0; i--) if (bandas[i].min <= nivel) {
+      idxActual = i;
+      break;
+    }
+  }
+  if (idxActual < 0) idxActual = 0;
+  const total = hitos.length;
+  const hechos = hitos.filter((m, i) => pasos.has(m.lvl + "|" + i)).length;
+  const pct2 = total ? Math.round(hechos / total * 1e3) / 10 : 0;
+  const locLabel = (c) => c === "K" ? t(lang, "ruta.locK") : c === "E" ? t(lang, "ruta.locE") : c;
+  return /* @__PURE__ */ jsxs4(
+    Tarjeta,
+    {
+      titulo: t(lang, "ruta.curada"),
+      extra: /* @__PURE__ */ jsxs4(Fragment5, { children: [
+        /* @__PURE__ */ jsx4(
+          SegmentedControl,
+          {
+            value: realm,
+            onChange: (v) => onGuardar({ realm: v }),
+            options: claves.map((k) => ({ id: k, label: k === "ek" ? t(lang, "ruta.ek") : k === "kalimdor" ? t(lang, "ruta.kalimdor") : k }))
+          }
+        ),
+        /* @__PURE__ */ jsx4(Origen, { f: "curado", lang })
+      ] }),
+      children: [
+        /* @__PURE__ */ jsx4("div", { style: S.sub, children: t(lang, "ruta.curadaSub") }),
+        /* @__PURE__ */ jsxs4("div", { style: { display: "flex", alignItems: "center", gap: 8 }, children: [
+          /* @__PURE__ */ jsx4("div", { style: { flex: 1, height: 6, borderRadius: 3, background: C.fondo3, overflow: "hidden" }, children: /* @__PURE__ */ jsx4("div", { style: { width: pct2 + "%", height: "100%", background: C.acento } }) }),
+          /* @__PURE__ */ jsxs4("span", { style: S.sub, children: [
+            hechos,
+            "/",
+            total,
+            " ",
+            t(lang, "ruta.pasos")
+          ] })
+        ] }),
+        bandas.map((b, bi) => {
+          const ms = hitos.map((m, i) => ({ m, i })).filter((x) => x.m.lvl >= b.min && x.m.lvl <= b.max);
+          if (!ms.length) return null;
+          const actual = nivel >= b.min && nivel <= b.max;
+          const dn = ms.filter((x) => pasos.has(x.m.lvl + "|" + x.i)).length;
+          return /* @__PURE__ */ jsxs4("details", { open: bi === idxActual, style: estiloDetails, "data-banda": bi, children: [
+            /* @__PURE__ */ jsxs4("summary", { style: estiloSummary, children: [
+              /* @__PURE__ */ jsx4("span", { style: { fontWeight: 600 }, children: t(lang, "ruta.nivel", { min: b.min, max: b.max }) }),
+              actual ? /* @__PURE__ */ jsx4("span", { style: { ...S.chip, borderColor: C.verde, color: C.verde }, children: t(lang, "ruta.aqui") }) : null,
+              /* @__PURE__ */ jsx4("span", { style: { ...S.sub, flex: 1, minWidth: 0 }, children: b.zones }),
+              /* @__PURE__ */ jsxs4("span", { style: { ...S.sub, whiteSpace: "nowrap" }, children: [
+                dn,
+                "/",
+                ms.length
+              ] })
+            ] }),
+            /* @__PURE__ */ jsxs4("div", { style: { padding: "0 8px 8px", display: "flex", flexDirection: "column", gap: 4 }, children: [
+              b.notes ? /* @__PURE__ */ jsx4("div", { style: S.sub, children: b.notes }) : null,
+              b.dung ? /* @__PURE__ */ jsxs4("div", { style: S.sub, children: [
+                /* @__PURE__ */ jsxs4("b", { style: { color: C.naranja }, children: [
+                  t(lang, "ruta.dungeons"),
+                  ":"
+                ] }),
+                " ",
+                b.dung
+              ] }) : null,
+              ms.map(({ m, i }) => {
+                const id = m.lvl + "|" + i;
+                const hecho = pasos.has(id);
+                return /* @__PURE__ */ jsxs4("label", { "data-paso": id, style: { display: "flex", gap: 8, alignItems: "baseline", fontSize: 12, opacity: hecho ? 0.65 : 1 }, children: [
+                  /* @__PURE__ */ jsx4(Checkbox2, { checked: hecho, onCheckedChange: (v) => onPaso(id, v) }),
+                  /* @__PURE__ */ jsx4("span", { style: { minWidth: 28, color: C.texto3 }, children: m.lvl }),
+                  /* @__PURE__ */ jsx4("span", { style: S.chip, children: m.cat }),
+                  m.loc ? /* @__PURE__ */ jsx4("span", { style: S.chip, children: locLabel(m.loc) }) : null,
+                  /* @__PURE__ */ jsx4("span", { style: { flex: 1 }, children: m.txt })
+                ] }, id);
+              })
+            ] })
+          ] }, bi);
+        })
+      ]
+    }
+  );
+}
+
+// src/vistas/ruta.jsx
+import { Fragment as Fragment6, jsx as jsx5, jsxs as jsxs5 } from "react/jsx-runtime";
+agregarTextos({
+  "ruta.zonas": "Zonas a tu nivel",
+  "ruta.zonasSub": "Zonas de tu facción (o disputadas) cuyo rango de niveles te incluye, ordenadas por nivel. El número es cuántas misiones de tu facción hay en cada una.",
+  "ruta.niveles": "Nv {min}–{max}",
+  "ruta.misionesDe": "{n} misiones",
+  "ruta.ambos": "Ambos bandos",
+  "ruta.kalimdor": "Kalimdor",
+  "ruta.ek": "Reinos del Este",
+  "ruta.inicio": "Zona inicial de tu raza",
+  "ruta.sinInicio": "Los datos no tienen zona de inicio para tu raza (hueco declarado en personaje.json).",
+  "ruta.sinNiveles": "Zonas sin rango de niveles en los datos (las nuevas de Forever y Moonglade):",
+  "ruta.sinZonas": "Ninguna zona con niveles de tu facción rodea tu nivel.",
+  "ruta.misiones": "Misiones de tu banda",
+  "ruta.sinMisiones": "No hay misiones de tu facción en esta banda.",
+  "ruta.otras": "Otras misiones"
+}, {
+  "ruta.zonas": "Zones at your level",
+  "ruta.zonasSub": "Zones of your faction (or contested) whose level range includes you, sorted by level. The number is how many of your faction’s quests each has.",
+  "ruta.niveles": "Lv {min}–{max}",
+  "ruta.misionesDe": "{n} quests",
+  "ruta.ambos": "Both factions",
+  "ruta.kalimdor": "Kalimdor",
+  "ruta.ek": "Eastern Kingdoms",
+  "ruta.inicio": "Your race’s starting zone",
+  "ruta.sinInicio": "The data has no starting zone for your race (declared gap in personaje.json).",
+  "ruta.sinNiveles": "Zones with no level range in the data (the new Forever ones and Moonglade):",
+  "ruta.sinZonas": "No zone with your faction’s level ranges surrounds your level.",
+  "ruta.misiones": "Quests in your band",
+  "ruta.sinMisiones": "No quests of your faction in this band.",
+  "ruta.otras": "Other quests"
+});
+var nombreDeZona = (id, lang) => {
+  const z = zona(id);
+  return z ? nombre(z.n, lang) || "#" + id : "#" + id;
+};
+var nombreDeDungeon = (id, lang) => {
+  const d = D.dungeons.clasicos[String(id)] || D.dungeons.forever[String(id)];
+  return d ? nombre(d.n, lang) || "#" + id : "#" + id;
+};
+var continenteDe = (c, lang) => c === "kalimdor" ? t(lang, "ruta.kalimdor") : c === "ek" ? t(lang, "ruta.ek") : null;
+function porTitulo(items, lang) {
+  const grupos = /* @__PURE__ */ new Map();
+  for (const [id, m] of items) {
+    const k = nombre(m.t, lang);
+    const g = grupos.get(k);
+    if (g) {
+      g.ids.push(id);
+      g.min = Math.min(g.min, m.nivel);
+      g.max = Math.max(g.max, m.nivel);
+    } else grupos.set(k, { id, m, ids: [id], min: m.nivel, max: m.nivel });
+  }
+  return [...grupos.values()].map((g) => ({ ...g, niveles: g.min === g.max ? String(g.min) : g.min + "–" + g.max }));
+}
+function VistaRuta({ almacen, estado, recargar, perfil, lang }) {
+  const [aviso, setAviso] = useState3("");
+  const build = useMemo(() => leerBuild(estado && estado.build), [estado && estado.build]);
+  const nivel = perfil.nivel;
+  const banda = bandaActual(nivel);
+  const listaZonas = useMemo(() => zonasDeNivel(D.zonas, perfil.faccion, nivel), [perfil.faccion, nivel]);
+  const sinNiveles = useMemo(() => zonasSinNiveles(D.zonas), []);
+  const grupos = useMemo(() => misionesDeBanda(D.misiones.misiones, perfil, D.dungeons), [perfil]);
+  const inicio = inicioDeRaza(D.personaje, perfil.raza);
+  const { datos } = guiaCurada(perfil) || {};
+  const pasos = useMemo(() => new Set(listaBuild(build, "steps")), [build]);
+  const guardar = async (cambios) => {
+    try {
+      await buildCambios(almacen, cambios);
+      setAviso("");
+      recargar();
+    } catch (e) {
+      setAviso(e && e.message ? e.message : String(e));
+    }
+  };
+  const alternarPaso = (id, puesto) => guardar({ steps: alternarEnLista(listaBuild(build, "steps"), id, puesto) });
+  const tituloGrupo = (g) => g.tipo === "zona" ? nombreDeZona(g.id, lang) : g.tipo === "dungeon" ? nombreDeDungeon(g.id, lang) : t(lang, "ruta.otras");
+  return /* @__PURE__ */ jsxs5(Fragment6, { children: [
+    aviso ? /* @__PURE__ */ jsx5(Aviso, { children: aviso }) : null,
+    /* @__PURE__ */ jsxs5(
+      Tarjeta,
+      {
+        titulo: t(lang, "ruta.zonas"),
+        estilo: { gap: 4 },
+        extra: /* @__PURE__ */ jsx5(Origen, { f: ["cliente-forever", "curado", "cmangos-1.12"], lang }),
+        children: [
+          /* @__PURE__ */ jsx5("div", { style: S.sub, children: t(lang, "ruta.zonasSub") }),
+          inicio ? nivel <= 10 ? /* @__PURE__ */ jsxs5("div", { style: S.fila, "data-inicio": inicio.zona, children: [
+            /* @__PURE__ */ jsx5("span", { style: { flex: 1 }, children: t(lang, "ruta.inicio") }),
+            /* @__PURE__ */ jsx5("span", { children: nombreDeZona(inicio.zona, lang) })
+          ] }) : null : /* @__PURE__ */ jsx5(Hueco, { lang, children: t(lang, "ruta.sinInicio") }),
+          listaZonas.length ? listaZonas.map((z) => {
+            const cont = continenteDe(z.continente, lang);
+            return /* @__PURE__ */ jsxs5("div", { "data-zona": z.id, style: S.fila, children: [
+              /* @__PURE__ */ jsx5("span", { style: { flex: 1, minWidth: 0 }, children: nombre(z.n, lang) }),
+              /* @__PURE__ */ jsx5("span", { style: { ...S.sub, whiteSpace: "nowrap" }, children: t(lang, "ruta.niveles", { min: z.niveles.min, max: z.niveles.max }) }),
+              /* @__PURE__ */ jsx5("span", { style: { ...S.sub, whiteSpace: "nowrap" }, children: z.misiones != null ? t(lang, "ruta.misionesDe", { n: z.misiones }) : "—" }),
+              cont ? /* @__PURE__ */ jsx5("span", { style: S.chip, children: cont }) : null,
+              z.faccion === "disputada" ? /* @__PURE__ */ jsx5("span", { style: S.chip, children: t(lang, "ruta.ambos") }) : null
+            ] }, z.id);
+          }) : /* @__PURE__ */ jsx5("div", { style: S.sub, children: t(lang, "ruta.sinZonas") }),
+          sinNiveles.length ? /* @__PURE__ */ jsxs5(Hueco, { lang, children: [
+            t(lang, "ruta.sinNiveles"),
+            " ",
+            sinNiveles.map((z) => nombre(z.n, lang)).filter(Boolean).join(", ")
+          ] }) : null
+        ]
+      }
+    ),
+    /* @__PURE__ */ jsx5(
+      Tarjeta,
+      {
+        titulo: t(lang, "ruta.misiones") + " · " + t(lang, "ruta.niveles", { min: banda.min, max: banda.max }),
+        extra: /* @__PURE__ */ jsx5(Origen, { f: "cmangos-1.12", lang }),
+        children: grupos.length ? grupos.map((g) => /* @__PURE__ */ jsxs5("div", { "data-grupo": g.tipo + ":" + (g.id ?? ""), children: [
+          /* @__PURE__ */ jsxs5("div", { style: { ...S.etiqueta, marginTop: 6 }, children: [
+            tituloGrupo(g),
+            " · ",
+            g.items.length
+          ] }),
+          porTitulo(g.items, lang).map(({ id, m, ids, niveles }) => /* @__PURE__ */ jsxs5("div", { "data-mision": id, "data-misiones": ids.join(","), style: { ...S.fila, borderBottom: "none", padding: "2px 0" }, children: [
+            /* @__PURE__ */ jsx5("span", { style: { minWidth: 34, color: C.texto3 }, children: niveles }),
+            /* @__PURE__ */ jsxs5("span", { style: { flex: 1 }, children: [
+              nombre(m.t, lang),
+              ids.length > 1 ? /* @__PURE__ */ jsxs5("span", { style: { color: C.texto3 }, children: [
+                " ×",
+                ids.length
+              ] }) : null
+            ] })
+          ] }, id))
+        ] }, g.tipo + ":" + (g.id ?? ""))) : /* @__PURE__ */ jsx5("div", { style: S.sub, children: t(lang, "ruta.sinMisiones") })
+      }
+    ),
+    datos && datos.routes ? /* @__PURE__ */ jsx5(CuradaRuta, { datos, build, pasos, onPaso: alternarPaso, onGuardar: guardar, perfil, lang }) : null
+  ] });
 }
 
 // src/vistas/profesiones.jsx
-import { jsx as jsx5 } from "react/jsx-runtime";
-function VistaProfesiones({ lang }) {
-  return /* @__PURE__ */ jsx5(Tarjeta, { titulo: t(lang, "tab.profesiones"), children: /* @__PURE__ */ jsx5("p", { children: t(lang, "pendiente") }) });
+import { useMemo as useMemo5, useState as useState5 } from "react";
+import { Input as Input2, Select as Select2, SelectContent as SelectContent2, SelectItem as SelectItem2, SelectTrigger as SelectTrigger2, SelectValue as SelectValue2 } from "@hermes/plugin-sdk";
+
+// ../src/crafteo.js
+function tablaItems(items) {
+  if (!items || typeof items !== "object") return {};
+  return items.items && typeof items.items === "object" ? items.items : items;
+}
+function filaItem(items, itemId) {
+  const t2 = tablaItems(items);
+  const f = t2[itemId] ?? t2[String(itemId)];
+  return Array.isArray(f) ? f : null;
+}
+var num = (v) => typeof v === "number" && Number.isFinite(v) ? v : null;
+function precioDe(precios, itemId) {
+  if (!precios) return null;
+  const v = precios instanceof Map ? precios.get(itemId) : precios[itemId] ?? precios[String(itemId)];
+  return Number.isFinite(v) && v > 0 ? v : null;
+}
+function dificultad(rango, skill) {
+  const s = Number(skill);
+  if (!rango || typeof rango !== "object" || !Number.isFinite(s)) return "desconocida";
+  const aprende = num(rango.aprende);
+  if (aprende !== null && s < aprende) return "no";
+  const amarillo = num(rango.amarillo), verde = num(rango.verde), gris = num(rango.gris);
+  if (amarillo === null || verde === null || gris === null) return "desconocida";
+  if (s < amarillo) return "naranja";
+  if (s < verde) return "amarillo";
+  if (s < gris) return "verde";
+  return "gris";
+}
+function probSubida(rango, skill) {
+  const d = dificultad(rango, skill);
+  if (d === "naranja") return 1;
+  if (d === "gris" || d === "no") return 0;
+  if (d === "desconocida") return null;
+  const amarillo = num(rango.amarillo), gris = num(rango.gris);
+  if (amarillo === null || gris === null || gris <= amarillo) return null;
+  return Math.min(1, Math.max(0, (gris - Number(skill)) / (gris - amarillo)));
+}
+function preciosDelMercado(market, reino) {
+  const precios = /* @__PURE__ */ new Map();
+  const realms = market && market.snapshot && Array.isArray(market.snapshot.realms) ? market.snapshot.realms : [];
+  if (!realms.length) return precios;
+  const buscar = (nombre2) => {
+    if (nombre2 === null || nombre2 === void 0 || nombre2 === "") return null;
+    const n = String(nombre2).trim().toLowerCase();
+    return realms.find((r) => r && typeof r.name === "string" && r.name.trim().toLowerCase() === n) || null;
+  };
+  const realm = reino !== null && reino !== void 0 && buscar(reino) || market.realm !== null && market.realm !== void 0 && buscar(market.realm) || realms[0];
+  const items = realm && Array.isArray(realm.items) ? realm.items : [];
+  for (const it of items) {
+    const id = it && it.itemId, precio = it && it.unitPriceCopper;
+    if (Number.isSafeInteger(id) && id > 0 && Number.isFinite(precio) && precio > 0 && !precios.has(id)) {
+      precios.set(id, precio);
+    }
+  }
+  return precios;
+}
+function costoUnidad(itemId, precios, items) {
+  const f = filaItem(items, itemId);
+  if (f && f[10] === 1 && Number.isFinite(f[9]) && f[9] > 0) return { cobre: f[9], fuente: "vendedor" };
+  const p = precioDe(precios, itemId);
+  if (p !== null) return { cobre: p, fuente: "subasta" };
+  return { cobre: null, fuente: null };
+}
+function costoReceta(receta, precios, items) {
+  const partes = (receta && Array.isArray(receta.reactivos) ? receta.reactivos : []).map((par) => {
+    const item2 = Array.isArray(par) ? par[0] : par;
+    const cant = Array.isArray(par) && Number.isFinite(par[1]) && par[1] > 0 ? par[1] : 1;
+    const u = costoUnidad(item2, precios, items);
+    return { item: item2, cant, cobre: u.cobre, fuente: u.fuente };
+  });
+  const faltan = partes.filter((p) => p.cobre === null).map((p) => p.item);
+  const total = faltan.length ? null : partes.reduce((a, p) => a + p.cobre * p.cant, 0);
+  return { total, partes, faltan };
+}
+function valorCreado(receta, precios, items) {
+  if (!receta || receta.crea == null) return null;
+  const par = receta.crea;
+  const itemId = Array.isArray(par) ? par[0] : par;
+  const cant = Array.isArray(par) && Number.isFinite(par[1]) && par[1] > 0 ? par[1] : 1;
+  const sub = precioDe(precios, itemId);
+  if (sub !== null) return sub * cant;
+  const f = filaItem(items, itemId);
+  if (f && Number.isFinite(f[5])) return f[5] * cant;
+  return null;
+}
+function margen(receta, precios, items) {
+  const v = valorCreado(receta, precios, items);
+  const c = costoReceta(receta, precios, items).total;
+  return v === null || c === null ? null : v - c;
+}
+var MAX_PUNTOS = 1e3;
+function compararCandidatas(a, b, conPrecio) {
+  if (conPrecio) {
+    const sa = a.costo.total === null ? Infinity : a.costo.total / a.p;
+    const sb = b.costo.total === null ? Infinity : b.costo.total / b.p;
+    if (sa !== sb) return sa - sb;
+  } else {
+    const na = a.d === "naranja" ? 0 : 1, nb = b.d === "naranja" ? 0 : 1;
+    if (na !== nb) return na - nb;
+  }
+  if (a.nReact !== b.nReact) return a.nReact - b.nReact;
+  if (!conPrecio && a.p !== b.p) return b.p - a.p;
+  return a.r.spell - b.r.spell;
+}
+function planDeSubida(recetas, desde, hasta, precios, items) {
+  if (!Array.isArray(recetas)) return [];
+  const d0 = Math.floor(Number(desde)), h = Math.ceil(Number(hasta));
+  if (!Number.isFinite(d0) || !Number.isFinite(h) || h <= d0) return [];
+  const conPrecio = precios instanceof Map ? precios.size > 0 : !!precios && typeof precios === "object" && Object.keys(precios).length > 0;
+  const infos = recetas.filter((r) => r && typeof r === "object" && Number.isFinite(r.spell)).map((r) => ({
+    r,
+    costo: costoReceta(r, precios, items),
+    nReact: Array.isArray(r.reactivos) ? r.reactivos.length : 0
+  }));
+  const elegir = (s) => {
+    let mejor = null;
+    for (const info of infos) {
+      const d = dificultad(info.r.rango, s);
+      if (d !== "naranja" && d !== "amarillo") continue;
+      const p = probSubida(info.r.rango, s);
+      if (!(p > 0)) continue;
+      const candidata = { ...info, d, p };
+      if (!mejor || compararCandidatas(candidata, mejor, conPrecio) < 0) mejor = candidata;
+    }
+    return mejor;
+  };
+  const pasos = [];
+  const fin = Math.min(h, d0 + MAX_PUNTOS);
+  for (let s = d0; s < fin; ) {
+    const primero = elegir(s);
+    const spell = primero ? primero.r.spell : null;
+    const total = primero ? primero.costo.total : null;
+    let j = s + 1, crafteos = primero ? 1 / primero.p : 0;
+    while (j < fin) {
+      const e = elegir(j);
+      const sp = e ? e.r.spell : null;
+      if (sp !== spell) break;
+      if (e) crafteos += 1 / e.p;
+      j++;
+    }
+    pasos.push({
+      desde: s,
+      hasta: j,
+      spell,
+      crafteos: Math.round(crafteos),
+      costo: total === null ? null : Math.round(total * crafteos)
+    });
+    s = j;
+  }
+  return pasos;
+}
+
+// src/vistas/profesiones/tabla.jsx
+import { useEffect, useMemo as useMemo2, useState as useState4 } from "react";
+import { SearchField, SegmentedControl as SegmentedControl2 } from "@hermes/plugin-sdk";
+import { Fragment as Fragment7, jsx as jsx6, jsxs as jsxs6 } from "react/jsx-runtime";
+agregarTextos({
+  "prof.recetas": "Recetas",
+  "prof.filtro.ahora": "Aprendibles ahora",
+  "prof.filtro.todas": "Todas",
+  "prof.filtro.forever": "Nuevas de Forever",
+  "prof.buscar": "Buscar receta o ítem…",
+  "prof.col.dificultad": "Dificultad",
+  "prof.col.crea": "Crea",
+  "prof.col.reactivos": "Reactivos",
+  "prof.col.como": "Se aprende",
+  "prof.col.costo": "Costo",
+  "prof.col.valor": "Valor",
+  "prof.col.margen": "Margen",
+  "prof.diff.no": "no",
+  "prof.diff.naranja": "naranja",
+  "prof.diff.amarillo": "amarillo",
+  "prof.diff.verde": "verde",
+  "prof.diff.gris": "gris",
+  "prof.diff.desconocida": "?",
+  "prof.como.entrenador": "Entrenador",
+  "prof.como.automatica": "Automática",
+  "prof.como.desconocido": "Desconocido",
+  "prof.como.receta": "Objeto receta",
+  "prof.recetaItem": "se aprende con",
+  "prof.encantamiento": "encantamiento",
+  "prof.recetas.vacio": "Ninguna receta coincide con estos filtros."
+}, {
+  "prof.recetas": "Recipes",
+  "prof.filtro.ahora": "Learnable now",
+  "prof.filtro.todas": "All",
+  "prof.filtro.forever": "New in Forever",
+  "prof.buscar": "Search recipe or item…",
+  "prof.col.dificultad": "Difficulty",
+  "prof.col.crea": "Creates",
+  "prof.col.reactivos": "Reagents",
+  "prof.col.como": "Learned from",
+  "prof.col.costo": "Cost",
+  "prof.col.valor": "Value",
+  "prof.col.margen": "Margin",
+  "prof.diff.no": "no",
+  "prof.diff.naranja": "orange",
+  "prof.diff.amarillo": "yellow",
+  "prof.diff.verde": "green",
+  "prof.diff.gris": "gray",
+  "prof.diff.desconocida": "?",
+  "prof.como.entrenador": "Trainer",
+  "prof.como.automatica": "Automatic",
+  "prof.como.desconocido": "Unknown",
+  "prof.como.receta": "Recipe item",
+  "prof.recetaItem": "learned from",
+  "prof.encantamiento": "enchant",
+  "prof.recetas.vacio": "No recipe matches these filters."
+});
+var APRENDIBLES = /* @__PURE__ */ new Set(["naranja", "amarillo", "verde", "gris"]);
+function DineroSigno({ cobre }) {
+  if (cobre == null || !Number.isFinite(cobre)) return /* @__PURE__ */ jsx6(Dinero, { cobre: null });
+  return /* @__PURE__ */ jsx6("span", { style: { fontVariantNumeric: "tabular-nums" }, children: cobre < 0 ? "-" + dinero(-cobre) : dinero(cobre) });
+}
+var num2 = (v) => Number.isFinite(v) ? v : null;
+var nivelDe = (r) => num2(r.rango?.aprende) ?? num2(r.rango?.amarillo) ?? num2(r.rango?.verde) ?? num2(r.rango?.gris) ?? 9999;
+function textoDe(r, items) {
+  const partes = [r.n?.es, r.n?.en];
+  if (r.crea) {
+    const it = items[String(r.crea[0])];
+    if (it) partes.push(it[0], it[1]);
+  }
+  for (const [i] of r.reactivos || []) {
+    const it = items[String(i)];
+    if (it) partes.push(it[0], it[1]);
+  }
+  return partes.filter(Boolean).join(" ").toLowerCase();
+}
+function ComoAprende({ r, faccion, lang }) {
+  if (r.como === "entrenador") return /* @__PURE__ */ jsx6("span", { children: t(lang, "prof.como.entrenador") });
+  if (r.como === "automatica") return /* @__PURE__ */ jsx6("span", { children: t(lang, "prof.como.automatica") });
+  if (r.como === "desconocido") return /* @__PURE__ */ jsx6("span", { style: { color: C.texto3 }, children: t(lang, "prof.como.desconocido") });
+  const vendedores = r.vendedores?.[faccion] || [];
+  return /* @__PURE__ */ jsxs6("span", { children: [
+    t(lang, "prof.como.receta"),
+    r.receta_item != null ? /* @__PURE__ */ jsxs6(Fragment7, { children: [
+      " · ",
+      /* @__PURE__ */ jsx6(NombreItem, { id: r.receta_item, lang })
+    ] }) : null,
+    vendedores.length ? /* @__PURE__ */ jsxs6("span", { style: { color: C.texto3 }, children: [
+      " · ",
+      vendedores.map((v) => nombre(v.n, lang)).join(", ")
+    ] }) : null
+  ] });
+}
+function TablaRecetas({ prof, skill, precios, items, faccion, lang, sel, onSel }) {
+  const [filtro, setFiltro] = useState4("ahora");
+  const [q, setQ] = useState4("");
+  const conteos = useMemo2(() => ({
+    ahora: prof.recetas.filter((r) => APRENDIBLES.has(dificultad(r.rango, skill))).length,
+    todas: prof.recetas.length,
+    forever: prof.recetas.filter((r) => r.f === "cliente-forever").length
+  }), [prof, skill]);
+  const filas = useMemo2(() => {
+    const buscado = q.trim().toLowerCase();
+    let rs = prof.recetas.filter((r) => {
+      if (filtro === "ahora" && !APRENDIBLES.has(dificultad(r.rango, skill))) return false;
+      if (filtro === "forever" && r.f !== "cliente-forever") return false;
+      return !buscado || textoDe(r, items).includes(buscado);
+    });
+    return [...rs].sort((a, b) => nivelDe(a) - nivelDe(b) || a.spell - b.spell);
+  }, [prof, skill, filtro, q, items]);
+  useEffect(() => {
+    if (sel == null && filas.length) onSel(filas[0].spell);
+  }, [filas, sel, onSel]);
+  const info = useMemo2(() => {
+    const m = /* @__PURE__ */ new Map();
+    for (const r of filas) {
+      const d = dificultad(r.rango, skill);
+      m.set(r.spell, {
+        d,
+        costo: costoReceta(r, precios, items).total,
+        valor: valorCreado(r, precios, items),
+        margen: margen(r, precios, items)
+      });
+    }
+    return m;
+  }, [filas, skill, precios, items]);
+  return /* @__PURE__ */ jsxs6(
+    Tarjeta,
+    {
+      titulo: t(lang, "prof.recetas") + " · " + prof.recetas.length,
+      extra: /* @__PURE__ */ jsx6(Origen, { f: prof.f || "cmangos-1.12", lang }),
+      children: [
+        /* @__PURE__ */ jsxs6("div", { style: { display: "flex", flexWrap: "wrap", gap: 12, alignItems: "center" }, children: [
+          /* @__PURE__ */ jsx6(SegmentedControl2, { value: filtro, onChange: setFiltro, options: [
+            { id: "ahora", label: `${t(lang, "prof.filtro.ahora")} (${conteos.ahora})` },
+            { id: "todas", label: `${t(lang, "prof.filtro.todas")} (${conteos.todas})` },
+            { id: "forever", label: `${t(lang, "prof.filtro.forever")} (${conteos.forever})` }
+          ] }),
+          /* @__PURE__ */ jsx6(SearchField, { placeholder: t(lang, "prof.buscar"), value: q, onChange: setQ })
+        ] }),
+        filas.length ? /* @__PURE__ */ jsx6("div", { style: { overflowX: "auto" }, children: /* @__PURE__ */ jsxs6("table", { style: S.tabla, children: [
+          /* @__PURE__ */ jsx6("thead", { children: /* @__PURE__ */ jsxs6("tr", { children: [
+            /* @__PURE__ */ jsx6("th", { style: S.th, children: t(lang, "prof.col.dificultad") }),
+            /* @__PURE__ */ jsx6("th", { style: S.th, children: t(lang, "prof.col.crea") }),
+            /* @__PURE__ */ jsx6("th", { style: S.th, children: t(lang, "prof.col.reactivos") }),
+            /* @__PURE__ */ jsx6("th", { style: S.th, children: t(lang, "prof.col.como") }),
+            /* @__PURE__ */ jsx6("th", { style: S.th, children: t(lang, "prof.col.costo") }),
+            /* @__PURE__ */ jsx6("th", { style: S.th, children: t(lang, "prof.col.valor") }),
+            /* @__PURE__ */ jsx6("th", { style: S.th, children: t(lang, "prof.col.margen") }),
+            /* @__PURE__ */ jsx6("th", { style: S.th })
+          ] }) }),
+          /* @__PURE__ */ jsx6("tbody", { children: filas.map((r) => {
+            const i = info.get(r.spell);
+            const activa = sel === r.spell;
+            return /* @__PURE__ */ jsxs6(
+              "tr",
+              {
+                onClick: () => onSel(r.spell),
+                style: { cursor: "pointer", background: activa ? C.fondo3 : void 0 },
+                children: [
+                  /* @__PURE__ */ jsx6("td", { style: { ...S.td, color: DIFICULTAD[i.d] || C.texto3, whiteSpace: "nowrap" }, children: t(lang, "prof.diff." + i.d) }),
+                  /* @__PURE__ */ jsx6("td", { style: S.td, children: r.crea ? /* @__PURE__ */ jsx6(Fragment7, { children: /* @__PURE__ */ jsx6(NombreItem, { id: r.crea[0], lang, cantidad: r.crea[1] }) }) : /* @__PURE__ */ jsxs6(Fragment7, { children: [
+                    nombre(r.n, lang),
+                    " ",
+                    /* @__PURE__ */ jsxs6("span", { style: { color: C.texto3 }, children: [
+                      "· ",
+                      t(lang, "prof.encantamiento")
+                    ] })
+                  ] }) }),
+                  /* @__PURE__ */ jsx6("td", { style: { ...S.td, fontSize: 11, color: C.texto2 }, children: (r.reactivos || []).map(([it, cant]) => /* @__PURE__ */ jsx6("div", { children: /* @__PURE__ */ jsx6(NombreItem, { id: it, lang, cantidad: cant }) }, it)) }),
+                  /* @__PURE__ */ jsx6("td", { style: { ...S.td, fontSize: 11 }, children: /* @__PURE__ */ jsx6(ComoAprende, { r, faccion, lang }) }),
+                  /* @__PURE__ */ jsx6("td", { style: { ...S.td, whiteSpace: "nowrap" }, children: /* @__PURE__ */ jsx6(Dinero, { cobre: i.costo }) }),
+                  /* @__PURE__ */ jsx6("td", { style: { ...S.td, whiteSpace: "nowrap" }, children: /* @__PURE__ */ jsx6(Dinero, { cobre: i.valor }) }),
+                  /* @__PURE__ */ jsx6("td", { style: { ...S.td, whiteSpace: "nowrap", color: i.margen == null ? C.texto3 : i.margen >= 0 ? C.verde : C.rojo }, children: /* @__PURE__ */ jsx6(DineroSigno, { cobre: i.margen }) }),
+                  /* @__PURE__ */ jsx6("td", { style: { ...S.td, whiteSpace: "nowrap" }, children: /* @__PURE__ */ jsx6(Origen, { f: r.f, lang }) })
+                ]
+              },
+              r.spell
+            );
+          }) })
+        ] }) }) : /* @__PURE__ */ jsx6("div", { style: S.sub, children: t(lang, "prof.recetas.vacio") })
+      ]
+    }
+  );
+}
+
+// src/vistas/profesiones/plan.jsx
+import { useMemo as useMemo3 } from "react";
+import { Button as Button3 } from "@hermes/plugin-sdk";
+import { Fragment as Fragment8, jsx as jsx7, jsxs as jsxs7 } from "react/jsx-runtime";
+agregarTextos({
+  "prof.plan": "Plan de subida",
+  "prof.plan.estimacion": "Estimación: probabilidad de subida con la fórmula aproximada de Classic; el costo usa precios de vendedor y subasta. No garantiza nada en Forever.",
+  "prof.plan.sinPrecios": "Sin precios de mercado: el plan se ordena por seguridad de subida y no muestra costos.",
+  "prof.plan.importar": "Importar precios en Mercado",
+  "prof.plan.vacio": "No hay tramo que planificar con los datos actuales.",
+  "prof.plan.tope": "Tu skill ya alcanza el tope que enseñan los entrenadores ({hasta}).",
+  "prof.plan.total": "Total estimado",
+  "prof.plan.crafts": "{n} crafts",
+  "prof.plan.sinReceta": "sin receta en este tramo",
+  "prof.plan.obtenibles": "Solo recetas de entrenador, automáticas y objetos receta que vende un vendedor de tu facción."
+}, {
+  "prof.plan": "Leveling plan",
+  "prof.plan.estimacion": "Estimate: skill-up chance uses the approximate Classic formula; cost uses vendor and auction prices. Not guaranteed on Forever.",
+  "prof.plan.sinPrecios": "No market prices: the plan is ordered by skill-up safety and shows no costs.",
+  "prof.plan.importar": "Import prices in Market",
+  "prof.plan.vacio": "No range to plan with the current data.",
+  "prof.plan.tope": "Your skill already reaches the cap the trainers teach ({hasta}).",
+  "prof.plan.total": "Estimated total",
+  "prof.plan.crafts": "{n} crafts",
+  "prof.plan.sinReceta": "no recipe in this range",
+  "prof.plan.obtenibles": "Only trainer recipes, automatic ones and recipe items a vendor of your faction sells."
+});
+var num3 = (v) => Number.isFinite(v) ? v : 0;
+function PlanSubida({ prof, skill, trainers, precios, items, lang, irA, faccion }) {
+  const hasta = useMemo3(() => {
+    const deTrainers = trainers.length ? Math.max(...trainers.map((e) => num3(e.max))) : 0;
+    if (deTrainers > 0) return Math.min(300, deTrainers);
+    const gris = Math.max(0, ...prof.recetas.map((r) => num3(r.rango?.gris)));
+    return Math.min(300, gris);
+  }, [trainers, prof]);
+  const obtenibles = useMemo3(() => prof.recetas.filter((r) => r.como === "entrenador" || r.como === "automatica" || r.como === "receta" && (r.vendedores && r.vendedores[faccion] || []).length > 0), [prof, faccion]);
+  const plan = useMemo3(
+    () => skill < hasta ? planDeSubida(obtenibles, skill, hasta, precios, items) : [],
+    [obtenibles, skill, hasta, precios, items]
+  );
+  const porSpell = useMemo3(() => new Map(prof.recetas.map((r) => [r.spell, r])), [prof]);
+  const hayPrecios = precios instanceof Map ? precios.size > 0 : false;
+  const totalCrafts = plan.reduce((a, p) => a + p.crafteos, 0);
+  const costos = plan.map((p) => p.costo);
+  const totalCosto = costos.every((c) => c !== null) && costos.length ? costos.reduce((a, c) => a + c, 0) : null;
+  const fuentes = useMemo3(() => [...new Set(prof.recetas.flatMap((r) => [].concat(r.f || [])))], [prof]);
+  return /* @__PURE__ */ jsxs7(
+    Tarjeta,
+    {
+      titulo: `${t(lang, "prof.plan")} · ${skill} → ${hasta}`,
+      extra: /* @__PURE__ */ jsx7(Origen, { f: fuentes.length ? fuentes : "cmangos-1.12", lang }),
+      children: [
+        /* @__PURE__ */ jsxs7("div", { style: S.sub, children: [
+          t(lang, "prof.plan.estimacion"),
+          " ",
+          t(lang, "prof.plan.obtenibles")
+        ] }),
+        !hayPrecios ? /* @__PURE__ */ jsxs7(Aviso, { children: [
+          t(lang, "prof.plan.sinPrecios"),
+          " ",
+          /* @__PURE__ */ jsx7(Button3, { variant: "outline", size: "xs", onClick: () => irA("mercado"), children: t(lang, "prof.plan.importar") })
+        ] }) : null,
+        skill >= hasta ? /* @__PURE__ */ jsx7("div", { style: S.sub, children: t(lang, "prof.plan.tope", { hasta }) }) : !plan.length ? /* @__PURE__ */ jsx7("div", { style: S.sub, children: t(lang, "prof.plan.vacio") }) : /* @__PURE__ */ jsxs7(Fragment8, { children: [
+          /* @__PURE__ */ jsx7("div", { style: { maxHeight: 320, overflowY: "auto" }, children: plan.map((p, i) => {
+            const r = p.spell != null ? porSpell.get(p.spell) : null;
+            return /* @__PURE__ */ jsxs7("div", { style: S.fila, children: [
+              /* @__PURE__ */ jsxs7("span", { style: { minWidth: 110, color: C.texto3, fontVariantNumeric: "tabular-nums" }, children: [
+                p.desde,
+                "–",
+                p.hasta - 1
+              ] }),
+              /* @__PURE__ */ jsx7("span", { style: { flex: 1 }, children: r ? nombre(r.n, lang) : /* @__PURE__ */ jsx7("span", { style: { color: C.texto3 }, children: t(lang, "prof.plan.sinReceta") }) }),
+              /* @__PURE__ */ jsx7("span", { style: S.sub, children: t(lang, "prof.plan.crafts", { n: p.crafteos }) }),
+              /* @__PURE__ */ jsx7("span", { style: { ...S.sub, fontVariantNumeric: "tabular-nums", minWidth: 80, textAlign: "right" }, children: p.costo === null ? "—" : /* @__PURE__ */ jsx7(Dinero, { cobre: p.costo }) })
+            ] }, i);
+          }) }),
+          /* @__PURE__ */ jsxs7("div", { style: { ...S.fila, borderBottom: "none", fontWeight: 600 }, children: [
+            /* @__PURE__ */ jsx7("span", { style: { flex: 1 }, children: t(lang, "prof.plan.total") }),
+            /* @__PURE__ */ jsx7("span", { style: S.sub, children: t(lang, "prof.plan.crafts", { n: totalCrafts }) }),
+            /* @__PURE__ */ jsx7("span", { style: { fontVariantNumeric: "tabular-nums", minWidth: 80, textAlign: "right" }, children: totalCosto === null ? "—" : /* @__PURE__ */ jsx7(Dinero, { cobre: totalCosto }) })
+          ] })
+        ] })
+      ]
+    }
+  );
+}
+
+// src/vistas/profesiones/fuentes.jsx
+import { useMemo as useMemo4 } from "react";
+import { jsx as jsx8, jsxs as jsxs8 } from "react/jsx-runtime";
+agregarTextos({
+  "prof.detalle": "De dónde sacar cada reactivo",
+  "prof.fuente.vendedor": "vendedor · {precio}",
+  "prof.fuente.subasta": "subasta ~{precio}",
+  "prof.fuente.mob": "{nombre} · {zona} · ~{prob}%",
+  "prof.fuente.objeto": "{nombre} ({tipo}) · {zona} · ~{prob}%",
+  "prof.fuente.otraFac": "otra facción",
+  "prof.fuente.nada": "sin fuentes en los datos",
+  "prof.fuente.tipomob": "mobs",
+  "prof.fuente.tipodesuello": "desuello",
+  "prof.fuente.tipohurtar": "hurtar",
+  "prof.fuente.tipoobjeto": "objeto"
+}, {
+  "prof.detalle": "Where to get each reagent",
+  "prof.fuente.vendedor": "vendor · {precio}",
+  "prof.fuente.subasta": "auction ~{precio}",
+  "prof.fuente.mob": "{nombre} · {zona} · ~{prob}%",
+  "prof.fuente.objeto": "{nombre} ({tipo}) · {zona} · ~{prob}%",
+  "prof.fuente.otraFac": "other faction",
+  "prof.fuente.nada": "no sources in the data",
+  "prof.fuente.tipomob": "mobs",
+  "prof.fuente.tipodesuello": "skinning",
+  "prof.fuente.tipohurtar": "pickpocket",
+  "prof.fuente.tipoobjeto": "object"
+});
+var TIPO_FUENTE = { m: "tipomob", s: "tipodesuello", p: "tipohurtar", o: "tipoobjeto" };
+var LADO = { alianza: "a", horda: "h" };
+var num4 = (v) => Number.isFinite(v) ? v : null;
+function zonaDrop(drop, zk) {
+  const z = drop && drop.zones ? drop.zones[zk] : null;
+  return z ? z[0] : null;
+}
+function fuentesDe(itemId, drop, n = 3) {
+  const it = drop && drop.items ? drop.items[String(itemId)] : null;
+  const srcs = it && Array.isArray(it[10]) ? it[10] : [];
+  const out = [];
+  for (const s of srcs) {
+    if (out.length >= n) break;
+    const [tipo, id, prob, min, max] = s;
+    if (tipo === "o") {
+      const o = drop.objects && drop.objects[String(id)];
+      if (!o) continue;
+      out.push({
+        tipo: "objeto",
+        subtipo: o[1],
+        nombre: o[0],
+        zona: zonaDrop(drop, o[2]),
+        prob: num4(prob),
+        min: num4(min),
+        max: num4(max)
+      });
+    } else if (tipo === "m" || tipo === "s" || tipo === "p") {
+      const m = drop.mobs && drop.mobs[String(id)];
+      if (!m) continue;
+      out.push({
+        tipo: TIPO_FUENTE[tipo] || "tipomob",
+        nombre: m[0],
+        zona: zonaDrop(drop, m[4]),
+        prob: num4(prob),
+        min: num4(min),
+        max: num4(max),
+        fac: m[7]
+      });
+    }
+  }
+  return out;
+}
+var probTxt = (p) => p === null ? "—" : String(Math.round(p * 10) / 10);
+var rangoTxt = (min, max) => max !== null && max > 1 ? ` ×${min ?? 1}-${max}` : "";
+function FuentesReceta({ prof, sel, precios, items, faccion, lang }) {
+  const receta = useMemo4(
+    () => (sel != null ? prof.recetas.find((r) => r.spell === sel) : null) ?? null,
+    [prof, sel]
+  );
+  const drop = D.dropData;
+  const lado = LADO[faccion] || null;
+  return /* @__PURE__ */ jsx8(
+    Tarjeta,
+    {
+      titulo: receta ? `${t(lang, "prof.detalle")} · ${nombre(receta.n, lang)}` : t(lang, "prof.detalle"),
+      extra: /* @__PURE__ */ jsx8(Origen, { f: ["cmangos-1.12", "cliente-forever"], lang }),
+      children: !receta ? /* @__PURE__ */ jsx8("div", { style: S.sub, children: t(lang, "prof.elegirReceta") }) : /* @__PURE__ */ jsxs8("div", { style: { display: "flex", flexDirection: "column", gap: 6 }, children: [
+        (receta.reactivos || []).map(([itemId, cant]) => {
+          const u = costoUnidad(itemId, precios, items);
+          const fuentes = fuentesDe(itemId, drop);
+          return /* @__PURE__ */ jsxs8("div", { style: { ...S.fila, flexWrap: "wrap" }, children: [
+            /* @__PURE__ */ jsx8("span", { style: { minWidth: 170 }, children: /* @__PURE__ */ jsx8(NombreItem, { id: itemId, lang, cantidad: cant }) }),
+            /* @__PURE__ */ jsxs8("span", { style: { flex: 1, display: "flex", flexWrap: "wrap", gap: 10, fontSize: 11 }, children: [
+              u.fuente === "vendedor" ? /* @__PURE__ */ jsx8("span", { style: { color: C.texto2 }, children: t(lang, "prof.fuente.vendedor", { precio: dinero(u.cobre) }) }) : null,
+              precios instanceof Map && precios.has(itemId) ? /* @__PURE__ */ jsx8("span", { style: { color: C.texto2 }, children: t(lang, "prof.fuente.subasta", { precio: dinero(precios.get(itemId)) }) }) : null,
+              fuentes.length ? fuentes.map((f, i) => /* @__PURE__ */ jsxs8("span", { style: { color: C.texto2 }, children: [
+                f.tipo === "objeto" ? t(lang, "prof.fuente.objeto", { nombre: f.nombre, tipo: f.subtipo, zona: f.zona || "—", prob: probTxt(f.prob) }) : `${t(lang, "prof.fuente." + f.tipo)}: ` + t(lang, "prof.fuente.mob", { nombre: f.nombre, zona: f.zona || "—", prob: probTxt(f.prob) }),
+                rangoTxt(f.min, f.max),
+                f.fac && lado && !f.fac.includes(lado) ? /* @__PURE__ */ jsxs8("span", { style: { color: C.texto3 }, children: [
+                  " · ",
+                  t(lang, "prof.fuente.otraFac")
+                ] }) : null
+              ] }, i)) : /* @__PURE__ */ jsx8("span", { style: { color: C.texto3 }, children: t(lang, "prof.fuente.nada") })
+            ] })
+          ] }, itemId);
+        }),
+        !(receta.reactivos || []).length ? /* @__PURE__ */ jsx8(Hueco, { lang, children: nombre(receta.n, lang) }) : null
+      ] })
+    }
+  );
+}
+
+// src/vistas/profesiones.jsx
+import { Fragment as Fragment9, jsx as jsx9, jsxs as jsxs9 } from "react/jsx-runtime";
+agregarTextos({
+  "prof.skill": "Skill",
+  "prof.tipo.principal": "Principal",
+  "prof.tipo.secundaria": "Secundaria",
+  "prof.recoleccion": "Recolección",
+  "prof.enPerfil": "En tu perfil",
+  "prof.entrenadores": "Entrenadores",
+  "prof.hasta": "hasta {max}",
+  "prof.huecoEntrenadores": "Sin entrenadores de esta profesión en tu facción en los datos (CMaNGOS 1.12).",
+  "prof.elegirReceta": "Elige una receta de la tabla para ver de dónde sacar sus reactivos."
+}, {
+  "prof.skill": "Skill",
+  "prof.tipo.principal": "Primary",
+  "prof.tipo.secundaria": "Secondary",
+  "prof.recoleccion": "Gathering",
+  "prof.enPerfil": "In your profile",
+  "prof.entrenadores": "Trainers",
+  "prof.hasta": "up to {max}",
+  "prof.huecoEntrenadores": "No trainers for this profession in your faction in the data (CMaNGOS 1.12).",
+  "prof.elegirReceta": "Pick a recipe from the table to see where to get its reagents."
+});
+var ORDEN_BASE = [...PRINCIPALES, ...SECUNDARIAS];
+var num5 = (v) => Number.isFinite(v) ? v : 0;
+var pct = (v) => Number.isFinite(v) ? String(Math.round(v * 10) / 10) : "—";
+function VistaProfesiones({ ctx, estado, perfil, lang, irA }) {
+  const datos = D.profesiones.profesiones;
+  const orden = useMemo5(() => {
+    const elegidas = [...perfil.profesiones || [], ...perfil.secundarias || []].filter((id) => datos[String(id)]);
+    const set = new Set(elegidas);
+    return [...elegidas, ...ORDEN_BASE.filter((id) => !set.has(id))];
+  }, [perfil, datos]);
+  const [pid, setPid] = useState5(() => orden[0]);
+  const [skills, setSkills] = useState5({});
+  const [sel, setSel] = useState5(null);
+  const pidReal = datos[String(pid)] ? pid : orden[0];
+  const prof = datos[String(pidReal)];
+  const skillDe = (id) => {
+    if (Object.prototype.hasOwnProperty.call(skills, id)) return skills[id];
+    const v = ctx.storage.get("skill-" + id, 0);
+    return Number.isInteger(v) && v >= 0 && v <= 300 ? v : 0;
+  };
+  const skill = prof ? skillDe(pidReal) : 0;
+  const cambiarSkill = async (v) => {
+    const n = Math.floor(Number(v));
+    if (!Number.isFinite(n)) return;
+    const c = Math.max(0, Math.min(300, n));
+    setSkills((s) => ({ ...s, [pidReal]: c }));
+    try {
+      await ctx.storage.set("skill-" + pidReal, c);
+    } catch {
+    }
+  };
+  const precios = useMemo5(() => preciosDelMercado(estado.market, perfil.reino), [estado.market, perfil.reino]);
+  const trainers = prof && prof.entrenadores ? prof.entrenadores[perfil.faccion] || [] : [];
+  const porZona = /* @__PURE__ */ new Map();
+  for (const e of trainers) {
+    const z = e.zona == null ? "—" : nombre(zona(e.zona)?.n, lang) || String(e.zona);
+    if (!porZona.has(z)) porZona.set(z, []);
+    porZona.get(z).push(e);
+  }
+  const enPerfil = /* @__PURE__ */ new Set([...perfil.profesiones || [], ...perfil.secundarias || []]);
+  if (!prof) return /* @__PURE__ */ jsx9(Tarjeta, { titulo: t(lang, "tab.profesiones"), children: /* @__PURE__ */ jsx9(Hueco, { lang, children: t(lang, "prof.huecoEntrenadores") }) });
+  return /* @__PURE__ */ jsxs9(Fragment9, { children: [
+    /* @__PURE__ */ jsx9(Tarjeta, { titulo: t(lang, "tab.profesiones"), extra: /* @__PURE__ */ jsx9(Origen, { f: prof.f || "cmangos-1.12", lang }), children: /* @__PURE__ */ jsxs9("div", { style: { display: "flex", flexWrap: "wrap", gap: 12, alignItems: "flex-end" }, children: [
+      /* @__PURE__ */ jsxs9("label", { style: S.campo, htmlFor: "wf-profesion", children: [
+        /* @__PURE__ */ jsx9("span", { style: S.etiqueta, children: t(lang, "tab.profesiones") }),
+        /* @__PURE__ */ jsxs9(Select2, { value: String(pidReal), onValueChange: (v) => {
+          setPid(Number(v));
+          setSel(null);
+        }, children: [
+          /* @__PURE__ */ jsx9(SelectTrigger2, { id: "wf-profesion", "aria-label": t(lang, "tab.profesiones"), children: /* @__PURE__ */ jsx9(SelectValue2, {}) }),
+          /* @__PURE__ */ jsx9(SelectContent2, { children: orden.map((id) => /* @__PURE__ */ jsxs9(SelectItem2, { value: String(id), children: [
+            nombre(datos[String(id)].n, lang),
+            enPerfil.has(id) ? " ★" : ""
+          ] }, id)) })
+        ] })
+      ] }),
+      /* @__PURE__ */ jsxs9("label", { style: S.campo, htmlFor: "wf-skill-" + pidReal, children: [
+        /* @__PURE__ */ jsx9("span", { style: S.etiqueta, children: t(lang, "prof.skill") }),
+        /* @__PURE__ */ jsx9(
+          Input2,
+          {
+            id: "wf-skill-" + pidReal,
+            type: "number",
+            min: 0,
+            max: 300,
+            value: skill,
+            onChange: (e) => cambiarSkill(e.target.value),
+            style: { width: 90 }
+          }
+        )
+      ] }),
+      /* @__PURE__ */ jsx9("span", { style: S.chip, children: t(lang, prof.tipo === "secundaria" ? "prof.tipo.secundaria" : "prof.tipo.principal") }),
+      prof.recoleccion ? /* @__PURE__ */ jsx9("span", { style: S.chip, children: t(lang, "prof.recoleccion") }) : null,
+      enPerfil.has(pidReal) ? /* @__PURE__ */ jsx9("span", { style: S.chip, children: t(lang, "prof.enPerfil") }) : null
+    ] }) }),
+    /* @__PURE__ */ jsx9(
+      Tarjeta,
+      {
+        titulo: t(lang, "prof.entrenadores") + " · " + nombre(D.personaje.facciones[perfil.faccion].n, lang),
+        extra: /* @__PURE__ */ jsx9(Origen, { f: "cmangos-1.12", lang }),
+        children: porZona.size ? [...porZona.entries()].sort().map(([z, lista]) => /* @__PURE__ */ jsxs9("div", { style: { display: "flex", flexDirection: "column" }, children: [
+          /* @__PURE__ */ jsx9("div", { style: { ...S.fila, borderBottom: "none", paddingBottom: 0 }, children: /* @__PURE__ */ jsx9("span", { style: { color: C.texto2 }, children: z }) }),
+          lista.map((e) => /* @__PURE__ */ jsxs9("div", { style: S.fila, children: [
+            /* @__PURE__ */ jsx9("span", { style: { flex: 1 }, children: nombre(e.n, lang) }),
+            /* @__PURE__ */ jsxs9("span", { style: S.sub, children: [
+              pct(e.x),
+              "%, ",
+              pct(e.y),
+              "%"
+            ] }),
+            /* @__PURE__ */ jsx9("span", { style: S.sub, children: t(lang, "prof.hasta", { max: num5(e.max) }) })
+          ] }, e.npc))
+        ] }, z)) : /* @__PURE__ */ jsx9(Hueco, { lang, children: t(lang, "prof.huecoEntrenadores") })
+      }
+    ),
+    /* @__PURE__ */ jsx9(
+      PlanSubida,
+      {
+        prof,
+        skill,
+        trainers,
+        precios,
+        items: D.items.items,
+        lang,
+        irA,
+        faccion: perfil.faccion
+      }
+    ),
+    /* @__PURE__ */ jsx9(
+      TablaRecetas,
+      {
+        prof,
+        skill,
+        precios,
+        items: D.items.items,
+        faccion: perfil.faccion,
+        lang,
+        sel,
+        onSel: setSel
+      }
+    ),
+    /* @__PURE__ */ jsx9(
+      FuentesReceta,
+      {
+        prof,
+        sel,
+        precios,
+        items: D.items.items,
+        faccion: perfil.faccion,
+        lang
+      }
+    )
+  ] });
 }
 
 // src/vistas/dungeons.jsx
-import { jsx as jsx6 } from "react/jsx-runtime";
-function VistaDungeons({ lang }) {
-  return /* @__PURE__ */ jsx6(Tarjeta, { titulo: t(lang, "tab.dungeons"), children: /* @__PURE__ */ jsx6("p", { children: t(lang, "pendiente") }) });
+import { useMemo as useMemo7, useState as useState6 } from "react";
+import { Checkbox as Checkbox4, SegmentedControl as SegmentedControl3 } from "@hermes/plugin-sdk";
+
+// src/vistas/dungeons/tarjeta.jsx
+import { useMemo as useMemo6 } from "react";
+import { Checkbox as Checkbox3 } from "@hermes/plugin-sdk";
+import { jsx as jsx10, jsxs as jsxs10 } from "react/jsx-runtime";
+agregarTextos({
+  "dungeon.niveles": "Nv {min}–{max}",
+  "dungeon.jugadores": "{n} jugadores",
+  "dungeon.raid": "Raid",
+  "dungeon.forever": "Forever",
+  "dungeon.enRango": "en tu rango",
+  "dungeon.sinDatosForever": "Niveles, tamaño de grupo y botín son datos del servidor: no figuran en las tablas del cliente.",
+  "dungeon.jefes": "Jefes",
+  "dungeon.sinBotin": "sin botín en los datos",
+  "dungeon.sinUtil": "nada útil para tu clase",
+  "dungeon.utiles": "{n} útiles",
+  "dungeon.misiones": "Misiones de dungeon",
+  "dungeon.clave": "CLAVE",
+  "dungeon.contK": "Kalimdor",
+  "dungeon.contE": "Reinos del Este"
+}, {
+  "dungeon.niveles": "Lv {min}–{max}",
+  "dungeon.jugadores": "{n} players",
+  "dungeon.raid": "Raid",
+  "dungeon.forever": "Forever",
+  "dungeon.enRango": "in your range",
+  "dungeon.sinDatosForever": "Level range, group size and loot are server-side data: they are not in the client tables.",
+  "dungeon.jefes": "Bosses",
+  "dungeon.sinBotin": "no loot in the data",
+  "dungeon.sinUtil": "nothing useful for your class",
+  "dungeon.utiles": "{n} useful",
+  "dungeon.misiones": "Dungeon quests",
+  "dungeon.clave": "KEY",
+  "dungeon.contK": "Kalimdor",
+  "dungeon.contE": "Eastern Kingdoms"
+});
+var estiloDetails2 = {
+  border: `1px solid ${C.borde}`,
+  borderRadius: 6,
+  background: C.fondo2
+};
+var estiloSummary2 = {
+  cursor: "pointer",
+  padding: "8px 12px",
+  display: "flex",
+  gap: 8,
+  alignItems: "baseline",
+  flexWrap: "wrap",
+  fontSize: 13
+};
+var estiloCuerpo = { padding: "0 12px 10px", display: "flex", flexDirection: "column", gap: 4 };
+var contLabel = (c, lang) => c === "K" ? t(lang, "dungeon.contK") : c === "E" ? t(lang, "dungeon.contE") : c;
+function TarjetaDungeon({ d, lang, perfil, soloUtil, items, competencias, gear, curados, onGear }) {
+  const enRango = dungeonEnRango(d, perfil.nivel);
+  const misiones = useMemo6(() => misionesDeDungeon(D.misiones.misiones, perfil, d.mapa), [perfil, d.mapa]);
+  const hs = huecos("dungeons", { tema: "botin", mapa: d.mapa });
+  const utilesTotal = useMemo6(() => {
+    if (!soloUtil) return 0;
+    return d.jefes.reduce((n, j) => n + (j.botin ? botinUtil(items, j.botin, competencias).length : 0), 0);
+  }, [soloUtil, d, items, competencias]);
+  const meta = d.niveles ? [
+    t(lang, "dungeon.niveles", { min: d.niveles.min, max: d.niveles.max }),
+    d.jugadores ? t(lang, "dungeon.jugadores", { n: d.jugadores }) : null
+  ].filter(Boolean).join(" · ") : t(lang, "dungeon.forever");
+  return /* @__PURE__ */ jsxs10("details", { open: enRango, "data-dungeon": d.mapa, style: estiloDetails2, children: [
+    /* @__PURE__ */ jsxs10("summary", { style: estiloSummary2, children: [
+      /* @__PURE__ */ jsx10("span", { style: { fontWeight: 600 }, children: nombre(d.n, lang) }),
+      /* @__PURE__ */ jsx10("span", { style: S.sub, children: meta }),
+      d.raid ? /* @__PURE__ */ jsx10("span", { style: { ...S.chip, borderColor: C.rojo, color: C.rojo }, children: t(lang, "dungeon.raid") }) : null,
+      enRango ? /* @__PURE__ */ jsx10("span", { style: { ...S.chip, borderColor: C.verde, color: C.verde }, children: t(lang, "dungeon.enRango") }) : null,
+      soloUtil && d.tipo === "clasico" ? /* @__PURE__ */ jsx10("span", { style: S.chip, children: t(lang, "dungeon.utiles", { n: utilesTotal }) }) : null,
+      /* @__PURE__ */ jsx10(Origen, { f: d.f, lang })
+    ] }),
+    /* @__PURE__ */ jsxs10("div", { style: estiloCuerpo, children: [
+      d.tipo === "forever" ? /* @__PURE__ */ jsx10(Hueco, { lang, children: t(lang, "dungeon.sinDatosForever") }) : null,
+      hs.filter((h) => d.tipo !== "forever").map((h, i) => /* @__PURE__ */ jsxs10(Hueco, { lang, children: [
+        h.motivo,
+        h.jefes && h.jefes.length ? " — " + h.jefes.join(", ") : ""
+      ] }, i)),
+      /* @__PURE__ */ jsxs10("div", { style: S.etiqueta, children: [
+        t(lang, "dungeon.jefes"),
+        " · ",
+        d.jefes.length
+      ] }),
+      d.jefes.map((j, ji) => {
+        const botin = j.botin || [];
+        const muestra = soloUtil ? botinUtil(items, botin, competencias) : botin;
+        return /* @__PURE__ */ jsxs10("div", { "data-jefe": ji, style: { paddingLeft: 6 }, children: [
+          /* @__PURE__ */ jsx10("div", { style: { fontSize: 12, fontWeight: 600 }, children: nombre(j.n, lang) }),
+          d.tipo === "forever" ? null : /* @__PURE__ */ jsx10("div", { style: { paddingLeft: 12, display: "flex", flexDirection: "column", gap: 2 }, children: muestra.length ? muestra.map(([iid, prob], bi) => /* @__PURE__ */ jsxs10("div", { style: { display: "flex", gap: 6, alignItems: "baseline" }, children: [
+            /* @__PURE__ */ jsx10(NombreItem, { id: iid, lang }),
+            /* @__PURE__ */ jsxs10("span", { style: S.sub, children: [
+              prob,
+              "%"
+            ] })
+          ] }, bi)) : /* @__PURE__ */ jsx10("div", { style: S.sub, children: botin.length ? t(lang, "dungeon.sinUtil") : t(lang, "dungeon.sinBotin") }) })
+        ] }, ji);
+      }),
+      misiones.length ? /* @__PURE__ */ jsxs10("div", { style: { marginTop: 4 }, children: [
+        /* @__PURE__ */ jsxs10("div", { style: S.etiqueta, children: [
+          t(lang, "dungeon.misiones"),
+          " · ",
+          misiones.length
+        ] }),
+        misiones.map(([id, m]) => /* @__PURE__ */ jsxs10("div", { "data-mision": id, style: { ...S.fila, borderBottom: "none", padding: "2px 0", opacity: m.min > perfil.nivel ? 0.6 : 1 }, children: [
+          /* @__PURE__ */ jsx10("span", { style: { minWidth: 34, color: C.texto3 }, children: m.nivel }),
+          /* @__PURE__ */ jsx10("span", { style: { flex: 1 }, children: nombre(m.t, lang) })
+        ] }, id))
+      ] }) : null,
+      curados.map(({ d: cd, indice }) => {
+        const loot = Array.isArray(cd.loot) ? cd.loot : [];
+        const conseguidos = loot.filter((l) => gear.has("d" + indice + "|" + l[0])).length;
+        return /* @__PURE__ */ jsxs10("div", { "data-curado": indice, style: { borderTop: `1px dashed ${C.borde}`, paddingTop: 6, marginTop: 4 }, children: [
+          /* @__PURE__ */ jsxs10("div", { style: { display: "flex", gap: 6, alignItems: "baseline", flexWrap: "wrap" }, children: [
+            /* @__PURE__ */ jsx10("span", { style: { fontSize: 12, fontWeight: 600 }, children: cd.n }),
+            /* @__PURE__ */ jsxs10("span", { style: S.sub, children: [
+              cd.loc,
+              " · ",
+              cd.r[0],
+              "–",
+              cd.r[1]
+            ] }),
+            /* @__PURE__ */ jsx10("span", { style: S.chip, children: contLabel(cd.cont, lang) }),
+            cd.key ? /* @__PURE__ */ jsx10("span", { style: { ...S.chip, borderColor: C.amarillo, color: C.amarillo }, children: t(lang, "dungeon.clave") }) : null,
+            /* @__PURE__ */ jsxs10("span", { style: { ...S.sub, marginLeft: "auto" }, children: [
+              conseguidos,
+              "/",
+              loot.length
+            ] })
+          ] }),
+          cd.note ? /* @__PURE__ */ jsx10("div", { style: S.sub, children: cd.note }) : null,
+          /* @__PURE__ */ jsx10(Origen, { f: "curado", lang }),
+          loot.map((l, li) => {
+            const gid = "d" + indice + "|" + l[0];
+            return /* @__PURE__ */ jsxs10("label", { "data-loot": gid, style: { display: "flex", gap: 6, alignItems: "baseline", fontSize: 12 }, children: [
+              /* @__PURE__ */ jsx10(Checkbox3, { checked: gear.has(gid), onCheckedChange: (v) => onGear(gid, v) }),
+              /* @__PURE__ */ jsx10("span", { style: { fontWeight: 600 }, children: l[0] }),
+              /* @__PURE__ */ jsxs10("span", { style: S.sub, children: [
+                "— ",
+                l[1]
+              ] })
+            ] }, li);
+          })
+        ] }, indice);
+      })
+    ] })
+  ] });
+}
+
+// src/vistas/dungeons.jsx
+import { Fragment as Fragment10, jsx as jsx11, jsxs as jsxs11 } from "react/jsx-runtime";
+agregarTextos({
+  "dungeon.util": "Solo útil para mi clase",
+  "dungeon.utilSub": "Deja solo el botín de calidad poco común o mejor que tu clase puede equipar.",
+  "dungeon.filtro.rango": "En mi rango",
+  "dungeon.filtro.todos": "Todos",
+  "dungeon.filtro.raids": "Raids",
+  "dungeon.vacio": "Ningún dungeon coincide con el filtro.",
+  "dungeon.intro": "Los que están en tu rango (±5 niveles) vienen abiertos. El tilde del botín curado se guarda solo."
+}, {
+  "dungeon.util": "Only useful for my class",
+  "dungeon.utilSub": "Keeps only uncommon-or-better loot your class can equip.",
+  "dungeon.filtro.rango": "In my range",
+  "dungeon.filtro.todos": "All",
+  "dungeon.filtro.raids": "Raids",
+  "dungeon.vacio": "No dungeon matches the filter.",
+  "dungeon.intro": "Those in your range (±5 levels) come open. The curated loot tick saves itself."
+});
+function VistaDungeons({ almacen, estado, recargar, perfil, lang }) {
+  const [filtro, setFiltro] = useState6("rango");
+  const [soloUtil, setSoloUtil] = useState6(false);
+  const [aviso, setAviso] = useState6("");
+  const build = useMemo7(() => leerBuild(estado && estado.build), [estado && estado.build]);
+  const lista = useMemo7(() => listaDungeons(D.dungeons), []);
+  const visibles = useMemo7(() => dungeonsVisibles(lista, filtro, perfil.nivel), [lista, filtro, perfil.nivel]);
+  const competencias = useMemo7(() => {
+    const cl = D.clases.clases[String(perfil.clase)];
+    return new Set((cl && cl.competencias ? cl.competencias : []).map((c) => c.id));
+  }, [perfil.clase]);
+  const gear = useMemo7(() => new Set(listaBuild(build, "gear")), [build]);
+  const { guia } = guiaCurada(perfil) || {};
+  const curados = useMemo7(
+    () => guia && guia.dungeons ? curadosPorDungeon(guia.dungeons, D.dungeons.clasicos, D.dungeons.forever) : /* @__PURE__ */ new Map(),
+    [guia]
+  );
+  const guardar = async (cambios) => {
+    try {
+      await buildCambios(almacen, cambios);
+      setAviso("");
+      recargar();
+    } catch (e) {
+      setAviso(e && e.message ? e.message : String(e));
+    }
+  };
+  const alternarGear = (id, puesto) => guardar({ gear: alternarEnLista(listaBuild(build, "gear"), id, puesto) });
+  return /* @__PURE__ */ jsxs11(Fragment10, { children: [
+    aviso ? /* @__PURE__ */ jsx11(Aviso, { children: aviso }) : null,
+    /* @__PURE__ */ jsxs11(Tarjeta, { titulo: t(lang, "tab.dungeons"), extra: /* @__PURE__ */ jsx11(Origen, { f: ["cliente-forever", "cmangos-1.12"], lang }), children: [
+      /* @__PURE__ */ jsxs11("div", { style: { display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }, children: [
+        /* @__PURE__ */ jsx11(
+          SegmentedControl3,
+          {
+            value: filtro,
+            onChange: setFiltro,
+            options: [
+              { id: "rango", label: t(lang, "dungeon.filtro.rango") },
+              { id: "todos", label: t(lang, "dungeon.filtro.todos") },
+              { id: "raids", label: t(lang, "dungeon.filtro.raids") }
+            ]
+          }
+        ),
+        /* @__PURE__ */ jsxs11("label", { title: t(lang, "dungeon.utilSub"), style: { display: "flex", gap: 6, alignItems: "center", fontSize: 12, color: C.texto2, cursor: "pointer" }, children: [
+          /* @__PURE__ */ jsx11(Checkbox4, { checked: soloUtil, onCheckedChange: setSoloUtil }),
+          t(lang, "dungeon.util")
+        ] }),
+        /* @__PURE__ */ jsx11("span", { style: { ...S.sub, marginLeft: "auto" }, children: visibles.length })
+      ] }),
+      /* @__PURE__ */ jsx11("div", { style: S.sub, children: t(lang, "dungeon.intro") }),
+      !visibles.length ? /* @__PURE__ */ jsx11("div", { style: S.sub, children: t(lang, "dungeon.vacio") }) : null
+    ] }),
+    visibles.map((d) => /* @__PURE__ */ jsx11(
+      TarjetaDungeon,
+      {
+        d,
+        lang,
+        perfil,
+        soloUtil,
+        items: D.items.items,
+        competencias,
+        gear,
+        curados: curados.get(d.mapa) || [],
+        onGear: alternarGear
+      },
+      d.mapa
+    ))
+  ] });
 }
 
 // src/vistas/mercado.jsx
-import { jsx as jsx7 } from "react/jsx-runtime";
-function VistaMercado({ lang }) {
-  return /* @__PURE__ */ jsx7(Tarjeta, { titulo: t(lang, "tab.mercado"), children: /* @__PURE__ */ jsx7("p", { children: t(lang, "pendiente") }) });
+import { useCallback, useEffect as useEffect2, useMemo as useMemo11, useRef, useState as useState7 } from "react";
+import { Button as Button5, Checkbox as Checkbox6, SearchField as SearchField2, Select as Select4, SelectContent as SelectContent4, SelectItem as SelectItem4, SelectTrigger as SelectTrigger4, SelectValue as SelectValue4 } from "@hermes/plugin-sdk";
+
+// src/auctionator.js
+var AUCTION_FILE = "Auctionator.lua";
+var AUCTION_MARK = "AUCTIONATOR_PRICE_DATABASE";
+var WALK_DIRS = 80;
+var WALK_DEPTH = 4;
+var auctionBusy = false;
+var filesApi = (ctx) => {
+  const f = ctx?.files;
+  return f && typeof f.requestFolder === "function" && typeof f.readText === "function" && typeof f.list === "function" && typeof f.folders === "function" ? f : null;
+};
+var dataUrlText = (url) => {
+  const b64 = String(url).slice(String(url).indexOf(",") + 1);
+  const bin = atob(b64);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return new TextDecoder("utf-8").decode(bytes);
+};
+async function readAuction(files, folder, rel) {
+  let r = await files.readText(folder.id, rel);
+  let text2 = r?.ok && typeof r.text === "string" ? r.text : null;
+  if (!text2 && r?.error === "too-large" && typeof files.readDataUrl === "function") {
+    const d = await files.readDataUrl(folder.id, rel);
+    if (d?.ok && typeof d.url === "string") text2 = dataUrlText(d.url);
+  }
+  if (!text2 || !text2.includes(AUCTION_MARK)) return null;
+  return { status: "ok", text: text2, path: folder.name + "/" + rel, byteSize: text2.length };
+}
+async function findInFolder(files, folder) {
+  const direct = await readAuction(files, folder, AUCTION_FILE).catch(() => null);
+  if (direct) return direct;
+  const queue = [{ rel: "", depth: 0 }], found = [];
+  let seen = 0;
+  while (queue.length && seen < WALK_DIRS && found.length < 10) {
+    const { rel, depth } = queue.shift();
+    seen++;
+    const l = await files.list(folder.id, rel).catch(() => null);
+    if (!l?.ok) continue;
+    for (const e of l.entries || []) {
+      if (e.isDirectory) {
+        if (depth < WALK_DEPTH) queue.push({ rel: e.path, depth: depth + 1 });
+      } else if (e.name === AUCTION_FILE) found.push(e.path);
+    }
+  }
+  let best = null;
+  for (const rel of found) {
+    const hit = await readAuction(files, folder, rel).catch(() => null);
+    if (hit && (!best || hit.byteSize > best.byteSize)) best = hit;
+  }
+  return best;
+}
+async function leerAuctionator(ctx, req = {}) {
+  if (auctionBusy) return { status: "busy" };
+  const files = filesApi(ctx);
+  if (!files) return { status: "unavailable" };
+  auctionBusy = true;
+  try {
+    if (!req.pick) {
+      const granted = await files.folders().catch(() => []);
+      for (const folder of Array.isArray(granted) ? granted : []) {
+        const hit2 = await findInFolder(files, folder).catch(() => null);
+        if (hit2) return { ...hit2, stored: true };
+      }
+    }
+    const picked = await files.requestFolder();
+    if (!picked?.ok || !picked.folder) return { status: "cancelled" };
+    const hit = await findInFolder(files, picked.folder).catch(() => null);
+    if (!hit) return { status: "error", error: "invalid", message: "No hay un Auctionator.lua con precios en esa carpeta. Elegí WTF/Account/<tu cuenta>/SavedVariables." };
+    return hit;
+  } finally {
+    auctionBusy = false;
+  }
+}
+
+// src/mercado-logica.js
+var import_market = __toESM(require_market());
+var import_market_history = __toESM(require_market_history());
+var import_market_deals = __toESM(require_market_deals());
+var import_market_chart = __toESM(require_market_chart());
+var import_market_farm = __toESM(require_market_farm());
+var Farm = import_market_farm.default;
+var PAGE_SIZE = 50;
+var SNAPSHOT_KEEP_DAYS = 5;
+var HISTORY_MAX_BYTES = 4194304 - 4096;
+var EPOCH = Date.UTC(2020, 0, 1);
+var DAY_MS = 864e5;
+var hoy = () => Math.floor((Date.now() - EPOCH) / DAY_MS);
+var fechaDe = (day) => Number.isSafeInteger(day) ? new Date(EPOCH + day * DAY_MS).toISOString().slice(0, 10) : null;
+var reciente = (item2, dia = hoy()) => item2?.observedDay !== null && item2?.observedDay !== void 0 && item2.observedDay <= dia && dia - item2.observedDay <= 3;
+var edadItem = (item2, dia = hoy()) => item2?.observedDay === null || item2?.observedDay === void 0 ? "sin-fecha" : item2.observedDay > dia ? "fecha-futura" : reciente(item2, dia) ? "reciente" : "antiguo";
+var cmpStr = (a, b) => a < b ? -1 : a > b ? 1 : 0;
+var nombreEN = (n) => n && (n.en || n.es) || "";
+function cmpFuente(a, b) {
+  const la = a.levelMin == null ? 1 : 0, lb = b.levelMin == null ? 1 : 0;
+  return la - lb || (a.levelMin || 0) - (b.levelMin || 0) || cmpStr(a.dungeon, b.dungeon) || cmpStr(a.boss, b.boss);
+}
+function catalogoMercado(itemsJson, dungeonsJson) {
+  const items = itemsJson?.items || {};
+  const salida = {};
+  for (const [iid, fila] of Object.entries(items)) {
+    const es = fila?.[0] || "", en = fila?.[1] || "";
+    const entrada = { name: en || es, sources: [] };
+    if (es && es !== en) entrada.nameEs = es;
+    salida[iid] = entrada;
+  }
+  const clasicos = dungeonsJson?.clasicos || {};
+  for (const mapa of Object.keys(clasicos).sort((a, b) => Number(a) - Number(b))) {
+    const d = clasicos[mapa];
+    const niveles = d?.niveles || {};
+    for (const jefe of d?.jefes || []) {
+      for (const par of jefe?.botin || []) {
+        const e = salida[String(par?.[0])];
+        if (!e) continue;
+        e.sources.push({
+          dungeon: nombreEN(d?.n),
+          location: nombreEN(d?.n),
+          levelMin: niveles.min ?? null,
+          levelMax: niveles.max ?? null,
+          boss: nombreEN(jefe?.n),
+          bossLevel: null,
+          chance: par?.[1],
+          raid: !!d?.raid,
+          reference: `data/dungeons.json#${mapa}/${jefe?.npc}`
+        });
+      }
+    }
+  }
+  const ordenado = {};
+  for (const iid of Object.keys(salida).sort((a, b) => Number(a) - Number(b))) {
+    const e = salida[iid];
+    if (!e.sources.length) continue;
+    e.sources.sort(cmpFuente);
+    ordenado[iid] = e;
+  }
+  return {
+    schemaVersion: 1,
+    source: {
+      addon: "CMaNGOS classic-db + cliente WoW Forever",
+      coverage: "Nombres de ítems del cliente WoW Forever 1.60.1.70888; botín de jefes de dungeons y raids de WoW 1.12 (CMaNGOS), aproximado para Forever. Sin los dungeons nuevos de Forever. No prueba ligadura, venta ni viabilidad en solitario."
+    },
+    items: ordenado
+  };
+}
+function fuentesItem(entradaCatalogo, dungeonsJson) {
+  return (entradaCatalogo?.sources || []).map((s) => {
+    let dungeonN = null, bossN = null;
+    const m = /#(\d+)\/(\d+)$/.exec(s?.reference || "");
+    if (m && m[2] !== "null") {
+      const d = dungeonsJson?.clasicos?.[m[1]];
+      if (d?.n) dungeonN = { es: d.n.es || d.n.en || "", en: d.n.en || d.n.es || "" };
+      const jefe = (d?.jefes || []).find((j) => String(j?.npc) === m[2]);
+      if (jefe?.n) bossN = { es: jefe.n.es || jefe.n.en || "", en: jefe.n.en || jefe.n.es || "" };
+    }
+    return { ...s, dungeonN, bossN };
+  });
+}
+function nombreItem(item2, itemsJson, catalogo, lang) {
+  const id = item2?.itemId;
+  if (!Number.isSafeInteger(id) || id <= 0) return null;
+  const fila = itemsJson?.items?.[String(id)];
+  if (fila) {
+    const n = { es: fila[0] || fila[1] || "", en: fila[1] || fila[0] || "" };
+    return (lang === "en" ? n.en || n.es : n.es || n.en) || `#${id}`;
+  }
+  const cat = catalogo?.items?.[String(id)];
+  if (cat) return (lang === "es" && cat.nameEs ? cat.nameEs : cat.name) || `#${id}`;
+  return `#${id}`;
+}
+var normBuscador = (s) => String(s ?? "").toLocaleLowerCase("es").normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s+/g, " ").trim();
+function textosBusqueda(items, catalogo, itemsJson, dungeonsJson) {
+  const mapa = /* @__PURE__ */ new Map();
+  const itemsData = itemsJson?.items || {};
+  for (const it of items || []) {
+    const partes = [String(it?.sourceKey ?? "")];
+    const id = it?.itemId;
+    if (Number.isSafeInteger(id) && id > 0) {
+      const fila = itemsData[String(id)];
+      if (fila) partes.push(String(fila[0] || ""), String(fila[1] || ""));
+      const cat = catalogo?.items?.[String(id)];
+      if (cat) {
+        partes.push(String(cat.name || ""), String(cat.nameEs || ""));
+        for (const s of fuentesItem(cat, dungeonsJson)) {
+          partes.push(String(s.boss || ""), String(s.dungeon || ""), String(s.location || ""));
+          if (s.bossN) partes.push(s.bossN.es, s.bossN.en);
+          if (s.dungeonN) partes.push(s.dungeonN.es, s.dungeonN.en);
+        }
+      }
+    }
+    mapa.set(it?.sourceKey, normBuscador(partes.join(" ")));
+  }
+  return mapa;
+}
+function fuenteEnRango(item2, nivel, catalogo) {
+  const id = item2?.itemId;
+  if (!Number.isSafeInteger(id) || id <= 0) return false;
+  const fuentes = catalogo?.items?.[String(id)]?.sources || [];
+  return fuentes.some((s) => s.levelMin !== null && s.levelMax !== null && s.levelMin <= nivel && nivel <= s.levelMax);
+}
+function filtrarMercado(items, opciones = {}) {
+  const {
+    textos,
+    q = "",
+    recientes: soloRecientes = false,
+    conFuente = false,
+    nivel = 0,
+    catalogo = null,
+    farmable = null,
+    oferta = null,
+    dia = hoy()
+  } = opciones;
+  const consulta = normBuscador(q);
+  return (items || []).filter((it) => {
+    if (soloRecientes && !reciente(it, dia)) return false;
+    if (conFuente && !fuenteEnRango(it, nivel, catalogo)) return false;
+    if (farmable && !farmable(it)) return false;
+    if (oferta && !oferta(it)) return false;
+    if (consulta) {
+      const hay = textos?.get(it?.sourceKey);
+      if (!hay || !hay.includes(consulta)) return false;
+    }
+    return true;
+  });
+}
+var cmpItem = (a, b) => cmpStr(String(a?.sourceKey ?? ""), String(b?.sourceKey ?? ""));
+function ordenarMercado(items, orden, opciones = {}) {
+  const { lang = "es", itemsJson = null, catalogo = null, metrica = null, oferta = null } = opciones;
+  const lista = [...items || []];
+  if (orden === "nombre") {
+    lista.sort((a, b) => cmpStr(
+      nombreItem(a, itemsJson, catalogo, lang) || String(a?.sourceKey ?? ""),
+      nombreItem(b, itemsJson, catalogo, lang) || String(b?.sourceKey ?? "")
+    ) || cmpItem(a, b));
+  } else if (orden === "ofertas" && oferta) {
+    lista.sort((a, b) => (oferta(b)?.score ?? -Infinity) - (oferta(a)?.score ?? -Infinity) || cmpItem(a, b));
+  } else if (orden === "roi" && metrica) {
+    lista.sort((a, b) => (metrica(b)?.farmable ? metrica(b).roi ?? -999 : -999) - (metrica(a)?.farmable ? metrica(a).roi ?? -999 : -999) || cmpItem(a, b));
+  } else if (orden === "gph" && metrica) {
+    lista.sort((a, b) => (metrica(b)?.farmable ? metrica(b).gph : -999) - (metrica(a)?.farmable ? metrica(a).gph : -999) || cmpItem(a, b));
+  } else {
+    lista.sort((a, b) => (b?.unitPriceCopper ?? 0) - (a?.unitPriceCopper ?? 0) || cmpItem(a, b));
+  }
+  return lista;
+}
+function frescura(snapshot, realmName, dia = hoy()) {
+  if (!snapshot) return null;
+  const realm = snapshot.realms?.find((r) => r.name === realmName);
+  const items = realm?.items || [];
+  let maxDay = null;
+  for (const i of items) if (i.observedDay != null && (maxDay === null || i.observedDay > maxDay)) maxDay = i.observedDay;
+  return {
+    importedAt: snapshot.importedAt ?? null,
+    items: items.length,
+    maxDay,
+    fechaMax: fechaDe(maxDay),
+    diasDesde: maxDay === null ? null : dia - maxDay,
+    aviso: maxDay !== null && dia - maxDay > 3
+  };
+}
+function snapshotVisible(mercado, historial) {
+  const s = mercado?.snapshot;
+  if (!s) return null;
+  const st = historial?.store;
+  return st ? import_market_history.default.applyStore(s, st) : s;
+}
+function planImportacion(raw, { snapshotActual = null, historyStore = null } = {}) {
+  const snapshot = import_market_history.default.trimSnapshotHistory(raw, SNAPSHOT_KEEP_DAYS);
+  const base = historyStore || (snapshotActual ? import_market_history.default.storeFromSnapshot(snapshotActual) : import_market_history.default.emptyStore());
+  const store = import_market_history.default.fitStore(import_market_history.default.storeMerge(base, raw), HISTORY_MAX_BYTES);
+  return { snapshot, store };
+}
+var histValido = (h) => Number.isSafeInteger(h.day) && h.day >= 0 && h.day <= 1e5 && Number.isSafeInteger(h.low) && h.low > 0 && Number.isSafeInteger(h.high) && h.high >= h.low && (h.available === null || Number.isSafeInteger(h.available) && h.available >= 0);
+var itemValido = (i) => typeof i.sourceKey === "string" && (i.itemId === null || Number.isSafeInteger(i.itemId) && i.itemId > 0) && Number.isSafeInteger(i.unitPriceCopper) && i.unitPriceCopper > 0 && (i.observedDay === null || Number.isSafeInteger(i.observedDay) && i.observedDay >= 0 && i.observedDay <= 1e5) && Array.isArray(i.history) && i.history.length <= 1e4 && i.history.every(histValido);
+var realmValido = (r) => typeof r.name === "string" && Array.isArray(r.items) && r.items.length <= 1e5 && r.items.every(itemValido);
+function snapshotValido(s) {
+  return s?.schemaVersion === 1 && s.sourceVersion === 8 && typeof s.importedAt === "string" && Number.isFinite(Date.parse(s.importedAt)) && Array.isArray(s.warnings) && s.warnings.length <= 1e3 && s.warnings.every((w) => typeof w === "string") && Array.isArray(s.realms) && s.realms.length > 0 && s.realms.length <= 100 && s.realms.every(realmValido);
+}
+function infoHistorial(store) {
+  if (!store || !import_market_history.default.validStore(store)) return { days: 0, entries: 0 };
+  const seen = /* @__PURE__ */ new Set();
+  let entries = 0;
+  for (const rn of Object.keys(store.realms || {})) {
+    for (const k of Object.keys(store.realms[rn]?.items || {})) {
+      for (const r of store.realms[rn].items[k]) {
+        entries++;
+        seen.add(r[0]);
+      }
+    }
+  }
+  return { days: seen.size, entries };
+}
+var CLASE_MOTOR = { 1: "warrior", 3: "hunter", 7: "shaman" };
+function perfilMotor(perfil, hubZones = "") {
+  return {
+    level: perfil?.nivel || 12,
+    cls: CLASE_MOTOR[perfil?.clase] || "otro",
+    fac: perfil?.faccion === "alianza" ? "alliance" : "horde",
+    spec: "",
+    pref: "any",
+    hubZones: hubZones || ""
+  };
+}
+function hubZonesDe(nivel, rutas, zonasJson, faccion) {
+  if (rutas && typeof rutas === "object") {
+    for (const bandas of Object.values(rutas)) {
+      if (!Array.isArray(bandas)) continue;
+      const b = bandas.find((x) => x && nivel >= x.min && nivel <= x.max);
+      if (b?.zones) return b.zones;
+    }
+  }
+  const enemiga = faccion === "alianza" ? "horda" : "alianza";
+  const nombres = [];
+  for (const z of Object.values(zonasJson?.zonas || {})) {
+    const nv = z?.niveles;
+    if (!nv || nv.min == null || nv.max == null || nivel < nv.min || nivel > nv.max) continue;
+    if (z.faccion === enemiga) continue;
+    const n = nombreEN(z.n);
+    if (n) nombres.push(n);
+  }
+  return nombres.join(" / ");
+}
+function ajustesBase(perfil) {
+  const p = new Set(perfil?.profesiones || []);
+  return {
+    comp: "auto",
+    zoneComp: {},
+    gph: 5,
+    prof: { skin: p.has(393), herb: p.has(182), mine: p.has(186) },
+    group: false,
+    pvp: true,
+    n: 5,
+    session: 2
+  };
+}
+var COMP_ORDER = ["low", "med", "high"];
+function normalizarAjustes(s) {
+  s = s || {};
+  const zc = {};
+  if (s.zoneComp && typeof s.zoneComp === "object") {
+    for (const k of Object.keys(s.zoneComp)) if (COMP_ORDER.includes(s.zoneComp[k])) zc[k] = s.zoneComp[k];
+  }
+  const p = s.prof || {}, n = Number(s.n);
+  return {
+    comp: COMP_ORDER.includes(s.comp) ? s.comp : "auto",
+    zoneComp: zc,
+    gph: Number.isFinite(+s.gph) && +s.gph > 0 ? Math.min(1e3, +s.gph) : 5,
+    prof: { skin: !!p.skin, herb: !!p.herb, mine: !!p.mine },
+    group: !!s.group,
+    pvp: s.pvp !== false,
+    n: Number.isInteger(n) && n >= 3 && n <= 8 ? n : 5,
+    session: [1, 2, 4].includes(+s.session) ? +s.session : 2
+  };
+}
+function ajustesFarm(perfil, guardado) {
+  const base = ajustesBase(perfil);
+  const g = guardado && typeof guardado === "object" ? guardado : {};
+  return normalizarAjustes({
+    ...base,
+    ...g,
+    prof: { ...base.prof, ...g.prof || {} },
+    zoneComp: { ...base.zoneComp || {}, ...g.zoneComp || {} }
+  });
+}
+function puntoDe(h) {
+  let day, low;
+  if (Array.isArray(h)) {
+    if (h.length < 2) return null;
+    day = h[0];
+    low = h[1];
+  } else if (h && typeof h === "object") {
+    day = h.day;
+    low = h.low;
+  } else return null;
+  if (!Number.isSafeInteger(day) || !Number.isSafeInteger(low) || low <= 0) return null;
+  return { day, low };
+}
+function puntosDe(history) {
+  const porDia = /* @__PURE__ */ new Map();
+  for (const h of Array.isArray(history) ? history : []) {
+    const p = puntoDe(h);
+    if (!p) continue;
+    const prev = porDia.get(p.day);
+    if (prev === void 0 || p.low > prev) porDia.set(p.day, p.low);
+  }
+  return [...porDia.keys()].sort((a, b) => a - b).map((d) => ({ day: d, low: porDia.get(d) }));
+}
+var pad2 = (n) => (n < 10 ? "0" : "") + n;
+var fmtDia = (day) => {
+  const d = new Date(EPOCH + day * DAY_MS);
+  return `${pad2(d.getUTCDate())}/${pad2(d.getUTCMonth() + 1)}/${d.getUTCFullYear()}`;
+};
+var fmtCobre = (c) => {
+  c = Math.round(c);
+  if (c >= 1e4) {
+    const g = c / 1e4;
+    return `${g >= 100 ? Math.round(g) : Math.round(g * 10) / 10}g`;
+  }
+  if (c >= 100) return `${Math.round(c / 100)}s`;
+  return `${c}c`;
+};
+function pasoLindo(raw) {
+  if (!(raw > 0) || !Number.isFinite(raw)) return 1;
+  const p = Math.pow(10, Math.floor(Math.log10(raw))), n = raw / p;
+  return (n <= 1 ? 1 : n <= 2 ? 2 : n <= 5 ? 5 : 10) * p;
+}
+function medianaDe(vals) {
+  const s = vals.slice().sort((a, b) => a - b);
+  const n = s.length;
+  return n % 2 ? s[(n - 1) / 2] : Math.round((s[n / 2 - 1] + s[n / 2]) / 2);
+}
+var f1 = (v) => Math.round(v * 10) / 10;
+function geometriaGrafico(history, opciones = {}) {
+  const pts = puntosDe(history);
+  if (!pts.length) return null;
+  const W = opciones.w || 720, H = opciones.h || 210;
+  const P = opciones.pad || { l: 52, r: 12, t: 12, b: 30 };
+  const axes = opciones.axes !== false;
+  const current = opciones.current != null && Number.isFinite(opciones.current) && opciones.current > 0 ? opciones.current : null;
+  const n = pts.length;
+  const lows = pts.map((p) => p.low);
+  let lo = Math.min(...lows), hi = Math.max(...lows);
+  if (hi <= lo) {
+    const pad = Math.max(1, Math.round(lo * 0.05));
+    lo -= pad;
+    hi += pad;
+  }
+  const x0 = P.l, x1 = W - P.r, y0 = P.t, y1 = H - P.b;
+  const plotW = Math.max(1, x1 - x0), plotH = Math.max(1, y1 - y0);
+  const dMin = pts[0].day, dMax = pts[n - 1].day;
+  const sx = (d) => dMax > dMin ? x0 + (d - dMin) / (dMax - dMin) * plotW : x0 + plotW / 2;
+  const sy = (v) => y1 - (v - lo) / (hi - lo) * plotH;
+  const coords = pts.map((p) => `${f1(sx(p.day))},${f1(sy(p.low))}`);
+  const firstX = coords[0].split(",")[0], lastX = coords[n - 1].split(",")[0];
+  const linea = `M${coords.join(" L")}`;
+  const area = `${linea} L${lastX},${y1} L${firstX},${y1} Z`;
+  const med = medianaDe(lows);
+  const mediana = med > lo && med < hi ? f1(sy(med)) : null;
+  const fin = { x: f1(sx(dMax)), y: f1(sy(pts[n - 1].low)) };
+  const actual = current != null && current >= lo && current <= hi && dMax > dMin ? { x: f1(sx(dMax)), y: f1(sy(current)) } : null;
+  const out = { W, H, x0, x1, y0, y1, area, linea, mediana, fin, actual };
+  if (axes) {
+    const paso = pasoLindo((hi - lo) / 4);
+    const primero = Math.ceil(lo / paso) * paso;
+    const ticksY = [];
+    const vistos = {};
+    for (let k = 0; k < 6; k++) {
+      const v = Math.round((primero + k * paso) * 100) / 100;
+      if (v > hi || vistos[v]) break;
+      vistos[v] = true;
+      ticksY.push({ v, y: f1(sy(v)), label: fmtCobre(v) });
+    }
+    const ticksX = [];
+    const vistosX = {};
+    for (let i = 0; i <= 4; i++) {
+      const idx = Math.round(i * (n - 1) / 4);
+      if (vistosX[idx]) continue;
+      vistosX[idx] = true;
+      ticksX.push({ x: f1(sx(pts[idx].day)), label: fmtDia(pts[idx].day) });
+    }
+    out.ticksY = ticksY;
+    out.ticksX = ticksX;
+  }
+  return out;
+}
+function paresZona(main, otros) {
+  const zm = {};
+  for (const p of otros || []) if (p && p[0]) zm[p[0]] = p[1];
+  if (main && main[0]) zm[main[0]] = main[1];
+  return Object.entries(zm);
+}
+function fuentesDropData(itemId, dd) {
+  const it = dd?.items?.[String(itemId ?? "")];
+  if (!it) return [];
+  const out = [];
+  for (const s of it[10] || []) {
+    const [t2, rid, chance, minC, maxC] = s || [];
+    const sid = String(rid ?? "");
+    const base = { tipo: t2, id: sid, chance: chance ?? null, minC: minC ?? null, maxC: maxC ?? null, nombre: null, zonas: [] };
+    if (t2 === "o") {
+      const o = dd.objects?.[sid];
+      if (o) {
+        base.nombre = o[0] || null;
+        base.objKind = o[1] || null;
+        for (const [zk, sp] of paresZona([o[2], o[3]], o[5])) {
+          const z = dd.zones?.[zk];
+          if (z) base.zonas.push({ key: zk, nombre: z[0] || zk, faccion: z[2] || null, nivelMin: z[3] ?? null, nivelMax: z[4] ?? null, spawns: sp ?? null });
+        }
+      }
+    } else {
+      const m = dd.mobs?.[sid];
+      if (m) {
+        base.nombre = m[0] || null;
+        base.nivelMin = m[1] ?? null;
+        base.nivelMax = m[2] ?? null;
+        base.rank = m[3] || null;
+        base.kind = t2 === "s" ? "skin" : t2 === "p" ? "pick" : "mob";
+        for (const [zk, sp] of paresZona([m[4], m[5]], m[8])) {
+          const z = dd.zones?.[zk];
+          if (z) base.zonas.push({ key: zk, nombre: z[0] || zk, faccion: z[2] || null, nivelMin: z[3] ?? null, nivelMax: z[4] ?? null, spawns: sp ?? null });
+        }
+      }
+    }
+    out.push(base);
+  }
+  return out;
+}
+
+// src/vistas/mercado/detalle.jsx
+import { useMemo as useMemo9 } from "react";
+
+// src/vistas/mercado/grafico.jsx
+import { useMemo as useMemo8 } from "react";
+import { jsx as jsx12, jsxs as jsxs12 } from "react/jsx-runtime";
+var ROLES = {
+  area: { fill: C.amarillo, fillOpacity: 0.1 },
+  linea: { stroke: C.amarillo, strokeWidth: 1.6, fill: "none", strokeLinejoin: "round", strokeLinecap: "round" },
+  mediana: { stroke: C.texto3, strokeWidth: 1, strokeDasharray: "4 3" },
+  punto: { fill: C.naranja },
+  eje: { stroke: C.borde2, strokeWidth: 1 },
+  tick: { stroke: C.borde2, strokeWidth: 1 },
+  texto: { fill: C.texto3, fontSize: 9.5 }
+};
+function GraficoPrecios({ history, actual, lang, titulo }) {
+  const g = useMemo8(() => geometriaGrafico(history, { current: actual }), [history, actual]);
+  if (!g) return /* @__PURE__ */ jsx12("p", { style: S.sub, children: t(lang, "mercado.sinHistorial") });
+  return /* @__PURE__ */ jsxs12("svg", { viewBox: `0 0 ${g.W} ${g.H}`, role: "img", "aria-label": titulo || t(lang, "mercado.grafico"), style: { width: "100%", height: "auto", display: "block" }, children: [
+    g.mediana != null && /* @__PURE__ */ jsx12("line", { x1: g.x0, y1: g.mediana, x2: g.x1, y2: g.mediana, style: ROLES.mediana }),
+    /* @__PURE__ */ jsx12("path", { d: g.area, style: ROLES.area }),
+    /* @__PURE__ */ jsx12("path", { d: g.linea, style: ROLES.linea }),
+    g.actual && /* @__PURE__ */ jsx12("circle", { cx: g.actual.x, cy: g.actual.y, r: 3, style: ROLES.punto }),
+    /* @__PURE__ */ jsx12("circle", { cx: g.fin.x, cy: g.fin.y, r: 3, style: ROLES.punto }),
+    g.ticksY?.map((tk) => /* @__PURE__ */ jsxs12("g", { children: [
+      /* @__PURE__ */ jsx12("line", { x1: g.x0 - 4, y1: tk.y, x2: g.x0, y2: tk.y, style: ROLES.tick }),
+      /* @__PURE__ */ jsx12("text", { x: g.x0 - 7, y: tk.y + 3, textAnchor: "end", style: ROLES.texto, children: tk.label })
+    ] }, "y" + tk.v)),
+    g.ticksX?.map((tk) => /* @__PURE__ */ jsxs12("g", { children: [
+      /* @__PURE__ */ jsx12("line", { x1: tk.x, y1: g.y1, x2: tk.x, y2: g.y1 + 4, style: ROLES.eje }),
+      /* @__PURE__ */ jsx12("text", { x: tk.x, y: g.y1 + 15, textAnchor: "middle", style: ROLES.texto, children: tk.label })
+    ] }, "x" + tk.x + tk.label)),
+    /* @__PURE__ */ jsx12("line", { x1: g.x0, y1: g.y0, x2: g.x0, y2: g.y1, style: ROLES.eje }),
+    /* @__PURE__ */ jsx12("line", { x1: g.x0, y1: g.y1, x2: g.x1, y2: g.y1, style: ROLES.eje })
+  ] });
+}
+function Sparkline({ history }) {
+  const g = useMemo8(() => geometriaGrafico(history, {
+    w: 150,
+    h: 34,
+    pad: { l: 4, r: 4, t: 5, b: 5 },
+    axes: false,
+    current: null
+  }), [history]);
+  if (!g) return null;
+  return /* @__PURE__ */ jsxs12("svg", { viewBox: `0 0 ${g.W} ${g.H}`, role: "img", "aria-label": "sparkline", style: { width: 150, height: 34, display: "block", flexShrink: 0 }, children: [
+    /* @__PURE__ */ jsx12("path", { d: g.area, style: ROLES.area }),
+    /* @__PURE__ */ jsx12("path", { d: g.linea, style: ROLES.linea }),
+    /* @__PURE__ */ jsx12("circle", { cx: g.fin.x, cy: g.fin.y, r: 2.5, style: ROLES.punto })
+  ] });
+}
+
+// src/vistas/mercado/detalle.jsx
+import { jsx as jsx13, jsxs as jsxs13 } from "react/jsx-runtime";
+var TENDENCIA = { sube: "mercado.tend.sube", baja: "mercado.tend.baja", estable: "mercado.tend.estable", "sin-datos": "mercado.tend.pocos" };
+var KIND_DROP = { mob: "", skin: "Piel: ", pick: "Pillosidad: ", object: "Objeto: " };
+function fmtPct(v) {
+  return v == null ? "—" : `${Math.round(v * 100)}%`;
+}
+function DetalleItem({ item: item2, lang, catalogo, metrica, deal, onCerrar }) {
+  const stats = useMemo9(() => import_market_history.default.priceStats(item2), [item2]);
+  const catEntry = useMemo9(() => item2?.itemId != null ? catalogo?.items?.[String(item2.itemId)] : null, [item2, catalogo]);
+  const fuentes = useMemo9(() => catEntry ? fuentesItem(catEntry, D.dungeons) : [], [catEntry]);
+  const drops = useMemo9(() => fuentesDropData(item2?.itemId, D.dropData), [item2]);
+  const fss = useMemo9(() => metrica?.sources?.length ? [...metrica.sources].sort((a, b) => Number(b.eligible) - Number(a.eligible) || (b.gph || 0) - (a.gph || 0)).slice(0, 10) : [], [metrica]);
+  const historial = useMemo9(() => (item2?.history || []).slice().sort((a, b) => b.day - a.day), [item2]);
+  if (!item2) return null;
+  const nombreVisible = nombreItem(item2, D.items, catalogo, lang) || item2.sourceKey;
+  const esVariante = item2.itemId == null;
+  const fmt2 = Farm.fmt || {};
+  const dealKind = deal?.kind;
+  const verdict = dealKind === "oferta" ? t(lang, "mercado.deal.oferta") : dealKind === "sobreprecio" ? t(lang, "mercado.deal.sobreprecio") : dealKind === "estable" ? t(lang, "mercado.deal.estable") : null;
+  return /* @__PURE__ */ jsxs13(
+    Tarjeta,
+    {
+      titulo: `${nombreVisible} · ${item2.sourceKey}`,
+      extra: onCerrar ? /* @__PURE__ */ jsx13("button", { type: "button", onClick: onCerrar, style: { ...S.etiqueta, cursor: "pointer" }, children: t(lang, "mercado.cerrar") }) : null,
+      children: [
+        /* @__PURE__ */ jsxs13("p", { style: S.sub, children: [
+          t(lang, "mercado.det.ultimo"),
+          ": ",
+          /* @__PURE__ */ jsx13(Dinero, { cobre: item2.unitPriceCopper }),
+          ". ",
+          t(lang, "mercado.det.aviso"),
+          metrica?.doubtful ? ` ${t(lang, "mercado.det.dudoso")}` : "",
+          esVariante ? ` ${t(lang, "mercado.det.variante")}` : ""
+        ] }),
+        stats?.diasMuestra > 0 && /* @__PURE__ */ jsxs13("p", { style: S.sub, children: [
+          t(lang, "mercado.det.historial"),
+          ": ",
+          stats.diasMuestra,
+          "d ·",
+          " ",
+          t(lang, "mercado.det.minimo"),
+          " ",
+          /* @__PURE__ */ jsx13(Dinero, { cobre: stats.minLow }),
+          " ·",
+          " ",
+          t(lang, "mercado.det.mediana"),
+          " ",
+          /* @__PURE__ */ jsx13(Dinero, { cobre: stats.medianaLow }),
+          " ·",
+          " ",
+          t(lang, "mercado.det.promedio"),
+          " ",
+          /* @__PURE__ */ jsx13(Dinero, { cobre: stats.avgLow }),
+          " ·",
+          " ",
+          t(lang, TENDENCIA[stats.tendencia] || "mercado.tend.pocos")
+        ] }),
+        verdict && /* @__PURE__ */ jsxs13("p", { style: S.sub, children: [
+          t(lang, "mercado.det.analisis"),
+          ": ",
+          /* @__PURE__ */ jsx13("b", { children: verdict }),
+          deal?.medianaLow != null ? ` — ${t(lang, "mercado.det.mediana")} <Dinero cobre={deal.medianaLow} />` : "",
+          deal?.minLow != null ? ` · ${t(lang, "mercado.det.minimo")} <Dinero cobre={deal.minLow} />` : "",
+          deal?.days ? ` · ${deal.days}d` : "",
+          deal?.available != null ? ` · ${deal.available} ${t(lang, "mercado.det.ofertas")}` : "",
+          ".",
+          (deal?.reasons || []).length ? ` ${deal.reasons.join(" ")}` : ""
+        ] }),
+        /* @__PURE__ */ jsxs13("div", { children: [
+          /* @__PURE__ */ jsx13("h4", { style: { ...S.titulo, fontSize: 12, margin: "4px 0" }, children: t(lang, "mercado.det.grafico") }),
+          /* @__PURE__ */ jsx13(GraficoPrecios, { history: item2.history, actual: item2.unitPriceCopper, lang }),
+          /* @__PURE__ */ jsx13("p", { style: S.sub, children: t(lang, "mercado.det.graficoNota") })
+        ] }),
+        /* @__PURE__ */ jsxs13("div", { children: [
+          /* @__PURE__ */ jsx13("h4", { style: { ...S.titulo, fontSize: 12, margin: "4px 0" }, children: t(lang, "mercado.det.diario") }),
+          /* @__PURE__ */ jsx13("div", { style: { overflowX: "auto" }, children: /* @__PURE__ */ jsxs13("table", { style: S.tabla, children: [
+            /* @__PURE__ */ jsx13("thead", { children: /* @__PURE__ */ jsxs13("tr", { children: [
+              /* @__PURE__ */ jsx13("th", { style: S.th, children: t(lang, "mercado.det.dia") }),
+              /* @__PURE__ */ jsx13("th", { style: S.th, children: t(lang, "mercado.det.minDiario") }),
+              /* @__PURE__ */ jsx13("th", { style: S.th, children: t(lang, "mercado.det.maxMin") }),
+              /* @__PURE__ */ jsx13("th", { style: S.th, children: t(lang, "mercado.det.maxOferta") })
+            ] }) }),
+            /* @__PURE__ */ jsx13("tbody", { children: historial.length ? historial.map((h) => /* @__PURE__ */ jsxs13("tr", { children: [
+              /* @__PURE__ */ jsx13("td", { style: S.td, children: fmtDia(h.day) }),
+              /* @__PURE__ */ jsx13("td", { style: S.td, children: /* @__PURE__ */ jsx13(Dinero, { cobre: h.low }) }),
+              /* @__PURE__ */ jsx13("td", { style: S.td, children: /* @__PURE__ */ jsx13(Dinero, { cobre: h.high }) }),
+              /* @__PURE__ */ jsx13("td", { style: S.td, children: h.available == null ? t(lang, "mercado.det.sinDato") : h.available })
+            ] }, h.day)) : /* @__PURE__ */ jsx13("tr", { children: /* @__PURE__ */ jsx13("td", { style: S.td, colSpan: 4, children: t(lang, "mercado.det.sinHistorialFila") }) }) })
+          ] }) })
+        ] }),
+        /* @__PURE__ */ jsxs13("div", { children: [
+          /* @__PURE__ */ jsxs13("h4", { style: { ...S.titulo, fontSize: 12, margin: "4px 0", display: "flex", gap: 8, alignItems: "center" }, children: [
+            t(lang, "mercado.det.fuentes"),
+            /* @__PURE__ */ jsx13(Origen, { f: ["cmangos-1.12", "cliente-forever"], lang })
+          ] }),
+          fuentes.length ? /* @__PURE__ */ jsx13("ul", { style: { margin: 0, paddingLeft: 18, fontSize: 12 }, children: fuentes.map((s, i) => /* @__PURE__ */ jsxs13("li", { children: [
+            nombre(s.bossN || { es: s.boss, en: s.boss }, lang) || s.boss,
+            " · ",
+            nombre(s.dungeonN || { es: s.dungeon, en: s.dungeon }, lang) || s.dungeon,
+            s.location ? ` · ${nombre({ es: s.dungeonN?.es || s.location, en: s.dungeonN?.en || s.location }, lang)}` : "",
+            s.levelMin != null && s.levelMax != null ? ` · ${t(lang, "mercado.det.rangoGrupo", { min: s.levelMin, max: s.levelMax })}` : "",
+            /* @__PURE__ */ jsx13("div", { style: S.etiqueta, children: s.reference })
+          ] }, i)) }) : /* @__PURE__ */ jsx13(Hueco, { lang, children: t(lang, "mercado.det.sinFuente") }),
+          /* @__PURE__ */ jsx13("p", { style: S.sub, children: t(lang, "mercado.det.fuentesNota") })
+        ] }),
+        /* @__PURE__ */ jsxs13("div", { children: [
+          /* @__PURE__ */ jsxs13("h4", { style: { ...S.titulo, fontSize: 12, margin: "4px 0", display: "flex", gap: 8, alignItems: "center" }, children: [
+            t(lang, "mercado.det.drops"),
+            /* @__PURE__ */ jsx13(Origen, { f: "cmangos-1.12", lang })
+          ] }),
+          drops.length ? /* @__PURE__ */ jsxs13("ul", { style: { margin: 0, paddingLeft: 18, fontSize: 12 }, children: [
+            drops.slice(0, 20).map((s, i) => /* @__PURE__ */ jsxs13("li", { children: [
+              KIND_DROP[s.kind || (s.tipo === "o" ? "object" : "mob")] || "",
+              s.nombre || `#${s.id}`,
+              s.objKind ? ` (${s.objKind})` : "",
+              s.nivelMin != null ? ` · nv ${s.nivelMin}${s.nivelMax != null && s.nivelMax !== s.nivelMin ? `–${s.nivelMax}` : ""}` : "",
+              s.chance != null ? ` · ${fmtPct(s.chance / 100)} ${t(lang, "mercado.det.cadaMuerte")}` : "",
+              s.minC != null && s.maxC != null && s.maxC !== s.minC ? ` · ${s.minC}–${s.maxC}` : "",
+              s.zonas.length ? /* @__PURE__ */ jsxs13("div", { style: S.etiqueta, children: [
+                s.zonas.slice(0, 4).map((z) => z.nombre).join(" · "),
+                s.zonas.length > 4 ? ` +${s.zonas.length - 4}` : ""
+              ] }) : null
+            ] }, i)),
+            drops.length > 20 ? /* @__PURE__ */ jsxs13("li", { style: S.etiqueta, children: [
+              "+",
+              drops.length - 20
+            ] }) : null
+          ] }) : /* @__PURE__ */ jsx13(Hueco, { lang, children: t(lang, "mercado.det.sinDrops") })
+        ] }),
+        fss.length > 0 && /* @__PURE__ */ jsxs13("div", { children: [
+          /* @__PURE__ */ jsxs13("h4", { style: { ...S.titulo, fontSize: 12, margin: "4px 0", display: "flex", gap: 8, alignItems: "center" }, children: [
+            t(lang, "mercado.det.farmeo"),
+            /* @__PURE__ */ jsx13(Origen, { f: "cmangos-1.12", lang })
+          ] }),
+          /* @__PURE__ */ jsx13("ul", { style: { margin: 0, paddingLeft: 18, fontSize: 12 }, children: fss.map((s, i) => /* @__PURE__ */ jsxs13("li", { children: [
+            fmt2.srcLabel ? fmt2.srcLabel(s) : `${s.name || "#" + s.id}`,
+            s.zoneKey != null && fmt2.zoneName ? ` · ${fmt2.zoneName(s.zoneKey)}` : "",
+            s.eligible ? ` · ${fmt2.pct ? fmt2.pct(s.chance) : fmtPct(s.chance)} · ~${fmt2.gph ? fmt2.gph(s.gph) : s.gph}/h${s.roi != null ? ` · ROI ${s.roi >= 0 ? "+" : ""}${Math.round(s.roi * 100)}%` : ""}` : ` — ${s.reason || t(lang, "mercado.det.noElegible")}`
+          ] }, i)) })
+        ] }),
+        /* @__PURE__ */ jsxs13("p", { style: S.sub, children: [
+          t(lang, "mercado.det.cobertura", { addon: catalogo?.source?.addon || t(lang, "mercado.det.sinCatalogo") }),
+          " ",
+          catalogo?.source?.coverage || ""
+        ] })
+      ]
+    }
+  );
+}
+
+// src/vistas/mercado/farmeo.jsx
+import { useMemo as useMemo10 } from "react";
+import { Button as Button4, Checkbox as Checkbox5, Input as Input3, Select as Select3, SelectContent as SelectContent3, SelectItem as SelectItem3, SelectTrigger as SelectTrigger3, SelectValue as SelectValue3 } from "@hermes/plugin-sdk";
+import { Fragment as Fragment11, jsx as jsx14, jsxs as jsxs14 } from "react/jsx-runtime";
+var COMP_LABEL = { auto: "Auto", low: "Baja", med: "Media", high: "Alta" };
+var RIESGO = { baja: "mercado.farm.riesgo.baja", media: "mercado.farm.riesgo.media", alta: "mercado.farm.riesgo.alta" };
+var PROF_NOMBRE = { skin: "mercado.farm.prof.skin", herb: "mercado.farm.prof.herb", mine: "mercado.farm.prof.mine" };
+function Chip({ children, color }) {
+  return /* @__PURE__ */ jsx14("span", { style: { ...S.chip, borderColor: color || C.borde, color: color || C.texto2 }, children });
+}
+function BadgeZona({ e, lang, fmt: fmt2 }) {
+  const bits = [];
+  bits.push(/* @__PURE__ */ jsxs14(Chip, { color: e.risk?.level === "alta" ? C.rojo : e.risk?.level === "media" ? C.amarillo : C.verde, children: [
+    t(lang, "mercado.farm.riesgo"),
+    ": ",
+    t(lang, RIESGO[e.risk?.level] || RIESGO.baja)
+  ] }, "r"));
+  bits.push(/* @__PURE__ */ jsxs14(Chip, { children: [
+    t(lang, "mercado.farm.comp"),
+    ": ",
+    COMP_LABEL[e.comp?.comp] || e.comp?.comp
+  ] }, "c"));
+  if (e.travel?.min) bits.push(/* @__PURE__ */ jsxs14(Chip, { children: [
+    t(lang, "mercado.farm.viaje", { min: e.travel.min }),
+    e.travel.fp ? "" : ` · ${t(lang, "mercado.farm.sinVuelo")}`,
+    e.travel.hub ? ` · ${t(lang, "mercado.farm.tuRuta")}` : ""
+  ] }, "v"));
+  if (e.vendorGph) bits.push(/* @__PURE__ */ jsxs14(Chip, { children: [
+    "≈",
+    fmt2.gph(e.vendorGph),
+    "/h ",
+    t(lang, "mercado.farm.vendedor")
+  ] }, "g"));
+  return /* @__PURE__ */ jsx14("div", { style: { display: "flex", gap: 4, flexWrap: "wrap" }, children: bits });
+}
+function PrecioItem({ hist, price, lang }) {
+  const st = useMemo10(() => hist?.length ? FarmHistPriceStats(hist) : null, [hist]);
+  if (!st) return null;
+  const tend = { sube: "mercado.tend.sube", baja: "mercado.tend.baja", estable: "mercado.tend.estable", "sin-datos": "mercado.tend.pocos" }[st.tendencia] || "mercado.tend.pocos";
+  return /* @__PURE__ */ jsxs14("span", { style: { display: "inline-flex", gap: 6, alignItems: "center", marginLeft: 6 }, children: [
+    /* @__PURE__ */ jsx14(Sparkline, { history: hist }),
+    st.diasMuestra >= 2 && /* @__PURE__ */ jsxs14(Chip, { color: st.tendencia === "sube" ? C.verde : st.tendencia === "baja" ? C.rojo : void 0, children: [
+      t(lang, tend),
+      " · ",
+      st.diasMuestra,
+      "d"
+    ] }),
+    st.medianaLow != null && /* @__PURE__ */ jsxs14("span", { style: S.etiqueta, children: [
+      t(lang, "mercado.farm.mediana"),
+      " ",
+      fmtMoney(st.medianaLow),
+      price != null ? ` · ${t(lang, "mercado.farm.hoy")} ${fmtMoney(price)}` : ""
+    ] })
+  ] });
+}
+function FarmHistPriceStats(hist) {
+  return import_market_history.default.priceStats(hist);
+}
+function fmtMoney(c) {
+  return Farm.fmt?.money ? Farm.fmt.money(c) : String(c);
+}
+function TarjetaZona({ e, rank, profile, settings, lang, onComp, onCopada }) {
+  const fmt2 = Farm.fmt || {};
+  const cur = settings.zoneComp?.[e.zoneKey] || "auto";
+  return /* @__PURE__ */ jsxs14("div", { style: { ...S.tarjeta, borderLeft: rank === "A" ? `3px solid ${C.acento}` : void 0 }, children: [
+    /* @__PURE__ */ jsxs14("div", { style: { display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }, children: [
+      /* @__PURE__ */ jsxs14("b", { children: [
+        rank,
+        " · ",
+        e.name
+      ] }),
+      /* @__PURE__ */ jsx14(BadgeZona, { e, lang, fmt: fmt2 })
+    ] }),
+    /* @__PURE__ */ jsxs14("p", { style: S.sub, children: [
+      t(lang, "mercado.farm.niveles", { min: e.levels?.[0] ?? "?", max: e.levels?.[1] ?? "?" }),
+      " · ",
+      t(lang, "mercado.farm.nivelVos", { nivel: profile.level || 12 })
+    ] }),
+    /* @__PURE__ */ jsxs14("p", { style: S.sub, children: [
+      "~",
+      fmt2.gph ? fmt2.gph(e.gph) : e.gph,
+      "/h ",
+      t(lang, "mercado.farm.antesMultiplicadores"),
+      " · ",
+      e.rareCount,
+      " ",
+      t(lang, "mercado.farm.rarezas"),
+      " (",
+      e.rareScan,
+      " ",
+      t(lang, "mercado.farm.conScan"),
+      ") · ",
+      e.chestCount,
+      " ",
+      t(lang, "mercado.farm.cofres"),
+      " · ",
+      e.usefulCount,
+      " ",
+      t(lang, "mercado.farm.utiles")
+    ] }),
+    e.topItems?.length > 0 && /* @__PURE__ */ jsxs14("div", { children: [
+      /* @__PURE__ */ jsx14("div", { style: S.etiqueta, children: t(lang, "mercado.farm.itemsScan") }),
+      /* @__PURE__ */ jsx14("ul", { style: { margin: 0, paddingLeft: 18, fontSize: 12 }, children: e.topItems.map((it, i) => /* @__PURE__ */ jsxs14("li", { children: [
+        it.name,
+        " · ",
+        fmt2.srcLabel ? fmt2.srcLabel(it.source) : it.source?.name,
+        " · ",
+        t(lang, "mercado.farm.zona"),
+        " ",
+        fmt2.zoneName ? fmt2.zoneName(it.source?.zoneKey) : it.source?.zoneKey,
+        " · ",
+        fmt2.pct ? fmt2.pct(it.chance) : it.chance,
+        it.doubtful ? /* @__PURE__ */ jsxs14(Fragment11, { children: [
+          " ",
+          /* @__PURE__ */ jsx14(Chip, { color: C.amarillo, children: t(lang, "mercado.farm.dudoso") })
+        ] }) : null,
+        /* @__PURE__ */ jsx14(PrecioItem, { hist: it.hist, price: it.price, lang })
+      ] }, i)) })
+    ] }),
+    e.useful?.length > 0 && /* @__PURE__ */ jsxs14("div", { children: [
+      /* @__PURE__ */ jsx14("div", { style: S.etiqueta, children: t(lang, "mercado.farm.utilesVos") }),
+      /* @__PURE__ */ jsx14("ul", { style: { margin: 0, paddingLeft: 18, fontSize: 12 }, children: e.useful.map((u, i) => /* @__PURE__ */ jsxs14("li", { children: [
+        u.name,
+        " ",
+        /* @__PURE__ */ jsxs14("span", { style: S.etiqueta, children: [
+          "· ",
+          u.srcName || ""
+        ] }),
+        u.preferred ? /* @__PURE__ */ jsxs14(Fragment11, { children: [
+          " ",
+          /* @__PURE__ */ jsx14(Chip, { color: C.azul, children: t(lang, "mercado.farm.preferida") })
+        ] }) : null,
+        u.isRare ? /* @__PURE__ */ jsxs14(Fragment11, { children: [
+          " ",
+          /* @__PURE__ */ jsx14(Chip, { color: C.amarillo, children: t(lang, "mercado.farm.rareza") })
+        ] }) : null,
+        /* @__PURE__ */ jsx14(PrecioItem, { hist: u.hist, price: u.price, lang })
+      ] }, i)) })
+    ] }),
+    e.camps?.length > 0 && /* @__PURE__ */ jsxs14("div", { children: [
+      /* @__PURE__ */ jsx14("div", { style: S.etiqueta, children: t(lang, "mercado.farm.camps") }),
+      /* @__PURE__ */ jsx14("ul", { style: { margin: 0, paddingLeft: 18, fontSize: 12 }, children: e.camps.map((c, i) => /* @__PURE__ */ jsxs14("li", { children: [
+        c.name,
+        " · ",
+        c.kind === "object" ? t(lang, "mercado.farm.recoleccion") : "mob",
+        " · ~",
+        fmt2.gph ? fmt2.gph(c.gph) : c.gph,
+        "/h ",
+        t(lang, "mercado.farm.approx")
+      ] }, i)) })
+    ] }),
+    e.risk?.note && /* @__PURE__ */ jsx14("div", { style: S.aviso, children: e.risk.note }),
+    /* @__PURE__ */ jsxs14("div", { style: { display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }, children: [
+      /* @__PURE__ */ jsxs14("label", { style: { ...S.campo, minWidth: 140 }, children: [
+        /* @__PURE__ */ jsx14("span", { style: S.etiqueta, children: t(lang, "mercado.farm.compZona") }),
+        /* @__PURE__ */ jsxs14(Select3, { value: cur, onValueChange: (v) => onComp(e.zoneKey, v), children: [
+          /* @__PURE__ */ jsx14(SelectTrigger3, { "aria-label": t(lang, "mercado.farm.compZona"), children: /* @__PURE__ */ jsx14(SelectValue3, {}) }),
+          /* @__PURE__ */ jsxs14(SelectContent3, { children: [
+            /* @__PURE__ */ jsx14(SelectItem3, { value: "auto", children: t(lang, "mercado.farm.compAuto") }),
+            /* @__PURE__ */ jsx14(SelectItem3, { value: "low", children: t(lang, "mercado.farm.compLow") }),
+            /* @__PURE__ */ jsx14(SelectItem3, { value: "med", children: t(lang, "mercado.farm.compMed") }),
+            /* @__PURE__ */ jsx14(SelectItem3, { value: "high", children: t(lang, "mercado.farm.compHigh") })
+          ] })
+        ] })
+      ] }),
+      /* @__PURE__ */ jsx14(Button4, { variant: "outline", size: "xs", onClick: () => onCopada(e.zoneKey), children: t(lang, "mercado.farm.copada") })
+    ] }),
+    e.reasons?.length > 0 && /* @__PURE__ */ jsx14("ul", { style: { margin: 0, paddingLeft: 18, fontSize: 12, color: C.texto2 }, children: e.reasons.map((r, i) => /* @__PURE__ */ jsx14("li", { children: r }, i)) })
+  ] });
+}
+function Farmeo({ items, perfil, settings, onSettings, lang }) {
+  const guia = useMemo10(() => guiaCurada(perfil), [perfil]);
+  const profile = useMemo10(() => {
+    const hub = hubZonesDe(perfil?.nivel || 12, guia?.datos?.routes, D.zonas, perfil?.faccion);
+    return perfilMotor(perfil, hub);
+  }, [perfil, guia]);
+  const cambiar = (parcial) => onSettings({ ...settings, ...parcial });
+  const cambiarCompZona = (zk, v) => {
+    const zoneComp = { ...settings.zoneComp || {} };
+    if (v === "auto") delete zoneComp[zk];
+    else zoneComp[zk] = v;
+    cambiar({ zoneComp });
+  };
+  const cambiarProf = (k, v) => cambiar({ prof: { ...settings.prof, [k]: v } });
+  const fmt2 = Farm.fmt || {};
+  const calculo = useMemo10(() => {
+    if (!items?.length) return null;
+    try {
+      return {
+        rank: Farm.rank(items, profile, settings),
+        prog: Farm.progression(items, profile, settings),
+        profs: Farm.profRecommendations(items, profile, settings),
+        stats: Farm.matchStats(items)
+      };
+    } catch {
+      return null;
+    }
+  }, [items, profile, settings]);
+  const sinAjusteClase = ![1, 3, 7].includes(perfil?.clase);
+  return /* @__PURE__ */ jsx14(Tarjeta, { titulo: t(lang, "mercado.farm.titulo"), extra: /* @__PURE__ */ jsx14("span", { style: S.etiqueta, children: t(lang, "mercado.farm.subtitulo") }), children: !items?.length ? /* @__PURE__ */ jsx14("p", { style: S.sub, children: t(lang, "mercado.farm.sinScan") }) : /* @__PURE__ */ jsxs14(Fragment11, { children: [
+    /* @__PURE__ */ jsxs14("div", { style: { display: "flex", gap: 12, flexWrap: "wrap", alignItems: "flex-end" }, children: [
+      /* @__PURE__ */ jsxs14("label", { style: S.campo, children: [
+        /* @__PURE__ */ jsx14("span", { style: S.etiqueta, children: t(lang, "mercado.farm.compGlobal") }),
+        /* @__PURE__ */ jsxs14(Select3, { value: settings.comp, onValueChange: (v) => cambiar({ comp: v }), children: [
+          /* @__PURE__ */ jsx14(SelectTrigger3, { "aria-label": t(lang, "mercado.farm.compGlobal"), children: /* @__PURE__ */ jsx14(SelectValue3, {}) }),
+          /* @__PURE__ */ jsxs14(SelectContent3, { children: [
+            /* @__PURE__ */ jsx14(SelectItem3, { value: "auto", children: t(lang, "mercado.farm.compAuto") }),
+            /* @__PURE__ */ jsx14(SelectItem3, { value: "low", children: t(lang, "mercado.farm.compLow") }),
+            /* @__PURE__ */ jsx14(SelectItem3, { value: "med", children: t(lang, "mercado.farm.compMed") }),
+            /* @__PURE__ */ jsx14(SelectItem3, { value: "high", children: t(lang, "mercado.farm.compHigh") })
+          ] })
+        ] })
+      ] }),
+      /* @__PURE__ */ jsxs14("label", { style: S.campo, children: [
+        /* @__PURE__ */ jsx14("span", { style: S.etiqueta, children: t(lang, "mercado.farm.gphRef") }),
+        /* @__PURE__ */ jsx14(
+          Input3,
+          {
+            type: "number",
+            min: "1",
+            max: "1000",
+            step: "1",
+            value: settings.gph,
+            onChange: (e) => {
+              const n = +e.target.value;
+              cambiar({ gph: Number.isFinite(n) && n > 0 ? Math.min(1e3, n) : 5 });
+            }
+          }
+        )
+      ] }),
+      /* @__PURE__ */ jsxs14("label", { style: S.campo, children: [
+        /* @__PURE__ */ jsx14("span", { style: S.etiqueta, children: t(lang, "mercado.farm.ciclo") }),
+        /* @__PURE__ */ jsxs14(Select3, { value: String(settings.session), onValueChange: (v) => cambiar({ session: [1, 2, 4].includes(+v) ? +v : 2 }), children: [
+          /* @__PURE__ */ jsx14(SelectTrigger3, { "aria-label": t(lang, "mercado.farm.ciclo"), children: /* @__PURE__ */ jsx14(SelectValue3, {}) }),
+          /* @__PURE__ */ jsxs14(SelectContent3, { children: [
+            /* @__PURE__ */ jsx14(SelectItem3, { value: "1", children: "1 h" }),
+            /* @__PURE__ */ jsx14(SelectItem3, { value: "2", children: "2 h" }),
+            /* @__PURE__ */ jsx14(SelectItem3, { value: "4", children: "4 h" })
+          ] })
+        ] })
+      ] }),
+      /* @__PURE__ */ jsxs14("label", { style: S.campo, children: [
+        /* @__PURE__ */ jsx14("span", { style: S.etiqueta, children: t(lang, "mercado.farm.zonasExtra") }),
+        /* @__PURE__ */ jsxs14(Select3, { value: String(settings.n), onValueChange: (v) => {
+          const n = +v;
+          cambiar({ n: n >= 3 && n <= 8 ? n : 5 });
+        }, children: [
+          /* @__PURE__ */ jsx14(SelectTrigger3, { "aria-label": t(lang, "mercado.farm.zonasExtra"), children: /* @__PURE__ */ jsx14(SelectValue3, {}) }),
+          /* @__PURE__ */ jsx14(SelectContent3, { children: [3, 4, 5, 6, 7, 8].map((n) => /* @__PURE__ */ jsx14(SelectItem3, { value: String(n), children: n }, n)) })
+        ] })
+      ] })
+    ] }),
+    /* @__PURE__ */ jsxs14("div", { style: { display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center" }, children: [
+      /* @__PURE__ */ jsx14(Checkbox5, { checked: !!settings.prof.skin, onCheckedChange: (v) => cambiarProf("skin", !!v) }),
+      /* @__PURE__ */ jsx14("span", { style: { fontSize: 12 }, children: t(lang, PROF_NOMBRE.skin) }),
+      /* @__PURE__ */ jsx14(Checkbox5, { checked: !!settings.prof.herb, onCheckedChange: (v) => cambiarProf("herb", !!v) }),
+      /* @__PURE__ */ jsx14("span", { style: { fontSize: 12 }, children: t(lang, PROF_NOMBRE.herb) }),
+      /* @__PURE__ */ jsx14(Checkbox5, { checked: !!settings.prof.mine, onCheckedChange: (v) => cambiarProf("mine", !!v) }),
+      /* @__PURE__ */ jsx14("span", { style: { fontSize: 12 }, children: t(lang, PROF_NOMBRE.mine) }),
+      /* @__PURE__ */ jsx14(Checkbox5, { checked: !!settings.group, onCheckedChange: (v) => cambiar({ group: !!v }) }),
+      /* @__PURE__ */ jsx14("span", { style: { fontSize: 12 }, children: t(lang, "mercado.farm.grupo") }),
+      /* @__PURE__ */ jsx14(Checkbox5, { checked: settings.pvp !== false, onCheckedChange: (v) => cambiar({ pvp: !!v }) }),
+      /* @__PURE__ */ jsx14("span", { style: { fontSize: 12 }, children: t(lang, "mercado.farm.pvp") })
+    ] }),
+    sinAjusteClase && /* @__PURE__ */ jsx14("p", { style: S.sub, children: t(lang, "mercado.farm.sinEquipoClase") }),
+    !calculo ? /* @__PURE__ */ jsx14("p", { style: S.sub, children: t(lang, "mercado.farm.sinZonas") }) : /* @__PURE__ */ jsxs14(Fragment11, { children: [
+      calculo.rank.A ? /* @__PURE__ */ jsxs14("div", { style: { display: "flex", flexDirection: "column", gap: 10 }, children: [
+        /* @__PURE__ */ jsx14(
+          TarjetaZona,
+          {
+            e: calculo.rank.A,
+            rank: "A",
+            profile,
+            settings,
+            lang,
+            onComp: cambiarCompZona,
+            onCopada: (zk) => cambiarCompZona(zk, "high")
+          }
+        ),
+        calculo.rank.B.map((b, i) => /* @__PURE__ */ jsx14(
+          TarjetaZona,
+          {
+            e: b,
+            rank: `B${i + 1}`,
+            profile,
+            settings,
+            lang,
+            onComp: cambiarCompZona,
+            onCopada: (zk) => cambiarCompZona(zk, "high")
+          },
+          b.zoneKey
+        ))
+      ] }) : /* @__PURE__ */ jsx14("p", { style: S.sub, children: t(lang, "mercado.farm.sinZonas") }),
+      calculo.profs?.length > 0 && /* @__PURE__ */ jsxs14("div", { children: [
+        /* @__PURE__ */ jsx14("div", { style: S.etiqueta, children: t(lang, "mercado.farm.porProfesion") }),
+        calculo.profs.map((p) => /* @__PURE__ */ jsxs14("div", { style: { marginTop: 6 }, children: [
+          /* @__PURE__ */ jsx14("b", { style: { fontSize: 12 }, children: p.name }),
+          /* @__PURE__ */ jsx14("ul", { style: { margin: 0, paddingLeft: 18, fontSize: 12 }, children: p.zones.map((z) => /* @__PURE__ */ jsxs14("li", { children: [
+            z.name,
+            " · ~",
+            fmt2.gph ? fmt2.gph(z.gph) : z.gph,
+            "/h ",
+            t(lang, "mercado.farm.enMateriales"),
+            z.items?.length ? ` · ${z.items.join(" · ")}` : ""
+          ] }, z.zoneKey)) }),
+          p.along?.length > 0 && /* @__PURE__ */ jsxs14("div", { style: { marginTop: 4 }, children: [
+            /* @__PURE__ */ jsx14("div", { style: S.etiqueta, children: t(lang, "mercado.farm.skinAlong") }),
+            /* @__PURE__ */ jsx14("ul", { style: { margin: 0, paddingLeft: 18, fontSize: 12 }, children: p.along.map((z) => /* @__PURE__ */ jsxs14("li", { children: [
+              z.name,
+              " · ~",
+              fmt2.gph ? fmt2.gph(z.gph) : z.gph,
+              "/h ",
+              t(lang, "mercado.farm.enMateriales"),
+              z.bands ? ` · ${t(lang, "mercado.farm.bandas", { bands: z.bands })}` : ""
+            ] }, z.zoneKey)) }),
+            /* @__PURE__ */ jsx14("p", { style: S.sub, children: t(lang, "mercado.farm.skinAlongNota") })
+          ] })
+        ] }, p.kind)),
+        /* @__PURE__ */ jsx14("p", { style: S.sub, children: t(lang, "mercado.farm.porProfesionNota") })
+      ] }),
+      calculo.prog?.length > 0 && /* @__PURE__ */ jsxs14("div", { children: [
+        /* @__PURE__ */ jsx14("div", { style: S.etiqueta, children: t(lang, "mercado.farm.progresion") }),
+        /* @__PURE__ */ jsx14("ul", { style: { margin: 0, paddingLeft: 18, fontSize: 12 }, children: calculo.prog.map((p, i, arr) => {
+          const prev = i > 0 ? arr[i - 1] : null;
+          const same = prev && p.zoneKey === prev.zoneKey;
+          return /* @__PURE__ */ jsxs14("li", { children: [
+            t(lang, "mercado.farm.progLinea", { nivel: p.level }),
+            " ",
+            same ? t(lang, "mercado.farm.progSeguimos", { zona: p.name }) : t(lang, "mercado.farm.progMover", { zona: p.name }),
+            !same && p.gph ? ` (~${fmt2.gph ? fmt2.gph(p.gph) : p.gph}/h ${t(lang, "mercado.farm.approx")}${p.camp ? `, ${t(lang, "mercado.farm.camp")} ${p.camp}` : ""})` : ""
+          ] }, p.level);
+        }) })
+      ] }),
+      /* @__PURE__ */ jsxs14("div", { children: [
+        /* @__PURE__ */ jsx14("div", { style: S.etiqueta, children: t(lang, "mercado.farm.cobertura") }),
+        /* @__PURE__ */ jsxs14("p", { style: S.sub, children: [
+          calculo.stats ? t(lang, "mercado.farm.coberturaLinea", { matched: calculo.stats.matched, total: calculo.stats.total, pct: calculo.stats.pct }) : "",
+          " ",
+          t(lang, "mercado.farm.estimaciones")
+        ] })
+      ] })
+    ] })
+  ] }) });
+}
+
+// src/vistas/mercado.jsx
+import { Fragment as Fragment12, jsx as jsx15, jsxs as jsxs15 } from "react/jsx-runtime";
+agregarTextos({
+  "mercado.scan.titulo": "Escaneo de Auctionator",
+  "mercado.leer": "Leer Auctionator.lua",
+  "mercado.otra": "Elegir otra carpeta",
+  "mercado.archivo": "Importar archivo .lua",
+  "mercado.borrar": "Borrar precios locales",
+  "mercado.borrarSi": "¿Confirmar borrado?",
+  "mercado.leyendo": "Leyendo y validando Auctionator.lua…",
+  "mercado.leyendoCarpeta": "Buscando Auctionator.lua en la carpeta concedida…",
+  "mercado.ok": "Importación guardada y verificada. {nota}",
+  "mercado.okSinHist": "Importación guardada; el historial acumulado no se pudo persistir y se reintentará en la próxima importación.{nota}",
+  "mercado.errorParse": "No se importó: no se pudo interpretar el archivo (¿es un Auctionator.lua válido?). Se conserva el scan anterior.",
+  "mercado.errorValido": "No se importó: datos inválidos, versión no compatible o archivo incompleto. Se conserva el scan anterior.",
+  "mercado.errorTamano": "No se importó: archivo vacío o demasiado grande (máximo 8 MiB). Se conserva el scan anterior.",
+  "mercado.errorLeer": "No se importó: no se pudo leer el archivo. Se conserva el scan anterior.",
+  "mercado.errorGuardar": "No se importó: no se pudo guardar ({msg}). Se conserva el scan anterior.",
+  "mercado.errorCarpeta": "No se pudo leer Auctionator.lua de la carpeta{msg}. También puedes importar el archivo a mano.",
+  "mercado.cancelado": "Elección de carpeta cancelada. El scan anterior se conserva.",
+  "mercado.ocupado": "Ya hay una importación en curso.",
+  "mercado.sinArchivos": "Las APIs de archivos no están disponibles en este contexto.",
+  "mercado.borrando": "Borrando solo el mercado local…",
+  "mercado.borrado": "Mercado local borrado. El juego y tu personaje no cambiaron.",
+  "mercado.errorBorrar": "No se pudo borrar. Se conservan los datos. {msg}",
+  "mercado.errorBorrarParcial": "No se pudo borrar el scan; el historial acumulado sí se vació. {msg}",
+  "mercado.notaCarpeta": "Auctionator.lua (carpeta concedida)",
+  "mercado.frescura.importado": "Importado",
+  "mercado.frescura.max": "Día observado más reciente",
+  "mercado.frescura.hace": "hace {dias} día(s)",
+  "mercado.frescura.aviso": "Los precios tienen más de 3 días: pueden no reflejar el mercado actual.",
+  "mercado.frescura.hist": "Historial acumulado: {dias} días · {entradas} registros",
+  "mercado.avisos": "avisos",
+  "mercado.privacidad.titulo": "Privacidad y formato del archivo",
+  "mercado.privacidad.texto": "Solo datos de precios por realm. Sin cuentas, personajes ni rutas del archivo. Lua se interpreta como datos; nunca se ejecuta. Máximo 8 MiB. El scan se guarda solo en este dispositivo.",
+  "mercado.filtros.titulo": "Cómo leer filtros y fuentes",
+  "mercado.filtros.texto": "Este filtro solo compara el nivel con el rango del grupo. No confirma solo, equipo suficiente ni que el ítem se pueda vender. Nombres y fuentes solo para IDs simples presentes en el catálogo local; las variantes se conservan sin mezclarlas.",
+  "mercado.aviso.titulo": "Oferta anunciada, no ventas",
+  "mercado.aviso.texto": "Los precios son mínimos unitarios en cobre; la cantidad es la máxima oferta diaria observada, no stock actual ni unidades vendidas. Un ítem caro no demuestra demanda. Antiguo = más de 3 días; cada ítem conserva su fecha, aunque lo importes hoy. La DB no demuestra que el scan haya sido completo.",
+  "mercado.tabla.titulo": "Precios por reino",
+  "mercado.realm": "Realm de subasta",
+  "mercado.buscar": "Buscar",
+  "mercado.buscar.ph": "ID, ítem, dungeon o boss",
+  "mercado.f.recientes": "Solo precios recientes (≤3 días)",
+  "mercado.f.conFuente": "Fuentes de dungeon en mi rango",
+  "mercado.f.farmeable": "Solo farmeables con tu ficha",
+  "mercado.f.ofertas": "Solo ofertas (bajo la mediana histórica)",
+  "mercado.orden": "Ordenar",
+  "mercado.orden.nombre": "Nombre",
+  "mercado.orden.precio": "Precio",
+  "mercado.orden.ofertas": "Mejores ofertas",
+  "mercado.orden.roi": "ROI estimado",
+  "mercado.orden.gph": "Oro/hora estimado",
+  "mercado.col.item": "Ítem / clave",
+  "mercado.col.min": "Último mínimo por unidad",
+  "mercado.col.dia": "Último día (UTC)",
+  "mercado.col.oferta": "Oferta máx. ese día",
+  "mercado.col.fuente": "Fuente parcial, no recomendación de venta",
+  "mercado.col.farmeo": "Farmeo (mejor fuente, approx)",
+  "mercado.contador": "{visibles} de {total} claves · {ordenTxt} · página {pag} de {paginas}",
+  "mercado.ordenTxt.precio": "precio descendente",
+  "mercado.ordenTxt.nombre": "nombre",
+  "mercado.ordenTxt.ofertas": "mejores ofertas vs mediana histórica (approx)",
+  "mercado.ordenTxt.roi": "orden por ROI estimado (approx)",
+  "mercado.ordenTxt.gph": "orden por oro/hora estimado (approx)",
+  "mercado.vacio.scan": "Todavía no importaste precios. Elige tu Auctionator.lua para empezar.",
+  "mercado.restaurado": "Precios importados restaurados. Son ofertas anunciadas, no ventas.",
+  "mercado.tusDatos": "Tus datos",
+  "mercado.vacio.filtros": "No hay resultados para estos filtros. Prueba otro ID, nombre, jefe o reino.",
+  "mercado.anterior": "Anterior",
+  "mercado.siguiente": "Siguiente",
+  "mercado.clave": "Clave",
+  "mercado.variante": "(variante sin ID simple: no se mezcla con la base)",
+  "mercado.edad.reciente": "reciente",
+  "mercado.edad.antiguo": "antiguo",
+  "mercado.edad.futura": "fecha futura",
+  "mercado.edad.sin": "sin fecha",
+  "mercado.oferta.deal": "oferta",
+  "mercado.oferta.caro": "caro",
+  "mercado.deal.oferta": "Oferta: el precio está bajo la mediana histórica.",
+  "mercado.deal.sobreprecio": "Sobreprecio: el precio está sobre la mediana histórica.",
+  "mercado.deal.estable": "Precio en línea con la mediana histórica.",
+  "mercado.fuente.sin": "Sin fuente comprobada en el catálogo local",
+  "mercado.fuente.enRango": "en tu rango",
+  "mercado.fuente.noVenta": "venta y solo sin comprobar",
+  "mercado.farmeo.sinId": "Sin ID",
+  "mercado.farmeo.sinDato": "Sin dato de drop",
+  "mercado.farmeo.noFar": "No farmeable con tu ficha",
+  "mercado.farmeo.sinElegible": "sin fuente elegible",
+  "mercado.farmeo.farmeable": "farmeable",
+  "mercado.farmeo.dudoso": "precio dudoso (≤2 ofertas, tope 50× vendedor)",
+  "mercado.farmeo.dudosoPre": "precio dudoso (≤2 ofertas, tope 50× vendedor) para estimar farmeo",
+  "mercado.cerrar": "Cerrar",
+  "mercado.sinHistorial": "Sin historial fechado para este ítem.",
+  "mercado.grafico": "Historial del precio mínimo diario (approx)",
+  "mercado.tend.sube": "al alza",
+  "mercado.tend.baja": "a la baja",
+  "mercado.tend.estable": "estable",
+  "mercado.tend.pocos": "pocos datos",
+  "mercado.det.ultimo": "Último mínimo anunciado",
+  "mercado.det.aviso": "No es mediana ni precio de venta. La fecha corresponde al último día de precio registrado, no a esta importación.",
+  "mercado.det.dudoso": "Precio dudoso (≤2 ofertas, tope 50× vendedor para estimar farmeo).",
+  "mercado.det.variante": "Variante sin ID simple: se muestra aparte, no se mezcla con la base.",
+  "mercado.det.historial": "Historial acumulado (approx, sobre el mínimo diario)",
+  "mercado.det.minimo": "mínimo",
+  "mercado.det.mediana": "mediana",
+  "mercado.det.promedio": "media",
+  "mercado.det.analisis": "Análisis de oferta (approx)",
+  "mercado.det.ofertas": "ofertas observadas",
+  "mercado.det.grafico": "Precio mínimo diario · approx",
+  "mercado.det.graficoNota": "Serie de mínimos diarios observados en subastas; no son ventas.",
+  "mercado.det.diario": "Historial diario",
+  "mercado.det.dia": "Día (UTC)",
+  "mercado.det.minDiario": "Mínimo diario",
+  "mercado.det.maxMin": "Máximo de mínimos",
+  "mercado.det.maxOferta": "Máxima oferta diaria",
+  "mercado.det.sinDato": "Sin datos",
+  "mercado.det.sinHistorialFila": "Sin historial fechado.",
+  "mercado.det.fuentes": "Fuentes documentadas para investigar",
+  "mercado.det.rangoGrupo": "rango de grupo {min}–{max}",
+  "mercado.det.sinFuente": "Sin fuente comprobada. El ID no permite inventar nombre, enemigo o drop.",
+  "mercado.det.fuentesNota": "Catálogo parcial: no prueba ligadura, probabilidad de drop, venta ni viabilidad en solitario. Rango de dungeon ≠ requisito de equipo.",
+  "mercado.det.drops": "Fuentes de drop (dataset)",
+  "mercado.det.cadaMuerte": "por baja",
+  "mercado.det.sinDrops": "Sin fuentes de drop en el dataset para este ID.",
+  "mercado.det.farmeo": "Fuentes de farmeo",
+  "mercado.det.noElegible": "no elegible",
+  "mercado.det.cobertura": "Fuente de nombres y relaciones:",
+  "mercado.det.sinCatalogo": "catálogo local no disponible",
+  "mercado.farm.titulo": "Farmeo recomendado",
+  "mercado.farm.subtitulo": "approx · Classic 1.12",
+  "mercado.farm.sinScan": "Importa tu Auctionator.lua para ver recomendaciones de farmeo.",
+  "mercado.farm.compGlobal": "Competencia",
+  "mercado.farm.gphRef": "Oro/h de ref.",
+  "mercado.farm.ciclo": "Ciclo de farmeo",
+  "mercado.farm.zonasExtra": "Zonas extra",
+  "mercado.farm.grupo": "Grupo",
+  "mercado.farm.pvp": "PvP",
+  "mercado.farm.prof.skin": "Desuello",
+  "mercado.farm.prof.herb": "Herboristería",
+  "mercado.farm.prof.mine": "Minería",
+  "mercado.farm.sinEquipoClase": "Tu clase no tiene ajuste por equipo de clase en el motor: puntúa igual que el resto.",
+  "mercado.farm.sinZonas": "Ninguna zona puntúa con tu scan y nivel — revisa nivel, facción o los datos.",
+  "mercado.farm.compZona": "Competencia de la zona",
+  "mercado.farm.compAuto": "Auto",
+  "mercado.farm.compLow": "Baja",
+  "mercado.farm.compMed": "Media",
+  "mercado.farm.compHigh": "Alta",
+  "mercado.farm.copada": "Zona copada",
+  "mercado.farm.riesgo": "riesgo",
+  "mercado.farm.riesgo.baja": "baja",
+  "mercado.farm.riesgo.media": "media",
+  "mercado.farm.riesgo.alta": "alta",
+  "mercado.farm.comp": "competencia",
+  "mercado.farm.viaje": "viaje ~{min} min",
+  "mercado.farm.sinVuelo": "sin vuelo",
+  "mercado.farm.tuRuta": "tu ruta",
+  "mercado.farm.vendedor": "vendedor",
+  "mercado.farm.niveles": "nv {min}–{max}",
+  "mercado.farm.nivelVos": "vos nv {nivel}",
+  "mercado.farm.antesMultiplicadores": "antes de multiplicadores",
+  "mercado.farm.rarezas": "rarezas",
+  "mercado.farm.conScan": "con tu scan",
+  "mercado.farm.cofres": "puntos de cofre",
+  "mercado.farm.utiles": "útiles",
+  "mercado.farm.itemsScan": "Ítems de tu scan",
+  "mercado.farm.zona": "zona",
+  "mercado.farm.dudoso": "precio dudoso",
+  "mercado.farm.mediana": "med",
+  "mercado.farm.hoy": "hoy",
+  "mercado.farm.utilesVos": "Útiles para vos",
+  "mercado.farm.preferida": "tu arma preferida",
+  "mercado.farm.rareza": "rareza",
+  "mercado.farm.camps": "Camps principales",
+  "mercado.farm.recoleccion": "recolección",
+  "mercado.farm.approx": "approx",
+  "mercado.farm.porProfesion": "Por tu profesión",
+  "mercado.farm.enMateriales": "en materiales",
+  "mercado.farm.skinAlong": "Skin-along · lo que otros cazan",
+  "mercado.farm.bandas": "quests nv {bands}",
+  "mercado.farm.skinAlongNota": "Skinneá todo lo que muera cerca tuyo: en zonas de misiones las bestias caen solas. Estimado al ~50% del farmeo propio — otros compiten por las mismas pieles.",
+  "mercado.farm.porProfesionNota": "Materiales valorados a AH neto si están en tu scan, si no a precio de vendedor. El oficio se suma al farmeo normal — no reemplaza el oro de monturas/ítems.",
+  "mercado.farm.progresion": "Progresión",
+  "mercado.farm.progLinea": "A nivel {nivel}",
+  "mercado.farm.progSeguimos": "seguí en {zona}",
+  "mercado.farm.progMover": "movete a {zona}",
+  "mercado.farm.camp": "camp",
+  "mercado.farm.cobertura": "Cobertura",
+  "mercado.farm.coberturaLinea": "Cobertura del scan: {matched}/{total} ítems ({pct}%).",
+  "mercado.farm.estimaciones": "Estimaciones aproximadas: drop rates de referencia Classic 1.12 (CMaNGOS), no observados en Forever. Sin datos de población: la competencia es tu selección + heurísticas. Ningún número es una venta ni un ingreso garantizado."
+}, {
+  "mercado.scan.titulo": "Auctionator scan",
+  "mercado.leer": "Read Auctionator.lua",
+  "mercado.otra": "Pick another folder",
+  "mercado.archivo": "Import .lua file",
+  "mercado.borrar": "Delete local prices",
+  "mercado.borrarSi": "Confirm deletion?",
+  "mercado.leyendo": "Reading and validating Auctionator.lua…",
+  "mercado.leyendoCarpeta": "Looking for Auctionator.lua in the granted folder…",
+  "mercado.ok": "Import saved and verified. {nota}",
+  "mercado.okSinHist": "Import saved; the accumulated history could not be persisted and will retry on the next import.{nota}",
+  "mercado.errorParse": "Not imported: could not parse the file (is it a valid Auctionator.lua?). The previous scan is kept.",
+  "mercado.errorValido": "Not imported: invalid data, incompatible version or incomplete file. The previous scan is kept.",
+  "mercado.errorTamano": "Not imported: empty file or too large (8 MiB max). The previous scan is kept.",
+  "mercado.errorLeer": "Not imported: could not read the file. The previous scan is kept.",
+  "mercado.errorGuardar": "Not imported: could not save ({msg}). The previous scan is kept.",
+  "mercado.errorCarpeta": "Could not read Auctionator.lua from the folder{msg}. You can also import the file manually.",
+  "mercado.cancelado": "Folder pick cancelled. The previous scan is kept.",
+  "mercado.ocupado": "An import is already in progress.",
+  "mercado.sinArchivos": "File APIs are not available in this context.",
+  "mercado.borrando": "Deleting only the local market…",
+  "mercado.borrado": "Local market deleted. The game and your character are untouched.",
+  "mercado.errorBorrar": "Could not delete. Data is kept. {msg}",
+  "mercado.errorBorrarParcial": "Could not delete the scan; the accumulated history was emptied. {msg}",
+  "mercado.notaCarpeta": "Auctionator.lua (granted folder)",
+  "mercado.frescura.importado": "Imported",
+  "mercado.frescura.max": "Most recent observed day",
+  "mercado.frescura.hace": "{dias} day(s) ago",
+  "mercado.frescura.aviso": "Prices are older than 3 days: they may not reflect the current market.",
+  "mercado.frescura.hist": "Accumulated history: {dias} days · {entradas} records",
+  "mercado.avisos": "warnings",
+  "mercado.privacidad.titulo": "Privacy and file format",
+  "mercado.privacidad.texto": "Only per-realm price data. No accounts, characters or file paths. Lua is parsed as data; it is never executed. 8 MiB max. The scan is stored only on this device.",
+  "mercado.filtros.titulo": "How to read filters and sources",
+  "mercado.filtros.texto": "This filter only compares level with the group range. It does not confirm solo, enough gear, or that the item can be sold. Names and sources only for simple IDs in the local catalog; variants are kept unmerged.",
+  "mercado.aviso.titulo": "Announced offer, not sales",
+  "mercado.aviso.texto": "Prices are minimum unit prices in copper; the quantity is the max daily observed offer, not current stock or units sold. An expensive item does not prove demand. Old = more than 3 days; each item keeps its own date even if imported today. The DB does not prove the scan was complete.",
+  "mercado.tabla.titulo": "Prices by realm",
+  "mercado.realm": "Auction realm",
+  "mercado.buscar": "Search",
+  "mercado.buscar.ph": "ID, item, dungeon or boss",
+  "mercado.f.recientes": "Only recent prices (≤3 days)",
+  "mercado.f.conFuente": "Dungeon sources in my range",
+  "mercado.f.farmeable": "Only farmable with your profile",
+  "mercado.f.ofertas": "Only deals (below historical median)",
+  "mercado.orden": "Sort",
+  "mercado.orden.nombre": "Name",
+  "mercado.orden.precio": "Price",
+  "mercado.orden.ofertas": "Best deals",
+  "mercado.orden.roi": "Estimated ROI",
+  "mercado.orden.gph": "Estimated gold/hour",
+  "mercado.col.item": "Item / key",
+  "mercado.col.min": "Last unit minimum",
+  "mercado.col.dia": "Last day (UTC)",
+  "mercado.col.oferta": "Max offer that day",
+  "mercado.col.fuente": "Partial source, not a sale recommendation",
+  "mercado.col.farmeo": "Farming (best source, approx)",
+  "mercado.contador": "{visibles} of {total} keys · {ordenTxt} · page {pag} of {paginas}",
+  "mercado.ordenTxt.precio": "price descending",
+  "mercado.ordenTxt.nombre": "name",
+  "mercado.ordenTxt.ofertas": "best deals vs historical median (approx)",
+  "mercado.ordenTxt.roi": "sorted by estimated ROI (approx)",
+  "mercado.ordenTxt.gph": "sorted by estimated gold/hour (approx)",
+  "mercado.vacio.scan": "No prices imported yet. Pick your Auctionator.lua to start.",
+  "mercado.restaurado": "Imported prices restored. They are listed offers, not sales.",
+  "mercado.tusDatos": "Your data",
+  "mercado.vacio.filtros": "No results for these filters. Try another ID, name, boss or realm.",
+  "mercado.anterior": "Previous",
+  "mercado.siguiente": "Next",
+  "mercado.clave": "Key",
+  "mercado.variante": "(variant without simple ID: kept separate from the base)",
+  "mercado.edad.reciente": "recent",
+  "mercado.edad.antiguo": "old",
+  "mercado.edad.futura": "future date",
+  "mercado.edad.sin": "no date",
+  "mercado.oferta.deal": "deal",
+  "mercado.oferta.caro": "pricy",
+  "mercado.deal.oferta": "Deal: price is below the historical median.",
+  "mercado.deal.sobreprecio": "Above median: price is over the historical median.",
+  "mercado.deal.estable": "Price is in line with the historical median.",
+  "mercado.fuente.sin": "No verified source in the local catalog",
+  "mercado.fuente.enRango": "in your range",
+  "mercado.fuente.noVenta": "sale and solo unverified",
+  "mercado.farmeo.sinId": "No ID",
+  "mercado.farmeo.sinDato": "No drop data",
+  "mercado.farmeo.noFar": "Not farmable with your profile",
+  "mercado.farmeo.sinElegible": "no eligible source",
+  "mercado.farmeo.farmeable": "farmable",
+  "mercado.farmeo.dudoso": "doubtful price (≤2 offers, 50× vendor cap)",
+  "mercado.farmeo.dudosoPre": "doubtful price (≤2 offers, 50× vendor cap) for farming estimate",
+  "mercado.cerrar": "Close",
+  "mercado.sinHistorial": "No dated history for this item.",
+  "mercado.grafico": "Daily minimum price history (approx)",
+  "mercado.tend.sube": "rising",
+  "mercado.tend.baja": "falling",
+  "mercado.tend.estable": "stable",
+  "mercado.tend.pocos": "little data",
+  "mercado.det.ultimo": "Last announced minimum",
+  "mercado.det.aviso": "Not a median or sale price. The date is the last recorded price day, not this import.",
+  "mercado.det.dudoso": "Doubtful price (≤2 offers, 50× vendor cap for farming estimate).",
+  "mercado.det.variante": "Variant without simple ID: shown separately, not merged with the base.",
+  "mercado.det.historial": "Accumulated history (approx, on daily minimum)",
+  "mercado.det.minimo": "minimum",
+  "mercado.det.mediana": "median",
+  "mercado.det.promedio": "average",
+  "mercado.det.analisis": "Deal analysis (approx)",
+  "mercado.det.ofertas": "observed offers",
+  "mercado.det.grafico": "Daily minimum price · approx",
+  "mercado.det.graficoNota": "Series of daily minimums observed in auctions; not sales.",
+  "mercado.det.diario": "Daily history",
+  "mercado.det.dia": "Day (UTC)",
+  "mercado.det.minDiario": "Daily minimum",
+  "mercado.det.maxMin": "Max of minimums",
+  "mercado.det.maxOferta": "Daily max offer",
+  "mercado.det.sinDato": "No data",
+  "mercado.det.sinHistorialFila": "No dated history.",
+  "mercado.det.fuentes": "Documented sources to research",
+  "mercado.det.rangoGrupo": "group range {min}–{max}",
+  "mercado.det.sinFuente": "No verified source. The ID does not allow inventing a name, enemy or drop.",
+  "mercado.det.fuentesNota": "Partial catalog: does not prove binding, drop chance, sale or solo viability. Dungeon range ≠ gear requirement.",
+  "mercado.det.drops": "Drop sources (dataset)",
+  "mercado.det.cadaMuerte": "per kill",
+  "mercado.det.sinDrops": "No drop sources in the dataset for this ID.",
+  "mercado.det.farmeo": "Farming sources",
+  "mercado.det.noElegible": "not eligible",
+  "mercado.det.cobertura": "Source of names and relations:",
+  "mercado.det.sinCatalogo": "local catalog unavailable",
+  "mercado.farm.titulo": "Recommended farming",
+  "mercado.farm.subtitulo": "approx · Classic 1.12",
+  "mercado.farm.sinScan": "Import your Auctionator.lua to see farming recommendations.",
+  "mercado.farm.compGlobal": "Competition",
+  "mercado.farm.gphRef": "Ref. gold/h",
+  "mercado.farm.ciclo": "Farming cycle",
+  "mercado.farm.zonasExtra": "Extra zones",
+  "mercado.farm.grupo": "Group",
+  "mercado.farm.pvp": "PvP",
+  "mercado.farm.prof.skin": "Skinning",
+  "mercado.farm.prof.herb": "Herbalism",
+  "mercado.farm.prof.mine": "Mining",
+  "mercado.farm.sinEquipoClase": "Your class has no class-gear adjustment in the engine: it scores like any other.",
+  "mercado.farm.sinZonas": "No zone scores with your scan and level — check level, faction or the dataset.",
+  "mercado.farm.compZona": "Zone competition",
+  "mercado.farm.compAuto": "Auto",
+  "mercado.farm.compLow": "Low",
+  "mercado.farm.compMed": "Medium",
+  "mercado.farm.compHigh": "High",
+  "mercado.farm.copada": "Zone crowded",
+  "mercado.farm.riesgo": "risk",
+  "mercado.farm.riesgo.baja": "low",
+  "mercado.farm.riesgo.media": "medium",
+  "mercado.farm.riesgo.alta": "high",
+  "mercado.farm.comp": "competition",
+  "mercado.farm.viaje": "travel ~{min} min",
+  "mercado.farm.sinVuelo": "no flight",
+  "mercado.farm.tuRuta": "your route",
+  "mercado.farm.vendedor": "vendor",
+  "mercado.farm.niveles": "lv {min}–{max}",
+  "mercado.farm.nivelVos": "you lv {nivel}",
+  "mercado.farm.antesMultiplicadores": "before multipliers",
+  "mercado.farm.rarezas": "rares",
+  "mercado.farm.conScan": "in your scan",
+  "mercado.farm.cofres": "chest spots",
+  "mercado.farm.utiles": "useful",
+  "mercado.farm.itemsScan": "Items from your scan",
+  "mercado.farm.zona": "zone",
+  "mercado.farm.dudoso": "doubtful price",
+  "mercado.farm.mediana": "med",
+  "mercado.farm.hoy": "today",
+  "mercado.farm.utilesVos": "Useful for you",
+  "mercado.farm.preferida": "your preferred weapon",
+  "mercado.farm.rareza": "rare",
+  "mercado.farm.camps": "Main camps",
+  "mercado.farm.recoleccion": "gathering",
+  "mercado.farm.approx": "approx",
+  "mercado.farm.porProfesion": "For your profession",
+  "mercado.farm.enMateriales": "in materials",
+  "mercado.farm.skinAlong": "Skin-along · what others farm",
+  "mercado.farm.bandas": "quests lv {bands}",
+  "mercado.farm.skinAlongNota": "Skin everything that dies near your questing: beasts drop on their own in quest zones. Estimated at ~50% of your own farming — others compete for the same hides.",
+  "mercado.farm.porProfesionNota": "Materials valued at net AH if in your scan, else vendor price. The profession adds to normal farming — it does not replace mount/item gold.",
+  "mercado.farm.progresion": "Progression",
+  "mercado.farm.progLinea": "At level {nivel}",
+  "mercado.farm.progSeguimos": "stay in {zona}",
+  "mercado.farm.progMover": "move to {zona}",
+  "mercado.farm.camp": "camp",
+  "mercado.farm.cobertura": "Coverage",
+  "mercado.farm.coberturaLinea": "Scan coverage: {matched}/{total} items ({pct}%).",
+  "mercado.farm.estimaciones": "Approximate estimates: Classic 1.12 reference drop rates (CMaNGOS), not observed on Forever. No population data: competition is your selection + heuristics. No number is a sale or guaranteed income."
+});
+var CATALOGO = catalogoMercado(D.items, D.dungeons);
+Farm.configure({
+  HunterDropData: D.dropData,
+  HunterMarketCatalog: CATALOGO,
+  HunterHistory: import_market_history.default,
+  HunterChart: import_market_chart.default,
+  GUIDE_HUNTER: GUIAS[3],
+  GUIDE_WARRIOR: GUIAS[1],
+  GUIDE_SHAMAN: GUIAS[7]
+});
+var fmt = Farm.fmt || {};
+var ORDENES = ["nombre", "precio", "ofertas", "roi", "gph"];
+function InsigniaOferta({ deal, lang }) {
+  if (!deal || deal.kind !== "oferta" && deal.kind !== "sobreprecio") return null;
+  const pct2 = Math.round(Math.abs(deal.discount) * 100);
+  const esOferta = deal.kind === "oferta";
+  const color = esOferta ? C.verde : C.rojo;
+  const tip = `${t(lang, "mercado.det.analisis")}: ${t(lang, esOferta ? "mercado.oferta.deal" : "mercado.oferta.caro")} ${esOferta ? "−" : "+"}${pct2}%`;
+  return /* @__PURE__ */ jsx15("span", { title: tip, style: { ...S.chip, borderColor: color, color, marginLeft: 4 }, children: tip });
+}
+function Chip2({ children, color }) {
+  return /* @__PURE__ */ jsx15("span", { style: { ...S.chip, borderColor: color || C.borde, color: color || C.texto2 }, children });
+}
+function FilaVacia({ texto }) {
+  return /* @__PURE__ */ jsx15("tr", { children: /* @__PURE__ */ jsx15("td", { style: S.td, colSpan: 6, children: texto }) });
+}
+function VistaMercado({ ctx, almacen, estado, recargar, perfil, lang }) {
+  const mercado = estado?.market;
+  const historial = estado?.history;
+  const snapshot = useMemo11(() => snapshotVisible(mercado, historial), [mercado, historial]);
+  const [mensaje, setMensaje] = useState7("");
+  const [importando, setImportando] = useState7(false);
+  const [confirmBorrar, setConfirmBorrar] = useState7(false);
+  const [realmName, setRealmName] = useState7("");
+  const [busqueda, setBusqueda] = useState7("");
+  const [soloRecientes, setSoloRecientes] = useState7(false);
+  const [conFuente, setConFuente] = useState7(false);
+  const [soloFarmable, setSoloFarmable] = useState7(false);
+  const [soloOfertas, setSoloOfertas] = useState7(false);
+  const [orden, setOrden] = useState7("precio");
+  const [pagina, setPagina] = useState7(0);
+  const [detalleKey, setDetalleKey] = useState7(null);
+  const [farmGuardado, setFarmGuardado] = useState7(null);
+  const fileRef = useRef(null);
+  const estadoRef = useRef(estado);
+  const revM = useRef(0);
+  const revH = useRef(0);
+  useEffect2(() => {
+    estadoRef.current = estado;
+  }, [estado]);
+  useEffect2(() => {
+    revM.current = estado?.revision ?? 0;
+    revH.current = estado?.history?.revision ?? 0;
+  }, [estado]);
+  useEffect2(() => {
+    let vivo = true;
+    Promise.resolve(ctx?.storage?.get?.("farm-settings")).then((v) => {
+      if (vivo) setFarmGuardado(v && typeof v === "object" ? v : {});
+    }).catch(() => {
+      if (vivo) setFarmGuardado({});
+    });
+    return () => {
+      vivo = false;
+    };
+  }, [ctx]);
+  useEffect2(() => {
+    if (!snapshot) {
+      if (realmName) setRealmName("");
+      return;
+    }
+    if (snapshot.realms.some((r) => r.name === realmName)) return;
+    const nombres = snapshot.realms.map((r) => r.name);
+    const preferido = perfil?.reino && nombres.includes(perfil.reino) ? perfil.reino : mercado?.realm && nombres.includes(mercado.realm) ? mercado.realm : nombres[0] || "";
+    setRealmName(preferido);
+  }, [snapshot, perfil?.reino, mercado?.realm, realmName]);
+  const realm = useMemo11(() => snapshot?.realms?.find((r) => r.name === realmName) || null, [snapshot, realmName]);
+  const items = useMemo11(() => realm?.items || [], [realm]);
+  const nivel = perfil?.nivel || 12;
+  const guia = useMemo11(() => guiaCurada(perfil), [perfil]);
+  const motorProfile = useMemo11(() => {
+    const hub = hubZonesDe(nivel, guia?.datos?.routes, D.zonas, perfil?.faccion);
+    return perfilMotor(perfil, hub);
+  }, [perfil, guia, nivel]);
+  const settings = useMemo11(() => ajustesFarm(perfil, farmGuardado), [perfil, farmGuardado]);
+  const guardarFarm = async (nuevo) => {
+    setFarmGuardado(nuevo);
+    try {
+      await ctx?.storage?.set?.("farm-settings", nuevo);
+    } catch {
+    }
+  };
+  const mkey = JSON.stringify([motorProfile, settings, realmName, snapshot?.importedAt || ""]);
+  const mcache = useRef({ key: "", map: /* @__PURE__ */ new Map() });
+  const metricOf = useCallback((item2) => {
+    if (!item2?.itemId) return null;
+    if (mcache.current.key !== mkey) mcache.current = { key: mkey, map: /* @__PURE__ */ new Map() };
+    if (!mcache.current.map.has(item2.sourceKey)) {
+      mcache.current.map.set(item2.sourceKey, Farm.itemMetrics(item2, motorProfile, settings));
+    }
+    return mcache.current.map.get(item2.sourceKey);
+  }, [mkey, motorProfile, settings]);
+  const dkey = `${snapshot?.importedAt || ""}|${realmName}`;
+  const dcache = useRef({ key: "", map: /* @__PURE__ */ new Map() });
+  const dealOf = useCallback((item2) => {
+    if (dcache.current.key !== dkey) dcache.current = { key: dkey, map: /* @__PURE__ */ new Map() };
+    if (!dcache.current.map.has(item2.sourceKey)) {
+      dcache.current.map.set(item2.sourceKey, import_market_deals.default.dealInfo(item2));
+    }
+    return dcache.current.map.get(item2.sourceKey);
+  }, [dkey]);
+  const textos = useMemo11(() => textosBusqueda(items, CATALOGO, D.items, D.dungeons), [items]);
+  const visibles = useMemo11(() => {
+    const filtrados = filtrarMercado(items, {
+      textos,
+      q: busqueda,
+      recientes: soloRecientes,
+      conFuente,
+      nivel,
+      catalogo: CATALOGO,
+      farmable: soloFarmable ? (i) => metricOf(i)?.farmable : null,
+      oferta: soloOfertas ? (i) => dealOf(i)?.kind === "oferta" : null
+    });
+    return ordenarMercado(filtrados, orden, {
+      lang,
+      itemsJson: D.items,
+      catalogo: CATALOGO,
+      metrica: metricOf,
+      oferta: dealOf
+    });
+  }, [items, textos, busqueda, soloRecientes, conFuente, soloFarmable, soloOfertas, nivel, orden, lang, metricOf, dealOf]);
+  const paginas = Math.max(1, Math.ceil(visibles.length / PAGE_SIZE));
+  const paginaSegura = Math.min(pagina, paginas - 1);
+  const paginaItems = visibles.slice(paginaSegura * PAGE_SIZE, (paginaSegura + 1) * PAGE_SIZE);
+  const detalle = useMemo11(() => items.find((i) => i.sourceKey === detalleKey) || null, [items, detalleKey]);
+  const detalleMetrica = useMemo11(() => detalle ? metricOf(detalle) : null, [detalle, metricOf]);
+  const detalleDeal = useMemo11(() => detalle ? dealOf(detalle) : null, [detalle, dealOf]);
+  const fres = useMemo11(() => frescura(snapshot, realmName), [snapshot, realmName]);
+  const histInfo = useMemo11(() => infoHistorial(historial?.store), [historial]);
+  const commitBytes = async (bytes, nota) => {
+    let raw;
+    try {
+      raw = await new Promise((res, rej) => setTimeout(() => {
+        try {
+          res(import_market.default.parseAuctionator(bytes));
+        } catch (e) {
+          rej(e);
+        }
+      }, 30));
+    } catch {
+      setMensaje(t(lang, "mercado.errorParse"));
+      setImportando(false);
+      return;
+    }
+    if (!snapshotValido(raw)) {
+      setMensaje(t(lang, "mercado.errorValido"));
+      setImportando(false);
+      return;
+    }
+    const est = estadoRef.current;
+    const { snapshot: shallow, store } = planImportacion(raw, {
+      snapshotActual: snapshotVisible(est?.market, est?.history),
+      historyStore: est?.history?.store || null
+    });
+    const sel = raw.realms.some((r) => r.name === realmName) ? realmName : raw.realms[0]?.name;
+    try {
+      const r = await almacen.market({ values: { snapshot: shallow, realm: sel }, revision: revM.current });
+      revM.current = r.revision;
+    } catch (e) {
+      setMensaje(t(lang, "mercado.errorGuardar", { msg: e?.message || String(e) }));
+      setImportando(false);
+      return;
+    }
+    let histOk = true;
+    try {
+      const hr = await almacen.history({ store, revision: revH.current });
+      revH.current = hr.revision;
+    } catch {
+      histOk = false;
+    }
+    setRealmName(sel);
+    setPagina(0);
+    setDetalleKey(null);
+    const notaTxt = nota ? ` · ${nota}` : "";
+    setMensaje(histOk ? t(lang, "mercado.ok", { nota: notaTxt }) : t(lang, "mercado.okSinHist", { nota: notaTxt }));
+    setImportando(false);
+    recargar();
+  };
+  const leerCarpeta = async (pick) => {
+    if (importando) return;
+    setImportando(true);
+    setMensaje(t(lang, pick ? "mercado.leyendoCarpeta" : "mercado.leyendoCarpeta"));
+    let r;
+    try {
+      r = await leerAuctionator(ctx, pick ? { pick: true } : {});
+    } catch (e) {
+      r = { status: "error", message: e?.message || String(e) };
+    }
+    if (r?.status === "ok" && typeof r.text === "string" && r.text.length) {
+      const bytes = new TextEncoder().encode(r.text);
+      if (bytes.length > import_market.default.MAX_BYTES) {
+        setMensaje(t(lang, "mercado.errorTamano"));
+        setImportando(false);
+        return;
+      }
+      await commitBytes(bytes, `${t(lang, "mercado.notaCarpeta")}${r.path ? " · " + r.path : ""}`);
+      return;
+    }
+    setImportando(false);
+    setMensaje(r?.status === "cancelled" ? t(lang, "mercado.cancelado") : r?.status === "busy" ? t(lang, "mercado.ocupado") : r?.status === "unavailable" ? t(lang, "mercado.sinArchivos") : t(lang, "mercado.errorCarpeta", { msg: r?.message ? ` (${r.message})` : "" }));
+  };
+  const onArchivo = async (e) => {
+    const f = e.target.files?.[0];
+    e.target.value = "";
+    if (!f || importando) return;
+    if (f.size === 0 || f.size > import_market.default.MAX_BYTES) {
+      setMensaje(t(lang, "mercado.errorTamano"));
+      return;
+    }
+    setImportando(true);
+    setMensaje(t(lang, "mercado.leyendo"));
+    try {
+      const buf = await f.arrayBuffer();
+      await commitBytes(buf, f.name);
+    } catch {
+      setMensaje(t(lang, "mercado.errorLeer"));
+      setImportando(false);
+    }
+  };
+  const borrar = async () => {
+    if (importando) return;
+    if (!confirmBorrar) {
+      setConfirmBorrar(true);
+      return;
+    }
+    setConfirmBorrar(false);
+    setImportando(true);
+    setMensaje(t(lang, "mercado.borrando"));
+    try {
+      const hr = await almacen.history({ store: import_market_history.default.emptyStore(), revision: revH.current });
+      revH.current = hr.revision;
+    } catch (e) {
+      setMensaje(t(lang, "mercado.errorBorrar", { msg: e?.message || String(e) }));
+      setImportando(false);
+      return;
+    }
+    try {
+      const r = await almacen.market({ values: {}, revision: revM.current });
+      revM.current = r.revision;
+    } catch (e) {
+      setMensaje(t(lang, "mercado.errorBorrarParcial", { msg: e?.message || String(e) }));
+      setImportando(false);
+      recargar();
+      return;
+    }
+    setRealmName("");
+    setPagina(0);
+    setDetalleKey(null);
+    setMensaje(t(lang, "mercado.borrado"));
+    setImportando(false);
+    recargar();
+  };
+  const fuenteResumen = (item2) => {
+    const cat = Number.isSafeInteger(item2?.itemId) && item2.itemId > 0 ? CATALOGO.items[String(item2.itemId)] : null;
+    const sources = cat?.sources || [];
+    if (!sources.length) return t(lang, "mercado.fuente.sin");
+    const relevantes = sources.filter((s2) => s2.levelMin != null && s2.levelMin <= nivel && s2.levelMax != null && nivel <= s2.levelMax);
+    const s = fuentesItem({ sources: [relevantes[0] || sources[0]] }, D.dungeons)[0] || relevantes[0] || sources[0];
+    const boss = nombre(s.bossN || { es: s.boss, en: s.boss }, lang) || s.boss;
+    const dun = nombre(s.dungeonN || { es: s.dungeon, en: s.dungeon }, lang) || s.dungeon;
+    const rango = s.levelMin != null && s.levelMax != null ? ` · ${t(lang, "mercado.det.rangoGrupo", { min: s.levelMin, max: s.levelMax })}` : "";
+    return `${boss} · ${dun}${rango}${relevantes.length ? ` · ${t(lang, "mercado.fuente.enRango")}` : ""}${sources.length > 1 ? ` · +${sources.length - 1}` : ""} · ${t(lang, "mercado.fuente.noVenta")}`;
+  };
+  const farmCell = (item2) => {
+    const m = metricOf(item2);
+    if (!m || item2.itemId == null) return /* @__PURE__ */ jsx15("span", { style: S.etiqueta, children: t(lang, "mercado.farmeo.sinId") });
+    const doubt = m.doubtful ? ` · ${t(lang, "mercado.farmeo.dudosoPre")}` : "";
+    if (m.farmable && m.best) {
+      const s = m.best;
+      const kind = s.kind === "mob" ? "" : s.kind === "skin" ? "Piel: " : s.kind === "pick" ? "Pillosidad: " : s.kind === "object" ? `${s.objKind || "objeto"}: ` : s.kind === "rare-obs" ? "Rareza observada: " : s.kind === "chest-obs" ? "Cofre observado: " : "";
+      const lvl = s.lvlMin != null || s.lvlMax != null ? `nv ${s.lvlMin ?? "?"}–${s.lvlMax ?? "?"} ` : "";
+      const rank = { normal: "normal", elite: "élite", rareelite: "élite rara", rare: "rara", boss: "jefe" }[s.rank] || "";
+      const roi = m.roi == null ? "" : ` · ROI ${m.roi >= 0 ? "+" : ""}${Math.round(m.roi * 100)}%`;
+      return /* @__PURE__ */ jsxs15(Fragment12, { children: [
+        kind,
+        s.name,
+        " · ",
+        fmt.zoneName(s.zoneKey),
+        " · ",
+        lvl,
+        rank ? rank + " · " : "",
+        fmt.pct(s.chance),
+        " · ~",
+        fmt.gph(m.gph),
+        "/h",
+        roi,
+        doubt,
+        " ",
+        /* @__PURE__ */ jsx15(Chip2, { color: C.verde, children: t(lang, "mercado.farmeo.farmeable") })
+      ] });
+    }
+    if (m.sources.length) {
+      const inel = m.sources.filter((s) => !s.eligible).sort((a, b) => (b.gph || 0) - (a.gph || 0))[0] || m.sources[0];
+      return /* @__PURE__ */ jsxs15(Fragment12, { children: [
+        t(lang, "mercado.farmeo.noFar"),
+        " (",
+        inel.reason || t(lang, "mercado.farmeo.sinElegible"),
+        ")",
+        doubt
+      ] });
+    }
+    return t(lang, "mercado.farmeo.sinDato");
+  };
+  const ordenTxt = t(lang, `mercado.ordenTxt.${orden}`);
+  const edadTexto = (item2) => {
+    const e = edadItem(item2);
+    return e === "reciente" ? t(lang, "mercado.edad.reciente") : e === "antiguo" ? t(lang, "mercado.edad.antiguo") : e === "fecha-futura" ? t(lang, "mercado.edad.futura") : t(lang, "mercado.edad.sin");
+  };
+  const fmtFecha = (iso) => {
+    const d = iso ? new Date(iso) : null;
+    return d && Number.isFinite(d.getTime()) ? d.toLocaleString(lang === "en" ? "en" : "es") : "—";
+  };
+  return /* @__PURE__ */ jsx15("div", { style: S.pagina, children: /* @__PURE__ */ jsxs15("div", { style: S.cuerpo, children: [
+    /* @__PURE__ */ jsxs15(Tarjeta, { titulo: t(lang, "mercado.scan.titulo"), extra: /* @__PURE__ */ jsx15("span", { style: S.chip, children: t(lang, "mercado.tusDatos") }), children: [
+      /* @__PURE__ */ jsxs15("div", { style: { display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }, children: [
+        /* @__PURE__ */ jsx15(Button5, { onClick: () => leerCarpeta(false), disabled: importando, children: t(lang, "mercado.leer") }),
+        /* @__PURE__ */ jsx15(Button5, { variant: "outline", onClick: () => leerCarpeta(true), disabled: importando, children: t(lang, "mercado.otra") }),
+        /* @__PURE__ */ jsx15(Button5, { variant: "outline", onClick: () => fileRef.current?.click(), disabled: importando, children: t(lang, "mercado.archivo") }),
+        /* @__PURE__ */ jsx15("input", { ref: fileRef, type: "file", accept: ".lua", onChange: onArchivo, style: { display: "none" } }),
+        /* @__PURE__ */ jsx15(Button5, { variant: "outline", onClick: borrar, disabled: importando || !snapshot, children: confirmBorrar ? t(lang, "mercado.borrarSi") : t(lang, "mercado.borrar") })
+      ] }),
+      /* @__PURE__ */ jsx15("p", { role: "status", "aria-live": "polite", style: { ...S.sub, margin: 0 }, children: mensaje || (snapshot ? t(lang, "mercado.restaurado") : t(lang, "mercado.vacio.scan")) }),
+      snapshot && fres && /* @__PURE__ */ jsxs15("div", { style: { display: "flex", gap: 10, flexWrap: "wrap", fontSize: 12, color: C.texto2 }, children: [
+        /* @__PURE__ */ jsxs15("span", { children: [
+          t(lang, "mercado.frescura.importado"),
+          ": ",
+          fmtFecha(fres.importedAt)
+        ] }),
+        /* @__PURE__ */ jsxs15("span", { children: [
+          t(lang, "mercado.frescura.max"),
+          ": ",
+          fres.fechaMax || "—",
+          fres.diasDesde != null ? ` (${t(lang, "mercado.frescura.hace", { dias: fres.diasDesde })})` : ""
+        ] }),
+        histInfo.days > 0 && /* @__PURE__ */ jsx15("span", { children: t(lang, "mercado.frescura.hist", { dias: histInfo.days, entradas: histInfo.entries }) })
+      ] }),
+      fres?.aviso && /* @__PURE__ */ jsx15(Aviso, { children: t(lang, "mercado.frescura.aviso") }),
+      (snapshot?.warnings || []).map((w, i) => /* @__PURE__ */ jsxs15("p", { style: S.sub, children: [
+        "⚠ ",
+        w
+      ] }, i)),
+      /* @__PURE__ */ jsxs15("details", { style: { fontSize: 12 }, children: [
+        /* @__PURE__ */ jsx15("summary", { style: { cursor: "pointer", color: C.texto3 }, children: t(lang, "mercado.privacidad.titulo") }),
+        /* @__PURE__ */ jsx15("p", { style: S.sub, children: t(lang, "mercado.privacidad.texto") })
+      ] })
+    ] }),
+    /* @__PURE__ */ jsx15(Tarjeta, { titulo: t(lang, "mercado.aviso.titulo"), children: /* @__PURE__ */ jsx15("p", { style: { ...S.sub, margin: 0 }, children: t(lang, "mercado.aviso.texto") }) }),
+    /* @__PURE__ */ jsxs15(
+      Tarjeta,
+      {
+        titulo: t(lang, "mercado.tabla.titulo"),
+        extra: /* @__PURE__ */ jsx15(Origen, { f: ["cliente-forever", "cmangos-1.12"], lang }),
+        children: [
+          /* @__PURE__ */ jsxs15("div", { style: { display: "flex", gap: 12, flexWrap: "wrap", alignItems: "flex-end" }, children: [
+            /* @__PURE__ */ jsxs15("label", { style: S.campo, children: [
+              /* @__PURE__ */ jsx15("span", { style: S.etiqueta, children: t(lang, "mercado.realm") }),
+              /* @__PURE__ */ jsxs15(Select4, { value: realmName, onValueChange: (v) => {
+                setRealmName(v);
+                setPagina(0);
+                setDetalleKey(null);
+              }, disabled: !snapshot, children: [
+                /* @__PURE__ */ jsx15(SelectTrigger4, { "aria-label": t(lang, "mercado.realm"), children: /* @__PURE__ */ jsx15(SelectValue4, { placeholder: "—" }) }),
+                /* @__PURE__ */ jsx15(SelectContent4, { children: (snapshot?.realms || []).map((r) => /* @__PURE__ */ jsx15(SelectItem4, { value: r.name, children: r.name }, r.name)) })
+              ] })
+            ] }),
+            /* @__PURE__ */ jsxs15("label", { style: { ...S.campo, flex: 1, minWidth: 220 }, children: [
+              /* @__PURE__ */ jsx15("span", { style: S.etiqueta, children: t(lang, "mercado.buscar") }),
+              /* @__PURE__ */ jsx15(SearchField2, { value: busqueda, onChange: (v) => {
+                setBusqueda(v);
+                setPagina(0);
+              }, placeholder: t(lang, "mercado.buscar.ph") })
+            ] }),
+            /* @__PURE__ */ jsxs15("label", { style: S.campo, children: [
+              /* @__PURE__ */ jsx15("span", { style: S.etiqueta, children: t(lang, "mercado.orden") }),
+              /* @__PURE__ */ jsxs15(Select4, { value: orden, onValueChange: (v) => {
+                setOrden(v);
+                setPagina(0);
+              }, children: [
+                /* @__PURE__ */ jsx15(SelectTrigger4, { "aria-label": t(lang, "mercado.orden"), children: /* @__PURE__ */ jsx15(SelectValue4, {}) }),
+                /* @__PURE__ */ jsx15(SelectContent4, { children: ORDENES.map((o) => /* @__PURE__ */ jsx15(SelectItem4, { value: o, children: t(lang, `mercado.orden.${o}`) }, o)) })
+              ] })
+            ] })
+          ] }),
+          /* @__PURE__ */ jsxs15("div", { style: { display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center" }, children: [
+            /* @__PURE__ */ jsx15(Checkbox6, { checked: soloRecientes, onCheckedChange: (v) => {
+              setSoloRecientes(!!v);
+              setPagina(0);
+            } }),
+            /* @__PURE__ */ jsx15("span", { style: { fontSize: 12 }, children: t(lang, "mercado.f.recientes") }),
+            /* @__PURE__ */ jsx15(Checkbox6, { checked: conFuente, onCheckedChange: (v) => {
+              setConFuente(!!v);
+              setPagina(0);
+            } }),
+            /* @__PURE__ */ jsxs15("span", { style: { fontSize: 12 }, children: [
+              t(lang, "mercado.f.conFuente"),
+              " (",
+              nivel,
+              ")"
+            ] }),
+            /* @__PURE__ */ jsx15(Checkbox6, { checked: soloFarmable, onCheckedChange: (v) => {
+              setSoloFarmable(!!v);
+              setPagina(0);
+            } }),
+            /* @__PURE__ */ jsx15("span", { style: { fontSize: 12 }, children: t(lang, "mercado.f.farmeable") }),
+            /* @__PURE__ */ jsx15(Checkbox6, { checked: soloOfertas, onCheckedChange: (v) => {
+              setSoloOfertas(!!v);
+              setPagina(0);
+            } }),
+            /* @__PURE__ */ jsx15("span", { style: { fontSize: 12 }, children: t(lang, "mercado.f.ofertas") })
+          ] }),
+          /* @__PURE__ */ jsxs15("details", { style: { fontSize: 12 }, children: [
+            /* @__PURE__ */ jsx15("summary", { style: { cursor: "pointer", color: C.texto3 }, children: t(lang, "mercado.filtros.titulo") }),
+            /* @__PURE__ */ jsx15("p", { style: S.sub, children: t(lang, "mercado.filtros.texto") })
+          ] }),
+          snapshot && fres && /* @__PURE__ */ jsxs15("p", { style: S.sub, children: [
+            t(lang, "mercado.frescura.importado"),
+            ": ",
+            fmtFecha(fres.importedAt),
+            " · DB ",
+            snapshot.sourceVersion,
+            (snapshot.warnings || []).length ? ` · ${snapshot.warnings.length} ${t(lang, "mercado.avisos")}` : ""
+          ] }),
+          /* @__PURE__ */ jsx15("p", { role: "status", style: S.etiqueta, children: snapshot ? t(lang, "mercado.contador", { visibles: visibles.length, total: items.length, ordenTxt, pag: paginaSegura + 1, paginas }) : t(lang, "mercado.vacio.scan") }),
+          /* @__PURE__ */ jsx15("div", { style: { overflowX: "auto" }, children: /* @__PURE__ */ jsxs15("table", { style: S.tabla, children: [
+            /* @__PURE__ */ jsx15("thead", { children: /* @__PURE__ */ jsxs15("tr", { children: [
+              /* @__PURE__ */ jsx15("th", { style: S.th, children: t(lang, "mercado.col.item") }),
+              /* @__PURE__ */ jsx15("th", { style: S.th, children: t(lang, "mercado.col.min") }),
+              /* @__PURE__ */ jsx15("th", { style: S.th, children: t(lang, "mercado.col.dia") }),
+              /* @__PURE__ */ jsx15("th", { style: S.th, children: t(lang, "mercado.col.oferta") }),
+              /* @__PURE__ */ jsx15("th", { style: S.th, children: t(lang, "mercado.col.fuente") }),
+              /* @__PURE__ */ jsx15("th", { style: S.th, children: t(lang, "mercado.col.farmeo") })
+            ] }) }),
+            /* @__PURE__ */ jsx15("tbody", { children: !snapshot ? /* @__PURE__ */ jsx15(FilaVacia, { texto: t(lang, "mercado.vacio.scan") }) : !paginaItems.length ? /* @__PURE__ */ jsx15(FilaVacia, { texto: t(lang, "mercado.vacio.filtros") }) : paginaItems.map((i) => {
+              const daily = i.history.find((h) => h.day === i.observedDay);
+              const nombreVisible = nombreItem(i, D.items, CATALOGO, lang) || i.sourceKey;
+              return /* @__PURE__ */ jsxs15("tr", { children: [
+                /* @__PURE__ */ jsxs15("td", { style: S.td, children: [
+                  /* @__PURE__ */ jsx15(
+                    "button",
+                    {
+                      type: "button",
+                      onClick: () => setDetalleKey(i.sourceKey),
+                      style: { background: "none", border: "none", padding: 0, color: C.acento, cursor: "pointer", font: "inherit", textAlign: "left" },
+                      children: nombreVisible
+                    }
+                  ),
+                  i.itemId == null && /* @__PURE__ */ jsx15("div", { style: S.etiqueta, children: t(lang, "mercado.variante") }),
+                  /* @__PURE__ */ jsx15(InsigniaOferta, { deal: dealOf(i), lang }),
+                  /* @__PURE__ */ jsxs15("div", { style: S.etiqueta, children: [
+                    t(lang, "mercado.clave"),
+                    " ",
+                    i.sourceKey
+                  ] })
+                ] }),
+                /* @__PURE__ */ jsx15("td", { style: S.td, children: /* @__PURE__ */ jsx15(Dinero, { cobre: i.unitPriceCopper }) }),
+                /* @__PURE__ */ jsxs15("td", { style: S.td, children: [
+                  fechaDe(i.observedDay) || "—",
+                  /* @__PURE__ */ jsx15("div", { style: S.etiqueta, children: edadTexto(i) })
+                ] }),
+                /* @__PURE__ */ jsx15("td", { style: S.td, children: daily?.available == null ? t(lang, "mercado.det.sinDato") : daily.available }),
+                /* @__PURE__ */ jsx15("td", { style: S.td, children: fuenteResumen(i) }),
+                /* @__PURE__ */ jsx15("td", { style: S.td, children: farmCell(i) })
+              ] }, i.sourceKey);
+            }) })
+          ] }) }),
+          snapshot && paginas > 1 && /* @__PURE__ */ jsxs15("div", { style: { display: "flex", gap: 8, alignItems: "center" }, children: [
+            /* @__PURE__ */ jsx15(Button5, { variant: "outline", size: "xs", disabled: paginaSegura === 0, onClick: () => setPagina(paginaSegura - 1), children: t(lang, "mercado.anterior") }),
+            /* @__PURE__ */ jsx15(Button5, { variant: "outline", size: "xs", disabled: paginaSegura + 1 >= paginas, onClick: () => setPagina(paginaSegura + 1), children: t(lang, "mercado.siguiente") })
+          ] }),
+          /* @__PURE__ */ jsxs15("p", { style: S.sub, children: [
+            t(lang, "mercado.det.cobertura", { addon: CATALOGO?.source?.addon || t(lang, "mercado.det.sinCatalogo") }),
+            " ",
+            CATALOGO?.source?.coverage || ""
+          ] })
+        ]
+      }
+    ),
+    detalle && /* @__PURE__ */ jsx15(
+      DetalleItem,
+      {
+        item: detalle,
+        lang,
+        catalogo: CATALOGO,
+        metrica: detalleMetrica,
+        deal: detalleDeal,
+        onCerrar: () => setDetalleKey(null)
+      }
+    ),
+    /* @__PURE__ */ jsx15(Farmeo, { items, perfil, settings, onSettings: guardarFarm, lang })
+  ] }) });
 }
 
 // src/vistas/guia.jsx
-import { jsx as jsx8 } from "react/jsx-runtime";
+import { jsx as jsx16 } from "react/jsx-runtime";
 function VistaGuia({ lang }) {
-  return /* @__PURE__ */ jsx8(Tarjeta, { titulo: t(lang, "tab.guia"), children: /* @__PURE__ */ jsx8("p", { children: t(lang, "pendiente") }) });
+  return /* @__PURE__ */ jsx16(Tarjeta, { titulo: t(lang, "tab.guia"), children: /* @__PURE__ */ jsx16("p", { children: t(lang, "pendiente") }) });
 }
 
 // src/vistas/legacy.jsx
-import { jsx as jsx9 } from "react/jsx-runtime";
+import { jsx as jsx17 } from "react/jsx-runtime";
 function VistaLegacy({ lang }) {
-  return /* @__PURE__ */ jsx9(Tarjeta, { titulo: t(lang, "tab.legacy"), children: /* @__PURE__ */ jsx9("p", { children: t(lang, "pendiente") }) });
+  return /* @__PURE__ */ jsx17(Tarjeta, { titulo: t(lang, "tab.legacy"), children: /* @__PURE__ */ jsx17("p", { children: t(lang, "pendiente") }) });
 }
 
 // src/app.jsx
-import { jsx as jsx10, jsxs as jsxs4 } from "react/jsx-runtime";
+import { jsx as jsx18, jsxs as jsxs16 } from "react/jsx-runtime";
 var PESTANAS = [
   ["personaje", VistaPersonaje],
   ["clase", VistaClase],
@@ -3107,7 +9094,7 @@ var Contencion = class extends Component {
   }
   render() {
     if (!this.state.error) return this.props.children;
-    return /* @__PURE__ */ jsx10("div", { role: "alert", style: S.aviso, children: String(this.state.error && this.state.error.message || this.state.error) });
+    return /* @__PURE__ */ jsx18("div", { role: "alert", style: S.aviso, children: String(this.state.error && this.state.error.message || this.state.error) });
   }
 };
 async function guardarConfirmado(ctx, clave, valor) {
@@ -3126,15 +9113,15 @@ function perfilInicial(guardado, build) {
   return { perfil: m.perfil, ok: validarPerfil(m.perfil, D.personaje).ok, errores: [], razaSupuesta: m.razaSupuesta };
 }
 function App({ ctx, almacen }) {
-  const [estado, setEstado] = useState3(null);
-  const [error, setError] = useState3("");
-  const [perfil, setPerfil] = useState3(null);
-  const [razaSupuesta, setRazaSupuesta] = useState3(false);
-  const [lang, setLang] = useState3(() => ctx.storage.get("idioma", "es") === "en" ? "en" : "es");
-  const [pestana, setPestana] = useState3(() => ctx.storage.get("pestana", "personaje"));
-  const [vuelta, setVuelta] = useState3(0);
-  const recargar = useCallback(() => setVuelta((v) => v + 1), []);
-  useEffect(() => {
+  const [estado, setEstado] = useState8(null);
+  const [error, setError] = useState8("");
+  const [perfil, setPerfil] = useState8(null);
+  const [razaSupuesta, setRazaSupuesta] = useState8(false);
+  const [lang, setLang] = useState8(() => ctx.storage.get("idioma", "es") === "en" ? "en" : "es");
+  const [pestana, setPestana] = useState8(() => ctx.storage.get("pestana", "personaje"));
+  const [vuelta, setVuelta] = useState8(0);
+  const recargar = useCallback2(() => setVuelta((v) => v + 1), []);
+  useEffect3(() => {
     let vivo = true;
     setError("");
     almacen.read().then((v) => {
@@ -3153,7 +9140,7 @@ function App({ ctx, almacen }) {
       vivo = false;
     };
   }, [almacen, ctx, vuelta]);
-  const guardarPerfil = useCallback(async (nuevo) => {
+  const guardarPerfil = useCallback2(async (nuevo) => {
     const r = validarPerfil(nuevo, D.personaje);
     setPerfil(r.perfil);
     setRazaSupuesta(false);
@@ -3175,7 +9162,7 @@ function App({ ctx, almacen }) {
     }
   };
   const listo = perfil && validarPerfil(perfil, D.personaje).ok;
-  const visibles = useMemo(() => PESTANAS.filter(([id]) => id === "personaje" || id === "legacy" || listo && (id !== "guia" || guiaCurada(perfil))), [listo, perfil]);
+  const visibles = useMemo12(() => PESTANAS.filter(([id]) => id === "personaje" || id === "legacy" || listo && (id !== "guia" || guiaCurada(perfil))), [listo, perfil]);
   const activa = visibles.some(([id]) => id === pestana) ? pestana : "personaje";
   const Vista = (visibles.find(([id]) => id === activa) || PESTANAS[0])[1];
   const resumen = listo ? [
@@ -3184,18 +9171,18 @@ function App({ ctx, almacen }) {
     t(lang, "clase.nivel") + " " + perfil.nivel,
     nombre(D.personaje.facciones[perfil.faccion].n, lang)
   ].join(" · ") : t(lang, "perfil.vacio");
-  return /* @__PURE__ */ jsxs4("div", { style: S.pagina, children: [
-    /* @__PURE__ */ jsxs4("div", { style: S.cabecera, children: [
-      /* @__PURE__ */ jsx10("strong", { children: t(lang, "app") }),
-      /* @__PURE__ */ jsx10("span", { style: { ...S.sub, flex: 1 }, children: resumen }),
-      /* @__PURE__ */ jsx10(SegmentedControl, { value: lang, onChange: cambiarLang, options: [{ id: "es", label: "ES" }, { id: "en", label: "EN" }] }),
-      /* @__PURE__ */ jsx10(Button3, { variant: "outline", size: "xs", onClick: async () => {
+  return /* @__PURE__ */ jsxs16("div", { style: S.pagina, children: [
+    /* @__PURE__ */ jsxs16("div", { style: S.cabecera, children: [
+      /* @__PURE__ */ jsx18("strong", { children: t(lang, "app") }),
+      /* @__PURE__ */ jsx18("span", { style: { ...S.sub, flex: 1 }, children: resumen }),
+      /* @__PURE__ */ jsx18(SegmentedControl4, { value: lang, onChange: cambiarLang, options: [{ id: "es", label: "ES" }, { id: "en", label: "EN" }] }),
+      /* @__PURE__ */ jsx18(Button6, { variant: "outline", size: "xs", onClick: async () => {
         await almacen.reset();
         recargar();
       }, children: t(lang, "reintentar") })
     ] }),
-    /* @__PURE__ */ jsx10("div", { style: { padding: "6px 16px 0" }, children: /* @__PURE__ */ jsx10(Tabs, { value: activa, onValueChange: cambiarPestana, children: /* @__PURE__ */ jsx10(TabsList, { children: visibles.map(([id]) => /* @__PURE__ */ jsx10(TabsTrigger, { value: id, children: t(lang, "tab." + id) }, id)) }) }) }),
-    /* @__PURE__ */ jsx10("div", { style: S.cuerpo, children: error ? /* @__PURE__ */ jsx10("div", { role: "alert", style: S.aviso, children: error }) : !estado || !perfil ? /* @__PURE__ */ jsx10("p", { role: "status", style: S.sub, children: t(lang, "cargando") }) : /* @__PURE__ */ jsx10(Contencion, { children: /* @__PURE__ */ jsx10(
+    /* @__PURE__ */ jsx18("div", { style: { padding: "6px 16px 0" }, children: /* @__PURE__ */ jsx18(Tabs, { value: activa, onValueChange: cambiarPestana, children: /* @__PURE__ */ jsx18(TabsList, { children: visibles.map(([id]) => /* @__PURE__ */ jsx18(TabsTrigger, { value: id, children: t(lang, "tab." + id) }, id)) }) }) }),
+    /* @__PURE__ */ jsx18("div", { style: S.cuerpo, children: error ? /* @__PURE__ */ jsx18("div", { role: "alert", style: S.aviso, children: error }) : !estado || !perfil ? /* @__PURE__ */ jsx18("p", { role: "status", style: S.sub, children: t(lang, "cargando") }) : /* @__PURE__ */ jsx18(Contencion, { children: /* @__PURE__ */ jsx18(
       Vista,
       {
         ctx,
@@ -3213,7 +9200,7 @@ function App({ ctx, almacen }) {
 }
 
 // src/plugin.src.jsx
-import { jsx as jsx11 } from "react/jsx-runtime";
+import { jsx as jsx19 } from "react/jsx-runtime";
 var RUTA = "/wow-forever";
 var plugin_src_default = {
   id: "wow-hunter-guide",
@@ -3225,7 +9212,7 @@ var plugin_src_default = {
     const almacen = createStore(ctx);
     ctx.registerMany([
       { id: "nav", area: SIDEBAR_NAV_AREA, order: 73, data: { path: RUTA, label: "WoW Forever", codicon: "target" } },
-      { id: "route", area: ROUTES_AREA, data: { path: RUTA }, render: () => /* @__PURE__ */ jsx11(App, { ctx, almacen }) },
+      { id: "route", area: ROUTES_AREA, data: { path: RUTA }, render: () => /* @__PURE__ */ jsx19(App, { ctx, almacen }) },
       { id: "open", area: PALETTE_AREA, data: {
         id: "wow-forever.open",
         label: "WoW Forever: abrir guía y mercado",
