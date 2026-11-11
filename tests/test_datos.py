@@ -267,6 +267,13 @@ class TestDatos(unittest.TestCase):
                             n += 1
         self.assertGreater(n, 300)
 
+    def test_entrenadores_de_capital_en_su_ciudad(self):
+        # Snarl (herrería, Orgrimmar) y Karn Stonehoof (herrería, Cima del Trueno) estaban en
+        # Azshara y Mulgore: el NPC va a la zona más chica que lo contiene.
+        bs = {e['n']['en']: e['zona'] for e in self.profesiones['profesiones']['164']['entrenadores']['horda']}
+        self.assertEqual(bs.get('Snarl'), 1454)
+        self.assertEqual(bs.get('Karn Stonehoof'), 1456)
+
     def test_reactivos_de_vendedor(self):
         items = self.items['items']
         # Hilo de lino (2320) y vial vacío (3371): se compran al vendedor.

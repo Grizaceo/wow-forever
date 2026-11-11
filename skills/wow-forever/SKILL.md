@@ -11,7 +11,7 @@ metadata:
 # WoW Forever — asistente de juego
 
 El plugin **wow-forever** instala una guía offline en Hermes Desktop (entrada
-"WoW Forever" en la barra lateral, ruta `/wow-hunter-guide`) y esta skill.
+"WoW Forever" en la barra lateral, ruta `/wow-forever`) y esta skill.
 
 ## Qué es WoW Forever
 

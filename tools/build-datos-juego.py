@@ -273,12 +273,23 @@ def race_faction(d, rid):
     return 'alianza' if fg == 3 else 'horda' if fg == 5 else None
 
 
+def zona_npc(loc, m, x, y):
+    """Zona de un NPC o de un punto de inicio: la más chica cuyo rectángulo contiene el punto.
+    Las capitales quedan dentro del rectángulo de su zona vecina (Orgrimmar en Durotar y
+    Azshara, Cima del Trueno en Mulgore…); la más chica es la ciudad. El criterio de
+    ZoneLocator (centro + cementerio) sirve para mobs, no para NPC de ciudad."""
+    if m not in (0, 1):
+        return None
+    cands = [z for z in loc.zones if z['map'] == m and z['x0'] <= x <= z['x1'] and z['y0'] <= y <= z['y1']]
+    if not cands:
+        return None
+    return min(cands, key=lambda z: ((z['x1'] - z['x0']) * (z['y1'] - z['y0']), z['ui']))
+
+
 def map_pct(loc, m, x, y):
     """Coordenadas del mapa de zona en porcentaje (como las muestra el juego), o (None, None).
     El eje horizontal del mapa es el Y del mundo decreciente; el vertical, el X decreciente."""
-    if m not in (0, 1):
-        return None, None
-    z = loc.locate(m, x, y)
+    z = zona_npc(loc, m, x, y)
     if not z:
         return None, None
     return (round((z['y1'] - y) / (z['y1'] - z['y0']) * 100, 1),
@@ -287,7 +298,7 @@ def map_pct(loc, m, x, y):
 
 def loc_key(loc, maps, m, x, y):
     if m in (0, 1):
-        z = loc.locate(m, x, y)
+        z = zona_npc(loc, m, x, y)
         return z['ui'] if z else None
     mp = maps.get(m)
     if mp and mp['InstanceType'] in ('1', '2'):
