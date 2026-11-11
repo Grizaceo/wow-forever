@@ -411,7 +411,7 @@ function matchZoneToken(t){
 }
 function trafficZones(profile){
   index();
-  const G=window['GUIDE_'+String(profile.cls||'').toUpperCase()];
+  const G=ENV['GUIDE_'+String(profile.cls||'').toUpperCase()];
   const fk=G?Object.keys(G.factions||{}):[],fac=fk.includes(profile.fac)?profile.fac:null;
   const routes=fac?G.factions[fac]?.routes:null;
   if(!routes)return new Map();
