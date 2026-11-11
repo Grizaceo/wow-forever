@@ -47,7 +47,7 @@ Los tests fallan si una combinación válida queda sin dato y sin hueco declarad
 Por clase:
 
 - `entrenadores`: `{alianza: [...], horda: [...]}`, cada uno `{npc, n, zona, x, y}`
-  (`cmangos-1.12`).
+  (`cmangos-1.12`); `x`, `y` en porcentaje del mapa de la zona, como en el juego.
 - `hechizos`: `[{spell, n, nivel, costo}]` enseñados por entrenadores de clase
   (`cmangos-1.12`; nombre del cliente cuando existe).
 - `misiones`: `{alianza: [questId], horda: [questId]}` (misiones de clase).
@@ -83,7 +83,9 @@ Por profesión (ID de SkillLine: 171 Alquimia, 164 Herrería, 333 Encantamiento,
 
 ### `data/items.json`
 
-`id → [es, en, calidad, nivel_req, nivel_item, venta_cobre, clase, subclase, ligado]`
+`id → [es, en, calidad, nivel_req, nivel_item, venta_cobre, clase, subclase, ligado,
+compra_cobre, vendedor]`; `compra_cobre` es el precio de compra al vendedor (cliente) y
+`vendedor` vale 1 si algún vendedor de 1.12 lo vende sin tope (reactivos como hilo o viales)
 desde ItemSparse e Item del cliente, sin el rango 200000–239999. Sirve para nombrar los
 ítems importados de Auctionator, las recetas y el botín, y para el costo de vendedor.
 

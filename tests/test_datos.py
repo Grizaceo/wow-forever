@@ -256,6 +256,24 @@ class TestDatos(unittest.TestCase):
         sin = sum(1 for m in ms if m['zona'] is None and 'dungeon' not in m)
         self.assertLess(sin, 0.03 * len(self.misiones['misiones']))
 
+    def test_coordenadas_en_porcentaje(self):
+        n = 0
+        for arch, col in ((self.clases, 'clases'), (self.profesiones, 'profesiones')):
+            for c in arch[col].values():
+                for lado in ('alianza', 'horda'):
+                    for e in c['entrenadores'][lado]:
+                        if e['x'] is not None:
+                            self.assertTrue(0 <= e['x'] <= 100 and 0 <= e['y'] <= 100, e)
+                            n += 1
+        self.assertGreater(n, 300)
+
+    def test_reactivos_de_vendedor(self):
+        items = self.items['items']
+        # Hilo de lino (2320) y vial vacío (3371): se compran al vendedor.
+        for iid in (2320, 3371):
+            self.assertEqual(items[str(iid)][10], 1, iid)
+            self.assertGreater(items[str(iid)][9], 0, iid)
+
     def test_encantamiento_completo(self):
         # Los encantamientos no crean ítem: antes se perdían. Deben estar todos los de 1.12.
         recs = self.profesiones['profesiones']['333']['recetas']
@@ -269,7 +287,7 @@ class TestDatos(unittest.TestCase):
         for k, v in items.items():
             self.assertTrue(k.isdigit(), k)
             self.assertNotIn(int(k), EXCL, k)
-            self.assertEqual(len(v), 9, k)
+            self.assertEqual(len(v), 11, k)
             self.assertIsInstance(v[0], str)
             self.assertIsInstance(v[1], str)
             for n in v[2:]:

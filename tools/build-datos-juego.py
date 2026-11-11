@@ -221,8 +221,11 @@ def build_cm(d):
     for r in db['npc_trainer_template']:
         ntt[r['entry']].append(r)
     vend = collections.defaultdict(set)
+    vend_ilimitado = collections.defaultdict(set)   # sin tope de stock: reactivos de vendedor
     for r in db['npc_vendor']:
         vend[r['item']].add(r['entry'])
+        if not r['maxcount']:
+            vend_ilimitado[r['item']].add(r['entry'])
     vt = collections.defaultdict(list)
     for r in db['npc_vendor_template']:
         vt[r['entry']].append(r)
@@ -230,6 +233,8 @@ def build_cm(d):
         if t['VendorTemplateId']:
             for r in vt.get(t['VendorTemplateId'], []):
                 vend[r['item']].add(t['Entry'])
+                if not r['maxcount']:
+                    vend_ilimitado[r['item']].add(t['Entry'])
     npc_f = {e: ct[e]['Faction'] for e in ct}
     # En 1.12 el entrenador lista el hechizo que ENSEÑA (efecto 36, aprender hechizo);
     # la receta es el hechizo que ese dispara. Se indexa por ambos.
@@ -256,7 +261,7 @@ def build_cm(d):
     for r in db['npc_trainer'] + db['npc_trainer_template']:
         trainer_spells.add(r['spell'])
         trainer_spells.add(learn2craft.get(r['spell'], r['spell']))
-    return {'ct': ct, 'spawns': spawns, 'nt': nt, 'ntt': ntt, 'vend': vend,
+    return {'ct': ct, 'spawns': spawns, 'nt': nt, 'ntt': ntt, 'vend': vend, 'vend_ilimitado': vend_ilimitado,
             'npc_f': npc_f, 'spell_req': spell_req, 'recipe_item': recipe_item,
             'trainer_spells': trainer_spells, 'items': {t['entry']: t for t in db['item_template']}}
 
@@ -266,6 +271,18 @@ def race_faction(d, rid):
     fid = inum(d['chraces'].get(rid, {}), 'FactionID')
     fg = inum(d['wowf_ft'].get(fid, {}), 'FactionGroup')
     return 'alianza' if fg == 3 else 'horda' if fg == 5 else None
+
+
+def map_pct(loc, m, x, y):
+    """Coordenadas del mapa de zona en porcentaje (como las muestra el juego), o (None, None).
+    El eje horizontal del mapa es el Y del mundo decreciente; el vertical, el X decreciente."""
+    if m not in (0, 1):
+        return None, None
+    z = loc.locate(m, x, y)
+    if not z:
+        return None, None
+    return (round((z['y1'] - y) / (z['y1'] - z['y0']) * 100, 1),
+            round((z['x1'] - x) / (z['x1'] - z['x0']) * 100, 1))
 
 
 def loc_key(loc, maps, m, x, y):
@@ -493,6 +510,7 @@ def build_items(d, cm, refs):
     cm_items = cm['items']
     EXC = lambda i: ITEM_EXCL_LO <= i <= ITEM_EXCL_HI
     items, n_cm, n_sin_nom = {}, 0, 0
+    vendido = {iid for iid, npcs in cm['vend_ilimitado'].items() if npcs}
     for iid in sorted(sp):
         if EXC(iid):
             continue
@@ -501,7 +519,8 @@ def build_items(d, cm, refs):
                       s.get('Display_lang') or '',
                       inum(s, 'OverallQualityID'), inum(s, 'RequiredLevel'),
                       inum(s, 'ItemLevel'), inum(s, 'SellPrice'),
-                      inum(c, 'ClassID'), inum(c, 'SubclassID'), inum(s, 'Bonding')]
+                      inum(c, 'ClassID'), inum(c, 'SubclassID'), inum(s, 'Bonding'),
+                      inum(s, 'BuyPrice'), 1 if iid in vendido else 0]
     for iid in sorted(refs):
         if iid in items or EXC(iid):
             continue
@@ -509,13 +528,14 @@ def build_items(d, cm, refs):
             t = cm_items[iid]
             nm = t['name'] or ''
             items[iid] = [nm, nm, t['Quality'], t['RequiredLevel'], t['ItemLevel'],
-                          t['SellPrice'], t['class'], t['subclass'], t['bonding']]
+                          t['SellPrice'], t['class'], t['subclass'], t['bonding'],
+                          t['BuyPrice'], 1 if iid in vendido else 0]
             n_cm += 1
         elif iid in it:
             # Item del cliente sin ItemSparse: sin nombre ni stats publicadas.
             c = it[iid]
             items[iid] = ['', '', 0, 0, 0, 0, inum(c, 'ClassID'),
-                          inum(c, 'SubclassID'), 0]
+                          inum(c, 'SubclassID'), 0, 0, 0]
             n_sin_nom += 1
     return items, n_cm, n_sin_nom
 
@@ -555,8 +575,9 @@ def build_clases(d, cm, loc, maps, names, quests, huecos):
         if not sp:
             continue
         m, x, y, _ = sp[0]
+        px, py = map_pct(loc, m, x, y)
         rec = {'npc': e, 'n': names['npc'](e), 'zona': loc_key(loc, maps, m, x, y),
-               'x': x, 'y': y}
+               'x': px, 'y': py}
         for side in lados(t['Faction'], d['era_ft']):
             trainers[cid][side].append(rec)
         for r in cm['nt'].get(e, []) + cm['ntt'].get(t['TrainerTemplateId'], []):
@@ -638,8 +659,9 @@ def build_prof_trainers(d, cm, loc, maps):
         m, x, y, _ = sp[0]
         vals = [r['reqskillvalue'] for r in rows if r['reqskill'] == prof] or \
                [r['reqskillvalue'] for r in rows]
+        px, py = map_pct(loc, m, x, y)
         rec = {'npc': e, 'n': npc_name(cm, e), 'zona': loc_key(loc, maps, m, x, y),
-               'x': x, 'y': y, 'max': max(vals) if vals else 0}
+               'x': px, 'y': py, 'max': max(vals) if vals else 0}
         for side in lados(t['Faction'], d['era_ft']):
             out[prof][side].append(rec)
     return out
