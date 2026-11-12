@@ -44,7 +44,7 @@ export function VistaClase({ perfil, lang }) {
         {!todos ? <div style={S.sub}>{t(lang, 'clase.proximos')} · {t(lang, 'clase.hastaNivel')} {perfil.nivel + VENTANA}</div> : null}
         {visibles.length ? (
           <table style={S.tabla}>
-            <thead><tr><th style={S.th}>{t(lang, 'clase.nivel')}</th><th style={S.th}>{t(lang, 'tab.clase')}</th><th style={S.th}>{t(lang, 'clase.costo')}</th></tr></thead>
+            <thead><tr><th style={S.th}>{t(lang, 'clase.nivel')}</th><th style={S.th}>{t(lang, 'clase.hechizo')}</th><th style={S.th}>{t(lang, 'clase.costo')}</th></tr></thead>
             <tbody>
               {visibles.map((h) => (
                 <tr key={h.spell + ':' + h.nivel} style={{ opacity: h.nivel <= perfil.nivel ? 1 : 0.75 }}>

@@ -4046,6 +4046,7 @@ var ES = {
   "clase.competencias": "Armas y armaduras",
   "clase.sinEntrenador": "En Classic 1.12 esta clase no existía en tu facción; los entrenadores de Forever aún no están en ninguna fuente publicable.",
   "clase.nivel": "Nv",
+  "clase.hechizo": "Hechizo",
   "clase.costo": "Costo",
   "clase.zona": "Zona",
   "clase.todos": "Ver todos",
@@ -4095,6 +4096,7 @@ var EN = {
   "clase.competencias": "Weapons and armor",
   "clase.sinEntrenador": "In Classic 1.12 this class did not exist in your faction; Forever’s trainers are not in any publishable source yet.",
   "clase.nivel": "Lv",
+  "clase.hechizo": "Spell",
   "clase.costo": "Cost",
   "clase.zona": "Zone",
   "clase.todos": "Show all",
@@ -4423,7 +4425,7 @@ function VistaClase({ perfil, lang }) {
       visibles.length ? /* @__PURE__ */ jsxs3("table", { style: S.tabla, children: [
         /* @__PURE__ */ jsx3("thead", { children: /* @__PURE__ */ jsxs3("tr", { children: [
           /* @__PURE__ */ jsx3("th", { style: S.th, children: t(lang, "clase.nivel") }),
-          /* @__PURE__ */ jsx3("th", { style: S.th, children: t(lang, "tab.clase") }),
+          /* @__PURE__ */ jsx3("th", { style: S.th, children: t(lang, "clase.hechizo") }),
           /* @__PURE__ */ jsx3("th", { style: S.th, children: t(lang, "clase.costo") })
         ] }) }),
         /* @__PURE__ */ jsx3("tbody", { children: visibles.map((h) => /* @__PURE__ */ jsxs3("tr", { style: { opacity: h.nivel <= perfil.nivel ? 1 : 0.75 }, children: [

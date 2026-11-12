@@ -21,7 +21,7 @@ const ES = {
   'clase.entrenadores': 'Entrenadores de clase', 'clase.hechizos': 'Hechizos de entrenador', 'clase.proximos': 'Próximos',
   'clase.misiones': 'Misiones de clase', 'clase.competencias': 'Armas y armaduras',
   'clase.sinEntrenador': 'En Classic 1.12 esta clase no existía en tu facción; los entrenadores de Forever aún no están en ninguna fuente publicable.',
-  'clase.nivel': 'Nv', 'clase.costo': 'Costo', 'clase.zona': 'Zona', 'clase.todos': 'Ver todos', 'clase.menos': 'Ver menos',
+  'clase.nivel': 'Nv', 'clase.hechizo': 'Hechizo', 'clase.costo': 'Costo', 'clase.zona': 'Zona', 'clase.todos': 'Ver todos', 'clase.menos': 'Ver menos',
   'clase.hastaNivel': 'hasta nivel', 'clase.ninguno': 'Nada nuevo que aprender en este rango.',
   pendiente: 'Esta sección se está construyendo.',
 }
@@ -46,7 +46,7 @@ const EN = {
   'clase.entrenadores': 'Class trainers', 'clase.hechizos': 'Trainer spells', 'clase.proximos': 'Next',
   'clase.misiones': 'Class quests', 'clase.competencias': 'Weapons and armor',
   'clase.sinEntrenador': 'In Classic 1.12 this class did not exist in your faction; Forever’s trainers are not in any publishable source yet.',
-  'clase.nivel': 'Lv', 'clase.costo': 'Cost', 'clase.zona': 'Zone', 'clase.todos': 'Show all', 'clase.menos': 'Show less',
+  'clase.nivel': 'Lv', 'clase.hechizo': 'Spell', 'clase.costo': 'Cost', 'clase.zona': 'Zone', 'clase.todos': 'Show all', 'clase.menos': 'Show less',
   'clase.hastaNivel': 'up to level', 'clase.ninguno': 'Nothing new to learn in this range.',
   pendiente: 'This section is being built.',
 }

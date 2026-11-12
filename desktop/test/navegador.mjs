@@ -35,6 +35,7 @@ await p.click('[data-tab="clase"]')
 await p.getByText('Hechizos de entrenador').waitFor()
 check('Paladín de la Horda: el hueco de entrenadores se dice', await p.getByText('Sin datos:').count() > 0)
 check('lista hechizos de entrenador', await p.locator('table tbody tr').count() > 0)
+check('la columna de nombres se titula Hechizo, no Clase', await p.getByRole('columnheader', { name: 'Hechizo', exact: true }).count() === 1)
 await cerrar()
 
 // 4) Cada pestaña se pinta sin errores, en claro y oscuro; idioma inglés.
