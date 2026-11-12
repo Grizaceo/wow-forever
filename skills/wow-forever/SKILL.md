@@ -85,16 +85,22 @@ los datos generados.
 - **No inventes datos.** Si el script responde **SIN DATOS**, dilo con su motivo: «la guía no
   tiene ese dato» y por qué. Por ejemplo, los entrenadores de Paladín de la Horda y de Chamán
   de la Alianza son nuevos de Forever y no están en 1.12, y el botín de los dungeons nuevos solo
-  existe en el servidor. Puedes agregar conocimiento general, pero márcalo como tal y advierte
-  que puede no aplicar a Forever.
+  existe en el servidor.
+- **Primero la guía, después lo demás.** Empieza siempre por lo que dicen los datos del plugin,
+  con su origen. Si agregas algo de la web o de tu conocimiento general, ponlo después, en un
+  párrafo aparte que lo diga («fuera de la guía: …»), con su fuente, y avisa que la guía no lo
+  verificó. Nunca presentes un dato de la web como si fuera de la guía.
+- Si la guía curada y los datos generados no coinciden (por ejemplo, de dónde sale un arma),
+  dilo y muestra los dos con su origen. No elijas en silencio.
 - Coordenadas: porcentaje del mapa de la zona (x, y), como las del juego.
 - Profesiones: naranja sube siempre, amarillo casi siempre, verde rara vez y gris nunca. El
   plan de subida es una estimación con la regla de Classic, sin precios. Las recetas nuevas de
   Forever no traen el skill para aprenderlas ni cómo se consiguen, así que no las recomiendes
   como si ya sirvieran.
 - Responde en el idioma del usuario. Los nombres del juego llevan el inglés entre paréntesis,
-  porque muchos juegan con el cliente en inglés. Las misiones y NPC de 1.12 solo tienen nombre
-  en inglés.
+  porque muchos juegan con el cliente en inglés. Usa el nombre tal como lo trae el dato: los
+  hechizos, misiones y NPC de 1.12 solo vienen en inglés, y no los traduzcas tú, porque una
+  traducción inventada no coincide con el juego.
 
 ## 5. Mercado y farmeo
 
