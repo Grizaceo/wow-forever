@@ -1,24 +1,35 @@
-# Licencia de datos — plugin público de escritorio
+# Licencia y origen de los datos
 
-Este archivo cubre **`desktop/plugin.js`**, el plugin público de escritorio
-distribuido en este repositorio, que incrusta el dataset público de drops
-(`drop-data.js`, generado por `tools/build-drop-data.py` en el
-[repositorio fuente](https://github.com/Grizaceo/wow-hunter-guide)).
+Este archivo cubre los datos generados que se distribuyen en este repositorio:
+`standalone/drop-data.js`, los archivos de `data/` y lo que de ellos se incrusta en
+`desktop/plugin.js`. Todos se regeneran con los scripts de `tools/` a partir de las
+entradas fijadas (versión y sha256) en `tools/fuentes.json`.
 
-## Origen y atribución
+## Fuentes que se usan
 
-Los datos derivan de **CMaNGOS classic-db** (<https://github.com/cmangos/classic-db>),
-publicado bajo **GPL-3.0-or-later**. Dump de referencia: `ClassicDB_1_12_1_z2815`.
-Las tablas de cliente (UiMapAssignment, UiMap, AreaTable, Map, Lock,
-FactionTemplate) provienen de **wago.tools** (tablas del cliente WoW Classic Era).
+| Fuente | Versión fijada | Licencia | Qué se toma |
+|---|---|---|---|
+| **CMaNGOS classic-db** (<https://github.com/cmangos/classic-db>) | commit `28ef6259c782928b08a8dc9cacf6bc02e64f2b29`, dump `ClassicDB_1_12_1_z2815` | **GPL-3.0** (texto completo abajo) | misiones, NPC, entrenadores, vendedores, botín y spawns de WoW 1.12 |
+| **Tablas del cliente WoW Classic Era** vía wago.tools | build 1.15.9.70576 | datos de Blizzard Entertainment | zonas, mapas, cerraduras, facciones |
+| **Tablas del cliente WoW Forever** vía wago.tools, en inglés y `esMX` | build 1.60.1.70888 | datos de Blizzard Entertainment | razas, clases y combinaciones, profesiones, recetas, reactivos, ítems, zonas, dungeons |
 
-**Aviso de copyright de CMaNGOS:** el material de Blizzard Entertainment
-(nombres y contenido de World of Warcraft) conserva sus marcas registradas y
-derechos de autor; este dataset se usa con fines no comerciales y no está
-afinado ni respaldado por Blizzard Entertainment ni por CMaNGOS.
+**Aviso:** el material de Blizzard Entertainment (nombres y contenido de World of
+Warcraft) conserva sus marcas registradas y derechos de autor. Se usa con fines no
+comerciales, con atribución, sin afiliación ni respaldo de Blizzard Entertainment,
+CMaNGOS ni wago.tools.
 
-`drop-data-private.js` y `market-local-scan.js` **no** están cubiertos por
-esta licencia ni se distribuyen: son datos privados de uso local.
+## Fuentes que NO se distribuyen
+
+No forman parte del repositorio ni de `desktop/plugin.js`, porque su licencia no permite
+redistribuirlas o no está clara:
+
+- **ForeverDungeonJournal** (addon, sin licencia): antes alimentaba el catálogo de
+  ítems del mercado; ese catálogo se retiró.
+- **QuestieDB** (addon; su licencia indica "todos los derechos reservados" ante la duda).
+- **RareScanner** (addon, todos los derechos reservados): solo existe como capa privada
+  opcional que un usuario puede generar en su máquina (`--with-private`, ignorada por git).
+- **Coordenadas raspadas de sitios comunitarios** (azeroth.wiki y similares).
+- Tus precios de Auctionator: se importan en tu máquina y nunca se incluyen.
 
 ---
 

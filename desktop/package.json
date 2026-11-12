@@ -1,0 +1,14 @@
+{
+  "name": "wow-forever-desktop",
+  "private": true,
+  "version": "2.0.0",
+  "description": "Build de la mitad Desktop de wow-forever: un solo ESM legible en desktop/plugin.js.",
+  "scripts": {
+    "build": "node build.mjs",
+    "check": "python3 ../scripts/check_desktop_bundle.py",
+    "test": "node test/navegador.mjs"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.2"
+  }
+}
