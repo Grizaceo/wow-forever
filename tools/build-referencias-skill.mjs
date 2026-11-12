@@ -24,7 +24,7 @@ const LIMITE_ARCHIVO = 30 * 1024 // ~30 KB: si un .md lo pasa, las macros van a 
 
 const CLASES = {
   hunter:  { slug: 'cazador',  nombre: 'Cazador', archivo: 'guide-hunter.js',  exp: 'GUIDE_HUNTER' },
-  warrior: { slug: 'guerrero', nombre: 'Guerrero', archivo: 'guide-warrior.js', exp: 'GUIDE_WARRIOR' },
+  // Guerrero retirado en la 2.0.0 (ver desktop/src/datos.js): su guía nombraba ítems y jefes que no existen.
   shaman:  { slug: 'chaman',   nombre: 'Chamán',   archivo: 'guide-shaman.js',  exp: 'GUIDE_SHAMAN'  },
 }
 const FACCIONES = { horde: 'Horda', alliance: 'Alianza' }

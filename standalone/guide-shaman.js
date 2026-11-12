@@ -224,7 +224,7 @@ const BANDS_SH_WA_EK = [
    notes:"Terminás Azuremyst y pasás a Bloodmyst. A 12-15 zep a EK (Menethil/Lakeshire) o quedate en Bloodmyst. Quests de la zona.",
    dung:"Wailing Caverns (17+, via Kalimdor u Org) · Shadowfang Keep (18+, EK)"},
   {min:18,max:24,zones:"EK: Redridge / Duskwood / Loch Modan",
-   notes:"Lakeshire/Lakmodan hubs. SFK en tu continente (18+) — buen XP y loot. WC para totems si viajas a Kalimdor.",
+   notes:"Lakeshire / Darkshire / Astranaar hubs. SFK en tu continente (18+) — buen XP y loot. WC para totems si viajas a Kalimdor.",
    dung:"SFK (18+) · BFD (20+, Ashenvale)"},
   {min:25,max:29,zones:"Wetlands / Arathi / Thousand Needles",
    notes:"Menethil/Refuge Pointe hubs. Quests de Wetlands + Arathi.",

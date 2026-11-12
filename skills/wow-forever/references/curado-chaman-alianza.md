@@ -11,7 +11,7 @@ en el juego salvo que el texto lo diga.
 - **1–9** — Azuremyst Isle (Dun Algaz / Ammen Vale). Draenei shaman empieza en Azuremyst — el único bando-clase que arranca acá. Quests de clase 10: primeros totems (Searing/Earthbind/Mana Spring/Ghost Wolf). Arma 1H vendor.
 - **10–17** — Azuremyst → Bloodmyst Isle → exodar/Hubbardton?. Terminás Azuremyst y pasás a Bloodmyst. A 12-15 zep a EK (Menethil/Lakeshire) o quedate en Bloodmyst. Quests de la zona.
   - Dungeons: Wailing Caverns (17+, via Kalimdor u Org) · Shadowfang Keep (18+, EK)
-- **18–24** — EK: Redridge / Duskwood / Loch Modan. Lakeshire/Lakmodan hubs. SFK en tu continente (18+) — buen XP y loot. WC para totems si viajas a Kalimdor.
+- **18–24** — EK: Redridge / Duskwood / Loch Modan. Lakeshire / Darkshire / Astranaar hubs. SFK en tu continente (18+) — buen XP y loot. WC para totems si viajas a Kalimdor.
   - Dungeons: SFK (18+) · BFD (20+, Ashenvale)
 - **25–29** — Wetlands / Arathi / Thousand Needles. Menethil/Refuge Pointe hubs. Quests de Wetlands + Arathi.
   - Dungeons: Razorfen Kraul (25+) · SFK restos

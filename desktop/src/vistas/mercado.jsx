@@ -403,7 +403,7 @@ const CATALOGO = catalogoMercado(D.items, D.dungeons)
 // Las guías curadas van por configure (el motor ya no lee globales): su ruta alimenta
 // las zonas de tráfico del recomendador.
 Farm.configure({ HunterDropData: D.dropData, HunterMarketCatalog: CATALOGO, HunterHistory, HunterChart,
-  GUIDE_HUNTER: GUIAS[3], GUIDE_WARRIOR: GUIAS[1], GUIDE_SHAMAN: GUIAS[7] })
+  GUIDE_HUNTER: GUIAS[3], GUIDE_SHAMAN: GUIAS[7] })
 
 const fmt = Farm.fmt || {}
 const ORDENES = ['nombre', 'precio', 'ofertas', 'roi', 'gph']

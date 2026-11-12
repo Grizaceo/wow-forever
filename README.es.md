@@ -43,7 +43,7 @@ página llega apagada aunque el plugin esté habilitado. Aparece en la barra lat
   dungeons nuevos de Forever con sus jefes.
 - **Mercado**: importa tu `Auctionator.lua`, acumula el historial, marca ofertas y recomienda
   dónde farmear.
-- **Guía curada** (Cazador de la Horda, y Guerrero y Chamán de ambas facciones) y **Legacy**.
+- **Guía curada** (Cazador de la Horda, y Chamán de ambas facciones) y **Legacy**.
 - **Skill del agente**: responde preguntas como «soy Paladín no-muerto nivel 24, ¿dónde
   entreno?» o «¿qué subo de herrería con 120 de skill?» consultando los datos del plugin. El
   botón **Copiar perfil para el agente** de la pestaña Personaje le pasa tu personaje al chat.

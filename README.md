@@ -43,7 +43,7 @@ page arrives switched off even when the plugin is enabled. It then shows up in t
   9 new Forever dungeons with their bosses.
 - **Market**: imports your `Auctionator.lua`, builds up price history, flags deals and suggests
   where to farm.
-- **Curated guide** (Horde Hunter, and Warrior and Shaman for both factions) and **Legacy**.
+- **Curated guide** (Horde Hunter, and Shaman for both factions) and **Legacy**.
 - **Agent skill**: answers questions such as "I'm a level 24 Undead Paladin, where do I
   train?" or "what do I craft at 120 Blacksmithing?" by querying the plugin's data. The
   **Copy profile for the agent** button on the Character tab hands your character to the chat.

@@ -149,7 +149,7 @@ Reglas, en `src/perfil.js` (módulo ES puro, sin DOM):
 
 ## Guías curadas
 
-Las guías escritas a mano (hoy Cazador, Guerrero y Chamán en `standalone/guide-*.js`) se
+Las guías escritas a mano (hoy Cazador y Chamán en `standalone/guide-*.js`; la de Guerrero se retiró en la 2.0.0) se
 mantienen como capa curada encima de lo generado. Al pasar a la mitad Desktop nueva se
 convierten a este esquema común:
 
