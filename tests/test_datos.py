@@ -294,11 +294,36 @@ class TestDatos(unittest.TestCase):
         for k, v in items.items():
             self.assertTrue(k.isdigit(), k)
             self.assertNotIn(int(k), EXCL, k)
-            self.assertEqual(len(v), 11, k)
+            self.assertEqual(len(v), 12, k)
             self.assertIsInstance(v[0], str)
             self.assertIsInstance(v[1], str)
             for n in v[2:]:
                 self.assertIsInstance(n, int, (k, v))
+            self.assertIn(v[10], (0, 1, 2), k)
+            self.assertGreaterEqual(v[11], 0, k)
+            if v[11]:
+                self.assertEqual(v[6], 2, 'DPS en un ítem que no es arma: %s' % k)
+
+    def test_items_de_classic_completos(self):
+        # Todo ítem de 1.12 que el cliente Forever también tiene trae ficha, aunque
+        # ningún otro dato lo cite: las guías curadas y la skill los nombran.
+        items = self.items['items']
+        for iid, nombre in ((1121, 'Feet of the Lynx'), (19991, 'Devilsaur Eye'), (2825, 'Bow of Searing Arrows')):
+            self.assertEqual(items[str(iid)][1], nombre)
+        self.assertGreater(self.items['meta']['items_cmangos'], 4000)
+
+    def test_dps_de_armas(self):
+        # DPS de CMaNGOS 1.12 x10: Venomstrike 9.6, Megashot Rifle 27.4; una pechera, 0.
+        items = self.items['items']
+        self.assertEqual(items['6469'][11], 96)
+        self.assertEqual(items['17717'][11], 274)
+        self.assertEqual(items['6627'][11], 0)
+
+    def test_vendedor_con_stock_limitado(self):
+        # Fine Longbow solo lo venden con stock limitado (2); el hilo de lino, sin tope (1).
+        items = self.items['items']
+        self.assertEqual(items['11304'][10], 2)
+        self.assertEqual(items['2320'][10], 1)
 
     def _items_referenciados(self):
         refs = set()
@@ -377,6 +402,16 @@ class TestDatos(unittest.TestCase):
                 self.assertIn(q['prof'], PROFESIONES)
             if 'prev' in q:
                 self.assertIsInstance(q['prev'], int)
+            for it in q.get('recompensas', ()):
+                self.assertIn(str(it), self.items['items'], (qid, it))
+                self.assertNotIn(it, EXCL)
+
+    def test_recompensas_de_mision(self):
+        # 'Dangerous!' (567) da Bow of Plunder (3742) a elegir; 'Big Game Hunter' (208),
+        # Master Hunter's Bow (17686) o Rifle (17687).
+        mis = self.misiones['misiones']
+        self.assertIn(3742, mis['567']['recompensas'])
+        self.assertEqual(mis['208']['recompensas'], [17686, 17687])
 
     # -------------------------------------------------------------- dungeons
     def test_dungeons(self):

@@ -133,6 +133,16 @@ def item_fila(D, iid):
     return D.items["items"].get(str(iid))
 
 
+FACCIONES_COD = {"a": "Alianza", "h": "Horda", "ah": "ambas facciones"}
+
+
+def ids_cmangos(D):
+    # Ítems cuya ficha sale de CMaNGOS 1.12 porque el cliente Forever no trae su nombre.
+    if not hasattr(D, "_ids_cm"):
+        D._ids_cm = set(D.items.get("meta", {}).get("ids_cmangos") or ())
+    return D._ids_cm
+
+
 def item_nombre(D, iid, lang):
     f = item_fila(D, iid)
     if not f:
@@ -502,9 +512,12 @@ def cmd_item(D, a, out):
     for iid in ids[: a.max]:
         f = items[iid]
         compra = f" compra {dinero(f[9])}" if len(f) > 9 and f[9] else ""
-        vend = " (lo vende algún vendedor sin tope)" if len(f) > 10 and f[10] == 1 else ""
+        vend = {1: " (lo vende algún vendedor sin tope)", 2: " (lo vende algún vendedor, con stock limitado)"}.get(
+            f[10] if len(f) > 10 else 0, "")
+        dps = f", {f[11] / 10:.1f} DPS [Classic 1.12]" if len(f) > 11 and f[11] else ""
+        ori = "[Classic 1.12]" if int(iid) in ids_cmangos(D) else "[cliente Forever]"
         out(f"- [{iid}] {item_nombre(D, iid, a.lang)} — {CALIDAD.get(f[2], f[2])}, nivel req. {f[3]}, "
-            f"nivel de ítem {f[4]}, venta {dinero(f[5])}{compra}{vend} [cliente Forever]")
+            f"nivel de ítem {f[4]}, venta {dinero(f[5])}{compra}{vend} {ori}{dps}")
         if a.detalle or len(ids) == 1:
             fuentes = []
             for grupo in ("clasicos",):
@@ -519,13 +532,18 @@ def cmd_item(D, a, out):
                     if r.get("crea") and str(r["crea"][0]) == iid]
             for pn, r in crea[:3]:
                 out(f"    se craftea: {pn} — {nombre(r['n'], a.lang)} (gris {r['rango'].get('gris')}) {origen(r.get('f'))}")
+            mis = [(q, m) for q, m in D.misiones["misiones"].items() if int(iid) in (m.get("recompensas") or ())]
+            if mis:
+                out("    recompensa de: " + "; ".join(f"[{q}] {nombre(m['t'], a.lang)} (nivel {m['nivel']}, "
+                                                    f"{FACCIONES_COD.get(m['faccion'], m['faccion'])})" for q, m in mis[:4])
+                    + " [Classic 1.12]")
             usa = sum(1 for p in D.profesiones["profesiones"].values() for r in p["recetas"]
                       if any(str(x[0]) == iid for x in r.get("reactivos") or []))
             if usa:
                 out(f"    reactivo de {usa} recetas")
-            if not fuentes and not crea:
-                out("    de dónde sale: SIN DATOS en las fuentes publicables (botín de criaturas comunes, "
-                    "misiones y vendedores no se listan por ítem)")
+            if not fuentes and not crea and not mis and not (len(f) > 10 and f[10]):
+                out("    de dónde sale: SIN DATOS en las fuentes publicables (el botín de criaturas comunes, "
+                    "raros y cofres no se lista por ítem)")
     if len(ids) > a.max:
         out(f"... y {len(ids) - a.max} más (usa --max o afina el texto)")
     return 0
@@ -629,6 +647,8 @@ def cmd_mision(D, a, out):
         if m.get("prev"):
             pm = ms.get(str(m["prev"]))
             extra.append(f"antes: [{m['prev']}] {nombre(pm['t'], a.lang) if pm else ''}".rstrip())
+        if m.get("recompensas"):
+            extra.append("recompensas: " + ", ".join(f"{item_nombre(D, i, a.lang)} [{i}]" for i in m["recompensas"]))
         out(f"- [{q}] {nombre(m['t'], a.lang)} — nivel {m['nivel']} (desde {m.get('min', '?')}), "
             f"{zona_nombre(D, m.get('zona'), a.lang) if m.get('zona') else 'sin zona'}, {FAC.get(m['faccion'])}"
             + (", " + ", ".join(extra) if extra else "") + " [Classic 1.12]")
@@ -659,7 +679,7 @@ def cmd_fuentes(D, a, out):
     for f in m["fuentes"]:
         par = ", ".join(f"{k} {v}" for k, v in f.get("parametros", {}).items())
         out(f"- {f['id']}: {f['descripcion']} ({par}); licencia: {f['licencia']}")
-    out("Lo curado (guías de Cazador, Guerrero, Chamán y Legacy) está en references/ de la skill.")
+    out("Lo curado (guía de Cazador de la Horda y Legacy) está en references/ de la skill.")
     return 0
 
 

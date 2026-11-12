@@ -376,6 +376,10 @@ def quest_faction(d, cm, mask, qid):
     return 'ah'
 
 
+# Ítems que da una misión: fijos (RewItemId) y a elegir (RewChoiceItemId).
+QUEST_RECOMPENSAS = ['RewItemId%d' % i for i in range(1, 5)] + ['RewChoiceItemId%d' % i for i in range(1, 7)]
+
+
 def build_quests(d, cm, zt, loc, maps):
     area_map = {int(a['ID']): int(a.get('ContinentID') or -1) for a in d['era_area'].values()}
     inst = {t['map'] for t in d['db']['instance_template']}
@@ -422,6 +426,10 @@ def build_quests(d, cm, zt, loc, maps):
             rec['prof'] = q['RequiredSkill']
         if q['PrevQuestId'] > 0:
             rec['prev'] = q['PrevQuestId']
+        rew = sorted({q[k] for k in QUEST_RECOMPENSAS if q[k] > 0
+                      and not ITEM_EXCL_LO <= q[k] <= ITEM_EXCL_HI})
+        if rew:
+            rec['recompensas'] = rew
         out[qid] = rec
     return out
 
@@ -499,8 +507,10 @@ def build_recipes(d, cm, names):
 
 
 # ------------------------------------------------------------------ items
-def item_refs(d, cm):
+def item_refs(d, cm, quests=None):
     refs = set()
+    for q in (quests or {}).values():
+        refs.update(q.get('recompensas', ()))
     for v in d['recipes_by_sl'].values():
         for r in v:
             if r['crea']:
@@ -516,12 +526,31 @@ def item_refs(d, cm):
     return refs
 
 
+def dps_x10(t):
+    """DPS de un arma de CMaNGOS (1.12) x10, entero; 0 si no es arma o no tiene daño."""
+    if not t or t['class'] != 2 or not t['delay']:
+        return 0
+    media = (t['dmg_min1'] + t['dmg_max1']) / 2.0
+    return int(round(media / (t['delay'] / 1000.0) * 10))
+
+
+# Ítems de prueba o de criaturas que CMaNGOS trae y el juego no muestra.
+ITEM_BASURA = re.compile(r'^(Test |TEST |Monster - |\[PH\])')
+
+
 def build_items(d, cm, refs):
+    """Fichas de ítem: [nombre es, nombre en, calidad, nivel req., nivel de ítem, venta,
+    clase, subclase, ligado, compra, vendedor (1 sin tope, 2 solo stock limitado), DPS x10]. Nombre y stats del
+    cliente Forever (ItemSparse) cuando los trae; si no, de CMaNGOS 1.12 para todo ítem
+    que el cliente Forever también tiene (Item.csv) o que otro dato cita. El DPS sale
+    siempre de CMaNGOS 1.12 (0 si no es arma o no está ahí)."""
     it, sp, spe = d['item'], d['item_sparse'], d['item_sparse_es']
     cm_items = cm['items']
     EXC = lambda i: ITEM_EXCL_LO <= i <= ITEM_EXCL_HI
-    items, n_cm, n_sin_nom = {}, 0, 0
-    vendido = {iid for iid, npcs in cm['vend_ilimitado'].items() if npcs}
+    items, n_cm, n_sin_nom, de_cm = {}, 0, 0, []
+    # 1 = algún vendedor lo vende sin tope de stock; 2 = solo con stock limitado.
+    vendido = {iid: 1 for iid, npcs in cm['vend'].items() if npcs}
+    vendido.update({iid: 2 for iid in vendido if not cm['vend_ilimitado'].get(iid)})
     for iid in sorted(sp):
         if EXC(iid):
             continue
@@ -531,8 +560,10 @@ def build_items(d, cm, refs):
                       inum(s, 'OverallQualityID'), inum(s, 'RequiredLevel'),
                       inum(s, 'ItemLevel'), inum(s, 'SellPrice'),
                       inum(c, 'ClassID'), inum(c, 'SubclassID'), inum(s, 'Bonding'),
-                      inum(s, 'BuyPrice'), 1 if iid in vendido else 0]
-    for iid in sorted(refs):
+                      inum(s, 'BuyPrice'), vendido.get(iid, 0),
+                      dps_x10(cm_items.get(iid))]
+    del_cliente = {i for i in cm_items if i in it and not ITEM_BASURA.match(cm_items[i]['name'] or '')}
+    for iid in sorted(set(refs) | del_cliente):
         if iid in items or EXC(iid):
             continue
         if iid in cm_items:
@@ -540,15 +571,16 @@ def build_items(d, cm, refs):
             nm = t['name'] or ''
             items[iid] = [nm, nm, t['Quality'], t['RequiredLevel'], t['ItemLevel'],
                           t['SellPrice'], t['class'], t['subclass'], t['bonding'],
-                          t['BuyPrice'], 1 if iid in vendido else 0]
+                          t['BuyPrice'], vendido.get(iid, 0), dps_x10(t)]
             n_cm += 1
+            de_cm.append(iid)
         elif iid in it:
             # Item del cliente sin ItemSparse: sin nombre ni stats publicadas.
             c = it[iid]
             items[iid] = ['', '', 0, 0, 0, 0, inum(c, 'ClassID'),
-                          inum(c, 'SubclassID'), 0, 0, 0]
+                          inum(c, 'SubclassID'), 0, 0, 0, 0]
             n_sin_nom += 1
-    return items, n_cm, n_sin_nom
+    return items, n_cm, n_sin_nom, sorted(de_cm)
 
 
 # ------------------------------------------------------------------ clases
@@ -973,7 +1005,7 @@ def main():
     cm['boss_loot'] = build_boss_loot(d, cm, loot, names)
     inst_maps = {t['map'] for t in d['db']['instance_template']}
 
-    items, n_items_cm, n_items_sin_nom = build_items(d, cm, item_refs(d, cm))
+    items, n_items_cm, n_items_sin_nom, ids_cm = build_items(d, cm, item_refs(d, cm, quests))
     items_keys = set(items)
 
     pers = build_personaje(d, loc, era_maps, huecos_per['personaje'])
@@ -1015,7 +1047,8 @@ def main():
     put('items.json',
         {'meta': dict(meta(['cliente-forever'] + (['cmangos-1.12'] if n_items_cm else []),
                            builds),
-                      items_cmangos=n_items_cm, items_sin_nombre=n_items_sin_nom),
+                      items_cmangos=n_items_cm, items_sin_nombre=n_items_sin_nom,
+                      ids_cmangos=ids_cm),
          'items': {str(i): items[i] for i in sorted(items)}, 'huecos': items_huecos})
     put('zonas.json',
         {'meta': meta(['cliente-forever', 'curado'], builds),

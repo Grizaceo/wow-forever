@@ -119,6 +119,19 @@ class TestScript(unittest.TestCase):
         c, s = correr('mision', '1528')
         self.assertIn('Call of Water', s)
 
+    def test_item_dps_recompensa_y_origen(self):
+        # Venomstrike: DPS de 1.12 y ficha de CMaNGOS; Bow of Plunder: la misión que lo da.
+        c, s = correr('item', 'Venomstrike')
+        self.assertIn('9.6 DPS [Classic 1.12]', s)
+        self.assertIn('25%', s)
+        c, s = correr('item', 'Bow of Plunder')
+        self.assertIn('recompensa de: [567] Dangerous!', s)
+        self.assertIn('[cliente Forever]', s)
+        c, s = correr('item', 'Fine Longbow')
+        self.assertIn('stock limitado', s)
+        c, s = correr('mision', '567')
+        self.assertIn('Bow of Plunder', s)
+
 
 class TestVersion(unittest.TestCase):
     def test_misma_version_en_todo_el_paquete(self):
