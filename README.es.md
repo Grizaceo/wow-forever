@@ -21,8 +21,9 @@ hermes plugins install Grizaceo/wow-forever --ref <commit de 40 caracteres>
 hermes plugins enable wow-forever
 ```
 
-La página **WoW Forever** aparece en la barra lateral de Hermes Desktop la próxima vez que se
-abre la app. La skill `wow-forever:wow-forever` funciona en cualquier superficie de Hermes.
+En Hermes Desktop, abre **Capabilities → Plugins**, busca **WoW Forever** y enciéndela: la
+página llega apagada aunque el plugin esté habilitado. Aparece en la barra lateral. La skill
+`wow-forever:wow-forever` funciona en cualquier superficie de Hermes.
 
 ## Qué hace
 
