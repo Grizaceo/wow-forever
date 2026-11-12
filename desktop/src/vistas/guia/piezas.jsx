@@ -36,7 +36,7 @@ agregarTextos({
   'guia.ficha.talento': 'Talent', 'guia.ficha.prefArma': 'Preferred weapon', 'guia.ficha.continente': 'Continent',
   'guia.ficha.tipoArma': 'Weapon type', 'guia.ficha.ingenieria': 'Engineering', 'guia.ficha.ingenieria2': 'engineering',
   'guia.ficha.equipada': 'Equipped', 'guia.ficha.mejorAhora': 'Best now', 'guia.ficha.siguiente': 'Next',
-  'guia.ficha.sinMejoras': 'no upgrades in sight', 'guia.ficha.sinDefinir': 'undefined',
+  'guia.ficha.sinMejoras': 'no upgrades in sight', 'guia.ficha.sinDefinir': 'not set',
   'guia.ficha.otraManual': 'Other (manual dps)', 'guia.ficha.manual': 'manual',
   'guia.ficha.captura': 'screenshot', 'guia.ficha.quitar': 'remove',
   'guia.rec.yaPodes': 'ready!', 'guia.rec.enNivel': 'at level {n}', 'guia.rec.enNiveles': 'at level {n}',

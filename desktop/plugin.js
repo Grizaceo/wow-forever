@@ -9681,7 +9681,7 @@ agregarTextos({
   "guia.ficha.mejorAhora": "Best now",
   "guia.ficha.siguiente": "Next",
   "guia.ficha.sinMejoras": "no upgrades in sight",
-  "guia.ficha.sinDefinir": "undefined",
+  "guia.ficha.sinDefinir": "not set",
   "guia.ficha.otraManual": "Other (manual dps)",
   "guia.ficha.manual": "manual",
   "guia.ficha.captura": "screenshot",
