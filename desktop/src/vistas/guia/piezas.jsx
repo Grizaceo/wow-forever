@@ -53,7 +53,7 @@ agregarTextos({
 })
 
 export const P = {
-  dung: { background: C.fondo2, border: `1px solid ${C.borde}`, borderRadius: 8, marginBottom: 9, overflow: 'hidden' },
+  dung: { background: C.tarjeta, border: `1px solid ${C.borde}`, borderRadius: 8, marginBottom: 9, overflow: 'hidden' },
   resumen: { cursor: 'pointer', listStyle: 'none', padding: '11px 14px', display: 'flex', alignItems: 'center', gap: 10,
     userSelect: 'none', color: C.texto, fontSize: 13 },
   flecha: { color: C.naranja, fontSize: 10, flexShrink: 0, display: 'inline-block', transition: 'transform .2s' },

@@ -42,7 +42,7 @@ agregarTextos({
 })
 
 const estiloDetails = {
-  border: `1px solid ${C.borde}`, borderRadius: 6, background: C.fondo2,
+  border: `1px solid ${C.borde}`, borderRadius: 6, background: C.tarjeta,
 }
 const estiloSummary = {
   cursor: 'pointer', padding: '8px 12px', display: 'flex', gap: 8, alignItems: 'baseline',

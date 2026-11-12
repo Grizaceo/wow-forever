@@ -5263,6 +5263,7 @@ var C = {
   borde2: "var(--ui-stroke-tertiary)",
   fondo2: "var(--ui-bg-secondary)",
   fondo3: "var(--ui-bg-tertiary)",
+  tarjeta: "var(--ui-bg-card)",
   acento: "var(--ui-accent)",
   verde: "var(--ui-green)",
   amarillo: "var(--ui-yellow)",
@@ -5292,7 +5293,7 @@ var S = {
     gap: 8,
     border: `1px solid ${C.borde}`,
     borderRadius: 6,
-    background: C.fondo2,
+    background: C.tarjeta,
     padding: 12
   },
   tarjetaTitulo: {
@@ -7072,7 +7073,7 @@ agregarTextos({
 var estiloDetails2 = {
   border: `1px solid ${C.borde}`,
   borderRadius: 6,
-  background: C.fondo2
+  background: C.tarjeta
 };
 var estiloSummary2 = {
   cursor: "pointer",
@@ -9708,7 +9709,7 @@ agregarTextos({
   "guia.simc.fecha": "Imported on {fecha}."
 });
 var P = {
-  dung: { background: C.fondo2, border: `1px solid ${C.borde}`, borderRadius: 8, marginBottom: 9, overflow: "hidden" },
+  dung: { background: C.tarjeta, border: `1px solid ${C.borde}`, borderRadius: 8, marginBottom: 9, overflow: "hidden" },
   resumen: {
     cursor: "pointer",
     listStyle: "none",
