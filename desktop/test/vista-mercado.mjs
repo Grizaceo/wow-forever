@@ -137,4 +137,34 @@ check('borrado vacía mercado e historial', await p.getByText('Todavía no impor
 check('tras borrar no quedan claves', /0 de 0|Todavía no importaste/.test(await texto(p)))
 await cerrar()
 
+// ---------- Sesión 3: Auctionator.lua real con blob CBOR crudo (no es UTF-8) ----------
+// WoW guarda los reinos no actuales como CBOR dentro de una cadena Lua, con bytes crudos.
+// Con readText (UTF-8 con pérdida) fallaba «cbor trailing data»; la lectura usa readDataUrl.
+const B = (s) => [...Buffer.from(s, 'latin1')]
+const cabeza = (mayor, n) => [(mayor << 5) | n] // longitudes < 24 bastan aquí
+const cbs = (s) => [...cabeza(2, B(s).length), ...B(s)]
+const mapa = (pares) => [...cabeza(5, pares.length), ...pares.flat(Infinity)]
+const itemCbor = mapa([[cbs('m'), [0x18, 200]], [cbs('h'), mapa([[cbs('2504'), [0x18, 200]]])], [cbs('a'), mapa([[cbs('2504'), [3]]])]])
+const blob = mapa([[cbs('version'), [2]], [cbs('2589'), itemCbor]])
+const crudo = blob.flatMap((b) => b === 0x22 ? [0x5c, 0x22] : b === 0x5c ? [0x5c, 0x5c] : b === 0x0a ? [0x5c, 0x6e] : b === 0 ? [0x5c, 0x30, 0x30, 0x30] : [b])
+const FIXTURE_CBOR = Buffer.concat([
+  Buffer.from('AUCTIONATOR_PRICE_DATABASE={__dbversion=8,["Actual"]={version=2,["2589"]={m=120,h={["2504"]=120},a={["2504"]=5}}},["Otro"]="', 'latin1'),
+  Buffer.from(crudo), Buffer.from('"}', 'latin1')]).toString('base64')
+;({ p, cerrar } = await a.abrir('claro', { perfil: PERFILES.cazadorHorda }))
+await p.click('[data-tab="mercado"]')
+await p.getByText('Todavía no importaste precios').first().waitFor()
+await p.evaluate((b64) => { window.carpetaConcedida = { name: 'SavedVariables', files: { 'Auctionator.lua': { b64 } } } }, FIXTURE_CBOR)
+await p.getByRole('button', { name: 'Leer Auctionator.lua' }).first().click()
+await esperar(p, /Importación guardada|No se importó/)
+check('lee un Auctionator.lua con blob CBOR crudo (bytes no UTF-8)', await p.getByText('Importación guardada').count() === 1, await texto(p))
+const reinos = await p.locator('select[aria-label="Realm de subasta"] option').allTextContents()
+check('importa el reino actual y el del blob CBOR', ['Actual', 'Otro'].every((r) => reinos.some((o) => o.includes(r))), reinos)
+
+// Host sin readDataUrl: la lectura cae a readText y un archivo UTF-8 sigue importando.
+await p.evaluate((fix) => { window.sinDataUrl = true; window.carpetaConcedida = { name: 'SavedVariables', files: { 'Auctionator.lua': fix } } }, FIXTURE)
+await p.getByRole('button', { name: 'Leer Auctionator.lua' }).first().click()
+await esperar(p, /Importación guardada|No se importó/)
+check('sin readDataUrl, readText sigue importando un archivo UTF-8', await p.getByText('Importación guardada').count() === 1)
+await cerrar()
+
 await a.terminar('mercado')

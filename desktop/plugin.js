@@ -5930,22 +5930,34 @@ var filesApi = (ctx) => {
   const f = ctx?.files;
   return f && typeof f.requestFolder === "function" && typeof f.readText === "function" && typeof f.list === "function" && typeof f.folders === "function" ? f : null;
 };
-var dataUrlText = (url) => {
+var dataUrlBytes = (url) => {
   const b64 = String(url).slice(String(url).indexOf(",") + 1);
   const bin = atob(b64);
   const bytes = new Uint8Array(bin.length);
   for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-  return new TextDecoder("utf-8").decode(bytes);
+  return bytes;
 };
-async function readAuction(files, folder, rel) {
-  let r = await files.readText(folder.id, rel);
-  let text2 = r?.ok && typeof r.text === "string" ? r.text : null;
-  if (!text2 && r?.error === "too-large" && typeof files.readDataUrl === "function") {
-    const d = await files.readDataUrl(folder.id, rel);
-    if (d?.ok && typeof d.url === "string") text2 = dataUrlText(d.url);
+var MARK_BYTES = new TextEncoder().encode(AUCTION_MARK);
+function contieneBytes(bytes, aguja) {
+  const n = aguja.length;
+  outer: for (let i = 0; i + n <= bytes.length; i++) {
+    for (let j = 0; j < n; j++) if (bytes[i + j] !== aguja[j]) continue outer;
+    return true;
   }
-  if (!text2 || !text2.includes(AUCTION_MARK)) return null;
-  return { status: "ok", text: text2, path: folder.name + "/" + rel, byteSize: text2.length };
+  return false;
+}
+async function readAuction(files, folder, rel) {
+  let bytes = null;
+  if (typeof files.readDataUrl === "function") {
+    const d = await files.readDataUrl(folder.id, rel);
+    if (d?.ok && typeof d.url === "string") bytes = dataUrlBytes(d.url);
+  }
+  if (!bytes) {
+    const r = await files.readText(folder.id, rel);
+    if (r?.ok && typeof r.text === "string") bytes = new TextEncoder().encode(r.text);
+  }
+  if (!bytes || !contieneBytes(bytes, MARK_BYTES)) return null;
+  return { status: "ok", bytes, path: folder.name + "/" + rel, byteSize: bytes.length };
 }
 async function findInFolder(files, folder) {
   const direct = await readAuction(files, folder, AUCTION_FILE).catch(() => null);
@@ -7547,8 +7559,8 @@ function VistaMercado({ ctx, almacen, estado, recargar, perfil, lang }) {
     } catch (e) {
       r = { status: "error", message: e?.message || String(e) };
     }
-    if (r?.status === "ok" && typeof r.text === "string" && r.text.length) {
-      const bytes = new TextEncoder().encode(r.text);
+    if (r?.status === "ok" && r.bytes instanceof Uint8Array && r.bytes.length) {
+      const bytes = r.bytes;
       if (bytes.length > import_market.default.MAX_BYTES) {
         setMensaje(t(lang, "mercado.errorTamano"));
         setImportando(false);

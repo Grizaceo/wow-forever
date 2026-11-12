@@ -29,7 +29,7 @@ export const TEMAS = {
     '--ui-blue': '#6aa8ff', '--ui-purple': '#c39bff', background: '#141414' },
 }
 
-// ctx simulado. window.carpetaConcedida = { name, files: { 'SavedVariables/Auctionator.lua': '…' } }
+// ctx simulado. window.carpetaConcedida = { name, files: { 'SavedVariables/Auctionator.lua': '…' | { b64 } } }
 // la define cada prueba; requestFolder la "concede" y window.lecturas registra lo leído.
 const ENTRADA = (plugin) => `
 import { createRoot } from 'react-dom/client'
@@ -60,7 +60,9 @@ const ctx = {
       if (!window.concedidas.some((c) => c.id === f)) return { ok: false, error: 'not-granted' }
       window.lecturas.push(rel)
       const t = carpeta().files[rel]
-      return t === undefined ? { ok: false, error: 'not-found' } : { ok: true, text: t, size: t.length }
+      // Como Hermes (toString('utf8')): un archivo binario { b64 } se decodifica con pérdida.
+      const texto = t === undefined ? undefined : typeof t === 'string' ? t : new TextDecoder('utf-8').decode(Uint8Array.from(atob(t.b64), (c) => c.charCodeAt(0)))
+      return texto === undefined ? { ok: false, error: 'not-found' } : { ok: true, text: texto, size: texto.length }
     },
     writeText: async (f, rel, text) => {
       if (f !== 'data') return { ok: false, error: 'not-granted' }
@@ -75,7 +77,16 @@ const ctx = {
       window.concedidas = [folder]; return { ok: true, folder }
     },
     list: async (f, rel) => window.concedidas.some((c) => c.id === f) ? { ok: true, entries: listar(rel), truncated: false } : { ok: false, error: 'not-granted' },
-    readDataUrl: async () => ({ ok: false, error: 'not-found' }),
+    // Bytes exactos en base64, como Hermes. window.sinDataUrl simula un host sin readDataUrl.
+    readDataUrl: async (f, rel) => {
+      if (window.sinDataUrl) return { ok: false, error: 'io-error' }
+      if (!window.concedidas.some((c) => c.id === f)) return { ok: false, error: 'not-granted' }
+      window.lecturas.push(rel)
+      const t = carpeta().files[rel]
+      if (t === undefined) return { ok: false, error: 'not-found' }
+      const b64 = typeof t === 'string' ? btoa(String.fromCharCode(...new TextEncoder().encode(t))) : t.b64
+      return { ok: true, url: 'data:text/plain;base64,' + b64 }
+    },
   },
   os: { writeClipboard: async (t) => { window.copiado = t; return true } },
 }

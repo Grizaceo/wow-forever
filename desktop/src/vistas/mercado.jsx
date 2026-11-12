@@ -585,8 +585,8 @@ export function VistaMercado({ ctx, almacen, estado, recargar, perfil, lang }) {
     let r
     try { r = await leerAuctionator(ctx, pick ? { pick: true } : {}) }
     catch (e) { r = { status: 'error', message: e?.message || String(e) } }
-    if (r?.status === 'ok' && typeof r.text === 'string' && r.text.length) {
-      const bytes = new TextEncoder().encode(r.text)
+    if (r?.status === 'ok' && r.bytes instanceof Uint8Array && r.bytes.length) {
+      const bytes = r.bytes
       if (bytes.length > HunterMarket.MAX_BYTES) {
         setMensaje(t(lang, 'mercado.errorTamano')); setImportando(false); return
       }

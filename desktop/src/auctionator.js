@@ -9,17 +9,30 @@
 const AUCTION_FILE='Auctionator.lua', AUCTION_MARK='AUCTIONATOR_PRICE_DATABASE', WALK_DIRS=80, WALK_DEPTH=4;
 let auctionBusy=false;
 export const filesApi=ctx=>{const f=ctx?.files;return f&&typeof f.requestFolder==='function'&&typeof f.readText==='function'&&typeof f.list==='function'&&typeof f.folders==='function'?f:null;};
-const dataUrlText=url=>{const b64=String(url).slice(String(url).indexOf(',')+1);const bin=atob(b64);const bytes=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)bytes[i]=bin.charCodeAt(i);return new TextDecoder('utf-8').decode(bytes);};
-async function readAuction(files,folder,rel){
-  let r=await files.readText(folder.id,rel);
-  let text=r?.ok&&typeof r.text==='string'?r.text:null;
-  // readText stops at 4 MiB; a big realm DB can exceed it, readDataUrl allows 16 MiB.
-  if(!text&&r?.error==='too-large'&&typeof files.readDataUrl==='function'){
+export const dataUrlBytes=url=>{const b64=String(url).slice(String(url).indexOf(',')+1);const bin=atob(b64);const bytes=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)bytes[i]=bin.charCodeAt(i);return bytes;};
+const MARK_BYTES=new TextEncoder().encode(AUCTION_MARK);
+export function contieneBytes(bytes,aguja){
+  const n=aguja.length;
+  outer:for(let i=0;i+n<=bytes.length;i++){for(let j=0;j<n;j++)if(bytes[i+j]!==aguja[j])continue outer;return true;}
+  return false;
+}
+// Auctionator keeps every realm except the current one as a CBOR blob inside a Lua
+// string, and WoW writes those bytes raw (>= 0x80, control bytes): the file is not
+// UTF-8. readText decodes it as UTF-8 and replaces those bytes, which breaks the CBOR
+// («cbor trailing data»). readDataUrl returns the exact bytes (up to 16 MiB), so it
+// goes first; readText is only the fallback for a host without readDataUrl.
+export async function readAuction(files,folder,rel){
+  let bytes=null;
+  if(typeof files.readDataUrl==='function'){
     const d=await files.readDataUrl(folder.id,rel);
-    if(d?.ok&&typeof d.url==='string')text=dataUrlText(d.url);
+    if(d?.ok&&typeof d.url==='string')bytes=dataUrlBytes(d.url);
   }
-  if(!text||!text.includes(AUCTION_MARK))return null;
-  return {status:'ok',text,path:folder.name+'/'+rel,byteSize:text.length};
+  if(!bytes){
+    const r=await files.readText(folder.id,rel);
+    if(r?.ok&&typeof r.text==='string')bytes=new TextEncoder().encode(r.text);
+  }
+  if(!bytes||!contieneBytes(bytes,MARK_BYTES))return null;
+  return {status:'ok',bytes,path:folder.name+'/'+rel,byteSize:bytes.length};
 }
 async function findInFolder(files,folder){
   const direct=await readAuction(files,folder,AUCTION_FILE).catch(()=>null);
