@@ -2,6 +2,8 @@
 
 [English](README.md)
 
+![WoW Forever en Hermes Desktop](docs/media/banner.png)
+
 Guía offline de **World of Warcraft: Forever** dentro de Hermes, para cualquier raza, clase y
 facción, con una skill para que tu agente responda con los mismos datos.
 
