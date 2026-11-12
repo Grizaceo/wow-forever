@@ -120,6 +120,18 @@ class TestScript(unittest.TestCase):
         self.assertIn('Call of Water', s)
 
 
+class TestVersion(unittest.TestCase):
+    def test_misma_version_en_todo_el_paquete(self):
+        import re
+        manifiesto = json.load(open(os.path.join(RAIZ, 'plugin.json'), encoding='utf-8'))['version']
+        with open(os.path.join(SKILL, 'SKILL.md'), encoding='utf-8') as f:
+            skill = re.search(r'^version: (\S+)$', f.read(), re.M).group(1)
+        with open(os.path.join(RAIZ, 'desktop', 'src', 'plugin.src.jsx'), encoding='utf-8') as f:
+            desktop = re.search(r"version: '([^']+)'", f.read()).group(1)
+        paquete = json.load(open(os.path.join(RAIZ, 'desktop', 'package.json'), encoding='utf-8'))['version']
+        self.assertEqual({manifiesto, skill, desktop, paquete}, {manifiesto}, (manifiesto, skill, desktop, paquete))
+
+
 @unittest.skipUnless(shutil.which('node'), 'sin node')
 class TestIgualQueLaPagina(unittest.TestCase):
     def test_dificultad_receta_igual_que_crafteo_js(self):

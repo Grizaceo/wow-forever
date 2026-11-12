@@ -12121,7 +12121,7 @@ var RUTA = "/wow-forever";
 var plugin_src_default = {
   id: "wow-hunter-guide",
   name: "WoW Forever",
-  version: "1.1.0",
+  version: "2.0.0",
   description: "Guía offline de WoW Forever para cualquier raza, clase y profesión, y mercado con tus precios de Auctionator. Solo lee Auctionator.lua de la carpeta que concedas.",
   defaultEnabled: true,
   register(ctx) {

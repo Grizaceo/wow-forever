@@ -1,8 +1,8 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "wow-forever",
-  "version": "1.1.0",
-  "description": "Guía offline de WoW Forever para Hermes: guías curadas (Cazador, Guerrero, Chamán), Legacy, mercado Auctionator local con historial y recomendador de farmeo, y una skill para que el agente asista al jugador. Sin red. Solo lee Auctionator.lua dentro de la carpeta que el usuario concede.",
+  "version": "2.0.0",
+  "description": "Offline WoW Forever guide for Hermes, for any race, class and faction (Spanish UI, English optional): trainers, spells and class quests, leveling zones, professions with a leveling plan, dungeons with bosses and loot, curated Hunter, Warrior and Shaman guides, Legacy, and a local Auctionator market. Includes a skill that answers from the same data with a read-only script. No network. Reads only Auctionator.lua inside the folder the user grants.",
   "author": {
     "name": "Cristóbal Muñoz"
   },
@@ -15,10 +15,12 @@
     "wow forever",
     "classic",
     "leveling",
+    "professions",
+    "dungeons",
     "guide",
     "auctionator",
     "market",
-    "farming",
-    "desktop"
+    "desktop",
+    "skill"
   ]
 }
