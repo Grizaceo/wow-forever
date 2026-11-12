@@ -1,12 +1,25 @@
 // Selector de personaje: facción → raza → clase, nivel, profesiones y reino.
 import { useState } from 'react'
 import { Button, Checkbox, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@hermes/plugin-sdk'
-import { razasPara } from '../../../src/perfil.js'
+import { perfilParaAgente, razasPara } from '../../../src/perfil.js'
 import { D, FACCIONES, PRINCIPALES, SECUNDARIAS, nombre } from '../datos.js'
 import { C, S } from '../estilos.js'
-import { t } from '../i18n.js'
+import { agregarTextos, t } from '../i18n.js'
 import { Aviso, Origen, Tarjeta } from '../ui.jsx'
 
+agregarTextos({
+  'perfil.copiar': 'Copiar perfil para el agente',
+  'perfil.copiar.ayuda': 'Pégalo en el chat de Hermes: la skill wow-forever lo usa para responder sobre tu personaje.',
+  'perfil.copiado': 'Copiado. Pégalo en el chat de Hermes.',
+  'perfil.noCopiado': 'No se pudo copiar. Selecciona el texto y cópialo a mano:',
+}, {
+  'perfil.copiar': 'Copy profile for the agent',
+  'perfil.copiar.ayuda': 'Paste it into the Hermes chat: the wow-forever skill uses it to answer about your character.',
+  'perfil.copiado': 'Copied. Paste it into the Hermes chat.',
+  'perfil.noCopiado': 'Could not copy. Select the text and copy it by hand:',
+})
+
+const NOMBRES_PROF = Object.fromEntries(Object.entries(D.profesiones.profesiones).map(([id, p]) => [id, p.n]))
 const CLASES = Object.keys(D.personaje.clases).map(Number).sort((a, b) => a - b)
 const esNueva = (raza, clase) => D.personaje.combinaciones.some(([r, c, n]) => r === raza && c === clase && n)
 
@@ -24,9 +37,10 @@ function Selector({ etiqueta, valor, opciones, onChange, id }) {
   )
 }
 
-export function VistaPersonaje({ perfil, guardarPerfil, razaSupuesta, lang, irA }) {
+export function VistaPersonaje({ ctx, perfil, guardarPerfil, razaSupuesta, lang, irA }) {
   const [borrador, setBorrador] = useState(perfil)
   const [estado, setEstado] = useState('')
+  const [copia, setCopia] = useState(null)
   const p = borrador
 
   const cambiar = async (parcial) => {
@@ -42,6 +56,13 @@ export function VistaPersonaje({ perfil, guardarPerfil, razaSupuesta, lang, irA 
       const r = await guardarPerfil(nuevo)
       setEstado(r.ok ? t(lang, 'perfil.guardado') : t(lang, 'perfil.incompleto'))
     } catch (e) { setEstado(e.message || String(e)) }
+  }
+
+  const resumen = perfilParaAgente(p, D.personaje, NOMBRES_PROF)
+  const copiar = async () => {
+    let ok = false
+    try { ok = (await ctx.os.writeClipboard(resumen)) === true } catch { ok = false }
+    setCopia({ ok, texto: resumen })
   }
 
   const razas = p.faccion && p.clase ? razasPara(D.personaje, p.faccion, p.clase) : []
@@ -98,6 +119,14 @@ export function VistaPersonaje({ perfil, guardarPerfil, razaSupuesta, lang, irA 
         </div>
         {p.faccion && p.raza && p.clase
           ? <div><Button size="xs" onClick={() => irA('clase')}>{t(lang, 'tab.clase')} →</Button></div> : null}
+      </Tarjeta>
+      <Tarjeta titulo={t(lang, 'perfil.copiar')}>
+        <div style={S.sub}>{t(lang, 'perfil.copiar.ayuda')}</div>
+        <div>
+          <Button size="xs" variant="outline" disabled={!resumen} onClick={copiar}>{t(lang, 'perfil.copiar')}</Button>
+        </div>
+        {copia ? <div style={S.sub} role="status">{t(lang, copia.ok ? 'perfil.copiado' : 'perfil.noCopiado')}</div> : null}
+        {copia && !copia.ok ? <pre style={{ ...S.sub, whiteSpace: 'pre-wrap', userSelect: 'text' }}>{copia.texto}</pre> : null}
       </Tarjeta>
     </>
   )

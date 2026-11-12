@@ -4,7 +4,7 @@
 // panel de reactivos.
 import { useEffect, useMemo, useState } from 'react'
 import { SearchField, SegmentedControl } from '@hermes/plugin-sdk'
-import { costoReceta, dificultad, margen, valorCreado } from '../../../../src/crafteo.js'
+import { costoReceta, dificultadReceta, margen, valorCreado } from '../../../../src/crafteo.js'
 import { dinero, nombre } from '../../datos.js'
 import { C, DIFICULTAD, S } from '../../estilos.js'
 import { agregarTextos, t } from '../../i18n.js'
@@ -106,7 +106,7 @@ export function TablaRecetas({ prof, skill, precios, items, faccion, lang, sel, 
   const [q, setQ] = useState('')
 
   const conteos = useMemo(() => ({
-    ahora: prof.recetas.filter((r) => APRENDIBLES.has(dificultad(r.rango, skill))).length,
+    ahora: prof.recetas.filter((r) => APRENDIBLES.has(dificultadReceta(r, skill))).length,
     todas: prof.recetas.length,
     forever: prof.recetas.filter((r) => r.f === 'cliente-forever').length,
   }), [prof, skill])
@@ -114,7 +114,7 @@ export function TablaRecetas({ prof, skill, precios, items, faccion, lang, sel, 
   const filas = useMemo(() => {
     const buscado = q.trim().toLowerCase()
     let rs = prof.recetas.filter((r) => {
-      if (filtro === 'ahora' && !APRENDIBLES.has(dificultad(r.rango, skill))) return false
+      if (filtro === 'ahora' && !APRENDIBLES.has(dificultadReceta(r, skill))) return false
       if (filtro === 'forever' && r.f !== 'cliente-forever') return false
       return !buscado || textoDe(r, items).includes(buscado)
     })
@@ -129,7 +129,7 @@ export function TablaRecetas({ prof, skill, precios, items, faccion, lang, sel, 
   const info = useMemo(() => {
     const m = new Map()
     for (const r of filas) {
-      const d = dificultad(r.rango, skill)
+      const d = dificultadReceta(r, skill)
       m.set(r.spell, {
         d,
         costo: costoReceta(r, precios, items).total,

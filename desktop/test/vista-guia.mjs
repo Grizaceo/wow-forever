@@ -30,7 +30,8 @@ let { p, cerrar } = await a.abrir('claro', { perfil: PERFILES.cazadorHorda, buil
 await p.click('[data-tab="guia"]')
 await p.getByText('Senda del Cazador').waitFor()
 check('cazador horda: guía abre con ficha del perfil', await p.evaluate(() =>
-  document.querySelector('.ficha') && /Hunter/.test(document.body.innerText)))
+  document.querySelector('.ficha') && /Cazador/.test(document.querySelector('.ficha').innerText)
+  && !/\bHunter\b/.test(document.querySelector('.ficha').innerText)))
 check('el nivel de la ficha sale del perfil, no del build (99→30)', await p.evaluate(() =>
   document.querySelector('.ficha-lvl') && document.querySelector('.ficha-lvl').innerText.includes('30') &&
   !document.querySelector('.ficha-lvl').innerText.includes('99')))
@@ -131,7 +132,7 @@ await cerrar()
 await p.click('[data-tab="guia"]')
 await p.getByText('Senda del Chamán').waitFor()
 check('chamán alianza: guía de la facción correcta', await p.evaluate(() =>
-  /Shaman/.test(document.body.innerText)))
+  /Chamán/.test((document.querySelector('.ficha') || document.body).innerText)))
 await cerrar()
 
 const GUERRERO_H = { v: 1, faccion: 'horda', raza: 2, clase: 1, nivel: 35, profesiones: [171], secundarias: [], reino: 'Prueba' }
@@ -140,7 +141,8 @@ for (const [nom, per] of [['horda', GUERRERO_H], ['alianza', GUERRERO_A]]) {
   ;({ p, cerrar } = await a.abrir('claro', { perfil: per, build: SEMILLA }))
   await p.click('[data-tab="guia"]')
   await p.getByText('Senda del Guerrero').waitFor()
-  check('guerrero ' + nom + ': guía abre', await p.evaluate(() => /Warrior/.test(document.body.innerText)))
+  check('guerrero ' + nom + ': guía abre con la clase en español', await p.evaluate(() =>
+    /Guerrero/.test((document.querySelector('.ficha') || document.body).innerText)))
   await cerrar()
 }
 

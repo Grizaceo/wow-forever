@@ -25,6 +25,10 @@ await p.waitForFunction(() => /Guardado/.test(document.body.innerText))
 const perfil = await p.evaluate((k) => JSON.parse(localStorage.getItem(k)), PREF + 'perfil')
 check('guarda un perfil válido de una combinación nueva', perfil.raza === 5 && perfil.clase === 2 && perfil.faccion === 'horda' && perfil.nivel === 24, perfil)
 check('marca la combinación como nueva de Forever', await p.getByText('Combinación nueva de Forever').count() > 0)
+await p.getByRole('button', { name: 'Copiar perfil para el agente' }).click()
+await p.getByText('Copiado. Pégalo en el chat de Hermes.').waitFor()
+check('copia el perfil para el agente con ctx.os.writeClipboard', await p.evaluate(() =>
+  window.copiado === 'Mi personaje de WoW Forever (plugin wow-forever): Horda · No-muerto (Undead, raza 5) · Paladín (Paladin, clase 2) · nivel 24'), await p.evaluate(() => window.copiado))
 
 // 3) Clase: hueco de entrenadores dicho; hechizos listados.
 await p.click('[data-tab="clase"]')

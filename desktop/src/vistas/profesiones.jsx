@@ -2,7 +2,7 @@
 // facción, el plan de subida estimado y la tabla de recetas con costo, valor y
 // margen según tus precios de mercado. El skill se guarda en ctx.storage ('skill-<id>').
 import { useMemo, useState } from 'react'
-import { Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@hermes/plugin-sdk'
+import { Button, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@hermes/plugin-sdk'
 import { preciosDelMercado } from '../../../src/crafteo.js'
 import { D, PRINCIPALES, SECUNDARIAS, nombre, zona } from '../datos.js'
 import { C, S } from '../estilos.js'
@@ -19,6 +19,9 @@ agregarTextos({
   'prof.recoleccion': 'Recolección',
   'prof.enPerfil': 'En tu perfil',
   'prof.entrenadores': 'Entrenadores',
+  'prof.entr.siguiente': 'Los que enseñan tu siguiente tramo (hasta {max}).',
+  'prof.entr.todos': 'Ver los {n} entrenadores',
+  'prof.entr.menos': 'Ver solo el siguiente tramo',
   'prof.hasta': 'hasta {max}',
   'prof.huecoEntrenadores': 'Sin entrenadores de esta profesión en tu facción en los datos (CMaNGOS 1.12).',
   'prof.elegirReceta': 'Elige una receta de la tabla para ver de dónde sacar sus reactivos.',
@@ -29,6 +32,9 @@ agregarTextos({
   'prof.recoleccion': 'Gathering',
   'prof.enPerfil': 'In your profile',
   'prof.entrenadores': 'Trainers',
+  'prof.entr.siguiente': 'Trainers who teach your next tier (up to {max}).',
+  'prof.entr.todos': 'Show all {n} trainers',
+  'prof.entr.menos': 'Show only the next tier',
   'prof.hasta': 'up to {max}',
   'prof.huecoEntrenadores': 'No trainers for this profession in your faction in the data (CMaNGOS 1.12).',
   'prof.elegirReceta': 'Pick a recipe from the table to see where to get its reagents.',
@@ -66,10 +72,16 @@ export function VistaProfesiones({ ctx, estado, perfil, lang, irA }) {
     try { await ctx.storage.set('skill-' + pidReal, c) } catch { /* queda solo en pantalla */ }
   }
 
+  const [todosEntr, setTodosEntr] = useState(false)
   const precios = useMemo(() => preciosDelMercado(estado.market, perfil.reino), [estado.market, perfil.reino])
   const trainers = prof && prof.entrenadores ? prof.entrenadores[perfil.faccion] || [] : []
+  // Plegada: solo los que enseñan el siguiente tramo por encima de tu skill.
+  const siguiente = Math.min(Infinity, ...trainers.map((e) => num(e.max)).filter((m) => m > skill))
+  const delTramo = Number.isFinite(siguiente) ? trainers.filter((e) => num(e.max) === siguiente) : []
+  const plegada = !todosEntr && delTramo.length > 0 && delTramo.length < trainers.length
+  const visibles = plegada ? delTramo : trainers
   const porZona = new Map()
-  for (const e of trainers) {
+  for (const e of visibles) {
     const z = e.zona == null ? '—' : nombre(zona(e.zona)?.n, lang) || String(e.zona)
     if (!porZona.has(z)) porZona.set(z, [])
     porZona.get(z).push(e)
@@ -108,6 +120,7 @@ export function VistaProfesiones({ ctx, estado, perfil, lang, irA }) {
 
       <Tarjeta titulo={t(lang, 'prof.entrenadores') + ' · ' + nombre(D.personaje.facciones[perfil.faccion].n, lang)}
         extra={<Origen f="cmangos-1.12" lang={lang} />}>
+        {plegada ? <div style={S.sub}>{t(lang, 'prof.entr.siguiente', { max: siguiente })}</div> : null}
         {porZona.size ? [...porZona.entries()].sort().map(([z, lista]) => (
           <div key={z} style={{ display: 'flex', flexDirection: 'column' }}>
             <div style={{ ...S.fila, borderBottom: 'none', paddingBottom: 0 }}>
@@ -122,6 +135,13 @@ export function VistaProfesiones({ ctx, estado, perfil, lang, irA }) {
             ))}
           </div>
         )) : <Hueco lang={lang}>{t(lang, 'prof.huecoEntrenadores')}</Hueco>}
+        {delTramo.length > 0 && delTramo.length < trainers.length ? (
+          <div>
+            <Button size="xs" variant="outline" onClick={() => setTodosEntr(!todosEntr)}>
+              {todosEntr ? t(lang, 'prof.entr.menos') : t(lang, 'prof.entr.todos', { n: trainers.length })}
+            </Button>
+          </div>
+        ) : null}
       </Tarjeta>
 
       <PlanSubida prof={prof} skill={skill} trainers={trainers} precios={precios}

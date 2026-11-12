@@ -1,7 +1,7 @@
 {
   "artifact": "desktop/plugin.js",
-  "sha256": "e8f1c3e261d5f264c5168d725c83afd8bb38e2a1aad2909ace91def5ee602bb0",
-  "bytes": 6027902,
+  "sha256": "d2ee29c2485cf9626b7df0f7608a87e06df17f8c05a45fd1c1201c1b07175f02",
+  "bytes": 6032744,
   "built_with": {
     "esbuild": "0.28.2"
   },

@@ -11,7 +11,7 @@ import { Hueco, NombreItem, Origen } from '../../ui.jsx'
 
 agregarTextos({
   'dungeon.niveles': 'Nv {min}–{max}',
-  'dungeon.jugadores': '{n} jugadores',
+  'dungeon.jugadores': 'hasta {n} jugadores',
   'dungeon.raid': 'Raid',
   'dungeon.forever': 'Forever',
   'dungeon.enRango': 'en tu rango',
@@ -26,7 +26,7 @@ agregarTextos({
   'dungeon.contE': 'Reinos del Este',
 }, {
   'dungeon.niveles': 'Lv {min}–{max}',
-  'dungeon.jugadores': '{n} players',
+  'dungeon.jugadores': 'up to {n} players',
   'dungeon.raid': 'Raid',
   'dungeon.forever': 'Forever',
   'dungeon.enRango': 'in your range',

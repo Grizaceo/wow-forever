@@ -5038,7 +5038,7 @@ function createStore(ctx) {
 
 // src/app.jsx
 import { Component, useCallback as useCallback3, useEffect as useEffect5, useMemo as useMemo13, useState as useState11 } from "react";
-import { Button as Button8, SegmentedControl as SegmentedControl6, Tabs, TabsList, TabsTrigger } from "@hermes/plugin-sdk";
+import { Button as Button9, SegmentedControl as SegmentedControl6, Tabs, TabsList, TabsTrigger } from "@hermes/plugin-sdk";
 
 // ../src/perfil.js
 var VERSION = 1;
@@ -5121,6 +5121,26 @@ function migrarPerfil(viejo, personaje) {
   }, personaje);
   return { perfil, razaSupuesta: razas.length > 0 };
 }
+function perfilParaAgente(perfil, personaje, nombresProf = {}) {
+  if (!perfil || !perfil.faccion || perfil.raza == null || perfil.clase == null) return null;
+  const conId = (x, tipo, id) => {
+    const es = x && (x.es || x.en), en = x && (x.en || x.es);
+    return es && en && es !== en ? `${es} (${en}, ${tipo} ${id})` : `${es || "?"} (${tipo} ${id})`;
+  };
+  const fac = personaje.facciones?.[perfil.faccion]?.n;
+  const raza = personaje.razas?.[String(perfil.raza)]?.n;
+  const clase = personaje.clases?.[String(perfil.clase)]?.n;
+  const profs = (ids) => (ids || []).map((id) => conId(nombresProf[String(id)], "id", id)).join(", ");
+  const partes = [
+    fac && (fac.es || fac.en) || perfil.faccion,
+    conId(raza, "raza", perfil.raza),
+    conId(clase, "clase", perfil.clase),
+    `nivel ${perfil.nivel}`
+  ];
+  if ((perfil.profesiones || []).length) partes.push(`profesiones: ${profs(perfil.profesiones)}`);
+  if ((perfil.secundarias || []).length) partes.push(`secundarias: ${profs(perfil.secundarias)}`);
+  return `Mi personaje de WoW Forever (plugin wow-forever): ${partes.join(" · ")}`;
+}
 
 // ../data/personaje.json
 var personaje_default = {
@@ -5186,6 +5206,11 @@ var import_guide_legacy = __toESM(require_guide_legacy());
 var D = { personaje: personaje_default, clases: clases_default, profesiones: profesiones_default, items: items_default, zonas: zonas_default, misiones: misiones_default, dungeons: dungeons_default, dropData: import_drop_data.default };
 var GUIAS = { 3: import_guide_hunter.GUIDE_HUNTER, 1: import_guide_warrior.GUIDE_WARRIOR, 7: import_guide_shaman.GUIDE_SHAMAN };
 var LEGACY = import_guide_legacy.GUIDE_LEGACY;
+function nombreClaseGuia(G, lang) {
+  const id = Object.keys(GUIAS).find((k) => GUIAS[k] === G);
+  const c = id && D.personaje.clases[id];
+  return c ? nombre(c.n, lang) : G && G.name || "";
+}
 var FAC_GUIA = { alianza: "alliance", horda: "horde" };
 function guiaCurada(perfil) {
   const g = perfil && GUIAS[perfil.clase];
@@ -5555,6 +5580,18 @@ function TextoRico({ html }) {
 
 // src/vistas/personaje.jsx
 import { Fragment as Fragment3, jsx as jsx2, jsxs as jsxs2 } from "react/jsx-runtime";
+agregarTextos({
+  "perfil.copiar": "Copiar perfil para el agente",
+  "perfil.copiar.ayuda": "Pégalo en el chat de Hermes: la skill wow-forever lo usa para responder sobre tu personaje.",
+  "perfil.copiado": "Copiado. Pégalo en el chat de Hermes.",
+  "perfil.noCopiado": "No se pudo copiar. Selecciona el texto y cópialo a mano:"
+}, {
+  "perfil.copiar": "Copy profile for the agent",
+  "perfil.copiar.ayuda": "Paste it into the Hermes chat: the wow-forever skill uses it to answer about your character.",
+  "perfil.copiado": "Copied. Paste it into the Hermes chat.",
+  "perfil.noCopiado": "Could not copy. Select the text and copy it by hand:"
+});
+var NOMBRES_PROF = Object.fromEntries(Object.entries(D.profesiones.profesiones).map(([id, p]) => [id, p.n]));
 var CLASES = Object.keys(D.personaje.clases).map(Number).sort((a, b) => a - b);
 var esNueva = (raza, clase) => D.personaje.combinaciones.some(([r, c, n]) => r === raza && c === clase && n);
 function Selector({ etiqueta, valor, opciones, onChange, id }) {
@@ -5566,9 +5603,10 @@ function Selector({ etiqueta, valor, opciones, onChange, id }) {
     ] })
   ] });
 }
-function VistaPersonaje({ perfil, guardarPerfil, razaSupuesta, lang, irA }) {
+function VistaPersonaje({ ctx, perfil, guardarPerfil, razaSupuesta, lang, irA }) {
   const [borrador, setBorrador] = useState(perfil);
   const [estado, setEstado] = useState("");
+  const [copia, setCopia] = useState(null);
   const p = borrador;
   const cambiar = async (parcial) => {
     const nuevo = { ...p, ...parcial };
@@ -5584,6 +5622,16 @@ function VistaPersonaje({ perfil, guardarPerfil, razaSupuesta, lang, irA }) {
     } catch (e) {
       setEstado(e.message || String(e));
     }
+  };
+  const resumen = perfilParaAgente(p, D.personaje, NOMBRES_PROF);
+  const copiar = async () => {
+    let ok = false;
+    try {
+      ok = await ctx.os.writeClipboard(resumen) === true;
+    } catch {
+      ok = false;
+    }
+    setCopia({ ok, texto: resumen });
   };
   const razas = p.faccion && p.clase ? razasPara(D.personaje, p.faccion, p.clase) : [];
   const clasesFac = p.faccion ? CLASES.filter((c) => razasPara(D.personaje, p.faccion, c).length) : CLASES;
@@ -5673,6 +5721,12 @@ function VistaPersonaje({ perfil, guardarPerfil, razaSupuesta, lang, irA }) {
         t(lang, "tab.clase"),
         " →"
       ] }) }) : null
+    ] }),
+    /* @__PURE__ */ jsxs2(Tarjeta, { titulo: t(lang, "perfil.copiar"), children: [
+      /* @__PURE__ */ jsx2("div", { style: S.sub, children: t(lang, "perfil.copiar.ayuda") }),
+      /* @__PURE__ */ jsx2("div", { children: /* @__PURE__ */ jsx2(Button, { size: "xs", variant: "outline", disabled: !resumen, onClick: copiar, children: t(lang, "perfil.copiar") }) }),
+      copia ? /* @__PURE__ */ jsx2("div", { style: S.sub, role: "status", children: t(lang, copia.ok ? "perfil.copiado" : "perfil.noCopiado") }) : null,
+      copia && !copia.ok ? /* @__PURE__ */ jsx2("pre", { style: { ...S.sub, whiteSpace: "pre-wrap", userSelect: "text" }, children: copia.texto }) : null
     ] })
   ] });
 }
@@ -6259,7 +6313,7 @@ function VistaRuta({ almacen, estado, recargar, perfil, lang }) {
 
 // src/vistas/profesiones.jsx
 import { useMemo as useMemo5, useState as useState5 } from "react";
-import { Input as Input2, Select as Select2, SelectContent as SelectContent2, SelectItem as SelectItem2, SelectTrigger as SelectTrigger2, SelectValue as SelectValue2 } from "@hermes/plugin-sdk";
+import { Button as Button4, Input as Input2, Select as Select2, SelectContent as SelectContent2, SelectItem as SelectItem2, SelectTrigger as SelectTrigger2, SelectValue as SelectValue2 } from "@hermes/plugin-sdk";
 
 // ../src/crafteo.js
 function tablaItems(items) {
@@ -6288,6 +6342,13 @@ function dificultad(rango, skill) {
   if (s < verde) return "amarillo";
   if (s < gris) return "verde";
   return "gris";
+}
+function dificultadReceta(receta, skill) {
+  const rango = receta && typeof receta === "object" ? receta.rango : null;
+  if (!rango || typeof rango !== "object" || num(rango.aprende) !== null) return dificultad(rango, skill);
+  if (receta.como === "automatica") return dificultad({ ...rango, aprende: 0 }, skill);
+  const d = dificultad(rango, skill);
+  return d === "gris" ? "gris" : "desconocida";
 }
 function probSubida(rango, skill) {
   const d = dificultad(rango, skill);
@@ -6510,14 +6571,14 @@ function TablaRecetas({ prof, skill, precios, items, faccion, lang, sel, onSel }
   const [filtro, setFiltro] = useState4("ahora");
   const [q, setQ] = useState4("");
   const conteos = useMemo2(() => ({
-    ahora: prof.recetas.filter((r) => APRENDIBLES.has(dificultad(r.rango, skill))).length,
+    ahora: prof.recetas.filter((r) => APRENDIBLES.has(dificultadReceta(r, skill))).length,
     todas: prof.recetas.length,
     forever: prof.recetas.filter((r) => r.f === "cliente-forever").length
   }), [prof, skill]);
   const filas = useMemo2(() => {
     const buscado = q.trim().toLowerCase();
     let rs = prof.recetas.filter((r) => {
-      if (filtro === "ahora" && !APRENDIBLES.has(dificultad(r.rango, skill))) return false;
+      if (filtro === "ahora" && !APRENDIBLES.has(dificultadReceta(r, skill))) return false;
       if (filtro === "forever" && r.f !== "cliente-forever") return false;
       return !buscado || textoDe(r, items).includes(buscado);
     });
@@ -6529,7 +6590,7 @@ function TablaRecetas({ prof, skill, precios, items, faccion, lang, sel, onSel }
   const info = useMemo2(() => {
     const m = /* @__PURE__ */ new Map();
     for (const r of filas) {
-      const d = dificultad(r.rango, skill);
+      const d = dificultadReceta(r, skill);
       m.set(r.spell, {
         d,
         costo: costoReceta(r, precios, items).total,
@@ -6805,6 +6866,9 @@ agregarTextos({
   "prof.recoleccion": "Recolección",
   "prof.enPerfil": "En tu perfil",
   "prof.entrenadores": "Entrenadores",
+  "prof.entr.siguiente": "Los que enseñan tu siguiente tramo (hasta {max}).",
+  "prof.entr.todos": "Ver los {n} entrenadores",
+  "prof.entr.menos": "Ver solo el siguiente tramo",
   "prof.hasta": "hasta {max}",
   "prof.huecoEntrenadores": "Sin entrenadores de esta profesión en tu facción en los datos (CMaNGOS 1.12).",
   "prof.elegirReceta": "Elige una receta de la tabla para ver de dónde sacar sus reactivos."
@@ -6815,6 +6879,9 @@ agregarTextos({
   "prof.recoleccion": "Gathering",
   "prof.enPerfil": "In your profile",
   "prof.entrenadores": "Trainers",
+  "prof.entr.siguiente": "Trainers who teach your next tier (up to {max}).",
+  "prof.entr.todos": "Show all {n} trainers",
+  "prof.entr.menos": "Show only the next tier",
   "prof.hasta": "up to {max}",
   "prof.huecoEntrenadores": "No trainers for this profession in your faction in the data (CMaNGOS 1.12).",
   "prof.elegirReceta": "Pick a recipe from the table to see where to get its reagents."
@@ -6850,10 +6917,15 @@ function VistaProfesiones({ ctx, estado, perfil, lang, irA }) {
     } catch {
     }
   };
+  const [todosEntr, setTodosEntr] = useState5(false);
   const precios = useMemo5(() => preciosDelMercado(estado.market, perfil.reino), [estado.market, perfil.reino]);
   const trainers = prof && prof.entrenadores ? prof.entrenadores[perfil.faccion] || [] : [];
+  const siguiente = Math.min(Infinity, ...trainers.map((e) => num5(e.max)).filter((m) => m > skill));
+  const delTramo = Number.isFinite(siguiente) ? trainers.filter((e) => num5(e.max) === siguiente) : [];
+  const plegada = !todosEntr && delTramo.length > 0 && delTramo.length < trainers.length;
+  const visibles = plegada ? delTramo : trainers;
   const porZona = /* @__PURE__ */ new Map();
-  for (const e of trainers) {
+  for (const e of visibles) {
     const z = e.zona == null ? "—" : nombre(zona(e.zona)?.n, lang) || String(e.zona);
     if (!porZona.has(z)) porZona.set(z, []);
     porZona.get(z).push(e);
@@ -6894,24 +6966,28 @@ function VistaProfesiones({ ctx, estado, perfil, lang, irA }) {
       prof.recoleccion ? /* @__PURE__ */ jsx9("span", { style: S.chip, children: t(lang, "prof.recoleccion") }) : null,
       enPerfil.has(pidReal) ? /* @__PURE__ */ jsx9("span", { style: S.chip, children: t(lang, "prof.enPerfil") }) : null
     ] }) }),
-    /* @__PURE__ */ jsx9(
+    /* @__PURE__ */ jsxs9(
       Tarjeta,
       {
         titulo: t(lang, "prof.entrenadores") + " · " + nombre(D.personaje.facciones[perfil.faccion].n, lang),
         extra: /* @__PURE__ */ jsx9(Origen, { f: "cmangos-1.12", lang }),
-        children: porZona.size ? [...porZona.entries()].sort().map(([z, lista]) => /* @__PURE__ */ jsxs9("div", { style: { display: "flex", flexDirection: "column" }, children: [
-          /* @__PURE__ */ jsx9("div", { style: { ...S.fila, borderBottom: "none", paddingBottom: 0 }, children: /* @__PURE__ */ jsx9("span", { style: { color: C.texto2 }, children: z }) }),
-          lista.map((e) => /* @__PURE__ */ jsxs9("div", { style: S.fila, children: [
-            /* @__PURE__ */ jsx9("span", { style: { flex: 1 }, children: nombre(e.n, lang) }),
-            /* @__PURE__ */ jsxs9("span", { style: S.sub, children: [
-              pct(e.x),
-              "%, ",
-              pct(e.y),
-              "%"
-            ] }),
-            /* @__PURE__ */ jsx9("span", { style: S.sub, children: t(lang, "prof.hasta", { max: num5(e.max) }) })
-          ] }, e.npc))
-        ] }, z)) : /* @__PURE__ */ jsx9(Hueco, { lang, children: t(lang, "prof.huecoEntrenadores") })
+        children: [
+          plegada ? /* @__PURE__ */ jsx9("div", { style: S.sub, children: t(lang, "prof.entr.siguiente", { max: siguiente }) }) : null,
+          porZona.size ? [...porZona.entries()].sort().map(([z, lista]) => /* @__PURE__ */ jsxs9("div", { style: { display: "flex", flexDirection: "column" }, children: [
+            /* @__PURE__ */ jsx9("div", { style: { ...S.fila, borderBottom: "none", paddingBottom: 0 }, children: /* @__PURE__ */ jsx9("span", { style: { color: C.texto2 }, children: z }) }),
+            lista.map((e) => /* @__PURE__ */ jsxs9("div", { style: S.fila, children: [
+              /* @__PURE__ */ jsx9("span", { style: { flex: 1 }, children: nombre(e.n, lang) }),
+              /* @__PURE__ */ jsxs9("span", { style: S.sub, children: [
+                pct(e.x),
+                "%, ",
+                pct(e.y),
+                "%"
+              ] }),
+              /* @__PURE__ */ jsx9("span", { style: S.sub, children: t(lang, "prof.hasta", { max: num5(e.max) }) })
+            ] }, e.npc))
+          ] }, z)) : /* @__PURE__ */ jsx9(Hueco, { lang, children: t(lang, "prof.huecoEntrenadores") }),
+          delTramo.length > 0 && delTramo.length < trainers.length ? /* @__PURE__ */ jsx9("div", { children: /* @__PURE__ */ jsx9(Button4, { size: "xs", variant: "outline", onClick: () => setTodosEntr(!todosEntr), children: todosEntr ? t(lang, "prof.entr.menos") : t(lang, "prof.entr.todos", { n: trainers.length }) }) }) : null
+        ]
       }
     ),
     /* @__PURE__ */ jsx9(
@@ -6964,7 +7040,7 @@ import { Checkbox as Checkbox3 } from "@hermes/plugin-sdk";
 import { jsx as jsx10, jsxs as jsxs10 } from "react/jsx-runtime";
 agregarTextos({
   "dungeon.niveles": "Nv {min}–{max}",
-  "dungeon.jugadores": "{n} jugadores",
+  "dungeon.jugadores": "hasta {n} jugadores",
   "dungeon.raid": "Raid",
   "dungeon.forever": "Forever",
   "dungeon.enRango": "en tu rango",
@@ -6979,7 +7055,7 @@ agregarTextos({
   "dungeon.contE": "Reinos del Este"
 }, {
   "dungeon.niveles": "Lv {min}–{max}",
-  "dungeon.jugadores": "{n} players",
+  "dungeon.jugadores": "up to {n} players",
   "dungeon.raid": "Raid",
   "dungeon.forever": "Forever",
   "dungeon.enRango": "in your range",
@@ -7197,7 +7273,7 @@ function VistaDungeons({ almacen, estado, recargar, perfil, lang }) {
 
 // src/vistas/mercado.jsx
 import { useCallback, useEffect as useEffect2, useMemo as useMemo11, useRef, useState as useState7 } from "react";
-import { Button as Button5, Checkbox as Checkbox6, SearchField as SearchField2, Select as Select4, SelectContent as SelectContent4, SelectItem as SelectItem4, SelectTrigger as SelectTrigger4, SelectValue as SelectValue4 } from "@hermes/plugin-sdk";
+import { Button as Button6, Checkbox as Checkbox6, SearchField as SearchField2, Select as Select4, SelectContent as SelectContent4, SelectItem as SelectItem4, SelectTrigger as SelectTrigger4, SelectValue as SelectValue4 } from "@hermes/plugin-sdk";
 
 // src/auctionator.js
 var AUCTION_FILE = "Auctionator.lua";
@@ -7909,7 +7985,7 @@ function DetalleItem({ item: item2, lang, catalogo, metrica, deal, onCerrar }) {
 
 // src/vistas/mercado/farmeo.jsx
 import { useMemo as useMemo10 } from "react";
-import { Button as Button4, Checkbox as Checkbox5, Input as Input3, Select as Select3, SelectContent as SelectContent3, SelectItem as SelectItem3, SelectTrigger as SelectTrigger3, SelectValue as SelectValue3 } from "@hermes/plugin-sdk";
+import { Button as Button5, Checkbox as Checkbox5, Input as Input3, Select as Select3, SelectContent as SelectContent3, SelectItem as SelectItem3, SelectTrigger as SelectTrigger3, SelectValue as SelectValue3 } from "@hermes/plugin-sdk";
 import { Fragment as Fragment11, jsx as jsx14, jsxs as jsxs14 } from "react/jsx-runtime";
 var COMP_LABEL = { auto: "Auto", low: "Baja", med: "Media", high: "Alta" };
 var RIESGO = { baja: "mercado.farm.riesgo.baja", media: "mercado.farm.riesgo.media", alta: "mercado.farm.riesgo.alta" };
@@ -8072,7 +8148,7 @@ function TarjetaZona({ e, rank, profile, settings, lang, onComp, onCopada }) {
           ] })
         ] })
       ] }),
-      /* @__PURE__ */ jsx14(Button4, { variant: "outline", size: "xs", onClick: () => onCopada(e.zoneKey), children: t(lang, "mercado.farm.copada") })
+      /* @__PURE__ */ jsx14(Button5, { variant: "outline", size: "xs", onClick: () => onCopada(e.zoneKey), children: t(lang, "mercado.farm.copada") })
     ] }),
     e.reasons?.length > 0 && /* @__PURE__ */ jsx14("ul", { style: { margin: 0, paddingLeft: 18, fontSize: 12, color: C.texto2 }, children: e.reasons.map((r, i) => /* @__PURE__ */ jsx14("li", { children: r }, i)) })
   ] });
@@ -8955,11 +9031,11 @@ function VistaMercado({ ctx, almacen, estado, recargar, perfil, lang }) {
   return /* @__PURE__ */ jsx15("div", { style: S.pagina, children: /* @__PURE__ */ jsxs15("div", { style: S.cuerpo, children: [
     /* @__PURE__ */ jsxs15(Tarjeta, { titulo: t(lang, "mercado.scan.titulo"), extra: /* @__PURE__ */ jsx15("span", { style: S.chip, children: t(lang, "mercado.tusDatos") }), children: [
       /* @__PURE__ */ jsxs15("div", { style: { display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }, children: [
-        /* @__PURE__ */ jsx15(Button5, { onClick: () => leerCarpeta(false), disabled: importando, children: t(lang, "mercado.leer") }),
-        /* @__PURE__ */ jsx15(Button5, { variant: "outline", onClick: () => leerCarpeta(true), disabled: importando, children: t(lang, "mercado.otra") }),
-        /* @__PURE__ */ jsx15(Button5, { variant: "outline", onClick: () => fileRef.current?.click(), disabled: importando, children: t(lang, "mercado.archivo") }),
+        /* @__PURE__ */ jsx15(Button6, { onClick: () => leerCarpeta(false), disabled: importando, children: t(lang, "mercado.leer") }),
+        /* @__PURE__ */ jsx15(Button6, { variant: "outline", onClick: () => leerCarpeta(true), disabled: importando, children: t(lang, "mercado.otra") }),
+        /* @__PURE__ */ jsx15(Button6, { variant: "outline", onClick: () => fileRef.current?.click(), disabled: importando, children: t(lang, "mercado.archivo") }),
         /* @__PURE__ */ jsx15("input", { ref: fileRef, type: "file", accept: ".lua", onChange: onArchivo, style: { display: "none" } }),
-        /* @__PURE__ */ jsx15(Button5, { variant: "outline", onClick: borrar, disabled: importando || !snapshot, children: confirmBorrar ? t(lang, "mercado.borrarSi") : t(lang, "mercado.borrar") })
+        /* @__PURE__ */ jsx15(Button6, { variant: "outline", onClick: borrar, disabled: importando || !snapshot, children: confirmBorrar ? t(lang, "mercado.borrarSi") : t(lang, "mercado.borrar") })
       ] }),
       /* @__PURE__ */ jsx15("p", { role: "status", "aria-live": "polite", style: { ...S.sub, margin: 0 }, children: mensaje || (snapshot ? t(lang, "mercado.restaurado") : t(lang, "mercado.vacio.scan")) }),
       snapshot && fres && /* @__PURE__ */ jsxs15("div", { style: { display: "flex", gap: 10, flexWrap: "wrap", fontSize: 12, color: C.texto2 }, children: [
@@ -9106,8 +9182,8 @@ function VistaMercado({ ctx, almacen, estado, recargar, perfil, lang }) {
             }) })
           ] }) }),
           snapshot && paginas > 1 && /* @__PURE__ */ jsxs15("div", { style: { display: "flex", gap: 8, alignItems: "center" }, children: [
-            /* @__PURE__ */ jsx15(Button5, { variant: "outline", size: "xs", disabled: paginaSegura === 0, onClick: () => setPagina(paginaSegura - 1), children: t(lang, "mercado.anterior") }),
-            /* @__PURE__ */ jsx15(Button5, { variant: "outline", size: "xs", disabled: paginaSegura + 1 >= paginas, onClick: () => setPagina(paginaSegura + 1), children: t(lang, "mercado.siguiente") })
+            /* @__PURE__ */ jsx15(Button6, { variant: "outline", size: "xs", disabled: paginaSegura === 0, onClick: () => setPagina(paginaSegura - 1), children: t(lang, "mercado.anterior") }),
+            /* @__PURE__ */ jsx15(Button6, { variant: "outline", size: "xs", disabled: paginaSegura + 1 >= paginas, onClick: () => setPagina(paginaSegura + 1), children: t(lang, "mercado.siguiente") })
           ] }),
           /* @__PURE__ */ jsxs15("p", { style: S.sub, children: [
             t(lang, "mercado.det.cobertura", { addon: CATALOGO?.source?.addon || t(lang, "mercado.det.sinCatalogo") }),
@@ -9134,7 +9210,7 @@ function VistaMercado({ ctx, almacen, estado, recargar, perfil, lang }) {
 
 // src/vistas/guia.jsx
 import { useCallback as useCallback2, useEffect as useEffect4, useMemo as useMemo12, useRef as useRef3, useState as useState10 } from "react";
-import { Button as Button7, Checkbox as Checkbox8, Input as Input4, SegmentedControl as SegmentedControl5, Select as Select5, SelectContent as SelectContent5, SelectItem as SelectItem5, SelectTrigger as SelectTrigger5, SelectValue as SelectValue5 } from "@hermes/plugin-sdk";
+import { Button as Button8, Checkbox as Checkbox8, Input as Input4, SegmentedControl as SegmentedControl5, Select as Select5, SelectContent as SelectContent5, SelectItem as SelectItem5, SelectTrigger as SelectTrigger5, SelectValue as SelectValue5 } from "@hermes/plugin-sdk";
 
 // src/guia-logica.js
 var validLevel = (value) => {
@@ -10064,7 +10140,7 @@ function skinDe(simcRace) {
   return SKINS[k ? h % SKINS.length : 0];
 }
 function charRetrato({ G, fac, simcRace, avatar, lang }) {
-  if (avatar) return /* @__PURE__ */ jsx16("img", { src: avatar, alt: t(lang, "guia.ficha.retrato", { clase: G.name }), style: { width: "100%", height: "100%", objectFit: "cover", display: "block" } });
+  if (avatar) return /* @__PURE__ */ jsx16("img", { src: avatar, alt: t(lang, "guia.ficha.retrato", { clase: nombreClaseGuia(G, lang) }), style: { width: "100%", height: "100%", objectFit: "cover", display: "block" } });
   const skin = skinDe(simcRace), acc = G.accent || C.amarillo;
   const cloak = fac === "alliance" ? C.azul : C.rojo;
   const trim = fac === "alliance" ? C.azul : C.naranja;
@@ -10088,7 +10164,7 @@ function charRetrato({ G, fac, simcRace, avatar, lang }) {
       /* @__PURE__ */ jsx16("rect", { x: "56", y: "30", width: "8", height: "10", rx: "2", fill: skin, opacity: ".85" })
     ] })
   }[G.id] || /* @__PURE__ */ jsx16("path", { d: "M36 48 C34 24 46 12 60 12 C74 12 86 24 84 48 L78 44 C76 32 68 28 60 28 C52 28 44 32 42 44 Z", fill: C.texto4 });
-  return /* @__PURE__ */ jsxs16("svg", { viewBox: "0 0 120 150", preserveAspectRatio: "xMidYMid slice", role: "img", "aria-label": t(lang, "guia.ficha.retrato", { clase: G.name }), style: { width: "100%", height: "100%", display: "block" }, children: [
+  return /* @__PURE__ */ jsxs16("svg", { viewBox: "0 0 120 150", preserveAspectRatio: "xMidYMid slice", role: "img", "aria-label": t(lang, "guia.ficha.retrato", { clase: nombreClaseGuia(G, lang) }), style: { width: "100%", height: "100%", display: "block" }, children: [
     /* @__PURE__ */ jsx16("defs", { children: /* @__PURE__ */ jsxs16("linearGradient", { id: "pbg-" + G.id, x1: "0", y1: "0", x2: "0", y2: "1", children: [
       /* @__PURE__ */ jsx16("stop", { offset: "0", stopColor: acc, stopOpacity: ".18" }),
       /* @__PURE__ */ jsx16("stop", { offset: "1", stopColor: C.fondo3 })
@@ -10169,7 +10245,7 @@ function Ficha({ v, lang }) {
           color: G.accent || C.amarillo
         }, children: /* @__PURE__ */ jsx16(Icono, { n: G.icon, size: 15 }) })
       ] }),
-      /* @__PURE__ */ jsx16("div", { style: P.fichaCls, children: G.name }),
+      /* @__PURE__ */ jsx16("div", { style: P.fichaCls, children: nombreClaseGuia(G, lang) }),
       /* @__PURE__ */ jsxs16("div", { className: "ficha-lvl", style: P.fichaLvl, children: [
         /* @__PURE__ */ jsx16("b", { style: P.fichaLvlB, children: lvl }),
         /* @__PURE__ */ jsx16("span", { style: P.fichaLvlS, children: t(lang, "guia.ficha.nivel") })
@@ -10639,7 +10715,7 @@ function VistaArmas({ v, lang }) {
 
 // src/vistas/guia/macros.jsx
 import { useEffect as useEffect3, useRef as useRef2, useState as useState9 } from "react";
-import { Button as Button6, SearchField as SearchField3, SegmentedControl as SegmentedControl4 } from "@hermes/plugin-sdk";
+import { Button as Button7, SearchField as SearchField3, SegmentedControl as SegmentedControl4 } from "@hermes/plugin-sdk";
 import { Fragment as Fragment15, jsx as jsx19, jsxs as jsxs19 } from "react/jsx-runtime";
 agregarTextos({
   "guia.mac.titulo": "Macros meta — WoW: Forever",
@@ -10921,7 +10997,7 @@ function MacroCard({ m, i, v, lang, onJump, flash, registerRef }) {
             len,
             "/255"
           ] }),
-          /* @__PURE__ */ jsx19(Button6, { size: "xs", variant: "outline", onClick: copiar, title: t(lang, "guia.mac.caracteres"), children: /* @__PURE__ */ jsxs19("span", { style: { display: "inline-flex", gap: 4, alignItems: "center" }, children: [
+          /* @__PURE__ */ jsx19(Button7, { size: "xs", variant: "outline", onClick: copiar, title: t(lang, "guia.mac.caracteres"), children: /* @__PURE__ */ jsxs19("span", { style: { display: "inline-flex", gap: 4, alignItems: "center" }, children: [
             /* @__PURE__ */ jsx19(Icono, { n: "copy", size: 12 }),
             cop === "copiado" ? t(lang, "guia.mac.copiado") : cop === "ctrlc" ? t(lang, "guia.mac.ctrlc") : t(lang, "guia.mac.copiar")
           ] }) })
@@ -11026,7 +11102,7 @@ function VistaMacros({ v, lang }) {
     listaVacia ? /* @__PURE__ */ jsx19(Tarjeta, { children: /* @__PURE__ */ jsxs19("div", { style: P.muted, children: [
       nadaTexto,
       " ",
-      /* @__PURE__ */ jsx19(Button6, { size: "xs", variant: "ghost", onClick: () => {
+      /* @__PURE__ */ jsx19(Button7, { size: "xs", variant: "ghost", onClick: () => {
         setMq("");
         guardar((b) => ({ ...b, mf: "all" }));
       }, children: t(lang, "guia.mac.limpiar") })
@@ -11204,7 +11280,7 @@ function VistaGuia({ ctx, almacen, estado, recargar, perfil, guardarPerfil, lang
     return /* @__PURE__ */ jsx21(Tarjeta, { titulo: t(lang, "tab.guia"), extra: /* @__PURE__ */ jsx21(Origen, { f: "curado", lang }), children: /* @__PURE__ */ jsx21(Hueco, { lang, children: t(lang, "guia.sinGuiaClase") }) });
   }
   if (!curada.datos) {
-    return /* @__PURE__ */ jsx21(Tarjeta, { titulo: curada.guia.name + " · " + t(lang, "tab.guia"), extra: /* @__PURE__ */ jsx21(Origen, { f: "curado", lang }), children: /* @__PURE__ */ jsx21(Hueco, { lang, children: t(lang, "guia.sinGuiaFac", { clase: curada.guia.name }) }) });
+    return /* @__PURE__ */ jsx21(Tarjeta, { titulo: nombreClaseGuia(curada.guia, lang) + " · " + t(lang, "tab.guia"), extra: /* @__PURE__ */ jsx21(Origen, { f: "curado", lang }), children: /* @__PURE__ */ jsx21(Hueco, { lang, children: t(lang, "guia.sinGuiaFac", { clase: nombreClaseGuia(curada.guia, lang) }) }) });
   }
   return /* @__PURE__ */ jsx21(
     GuiaPrincipal,
@@ -11448,8 +11524,8 @@ function GuiaPrincipal({ ctx, almacen, estado, recargar, perfil, guardarPerfil, 
     /* @__PURE__ */ jsxs21(Tarjeta, { titulo: t(lang, "guia.datos.titulo"), extra: /* @__PURE__ */ jsx21(Origen, { f: "curado", lang }), children: [
       build.simc ? /* @__PURE__ */ jsx21(SimcCard, { simc: build.simc, G, lang }) : null,
       /* @__PURE__ */ jsxs21("div", { style: { display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }, children: [
-        /* @__PURE__ */ jsx21(Button7, { variant: build.simc ? "outline" : "default", size: "xs", onClick: () => setSimcOpen((o) => !o), children: build.simc ? t(lang, "guia.simc.importarOtro") : t(lang, "guia.simc.boton") }),
-        build.simc ? /* @__PURE__ */ jsx21(Button7, { variant: "ghost", size: "xs", onClick: () => guardar((b) => ({ ...b, simc: null })), children: t(lang, "guia.simc.quitar") }) : /* @__PURE__ */ jsx21("span", { style: S.sub, children: t(lang, "guia.simc.ayuda") })
+        /* @__PURE__ */ jsx21(Button8, { variant: build.simc ? "outline" : "default", size: "xs", onClick: () => setSimcOpen((o) => !o), children: build.simc ? t(lang, "guia.simc.importarOtro") : t(lang, "guia.simc.boton") }),
+        build.simc ? /* @__PURE__ */ jsx21(Button8, { variant: "ghost", size: "xs", onClick: () => guardar((b) => ({ ...b, simc: null })), children: t(lang, "guia.simc.quitar") }) : /* @__PURE__ */ jsx21("span", { style: S.sub, children: t(lang, "guia.simc.ayuda") })
       ] }),
       simcOpen ? /* @__PURE__ */ jsxs21("div", { style: { marginTop: 10 }, children: [
         /* @__PURE__ */ jsx21("p", { style: { ...S.sub, margin: "0 0 6px" }, children: t(lang, "guia.simc.instrucciones") }),
@@ -11477,8 +11553,8 @@ function GuiaPrincipal({ ctx, almacen, estado, recargar, perfil, guardarPerfil, 
         simcErr ? /* @__PURE__ */ jsx21("div", { role: "alert", style: { ...S.aviso, marginTop: 6 }, children: simcErr }) : null,
         simcNota ? /* @__PURE__ */ jsx21("div", { style: { ...S.sub, marginTop: 6 }, children: simcNota }) : null,
         /* @__PURE__ */ jsxs21("div", { style: { display: "flex", gap: 8, marginTop: 8 }, children: [
-          /* @__PURE__ */ jsx21(Button7, { size: "xs", onClick: importarSimc, children: t(lang, "guia.simc.importar") }),
-          /* @__PURE__ */ jsx21(Button7, { variant: "ghost", size: "xs", onClick: () => {
+          /* @__PURE__ */ jsx21(Button8, { size: "xs", onClick: importarSimc, children: t(lang, "guia.simc.importar") }),
+          /* @__PURE__ */ jsx21(Button8, { variant: "ghost", size: "xs", onClick: () => {
             setSimcOpen(false);
             setSimcErr("");
           }, children: t(lang, "guia.simc.cancelar") })
@@ -12016,7 +12092,7 @@ function App({ ctx, almacen }) {
       /* @__PURE__ */ jsx23("strong", { children: t(lang, "app") }),
       /* @__PURE__ */ jsx23("span", { style: { ...S.sub, flex: 1 }, children: resumen }),
       /* @__PURE__ */ jsx23(SegmentedControl6, { value: lang, onChange: cambiarLang, options: [{ id: "es", label: "ES" }, { id: "en", label: "EN" }] }),
-      /* @__PURE__ */ jsx23(Button8, { variant: "outline", size: "xs", onClick: async () => {
+      /* @__PURE__ */ jsx23(Button9, { variant: "outline", size: "xs", onClick: async () => {
         await almacen.reset();
         recargar();
       }, children: t(lang, "reintentar") })

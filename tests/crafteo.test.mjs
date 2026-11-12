@@ -5,6 +5,7 @@ import test from 'node:test'
 import {
   dificultad, probSubida, preciosDelMercado, costoUnidad, costoReceta,
   valorCreado, margen, planDeSubida,
+  dificultadReceta,
 } from '../src/crafteo.js'
 
 const profesiones = JSON.parse(readFileSync(new URL('../data/profesiones.json', import.meta.url), 'utf8'))
@@ -135,4 +136,20 @@ test('planDeSubida de Primeros auxilios de 1 a 75 cubre todo y termina', () => {
   assert.deepEqual(planDeSubida(FA, 75, 1, new Map(), items), [])
   assert.deepEqual(planDeSubida(FA, 1, 75, new Map(), items).length > 0, true)
   assert.deepEqual(planDeSubida(null, 1, 75, new Map(), items), [])
+})
+
+test('dificultadReceta: sin requisito conocido no se presenta como aprendible', () => {
+  const herreria = profesiones.profesiones['164'].recetas
+  const nueva = herreria.find((r) => r.n.en === 'Blessed Plate Gauntlet')
+  assert.ok(nueva, 'receta nueva de Forever en los datos')
+  assert.equal(nueva.rango.aprende, null)
+  assert.equal(nueva.como, 'desconocido')
+  assert.equal(dificultad(nueva.rango, 120), 'naranja')          // el umbral solo, sin requisito
+  assert.equal(dificultadReceta(nueva, 120), 'desconocida')
+  assert.equal(dificultadReceta(nueva, 300), 'gris')
+  const auto = herreria.find((r) => r.como === 'automatica')
+  assert.equal(auto.rango.aprende, null)
+  assert.equal(dificultadReceta(auto, 0), 'naranja')             // automática: se aprende al tomar la profesión
+  assert.equal(dificultadReceta(VENDA_GRUESA, 39), 'no')
+  assert.equal(dificultadReceta(VENDA_GRUESA, 40), dificultad(VENDA_GRUESA.rango, 40))
 })

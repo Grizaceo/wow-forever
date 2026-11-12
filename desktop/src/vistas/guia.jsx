@@ -5,7 +5,7 @@
 // conservadas). Sin rutas ni dungeons: eso es de otro encargo.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Button, Checkbox, Input, SegmentedControl, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@hermes/plugin-sdk'
-import { D, guiaCurada, nombre } from '../datos.js'
+import { D, guiaCurada, nombre, nombreClaseGuia } from '../datos.js'
 import { C, S } from '../estilos.js'
 import { t, agregarTextos } from '../i18n.js'
 import { Hueco, Origen, Tarjeta } from '../ui.jsx'
@@ -100,8 +100,8 @@ export function VistaGuia({ ctx, almacen, estado, recargar, perfil, guardarPerfi
   }
   if (!curada.datos) {
     return (
-      <Tarjeta titulo={curada.guia.name + ' · ' + t(lang, 'tab.guia')} extra={<Origen f="curado" lang={lang} />}>
-        <Hueco lang={lang}>{t(lang, 'guia.sinGuiaFac', { clase: curada.guia.name })}</Hueco>
+      <Tarjeta titulo={nombreClaseGuia(curada.guia, lang) + ' · ' + t(lang, 'tab.guia')} extra={<Origen f="curado" lang={lang} />}>
+        <Hueco lang={lang}>{t(lang, 'guia.sinGuiaFac', { clase: nombreClaseGuia(curada.guia, lang) })}</Hueco>
       </Tarjeta>
     )
   }

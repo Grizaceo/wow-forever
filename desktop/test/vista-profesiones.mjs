@@ -30,7 +30,10 @@ await p.click('[data-tab="profesiones"]')
 await p.getByText('Entrenadores').first().waitFor()
 check('Herrería es la profesión por defecto (primera del perfil)', await p.evaluate(() =>
   document.querySelector('#wf-profesion').value === '164'))
-check('ve entrenadores de la Horda (Herrería)', await p.getByText('Brikk Keencraft').count() > 0
+check('plegada: solo los entrenadores del siguiente tramo (hasta 75)', await p.getByText('Thrag Stonehoof').count() > 0
+  && await p.getByText('Karn Stonehoof').count() === 0 && await p.getByText(/siguiente tramo \(hasta 75\)/).count() > 0)
+await p.getByRole('button', { name: 'Ver los 16 entrenadores' }).click()
+check('ve todos los entrenadores de la Horda (Herrería)', await p.getByText('Brikk Keencraft').count() > 0
   && await p.getByText('Karn Stonehoof').count() > 0)
 // Snarl (herrería) está en Orgrimmar, no en Azshara: el NPC va a la zona más chica que lo contiene.
 check('los entrenadores muestran zona y coordenadas', await p.getByText('Orgrimmar').count() > 0

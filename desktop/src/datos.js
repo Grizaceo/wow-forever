@@ -20,6 +20,14 @@ export const D = { personaje, clases, profesiones, items, zonas, misiones, dunge
 // facción que cubren. El resto de clases no tiene capa curada todavía.
 export const GUIAS = { 3: GUIDE_HUNTER, 1: GUIDE_WARRIOR, 7: GUIDE_SHAMAN }
 export const LEGACY = GUIDE_LEGACY
+
+// Nombre visible de la clase de una guía curada, desde personaje.json (la guía trae su
+// nombre en inglés, `G.name`). Si la guía no está en GUIAS, cae a ese nombre.
+export function nombreClaseGuia(G, lang) {
+  const id = Object.keys(GUIAS).find((k) => GUIAS[k] === G)
+  const c = id && D.personaje.clases[id]
+  return c ? nombre(c.n, lang) : (G && G.name) || ''
+}
 const FAC_GUIA = { alianza: 'alliance', horda: 'horde' }
 
 export function guiaCurada(perfil) {

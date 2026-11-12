@@ -48,6 +48,18 @@ export function dificultad(rango, skill) {
   return 'gris'
 }
 
+// Dificultad de una receta concreta. Como dificultad(), pero las automáticas se aprenden al
+// tomar la profesión (aprende 0) y, sin requisito conocido (casi todas las recetas nuevas de
+// Forever: es dato del servidor), no se sabe si ya se puede aprender: 'desconocida', salvo
+// que el skill ya la deje en gris.
+export function dificultadReceta(receta, skill) {
+  const rango = receta && typeof receta === 'object' ? receta.rango : null
+  if (!rango || typeof rango !== 'object' || num(rango.aprende) !== null) return dificultad(rango, skill)
+  if (receta.como === 'automatica') return dificultad({ ...rango, aprende: 0 }, skill)
+  const d = dificultad(rango, skill)
+  return d === 'gris' ? 'gris' : 'desconocida'
+}
+
 // Probabilidad estimada de ganar 1 punto de skill con una receta (fórmula de Classic,
 // aproximada para Forever): 1 en naranja; en amarillo/verde decae linealmente como
 // (gris - skill) / (gris - amarillo), acotada a [0, 1]; 0 en gris y en 'no'.

@@ -62,3 +62,17 @@ test('migración desde la guía anterior conserva clase, facción y nivel', () =
   assert.equal(vacio.razaSupuesta, false)
   assert.equal(vacio.perfil.clase, null)
 })
+
+test('perfilParaAgente: resumen con nombres e IDs, sin el reino', async () => {
+  const { perfilParaAgente } = await import('../src/perfil.js')
+  const profesiones = JSON.parse(readFileSync(new URL('../data/profesiones.json', import.meta.url), 'utf8')).profesiones
+  const nombres = Object.fromEntries(Object.entries(profesiones).map(([id, p]) => [id, p.n]))
+  const r = validarPerfil({ raza: NOMUERTO, clase: PALADIN, nivel: 24, profesiones: [164, 186], secundarias: [185], reino: 'Mi reino' }, personaje)
+  assert.equal(perfilParaAgente(r.perfil, personaje, nombres),
+    'Mi personaje de WoW Forever (plugin wow-forever): Horda · No-muerto (Undead, raza 5) · Paladín (Paladin, clase 2) · nivel 24 · ' +
+    'profesiones: Herrería (Blacksmithing, id 164), Minería (Mining, id 186) · secundarias: Cocina (Cooking, id 185)')
+  const enano = validarPerfil({ raza: ENANO, clase: CHAMAN, nivel: 1, profesiones: [], secundarias: [] }, personaje)
+  assert.equal(perfilParaAgente(enano.perfil, personaje, nombres),
+    'Mi personaje de WoW Forever (plugin wow-forever): Alianza · Enano (Dwarf, raza 3) · Chamán (Shaman, clase 7) · nivel 1')
+  assert.equal(perfilParaAgente({ faccion: 'horda', raza: null, clase: 2 }, personaje, nombres), null)
+})

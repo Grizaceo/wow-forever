@@ -5,6 +5,7 @@ import { useState } from 'react'
 import { C, CALIDAD } from '../../estilos.js'
 import { t, agregarTextos } from '../../i18n.js'
 import { TextoRico } from '../../ui.jsx'
+import { nombreClaseGuia } from '../../datos.js'
 import { fmtDps, simcHelpers, simcVitals, petHappyText } from '../../guia-logica.js'
 
 agregarTextos({
@@ -294,7 +295,7 @@ function skinDe(simcRace) {
 // Retrato procedural del personaje (port de charPortrait de index.html, con la
 // paleta del tema en vez de hex fijos; el acento de clase viene del dato curado).
 export function charRetrato({ G, fac, simcRace, avatar, lang }) {
-  if (avatar) return <img src={avatar} alt={t(lang, 'guia.ficha.retrato', { clase: G.name })} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+  if (avatar) return <img src={avatar} alt={t(lang, 'guia.ficha.retrato', { clase: nombreClaseGuia(G, lang) })} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
   const skin = skinDe(simcRace), acc = G.accent || C.amarillo
   const cloak = fac === 'alliance' ? C.azul : C.rojo
   const trim = fac === 'alliance' ? C.azul : C.naranja
@@ -306,7 +307,7 @@ export function charRetrato({ G, fac, simcRace, avatar, lang }) {
     shaman: <><path d="M36 40 Q60 31 84 40 L84 47 Q60 38 36 47 Z" fill={C.amarillo} /><path d="M44 36 C38 26 36 16 40 6 M50 34 C48 22 50 12 56 4" stroke={skin} strokeWidth="3.4" fill="none" strokeLinecap="round" /><path d="M76 36 C82 26 84 16 80 6 M70 34 C72 22 70 12 64 4" stroke={skin} strokeWidth="3.4" fill="none" strokeLinecap="round" /><rect x="56" y="30" width="8" height="10" rx="2" fill={skin} opacity=".85" /></>,
   }[G.id] || <path d="M36 48 C34 24 46 12 60 12 C74 12 86 24 84 48 L78 44 C76 32 68 28 60 28 C52 28 44 32 42 44 Z" fill={C.texto4} />
   return (
-    <svg viewBox="0 0 120 150" preserveAspectRatio="xMidYMid slice" role="img" aria-label={t(lang, 'guia.ficha.retrato', { clase: G.name })} style={{ width: '100%', height: '100%', display: 'block' }}>
+    <svg viewBox="0 0 120 150" preserveAspectRatio="xMidYMid slice" role="img" aria-label={t(lang, 'guia.ficha.retrato', { clase: nombreClaseGuia(G, lang) })} style={{ width: '100%', height: '100%', display: 'block' }}>
       <defs>
         <linearGradient id={'pbg-' + G.id} x1="0" y1="0" x2="0" y2="1">
           <stop offset="0" stopColor={acc} stopOpacity=".18" />
@@ -389,7 +390,7 @@ export function Ficha({ v, lang }) {
             <Icono n={G.icon} size={15} />
           </span>
         </div>
-        <div style={P.fichaCls}>{G.name}</div>
+        <div style={P.fichaCls}>{nombreClaseGuia(G, lang)}</div>
         <div className="ficha-lvl" style={P.fichaLvl}><b style={P.fichaLvlB}>{lvl}</b><span style={P.fichaLvlS}>{t(lang, 'guia.ficha.nivel')}</span></div>
         <div title={facLabel} style={{ lineHeight: 0 }}>{facEscudo(fac, facLabel.charAt(0).toUpperCase())}</div>
         <div style={P.fichaAvbtns}>

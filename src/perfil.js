@@ -94,3 +94,28 @@ export function migrarPerfil(viejo, personaje) {
   }, personaje)
   return { perfil, razaSupuesta: razas.length > 0 }
 }
+
+// Resumen del perfil para pegarlo en el chat del agente (botón «Copiar perfil para el
+// agente»). Nombres en español con el inglés entre paréntesis y los IDs que usa la skill
+// (scripts/consultar.py acepta --raza/--clase/profesión por ID). `nombresProf` es
+// {id: {es, en}} (de profesiones.json). null si faltan facción, raza o clase.
+export function perfilParaAgente(perfil, personaje, nombresProf = {}) {
+  if (!perfil || !perfil.faccion || perfil.raza == null || perfil.clase == null) return null
+  const conId = (x, tipo, id) => {
+    const es = x && (x.es || x.en), en = x && (x.en || x.es)
+    return es && en && es !== en ? `${es} (${en}, ${tipo} ${id})` : `${es || '?'} (${tipo} ${id})`
+  }
+  const fac = personaje.facciones?.[perfil.faccion]?.n
+  const raza = personaje.razas?.[String(perfil.raza)]?.n
+  const clase = personaje.clases?.[String(perfil.clase)]?.n
+  const profs = (ids) => (ids || []).map((id) => conId(nombresProf[String(id)], 'id', id)).join(', ')
+  const partes = [
+    (fac && (fac.es || fac.en)) || perfil.faccion,
+    conId(raza, 'raza', perfil.raza),
+    conId(clase, 'clase', perfil.clase),
+    `nivel ${perfil.nivel}`,
+  ]
+  if ((perfil.profesiones || []).length) partes.push(`profesiones: ${profs(perfil.profesiones)}`)
+  if ((perfil.secundarias || []).length) partes.push(`secundarias: ${profs(perfil.secundarias)}`)
+  return `Mi personaje de WoW Forever (plugin wow-forever): ${partes.join(' · ')}`
+}
