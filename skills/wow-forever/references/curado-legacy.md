@@ -156,7 +156,7 @@ Verificado en el cliente post-launch (builds 70205/70425/70888): cada rango = 1 
 
 - **Frilled Lichen** — Herbalism · ilvl 25
   → Cerulean Dye · Alchemy (amarillo 50): 2× hierba + vial · 131 recetas, 108 Tailoring
-  recetas desde skill 50 · hierbas nv 15–100 (Earthroot/Mageroyal/Briarthorn/Bruiseweed) · solo PJ ≤25
+  recetas desde skill 50 · hierbas nv 15–100 (Earthroot/Mageroyal/Briarthorn/Bruiseweed) · solo PJ ≤25 según la beta
 - **Rosecap** — Herbalism · ilvl 45
   → Magenta Dye · Alchemy (amarillo 130) · 62 recetas, 52 Tailoring
   recetas desde skill 130 · sin fuente confirmada en beta · tier 2 (PJ ≥26)
@@ -165,7 +165,7 @@ Verificado en el cliente post-launch (builds 70205/70425/70888): cada rango = 1 
   recetas desde skill 230 · sin fuente confirmada · tier 3
 - **Pyrite** — Mining · ilvl 25
   → Sulfuric Acid · Alchemy (amarillo 50) · 42 recetas, 30 Blacksmithing · Pyrite directo: 12 recetas, 9 Tailoring
-  recetas desde skill 50 · reportes: vetas Copper–Iron · solo PJ ≤25
+  recetas desde skill 50 · reportes: vetas Copper–Iron · solo PJ ≤25 según la beta
 - **Bauxite** — Mining · ilvl 45
   → Sandpaper · Engineering (amarillo 130): 2× Bauxite + lienzo · 27 recetas, 25 Blacksmithing
   recetas desde skill 130 · reportes: vetas Gold–Mithril · tier 2
@@ -174,7 +174,7 @@ Verificado en el cliente post-launch (builds 70205/70425/70888): cada rango = 1 
   recetas desde skill 275 · reportes: vetas Truesilver+ · tier 3
 - **Pristine Leather** — Skinning · ilvl 25
   → se usa directo · 126 recetas: 80 Leatherworking · 30 Blacksmithing · 16 Tailoring · primera a skill 80
-  bestias nv ~11–26 · zonas: Westfall, Barrens, Darkshore, Loch Modan (+WC, SFK, Duskwood, Silverpine, Redridge) · solo PJ ≤25
+  bestias nv ~11–26 · zonas: Westfall, Barrens, Darkshore, Loch Modan (+WC, SFK, Duskwood, Silverpine, Redridge) · solo PJ ≤25 según la beta
 - **Pristine Hide** — Skinning · ilvl 45
   → se usa directo · 46 recetas (43 Leatherworking)
   bestias nv 25–34 · Kraul Bat (RFK) · Maddened Rotclaw (Wetlands) · Scarlet Tracking Hound (Scarlet Monastery) · Aku'mai Snapjaw (BFD) · tier 2
@@ -182,7 +182,7 @@ Verificado en el cliente post-launch (builds 70205/70425/70888): cada rango = 1 
   → se usa directo · 16 recetas (12 Leatherworking) · primera a skill 235
   sin fuente confirmada — el beta capaba en nv 30 · tier 3
 
-Son bonus drops de nodos/menas/cadáveres NORMALES de tu oficio — no hay nodos especiales. REGLA DE NIVEL (testeada exhaustivamente en beta, bug report #375; Blizzard NO la confirmó): el tier de escaso depende del NIVEL DEL PERSONAJE, no del mob ni del skill ni de la zona — PJ ≤25 solo consigue tier 1 (PL/FL/Pyrite), PJ ≥26 pasa a la tabla tier 2 (PH/Rosecap/Bauxite). Implicación: tu Grizaceo nv 28 NO puede conseguir Pristine Leather ni Frilled Lichen — eso es para un alt ≤25; tu escaso de skinning es Pristine Hide. Drop rates exactos y el límite del tier 3 siguen sin confirmar (approx).
+Son bonus drops de nodos/menas/cadáveres NORMALES de tu oficio — no hay nodos especiales. REGLA DE NIVEL (testeada exhaustivamente en beta, bug report #375; Blizzard NO la confirmó): el tier de escaso depende del NIVEL DEL PERSONAJE, no del mob ni del skill ni de la zona — PJ ≤25 solo consigue tier 1 (PL/FL/Pyrite), PJ ≥26 pasa a la tabla tier 2 (PH/Rosecap/Bauxite). Implicación, si la regla se confirma: un personaje de nivel 26 o más ya no consigue Pristine Leather ni Frilled Lichen (quedan para un alt de nivel 25 o menos) y en Skinning le toca Pristine Hide. Drop rates exactos y el límite del tier 3 siguen sin confirmar (approx).
 
 ## Dónde farmear por oficio
 
@@ -193,19 +193,19 @@ Son bonus drops de nodos/menas/cadáveres NORMALES de tu oficio — no hay nodos
   Warmup de Skinning; vendor vale hasta ~20-25 según la guía de oro. Top beta: Black Dragon Whelp (Redridge 17-18), Starving/Rabid Dire Wolf (Duskwood 19-21), Great Goretusk (Redridge 16-17), Young Wetlands Crocolisk (Wetlands 21-22).
 - **Medium Leather · beasts nv 16–35 (mejor 21–30)** — nv 20–30 · ambas facciones
   Darkshore · Loch Modan · The Barrens (Field of Giants oeste — la mejor zona del juego para este cuero) · Ashenvale · Hillsbrad · Duskwood · Wetlands
-  Acá estás vos: las bestias nv 21-30 dan Medium Leather, y encima caen los escasos tier 2 si tu PJ es ≥26.
+  Las bestias nv 21-30 dan Medium Leather; con un personaje de nivel 26 o más, además, los escasos de tier 2 (regla de la beta, sin confirmar).
 - **Heavy Leather · beasts nv 26–45 (mejor 31–40)** — nv 30–45 · ambas facciones
   Arathi Highlands · Desolace · Stranglethorn Vale · Wetlands · Duskwood
   Siguiente tier de cuero normal; también Thick Leather desde beasts nv 36+ (STV, Tanaris, Feralas, Hinterlands, Dustwallow).
 - **Thick → Rugged Leather · beasts nv 36–60** — nv 45–60 · ambas facciones
   Stranglethorn · Tanaris · Feralas · The Hinterlands · Dustwallow Marsh (Thick) → Un'Goro · Felwood · Winterspring · Burning Steppes · Azshara · Silithus (Rugged)
   Tier alto; Rugged pide beasts nv 46-60.
-- **★ Pristine Leather (escaso tier 1) — SOLO PJ ≤25** — nv 1–25 · ambas facciones
+- **★ Pristine Leather (escaso tier 1) — PJ ≤25 según la beta** — nv 1–25 · ambas facciones
   Westfall · The Barrens (38% de los loots del beta) · Darkshore · Loch Modan · Wailing Caverns · Shadowfang Keep · Duskwood · Silverpine · Redridge
-  Bestias nv ~11–26. Tu nivel 28 YA NO puede conseguirlo (regla de nivel) — farmealo en un ALT ≤25; skinneá hasta las grises.
-- **★ Pristine Hide (escaso tier 2) — tu rango** — nv 26–34 · ambas facciones
+  Bestias nv ~11–26. Según la regla de nivel de la beta (sin confirmar), un personaje de nivel 26 o más ya no lo consigue: farmealo con un alt de nivel 25 o menos y despellejá también las bestias grises.
+- **★ Pristine Hide (escaso tier 2) — PJ ≥26 según la beta** — nv 26–34 · ambas facciones
   Razorfen Krawl (Kraul Bat, Sur del Barrens) · Wetlands (Maddened Rotclaw) · Scarlet Monastery (Scarlet Tracking Hound, Tirisfal) · Blackfathom Deeps (Aku'mai Snapjaw)
-  Bestias nv 25–34 — el escaso que te corresponde a nv 28+. En beta hubo pocos registros.
+  Bestias nv 25–34. Según la beta, es el escaso de los personajes de nivel 26 o más; hubo pocos registros.
 - **★ Pristine Scale (escaso tier 3)** — nv 35–60 · ambas facciones
   sin confirmar
   Ninguna fuente lo vio caer (beta cap nv 30). Si existe, probablemente bestias de tier alto.
@@ -220,19 +220,19 @@ Son bonus drops de nodos/menas/cadáveres NORMALES de tu oficio — no hay nodos
   El Barrens es LA zona de hierbas de la Horda.
 - **Mageroyal (skill 50)** — nv 25–40 · ambas facciones
   The Barrens (261 puntos — zona #1, Lushwater Oasis, Sludge Fen) · Ashenvale · Darkshore · Westfall
-  Tu rango: Mageroyal + Earthroot conviven en el Barrens.
+  Mageroyal y Earthroot conviven en el Barrens.
 - **Briarthorn (skill 70)** — nv 40–55 · ambas facciones
   Duskwood (Raven Hill, Brightwood) · The Barrens · Darkshore · Westfall · Razorfen Krawl
   Siguiente skill de hierba.
 - **Stranglekelp (skill 85) · Bruiseweed (skill 100)** — nv 50–60 · ambas facciones
   Wetlands (mejor Stranglekelp) · Ashenvale · Stranglethorn Vale · Hinterlands · Hillsbrad · Redridge · Silverpine · Wailing Caverns · Blackfathom Deeps
   Bruiseweed pica skill 100 — llega con nivel alto o hierbalismo dedicado.
-- **★ Frilled Lichen (escaso tier 1) — SOLO PJ ≤25** — nv 1–25 · ambas facciones
+- **★ Frilled Lichen (escaso tier 1) — PJ ≤25 según la beta** — nv 1–25 · ambas facciones
   cualquier nodo de Earthroot/Mageroyal/Briarthorn/Bruiseweed
-  Suelto de las hierbas nv 15–100 — solo lo consiguen personajes ≤25; a nv 28 ya no te toca.
+  Sale de las hierbas de skill 15–100. Según la beta (sin confirmar), solo para personajes de nivel 25 o menos.
 - **★ Rosecap / Stranglevine (escasos tier 2/3)** — nv 26–60 · ambas facciones
   sin confirmar
-  Zonas exactas no publicadas. Tu PJ ≥26 debería tirar a la tabla tier 2 (Rosecap) — aprox.
+  Zonas exactas no publicadas. Con la regla de la beta, un personaje de nivel 26 o más tiraría a la tabla tier 2 (Rosecap) — aprox.
 
 ### Mining
 
@@ -244,21 +244,21 @@ Son bonus drops de nodos/menas/cadáveres NORMALES de tu oficio — no hay nodos
   Estaño pide skill 65 — con Mining bajo conviene farmeo de skill primero.
 - **Iron Deposit (skill 125) · Gold (~155)** — nv 20–35 · ambas facciones
   Arathi Highlands · Desolace · Stranglethorn Vale · Thousand Needles
-  Hierro pide skill 125 — probablemente lo deje tu alt o un mining dedicado.
+  Hierro pide skill 125: subí Mining antes de venir.
 - **Mithril (~175) · Truesilver (~200)** — nv 35–50 · ambas facciones
   Azshara · Tanaris · The Hinterlands · Searing Gorge · Badlands
   Tier alto de menas.
 - **Thorium Vein (skill 245–275)** — nv 50–60 · ambas facciones
   Un'Goro Crater · Winterspring · Burning Steppes · Eastern Plaguelands · Silithus
   Menas de endgame; Rich/Small Thorium.
-- **★ Pyrite (escaso tier 1) — SOLO PJ ≤25** — nv 1–25 · ambas facciones
+- **★ Pyrite (escaso tier 1) — PJ ≤25 según la beta** — nv 1–25 · ambas facciones
   vetas Copper–Iron (reportes de jugadores, sin confirmar)
   Recetas desde skill 50; drop rate desconocido.
 - **★ Bauxite / Pitchblende (escasos tier 2/3)** — nv 26–60 · ambas facciones
   reportes: Gold–Mithril (Bauxite) · Truesilver+ (Pitchblende) — sin confirmar
   Bauxite pide skill 130 de recipes, Pitchblende 275 — mid/endgame de Mining.
 
-Spots rankeados por densidad de nodos/beasts y guards según spawn data Classic (warcraftmaps, build 1.60.1.70685) + rutas de skill ForeverDB/Wowhead (theforeverguides). NO hay rates por hora confirmados — son laps caminables, no promesas de oro. Recuerda la REGLA DE NIVEL de escasos: a nv 28 tu tabla es tier 2 — Pristine Leather y Frilled Lichen ya no te caen (van a un alt ≤25). Para skinsneado: las bestias solo se skinnean una vez — no dejes cadáveres.
+Spots rankeados por densidad de nodos/beasts y guards según spawn data Classic (warcraftmaps, build 1.60.1.70685) + rutas de skill ForeverDB/Wowhead (theforeverguides). NO hay rates por hora confirmados — son laps caminables, no promesas de oro. Recordá la regla de nivel de los escasos (reportada en la beta, sin confirmar por Blizzard): desde el nivel 26 la tabla pasa a tier 2 y Pristine Leather y Frilled Lichen dejan de caer. Para Skinning: cada bestia se despelleja una sola vez, no dejes cadáveres.
 
 ## Desbloqueo del panel
 

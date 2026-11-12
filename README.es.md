@@ -43,7 +43,8 @@ página llega apagada aunque el plugin esté habilitado. Aparece en la barra lat
   dungeons nuevos de Forever con sus jefes.
 - **Mercado**: importa tu `Auctionator.lua`, acumula el historial, marca ofertas y recomienda
   dónde farmear.
-- **Guía curada** (Cazador de la Horda, y Chamán de ambas facciones) y **Legacy**.
+- **Guía curada** del Cazador de la Horda y **Legacy**. Un test las compara con los datos generados
+  (ítems, botín, misiones, hechizos, razas); las demás clases usan solo los datos generados.
 - **Skill del agente**: responde preguntas como «soy Paladín no-muerto nivel 24, ¿dónde
   entreno?» o «¿qué subo de herrería con 120 de skill?» consultando los datos del plugin. El
   botón **Copiar perfil para el agente** de la pestaña Personaje le pasa tu personaje al chat.
@@ -116,7 +117,7 @@ Tests:
 
 ```sh
 python3 -m unittest discover -s tests     # datos, lint de Hermes, bundle reproducible, skill
-node --test tests/                         # lógica pura (perfil, crafteo, mercado, ruta, guía, referencias)
+node --test tests/                         # lógica pura (perfil, crafteo, mercado, ruta, guía, referencias, curado vs datos)
 PLAYWRIGHT_MODULE=… CHROMIUM_PATH=… node desktop/test/navegador.mjs   # y desktop/test/vista-*.mjs
 ```
 
@@ -138,7 +139,9 @@ juego: macros, rutas y estimaciones de oro por hora.
 - Forever movió algunos mapas: las coordenadas de 1.12 en Mulgore, Eastern Plaguelands,
   Redridge y Stormwind pueden no coincidir con el juego.
 - Oro por hora, ROI y ofertas son estimaciones sobre precios anunciados, no ventas.
-- Las macros y rutas curadas no se probaron en el juego.
+- Las macros y rutas curadas no se probaron en el juego. Solo el Cazador de la Horda tiene guía
+  curada: las de Guerrero y Chamán nombraban ítems, jefes y razas que no existen y se retiraron
+  hasta reescribirlas.
 - Algunos ítems clásicos no traen nombre en español en el cliente esMX y se muestran en inglés.
 
 ## Licencia

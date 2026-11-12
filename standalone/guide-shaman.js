@@ -1,4 +1,9 @@
-/* Guía Shaman — WoW: Forever (clase + ambos bandos).
+/* RETIRADA en la 2.0.0: la página y la skill ya no la publican (ver desktop/src/datos.js).
+   tools/auditar-curado.mjs mostró que nombra armas y botín que no existen, una ruta para
+   draenei (raza que Forever no tiene), «sin 2H» cuando la clase sí las usa y niveles de
+   hechizos equivocados. Se conserva solo como borrador para reescribirla.
+
+   Guía Shaman — WoW: Forever (clase + ambos bandos).
    Consumida por index.html vía window.GUIDE_SHAMAN. Contenido público de la guía.
    NOTA: tabla de armas y fuentes por validar in-game (datos Classic Era 1.12).
    Shaman en Classic: solo armas 1H (hacha/maza/daga) + escudo; sin 2H ni rango.

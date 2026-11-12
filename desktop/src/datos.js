@@ -10,16 +10,17 @@ import misiones from '../../data/misiones.json'
 import dungeons from '../../data/dungeons.json'
 import dropData from '../../standalone/drop-data.js'
 import { GUIDE_HUNTER } from '../../standalone/guide-hunter.js'
-import { GUIDE_SHAMAN } from '../../standalone/guide-shaman.js'
 import { GUIDE_LEGACY } from '../../standalone/guide-legacy.js'
 
 export const D = { personaje, clases, profesiones, items, zonas, misiones, dungeons, dropData }
 
-// Guías curadas por ID de clase del cliente (3 Cazador, 7 Chamán) y por facción que
-// cubren. El resto de clases no tiene capa curada todavía. La de Guerrero
-// (standalone/guide-warrior.js) se retiró en la 2.0.0: nombraba ítems, misiones y jefes
-// que no existen; el Guerrero usa solo los datos generados hasta que se reescriba.
-export const GUIAS = { 3: GUIDE_HUNTER, 7: GUIDE_SHAMAN }
+// Guías curadas por ID de clase del cliente (3 Cazador) y por facción que cubren. El
+// resto de clases no tiene capa curada. Las de Guerrero y Chamán
+// (standalone/guide-warrior.js, guide-shaman.js) se retiraron en la 2.0.0: nombraban
+// ítems, misiones, jefes y razas que no existen (tools/auditar-curado.mjs lo mostró), y
+// esas clases usan solo los datos generados hasta que se reescriban. Toda guía que se
+// agregue acá tiene que pasar ese auditor (tests/curado-datos.test.mjs).
+export const GUIAS = { 3: GUIDE_HUNTER }
 export const LEGACY = GUIDE_LEGACY
 
 // Nombre visible de la clase de una guía curada, desde personaje.json (la guía trae su

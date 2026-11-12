@@ -43,7 +43,8 @@ page arrives switched off even when the plugin is enabled. It then shows up in t
   9 new Forever dungeons with their bosses.
 - **Market**: imports your `Auctionator.lua`, builds up price history, flags deals and suggests
   where to farm.
-- **Curated guide** (Horde Hunter, and Shaman for both factions) and **Legacy**.
+- **Curated guide** for the Horde Hunter, and **Legacy**. A test checks them against the generated
+  data (items, loot, quests, spells, races); the other classes use the generated data only.
 - **Agent skill**: answers questions such as "I'm a level 24 Undead Paladin, where do I
   train?" or "what do I craft at 120 Blacksmithing?" by querying the plugin's data. The
   **Copy profile for the agent** button on the Character tab hands your character to the chat.
@@ -116,7 +117,7 @@ Tests:
 
 ```sh
 python3 -m unittest discover -s tests     # data, Hermes lint, reproducible bundle, skill
-node --test tests/                         # pure logic (profile, crafting, market, route, guide, references)
+node --test tests/                         # pure logic (profile, crafting, market, route, guide, references, curated vs data)
 PLAYWRIGHT_MODULE=… CHROMIUM_PATH=… node desktop/test/navegador.mjs   # and desktop/test/vista-*.mjs
 ```
 
@@ -137,7 +138,9 @@ game: macros, routes and gold-per-hour estimates.
 - Forever moved some maps: the 1.12 coordinates in Mulgore, Eastern Plaguelands, Redridge and
   Stormwind may not match the game.
 - Gold per hour, ROI and deals are estimates over listed prices, not sales.
-- The curated macros and routes were not tested in the game.
+- The curated macros and routes were not tested in the game. Only the Horde Hunter has a curated
+  guide: the Warrior and Shaman ones named items, bosses and races that do not exist and were
+  withdrawn until they are rewritten.
 - Some classic items have no Spanish name in the esMX client and show in English.
 
 ## License

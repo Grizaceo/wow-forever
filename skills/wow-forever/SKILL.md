@@ -54,10 +54,10 @@ muestra, 15 por defecto.)
 | ¿Dónde subo de nivel? | `zonas --faccion horda --nivel 24` |
 | ¿Qué subo de herrería con 120 de skill? | `profesion herreria --skill 120 --faccion horda` |
 | ¿Cómo se aprende o qué pide una receta? | `receta "bronze bracers"` |
-| ¿Dónde consigo un ítem? ¿Qué es? | `item "venomstrike"` (o un id; `--detalle` con varios) |
+| ¿Dónde consigo un ítem? ¿Qué es? (jefe y %, misión que lo da, vendedor, DPS) | `item "venomstrike"` (o un id; `--detalle` con varios) |
 | ¿Qué dungeons hago a mi nivel? | `dungeons --nivel 24` |
 | Jefes y botín de un dungeon (útil para mi clase) | `dungeon "deadmines" --clase guerrero` |
-| Buscar una misión | `mision "call of water" --faccion horda` (o un id) |
+| Buscar una misión y sus recompensas | `mision "call of water" --faccion horda` (o un id) |
 | ¿Qué datos faltan? | `huecos --tema entrenadores` |
 | ¿De dónde salen los datos? | `fuentes` |
 
@@ -67,12 +67,12 @@ ID. Si el script dice que un nombre es ambiguo (por ejemplo, «cielonato» sin f
 
 ## 3. Guías curadas
 
-Las guías escritas a mano (Cazador de la Horda y Chamán de ambas facciones, con ruta
-por bandas, armas, dungeons, lista de subasta y macros) y la de **Legacy** están en
+La guía escrita a mano del **Cazador de la Horda** (ruta por bandas, armas, dungeons, lista
+de subasta y macros) y la de **Legacy** están en
 `references/`. Lee primero `references/INDICE.md` con
 `skill_view(name="wow-forever:wow-forever", file_path="references/INDICE.md")` y luego solo el
-archivo de la clase y facción del jugador. Las demás clases no tienen guía curada: dilo y usa
-los datos generados.
+archivo de la clase y facción del jugador. Las demás clases y facciones no tienen guía
+curada (las de Guerrero y Chamán se retiraron por errores): dilo y usa los datos generados.
 
 ## 4. Cómo responder
 

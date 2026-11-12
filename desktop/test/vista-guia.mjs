@@ -127,22 +127,18 @@ check('/simc: snapshot con arma real, stats y profesiones', await p.evaluate(() 
 check('/simc: conservó claves desconocidas', !!bSim && bSim.claveFutura.oro === 777)
 await cerrar()
 
-// ---------------------------------------------------------------- 4) Chamán Alianza; Guerrero sin guía curada
-;({ p, cerrar } = await a.abrir('claro', { perfil: PERFILES.chamanAlianza, build: SEMILLA }))
-await p.click('[data-tab="guia"]')
-await p.getByText('Senda del Chamán').waitFor()
-check('chamán alianza: guía de la facción correcta', await p.evaluate(() =>
-  /Chamán/.test((document.querySelector('.ficha') || document.body).innerText)))
-await cerrar()
-
+// ---------------------------------------------------------------- 4) Guerrero y Chamán sin guía curada
 const GUERRERO_H = { v: 1, faccion: 'horda', raza: 2, clase: 1, nivel: 35, profesiones: [171], secundarias: [], reino: 'Prueba' }
 const GUERRERO_A = { v: 1, faccion: 'alianza', raza: 1, clase: 1, nivel: 35, profesiones: [171], secundarias: [], reino: 'Prueba' }
-// La guía curada de Guerrero se retiró en la 2.0.0 (nombraba ítems y jefes que no existen):
-// el Guerrero no tiene pestaña de guía curada y su progreso anterior sigue intacto.
-for (const [nom, per] of [['horda', GUERRERO_H], ['alianza', GUERRERO_A]]) {
+const CHAMAN_H = { v: 1, faccion: 'horda', raza: 2, clase: 7, nivel: 30, profesiones: [171], secundarias: [], reino: 'Prueba' }
+// Las guías curadas de Guerrero y Chamán se retiraron en la 2.0.0 (nombraban ítems, jefes y
+// razas que no existen): esas clases no tienen pestaña de guía curada, usan los datos
+// generados y su progreso anterior sigue intacto.
+for (const [nom, per] of [['guerrero horda', GUERRERO_H], ['guerrero alianza', GUERRERO_A],
+  ['chamán horda', CHAMAN_H], ['chamán alianza', PERFILES.chamanAlianza]]) {
   ;({ p, cerrar } = await a.abrir('claro', { perfil: per, build: SEMILLA }))
   await p.getByText('Raza').first().waitFor()
-  check('guerrero ' + nom + ': sin pestaña de guía curada', await p.locator('[data-tab="guia"]').count() === 0)
+  check(nom + ': sin pestaña de guía curada', await p.locator('[data-tab="guia"]').count() === 0)
   await cerrar()
 }
 

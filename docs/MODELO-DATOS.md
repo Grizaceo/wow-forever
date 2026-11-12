@@ -84,10 +84,14 @@ Por profesión (ID de SkillLine: 171 Alquimia, 164 Herrería, 333 Encantamiento,
 ### `data/items.json`
 
 `id → [es, en, calidad, nivel_req, nivel_item, venta_cobre, clase, subclase, ligado,
-compra_cobre, vendedor]`; `compra_cobre` es el precio de compra al vendedor (cliente) y
-`vendedor` vale 1 si algún vendedor de 1.12 lo vende sin tope (reactivos como hilo o viales)
-desde ItemSparse e Item del cliente, sin el rango 200000–239999. Sirve para nombrar los
-ítems importados de Auctionator, las recetas y el botín, y para el costo de vendedor.
+compra_cobre, vendedor, dps_x10]`; `compra_cobre` es el precio de compra al vendedor
+(cliente), `vendedor` vale 1 si algún vendedor de 1.12 lo vende sin tope (reactivos como
+hilo o viales), 2 si solo con stock limitado y 0 si ninguno, y `dps_x10` es el DPS de un
+arma en 1.12 por 10 (0 si no es arma). Nombre y stats salen de ItemSparse del cliente
+Forever; los ítems que el cliente tiene (Item.csv) pero sin nombre publicado los completa
+CMaNGOS 1.12, y sus IDs quedan en `meta.ids_cmangos`. Sin el rango 200000–239999. Sirve
+para nombrar los ítems importados de Auctionator, las recetas, el botín y las recompensas,
+para el costo de vendedor y para auditar las guías curadas.
 
 ### `data/zonas.json`
 
@@ -101,9 +105,10 @@ desde ItemSparse e Item del cliente, sin el rango 200000–239999. Sirve para no
 ### `data/misiones.json`
 
 `questId → {t: {es, en}, nivel, min, zona, dungeon?, categoria?, faccion: "a"|"h"|"ah",
-clases?, prof?, prev?}` (`cmangos-1.12`; títulos solo en inglés). `zona` sale del área
-de la misión y, si no, de dónde está quien la da; `dungeon` es el mapa cuando la misión
-es de un dungeon; `categoria` es el `ZoneOrSort` negativo (clase, profesión, evento).
+clases?, prof?, prev?, recompensas?}` (`cmangos-1.12`; títulos solo en inglés). `zona` sale
+del área de la misión y, si no, de dónde está quien la da; `dungeon` es el mapa cuando la
+misión es de un dungeon; `categoria` es el `ZoneOrSort` negativo (clase, profesión, evento);
+`recompensas` son los ítems que da, fijos y a elegir.
 
 ### `data/dungeons.json`
 
@@ -149,8 +154,15 @@ Reglas, en `src/perfil.js` (módulo ES puro, sin DOM):
 
 ## Guías curadas
 
-Las guías escritas a mano (hoy Cazador y Chamán en `standalone/guide-*.js`; la de Guerrero se retiró en la 2.0.0) se
-mantienen como capa curada encima de lo generado. Al pasar a la mitad Desktop nueva se
+Las guías escritas a mano (hoy Cazador de la Horda y Legacy en `standalone/guide-*.js`;
+las de Guerrero y Chamán se retiraron en la 2.0.0 porque nombraban ítems, jefes y razas que
+no existen) se mantienen como capa curada encima de lo generado.
+`tools/auditar-curado.mjs` las compara con `data/`: razas por clase y facción, lugares de
+otras expansiones, ítems (tipo, calidad, nivel, DPS, vendedor, BoE, crafteo), botín por jefe
+y probabilidad, misiones y sus recompensas, hechizos por nivel, y consejos escritos para un
+personaje concreto. Lo que los datos no pueden decidir (talentos, habilidades del pet,
+botín de cofres o de raros) queda en `tools/curado-revisado.json` con su motivo, y
+`tests/curado-datos.test.mjs` falla con cualquier hallazgo nuevo sin revisar. Al pasar a la mitad Desktop nueva se
 convierten a este esquema común:
 
 ```json

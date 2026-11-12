@@ -19,10 +19,10 @@ en el juego salvo que el texto lo diga.
   - Dungeons: SM Armory (32+, Herod's Shoulder + Ravager) · SM Cathedral (35+) · Gnomeregan opcional
 - **38–43** — STV / Desolace / Arathi / Dustwallow. Al 43 'Big Game Hunter' → Master Hunter's Bow o Rifle (19.4 dps): salto enorme de daño. A 40 entrená MAIL.
   - Dungeons: SM Cathedral · RFD opcional
-- **44–49** — Tanaris / Feralas / Hinterlands. Maraudon es la prioridad: Verdant Keeper's Aim por quest (28.2 dps) y Megashot Rifle si vas por guns. Highland Bow en Hinterlands.
+- **44–49** — Tanaris / Feralas / Hinterlands. Maraudon es la prioridad: Verdant Keeper's Aim por quest (27.3 dps), Blackstone Ring (Princess Theradras) y Megashot Rifle si vas por guns. Highland Bow en Hinterlands.
   - Dungeons: Zul'Farrak (42+) · Maraudon (45+)
 - **50–54** — Un'goro / Felwood / Western Plaguelands. Quest de clase en Sunken Temple: Devilsaur Eye si sos MM/SV, Devilsaur Tooth si sos BM.
-  - Dungeons: Sunken Temple (50+) · BRD (52+): Blackstone Ring + Ribbly's Quiver
+  - Dungeons: Sunken Temple (50+) · BRD (52+): Ribbly's Quiver + Hand of Justice
 - **55–60** — EPL / Winterspring / Silithus + dungeons. Recta final pre-raid: Satyr's Bow (DM East), Blackcrow/Riphook (LBRS), Ancient Bone Bow (Scholo), T0 Beaststalker.
   - Dungeons: DM East · Stratholme · Scholomance · LBRS/UBRS · BRD restos
 
@@ -37,10 +37,10 @@ en el juego salvo que el texto lo diga.
   - Dungeons: SM Armory (32+, Herod's Shoulder + Ravager) · SM Cathedral (35+) · Gnomeregan opcional
 - **38–43** — STV / Badlands (Kargath) / Swamp of Sorrows. Al 43 'Big Game Hunter' → Master Hunter's Bow o Rifle (19.4 dps). Badlands (Kargath) es buen hub Horde 38-45. A 40 entrená MAIL.
   - Dungeons: SM Cathedral · Badlands quests
-- **44–49** — Hinterlands / Searing Gorge / Blasted Lands. Revantusk Village (Hinterlands): 'Return to Primal Torntusk' → Highland Bow. Maraudon queda en Kalimdor, pero Verdant Keeper's Aim (28.2 dps) justifica el viaje (zep→Org→Desolace).
+- **44–49** — Hinterlands / Searing Gorge / Blasted Lands. Revantusk Village (Hinterlands): 'Return to Primal Torntusk' → Highland Bow. Maraudon queda en Kalimdor, pero Verdant Keeper's Aim (27.3 dps) y Blackstone Ring justifican el viaje (zep→Org→Desolace).
   - Dungeons: ST (48+, Swamp of Sorrows — en tu continente) · Mara si viajás
 - **50–54** — Searing Gorge / Burning Steppes / WPL. La quest de clase 50 es EN Sunken Temple (Swamp of Sorrows) — en tu continente. Devilsaur Eye (MM/SV) o Tooth (BM).
-  - Dungeons: Sunken Temple (50+) · BRD (52+): Blackstone Ring + Ribbly's Quiver
+  - Dungeons: Sunken Temple (50+) · BRD (52+): Ribbly's Quiver + Hand of Justice
 - **55–60** — EPL / WPL / Blackrock Mountain. EK es el continente endgame: Strat, Scholo, Spire y BRD están todos acá. DM East (Satyr's Bow) pide viaje a Feralas (Kalimdor).
   - Dungeons: Strat UD · Scholo · LBRS/UBRS · BRD · DM East vía Kalimdor
 
@@ -55,7 +55,7 @@ en el juego salvo que el texto lo diga.
 | 17 | Dungeon | Kalimdor | ¡WC! Farmeá Venomstrike (Lord Serpentis) + piezas de agilidad |
 | 20 | Clase | — | Dual Wield desbloqueado — 2 armas 1H de agi, o un 2H stat stick |
 | 20 | Quest | Kalimdor | Cadena 'The Sacred Flame' (Cima del Trueno) → Cliffrunner's Aim |
-| 25 | Dungeon | — | Razorfen Kraul: Ferine Leggings, Mantle of Thieves, Corpsemaker |
+| 25 | Dungeon | — | Razorfen Kraul: Ferine Leggings, Corpsemaker y, si aparece el raro Blind Hunter, Nightstalker Bow |
 | 27 | Vendor | — | Sturdy Recurve en Cima del Trueno/Entrañas |
 | 28 | Quest | Reinos del Este | 'Dangerous!' en Molino Tarren → Bow of Plunder |
 | 30 | Zona | Kalimdor | Shimmering Flats: uno de los mejores grind 30-35 del juego |
@@ -64,11 +64,11 @@ en el juego salvo que el texto lo diga.
 | 40 | Clase | — | ¡Entrená MAIL! Cambiá cuero por malla con agi/stam |
 | 42 | Vendor | — | Massive Longbow (22.0 dps) en TB/Entrañas |
 | 43 | Quest | Reinos del Este | 'Big Game Hunter' → Master Hunter's Bow o Rifle (19.4 dps) |
-| 45 | Quest | Kalimdor | Maraudon: 'Corruption of Earth and Seed' → Verdant Keeper's Aim (28.2) |
+| 45 | Quest | Kalimdor | Maraudon: 'Corruption of Earth and Seed' → Verdant Keeper's Aim (27.3) |
 | 46 | Quest | Reinos del Este | Hinterlands: 'Return to Primal Torntusk' → Highland Bow |
 | 48 | Dungeon | Kalimdor | Mara: Megashot Rifle (Gizlock) — el gun azul del leveling |
 | 50 | Clase | Reinos del Este | Quest de clase (ST): Devilsaur Eye si MM/SV, Devilsaur Tooth si BM |
-| 52 | Dungeon | Reinos del Este | BRD: Blackstone Ring (+hit) y Ribbly's Quiver (14 slots) |
+| 52 | Dungeon | Reinos del Este | BRD: Ribbly's Quiver (16 slots) y Hand of Justice |
 | 53 | Dungeon | Kalimdor | Satyr's Bow en DM East (farmeable solo a 60) / Dwarven Hand Cannon en AH |
 | 56 | Dungeon | — | Pre-raid farm: Ancient Bone Bow, Blackcrow/Riphook, T0 Beaststalker |
 | 60 | Meta | — | DM East solo → Satyr's. Pre-raid BiS: Blackcrow o Satyr's + piezas agi/hit |
@@ -78,39 +78,39 @@ en el juego salvo que el texto lo diga.
 | Arma | Tipo | DPS | Req | Fuente | Nota |
 |---|---|---|---|---|---|
 | Hornwood Recurve Bow | Arco | 2.4 | 3 | Vendor — cualquier bowyer |  |
-| Hunting Bow | Arco | 4.6 | 6 | World drop verde (mobs 7-15) | +3 AP vs bestias |
+| Hunting Bow | Arco | 4.6 | 6 | World drop verde (mobs 7-15) |  |
 | Hickory Shortbow | Arco | 3.8 | 7 | Quest 'Securing the Lines' — Durotar |  |
 | Orcish Battle Bow | Arco | 5.5 | 10 | Quest 'Centaur Bracers' — Barrens |  |
 | Laminated Recurve Bow | Arco | 5.8 | 11 | Vendor bowyer |  |
-| Fine Longbow | Arco | 7.4 | 14 | Vendor bowyer |  |
+| Fine Longbow | Arco | 7.4 | 14 | Vendor bowyer (stock limitado) |  |
 | Reinforced Bow | Arco | 7.5 | 16 | Vendor bowyer (Orgrimmar / Cima del Trueno) |  |
-| Deadly Blunderbuss | Gun · ingeniería | 8.6~ | 16 | Ingeniería |  |
-| Venomstrike | Arco | 9.6 | 19 | Lord Serpentis — Wailing Caverns (~17%) | + proc de naturaleza: pega más de lo que dice el DPS |
-| Precision Bow | Arco | 11.9~ | 19 | BoE — subasta |  |
+| Deadly Blunderbuss | Gun · ingeniería | 8.3~ | 16 | Ingeniería |  |
+| Venomstrike | Arco | 9.6 | 19 | Lord Serpentis — Wailing Caverns (~25%) | + proc de naturaleza: pega más de lo que dice el DPS |
+| Silver-plated Shotgun | Gun · ingeniería | 10.4~ | 21 | Ingeniería |  |
 | Naga Heartpiercer | Arco | 10.6 | 21 | Lady Sarevess — Blackfathom Deeps (~20%) |  |
+| Precision Bow | Arco | 11.0 | 22 | BoE — subasta (world drop) |  |
 | Cliffrunner's Aim | Arco | 12.0 | 22 | Quest 'The Sacred Flame' — cadena desde Cima del Trueno |  |
-| Nightstalker Bow | Arco | 12.2~ | 23 | BoE — subasta |  |
-| Moonsight Rifle | Gun · ingeniería | 10.6~ | 24 | Ingeniería |  |
-| Silver-plated Shotgun | Gun · ingeniería | 12.4~ | 26 | Ingeniería |  |
-| Sturdy Recurve | Arco | 13.0 | 27 | Vendor — Cima del Trueno / Entrañas |  |
+| Moonsight Rifle | Gun · ingeniería | 11.8~ | 24 | Ingeniería |  |
+| Sturdy Recurve | Arco | 13.0 | 27 | Vendor — Cima del Trueno / Entrañas (stock limitado) |  |
+| Nightstalker Bow | Arco | 16.2 | 27 | Blind Hunter (raro) — Razorfen Kraul (~33%) | ligado al recogerlo: no se vende en la subasta |
 | Bow of Plunder | Arco | 11.3 | 28 | Quest 'Dangerous!' — Molino Tarren, Hillsbrad | mejor daño máximo que Venomstrike |
-| Bow of Searing Arrows | Arco | 23.6~ | 34 | BoE épico — subasta (caro) | + proc de fuego |
-| Mithril Blunderbuss | Gun · ingeniería | 16.6~ | 36 | Ingeniería |  |
-| Mithril Heavy-bore Rifle | Gun · ingeniería | 20.4~ | 41 | Ingeniería |  |
-| Massive Longbow | Arco | 22.0 | 42 | Vendor — Cima del Trueno / Entrañas |  |
+| Mithril Blunderbuss | Gun · ingeniería | 17.9~ | 36 | Ingeniería |  |
+| Bow of Searing Arrows | Arco | 25.0 | 37 | BoE épico — subasta (caro) | + proc de fuego |
+| Mithril Heavy-bore Rifle | Gun · ingeniería | 20.2~ | 39 | Ingeniería |  |
+| Massive Longbow | Arco | 22.0 | 42 | Vendor — Cima del Trueno / Entrañas (stock limitado) |  |
 | Master Hunter's Bow | Arco | 19.4 | 43 | Quest élite 'Big Game Hunter' — STV (Hemet Nesingwary) |  |
 | Master Hunter's Rifle | Gun | 19.4 | 43 | Quest élite 'Big Game Hunter' — STV (Hemet Nesingwary) |  |
-| Verdant Keeper's Aim | Arco | 28.2 | 45 | Quest 'Corruption of Earth and Seed' — Maraudon |  |
+| Verdant Keeper's Aim | Arco | 27.3 | 45 | Quest 'Corruption of Earth and Seed' — Maraudon |  |
 | Highland Bow | Arco | 23.6 | 46 | Quest 'Return to Primal Torntusk' — Hinterlands |  |
-| Thorium Rifle | Gun · ingeniería | 31.4 | 47 | Ingeniería | +17 AP ranged |
+| Thorium Rifle | Gun · ingeniería | 24.2 | 47 | Ingeniería | +17 AP ranged |
 | Megashot Rifle | Gun | 27.4 | 48 | Tinkerer Gizlock — Maraudon (~33%) | +19 AP ranged · velocidad 1.7 |
 | Satyr's Bow | Arco | 29.8 | 53 | Zevrim Thornhoof — Dire Maul East | +3 agi +1% hit · farmeable SOLO a 60 |
 | Dwarven Hand Cannon | Gun | 32.8 | 53 | BoE épico — subasta (caro) | + proc de fuego |
-| Blackcrow | Ballesta | 30.3 | 54 | Shadow Hunter Vosh'gajin — LBRS (~7%) | +3 agi +1% hit · pre-raid BiS |
-| Screeching Bow | Arco | 29.0~ | 55 | Baroness Anastari — Stratholme UD |  |
-| Riphook | Arco | 30.2 | 56 | Shadow Hunter Vosh'gajin — LBRS (~8%) | proc daño de sombra |
-| Ancient Bone Bow | Arco | 31.3 | 56 | Mini-bosses — Scholomance (~3%) | +11 agi |
-| Flawless Arcanite Rifle | Gun · ingeniería | 34.0~ | 56 | Ingeniería |  |
+| Riphook | Arco | 30.2 | 54 | Shadow Hunter Vosh'gajin — LBRS (~8%) | +22 AP |
+| Blackcrow | Ballesta | 30.3 | 54 | Shadow Hunter Vosh'gajin — LBRS (~8%) | +3 agi +1% hit · pre-raid BiS |
+| Screeching Bow | Arco | 30.7 | 55 | Baroness Anastari — Stratholme UD (~20%) |  |
+| Flawless Arcanite Rifle | Gun · ingeniería | 31.2~ | 56 | Ingeniería |  |
+| Ancient Bone Bow | Arco | 31.3 | 56 | Lord Alexei Barov — Scholomance (~4%; otros jefes ~1%) | +11 agi |
 
 ## Dungeons
 
@@ -120,8 +120,8 @@ Orgrimmar · Kalimdor · niveles 13–18
 
 Loot pobre para hunter — solo si cae un grupo gratis.
 
-- Cavedweller Bracers — Brazales — Taragaman
-- Subterranean Cape — Capa — Oggleflint
+- Cavedweller Bracers — Brazales — Jergosh the Invoker
+- Subterranean Cape — Capa — Taragaman the Hungerer
 
 ### Wailing Caverns
 
@@ -129,7 +129,7 @@ Los Barrens · Kalimdor · niveles 17–24 · **clave**
 
 LA dungeon de hunter de bajo nivel. Venomstrike es el objetivo #1.
 
-- Venomstrike — Arco azul 9.6 dps + proc — Lord Serpentis ~17%
+- Venomstrike — Arco azul 9.6 dps + proc — Lord Serpentis ~25%
 - Mutant Scale Breastplate — Pecho mail — Mutanus the Devourer
 - Serpent's Shoulders — Hombros agi — Lady Anacondra
 - Leggings of the Fang — Pantalones agi — Lord Cobrahn
@@ -150,7 +150,7 @@ Ashenvale · Kalimdor · niveles 20–27
 Bosque de Argénteos · Reinos del Este · niveles 22–30
 
 - Feline Mantle — Hombros agi — Wolf Master Nandos
-- Wolfmaster Cape — Capa agi — Fenrus the Devourer
+- Wolfmaster Cape — Capa agi — Wolf Master Nandos
 - Odo's Ley Staff — Staff (stat stick) — Odo the Blindwatcher
 
 ### Razorfen Kraul
@@ -158,8 +158,8 @@ Bosque de Argénteos · Reinos del Este · niveles 22–30
 Sur de Barrens · Kalimdor · niveles 25–33
 
 - Ferine Leggings — Pantalones cuero agi — Agathelos the Raging
-- Mantle of Thieves — Hombros cuero
-- Corpsemaker — 2H axe — Charlga Razorflank (stat stick)
+- Corpsemaker — 2H axe — Overlord Ramtusk (stat stick)
+- Nightstalker Bow — Arco azul 16.2 dps — Blind Hunter, raro que no siempre aparece (~33%)
 
 ### Gnomeregan
 
@@ -181,15 +181,14 @@ Tirisfal · Reinos del Este · niveles 32–38
 
 Tirisfal · Reinos del Este · niveles 35–40
 
-- Mograine's Might — 2H mace — Mograine (stat stick)
+- Mograine's Might — 2H mace — Scarlet Commander Mograine (stat stick)
+- Dragon's Blood Necklace — Cuello — quest 'Into The Scarlet Monastery' (Horda)
 
 ### Razorfen Downs
 
 Sur de Barrens · Kalimdor · niveles 37–46
 
 Opcional — poco loot útil para hunter.
-
-- Dragon's Blood Necklace — Cuello — Amnennar
 
 ### Zul'Farrak
 
@@ -206,10 +205,10 @@ Desolace · Kalimdor · niveles 45–52 · **clave**
 Segunda dungeon clave: arco por quest + el gun azul del leveling.
 
 - Megashot Rifle — Gun azul 27.4 dps +19 RAP — Gizlock ~33%
-- Verdant Keeper's Aim — Arco 28.2 dps — QUEST 'Corruption of Earth and Seed'
+- Verdant Keeper's Aim — Arco 27.3 dps — QUEST 'Corruption of Earth and Seed'
+- Blackstone Ring — Anillo +20 AP +1% hit — Princess Theradras (~25%)
 - Thrash Blade — Espada — quest (stat stick)
 - Mark of the Chosen — Trinket — quest 'The Pariah's Instructions'
-- Charstone Dirk — Daga — Princesa Theradras
 
 ### Sunken Temple (Atal'Hakkar)
 
@@ -217,17 +216,16 @@ Swamp of Sorrows · Reinos del Este · niveles 50–55
 
 Acá se completa la quest de clase de nivel 50.
 
-- Devilsaur Eye — Trinket: +150 AP y +hit por 20s — elegir si MM/SV
-- Devilsaur Tooth — Trinket: +200 AP al pet 20s — elegir si BM
-- Hunting Spear — Polearm (3ª opción, la peor)
+- Devilsaur Eye — Trinket: +150 AP y +2% hit por 20s — quest de clase 'The Green Drake', elegir si MM/SV
+- Devilsaur Tooth — Trinket: el próximo ataque del pet es crítico — quest de clase 'The Green Drake', elegir si BM
+- Hunting Spear — Polearm — 3ª opción de la quest 'The Green Drake', la peor
 
 ### Blackrock Depths
 
 Montaña Roca Negra · Reinos del Este · niveles 52–58
 
-- Blackstone Ring — Anillo +hit — Princesa Moira
-- Ribbly's Quiver — ¡Quiver azul de 14 slots! — Ribbly Screwspigot
-- Hand of Justice — Trinket melee — Angerforge (disputable con melees)
+- Ribbly's Quiver — Quiver verde de 16 slots — Ribbly Screwspigot
+- Hand of Justice — Trinket melee — Emperor Dagran Thaurissan (~20%, disputable con melees)
 
 ### Dire Maul East / North
 
@@ -238,7 +236,7 @@ A 60 un hunter puede farmear DM East y el Tribute de North SOLO.
 - Satyr's Bow — Arco 29.8 dps +1% hit — Zevrim Thornhoof (East)
 - Tarnished Elven Ring — Anillo — Tribute (North)
 - Counterattack Lodestone — Trinket — Tribute (North)
-- Barbarous Blade — 2H sword (stat stick) — Tribute (North)
+- Barbarous Blade — 2H sword (stat stick) — King Gordok (North)
 
 ### Scholomance
 
@@ -259,7 +257,7 @@ Eastern Plaguelands · Reinos del Este · niveles 55–60
 
 Montaña Roca Negra · Reinos del Este · niveles 55–60
 
-- Blackcrow — Ballesta 30.3 dps +1% hit — Vosh'gajin (LBRS)
+- Blackcrow — Ballesta 30.3 dps +1% hit — Vosh'gajin (LBRS, ~8%)
 - Riphook — Arco 30.2 dps — Vosh'gajin (LBRS)
 - Truestrike Shoulders — Hombros — Pyroguard Emberseer (UBRS)
 
@@ -267,12 +265,11 @@ Montaña Roca Negra · Reinos del Este · niveles 55–60
 
 | Ítem | Qué es | Nota |
 |---|---|---|
-| **Precision Bow** | Arco azul (~19) | Compralo si no te cayó Venomstrike |
-| **Nightstalker Bow** | Arco azul (~23) | Alternativa si no fuiste a BFD |
+| **Precision Bow** | Arco verde (22) | Compralo si no te cayó Venomstrike |
 | **Feet of the Lynx** | Botas agi (~19) | Clásico twink, barato a veces |
 | **Sentry Cloak** | Capa (~19) | Buena capa de leveling |
-| **Icemail Jerkin** | Pecho mail (~29) | Aguanta hasta los 40 |
-| **Bow of Searing Arrows** | Arco ÉPICO (34) | Carísimo — solo si sobra el oro |
+| **Icemail Jerkin** | Pecho mail ÉPICO (39) | Malla: te la ponés al 40, cuando entrenás Mail |
+| **Bow of Searing Arrows** | Arco ÉPICO (37) | Carísimo — solo si sobra el oro |
 | **Dwarven Hand Cannon** | Gun ÉPICO (53) | La mejor opción de gun pre-raid vía oro |
 
 ## Macros
@@ -291,7 +288,7 @@ Tag rápido si en la zona te roban los mobs.
 
 - **Trampas:** van en combate y podés tener 1 de fuego + 1 de escarcha activas, pero desde el 3-nov **todas comparten un solo CD de 30s**. Una tecla con modificadores alcanza.
 - **Raptor Strike no usa GCD** (es de próximo golpe): entra en la misma pulsación que Mongoose Bite.
-- **Aimed Shot** es de trainer al 20 y comparte 6s de CD con Multi-Shot; **Summon Hawk** (BM) comparte el de Arcane Shot.
+- **Aimed Shot** es de trainer al 20 según las notas del parche de Forever (sin verificar en el juego) y comparte 6s de CD con Multi-Shot; **Summon Hawk** (BM) comparte el de Arcane Shot.
 - **Pet:** sus comandos y habilidades no usan tu GCD, así que van en la misma tecla que un tiro. Habilidad de familia desde pet lvl 10-12, y comando nuevo **Move To** (/petmoveto).
 - **Auto Shot** pide 0.5s quieto para disparar: frená un instante tras kitear. Activá la opción **Auto Attack/Auto Shot** (agregada el 16-oct): cambia sola entre melee y rango y reemplaza las macros de weaving.
 - **Focus existe** en Forever (las macros con @focus andan). **Misdirection no**: es de TBC. En dungeons usá la macro de asistir al tank.
@@ -525,7 +522,7 @@ Desde el 3-nov todas las trampas comparten **un solo CD de 30s**: podés tener 1
 
 `DPS` · nivel 20
 
-Aimed Shot (de trainer al 20, cast 2s) comparte 6s de CD con Multi-Shot: con una sola tecla tenés las dos. Shift = Multi para packs.
+Aimed Shot (en Forever, de entrenador al 20 con cast de 2s según las notas del parche; en Classic 1.12 era talento) comparte 6s de CD con Multi-Shot: con una sola tecla tenés las dos. Shift = Multi para packs.
 
 ```
 #showtooltip
@@ -660,7 +657,7 @@ Tranq al boss bajo el cursor o a tu focus sin soltar tu objetivo, para la rotaci
 
 - **Melee = stat stick.** Solo aportan stats: agi/stam/AP. Corpsemaker, Ravager, Barbarous Blade, o dos 1H de agi tras dual wield (20).
 - **Scopes:** sirven para arcos y guns (+3/+7 daño). Un scope en Venomstrike o Satyr's vale cada centavo.
-- **Quiver/ammo pouch:** dan velocidad de ataque — subí de tamaño siempre. El azul es Ribbly's Quiver (14 slots, BRD).
+- **Quiver/ammo pouch:** dan velocidad de ataque — subí de tamaño siempre. El mejor del leveling es Ribbly's Quiver (16 slots, BRD).
 - **Pets:** gatos y raptors rinden mejor. En Barrens: Humar the Pridelord y Takk the Leaper. A 37: Broken Tooth (Badlands, 1.0 speed) para PvP.
 - **Ammo:** usá siempre las flechas/balas de mayor nivel — es DPS gratis.
 - **Stats:** Agilidad > AP ranged > stamina > int. Cuero antes de 40, mail después.
