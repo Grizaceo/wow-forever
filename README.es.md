@@ -9,8 +9,7 @@ facción, con una skill para que tu agente responda con los mismos datos.
 
 ## Estado
 
-- **En desarrollo**, en la rama `agent/claude-code/fuente-y-datos`. `main` todavía tiene la
-  versión anterior, que solo cubría tres clases.
+- Versión 2.0.0. La 1.0.0 solo cubría tres clases (Cazador, Guerrero y Chamán).
 - Todavía no está en el catálogo de plugins de Hermes. Probado en Linux con Hermes Agent
   v0.23.0, que es la versión mínima.
 - WoW Forever es el juego oficial de Blizzard (producto `wowf`, cliente 1.60), no un servidor
@@ -26,6 +25,12 @@ hermes plugins enable wow-forever
 En Hermes Desktop, abre **Capabilities → Plugins**, busca **WoW Forever** y enciéndela: la
 página llega apagada aunque el plugin esté habilitado. Aparece en la barra lateral. La skill
 `wow-forever:wow-forever` funciona en cualquier superficie de Hermes.
+
+**Si vienes de la 1.0.0:** corre `hermes plugins update wow-forever`. Hermes Desktop carga la
+página nueva tras **Rescan** en **Capabilities → Plugins** («Volver a buscar» si Hermes está
+en español), o al reiniciarse. La página conserva el id interno de la 1.0.0, así que se
+mantienen el encendido o apagado, el progreso de la guía, los precios, su historial y el
+permiso de carpeta. La ruta pasa de `/wow-hunter-guide` a `/wow-forever`.
 
 ## Qué hace
 
@@ -59,8 +64,10 @@ curada. Lo que no está en ninguna fuente publicable se muestra como **sin datos
 2. Escribe `/reload` o vuelve a entrar, para que el juego guarde los datos.
 3. En la guía, ve a **Mercado** → **Leer Auctionator.lua**. La primera vez, Hermes abre su
    selector de carpetas: elige `WTF/Account/<tu cuenta>/SavedVariables`. Hermes recuerda ese
-   permiso, y puedes revocarlo en **Capacidades → Plugins → Acceso a carpetas**. También puedes
-   importar el archivo a mano con **Importar Auctionator.lua**.
+   permiso, y puedes revocarlo en **Capabilities → Plugins → Folder access** (Capacidades →
+   Plugins → Acceso a carpetas, con Hermes en español). Si la carpeta que concediste antes no
+   tiene el archivo, la guía abre el selector; **Elegir otra carpeta** lo abre cuando quieras.
+   También puedes importar el archivo a mano con **Importar archivo .lua**.
 
 Cada importación suma sus días al historial de cada ítem, aunque Auctionator solo guarde unas
 tres semanas.

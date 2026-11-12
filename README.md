@@ -9,8 +9,7 @@ faction, with a skill so your agent answers from the same data.
 
 ## Status
 
-- **In development** on the `agent/claude-code/fuente-y-datos` branch. `main` still has the
-  previous version, which covered three classes only.
+- Version 2.0.0. Version 1.0.0 covered three classes only (Hunter, Warrior and Shaman).
 - Not yet in the Hermes plugin catalog. Tested on Linux with Hermes Agent v0.23.0, which is
   the minimum version.
 - WoW Forever is Blizzard's official game (product `wowf`, client 1.60), not a private
@@ -26,6 +25,11 @@ hermes plugins enable wow-forever
 In Hermes Desktop, open **Capabilities → Plugins**, find **WoW Forever** and switch it on: the
 page arrives switched off even when the plugin is enabled. It then shows up in the sidebar. The
 `wow-forever:wow-forever` skill works on every Hermes surface.
+
+**Upgrading from 1.0.0:** run `hermes plugins update wow-forever`. Hermes Desktop loads the new
+page after **Rescan** in **Capabilities → Plugins**, or when it restarts. The page keeps the
+1.0.0 internal id, so your on/off choice, guide progress, prices, price history and folder
+grant carry over. The route changes from `/wow-hunter-guide` to `/wow-forever`.
 
 ## What it does
 
@@ -60,8 +64,10 @@ data**.
 2. Type `/reload` or log out and back in, so the game saves the data.
 3. In the guide, go to **Market** → **Read Auctionator.lua**. The first time, Hermes opens its
    folder picker: choose `WTF/Account/<your account>/SavedVariables`. Hermes remembers that
-   grant, and you can revoke it under **Capabilities → Plugins → Folder access**. You can also
-   import the file by hand with **Import Auctionator.lua**.
+   grant, and you can revoke it under **Capabilities → Plugins → Folder access**. If the
+   folder you granted earlier does not contain the file, the guide opens the picker; **Pick
+   another folder** opens it at any time. You can also import the file by hand with
+   **Import .lua file**.
 
 Each import adds its days to every item's history, even though Auctionator keeps only about
 three weeks.

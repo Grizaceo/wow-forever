@@ -1,6 +1,6 @@
 ---
 name: wow-forever
-description: "Asiste a jugadores de World of Warcraft: Forever (juego oficial de Blizzard, cliente 1.60, basado en Classic) con los datos del plugin wow-forever de Hermes: entrenadores, hechizos y misiones de clase, zonas por nivel, profesiones (recetas, plan de subida, materiales), dungeons con jefes y botín, ítems, guías curadas (Cazador, Chamán), Legacy y el mercado Auctionator local. Usar cuando el usuario juegue WoW Forever o pregunte por su personaje, dónde entrenar o subir de nivel, profesiones, drops, dungeons, precios o farmeo. Assists WoW Forever players (any race, class and faction) with the plugin's offline game data."
+description: "Asiste a jugadores de World of Warcraft: Forever (juego oficial de Blizzard, cliente 1.60, basado en Classic) con los datos del plugin wow-forever de Hermes: entrenadores, hechizos y misiones de clase, zonas por nivel, profesiones (recetas, plan de subida, materiales), dungeons con jefes y botín, ítems, la guía curada del Cazador de la Horda, Legacy y el mercado Auctionator local. Usar cuando el usuario juegue WoW Forever o pregunte por su personaje, dónde entrenar o subir de nivel, profesiones, drops, dungeons, precios o farmeo. Assists WoW Forever players (any race, class and faction) with the plugin's offline game data."
 version: 2.0.0
 author: Cristóbal Muñoz
 license: GPL-3.0-or-later
@@ -109,6 +109,8 @@ Los precios importados de Auctionator viven en la página, no en `data/`, y tú 
 - Para importarlos: en el juego, hacer un **full scan** con Auctionator, luego `/reload`, y en la
   guía ir a **Mercado** → **Leer Auctionator.lua**. La primera vez, Hermes pide elegir la carpeta
   `WTF/Account/<cuenta>/SavedVariables`. La guía solo lee ese archivo dentro de esa carpeta.
+  Si la carpeta concedida antes no lo tiene, la guía abre el selector; **Elegir otra carpeta**
+  lo abre cuando el usuario quiera. También puede usar **Importar archivo .lua**.
 - Si el usuario te pega números de la página: `m` es el último mínimo unitario observado, en
   cobre (1 oro = 10000), no una venta. Oro por hora, ROI y ofertas son **estimaciones** con
   drops de Classic 1.12 y sin datos de población.
