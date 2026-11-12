@@ -2,7 +2,7 @@
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "wow-forever",
   "version": "2.0.0",
-  "description": "Offline WoW Forever guide for Hermes, for any race, class and faction (Spanish UI, English optional): trainers, spells and class quests, leveling zones, professions with a leveling plan, dungeons with bosses and loot, curated Hunter and Shaman guides, Legacy, and a local Auctionator market. Includes a skill that answers from the same data with a read-only script. No network. Reads only Auctionator.lua inside the folder the user grants.",
+  "description": "Offline WoW Forever guide for Hermes, for any race, class and faction (Spanish UI, English optional): trainers, spells and class quests, leveling zones, professions with a leveling plan, dungeons with bosses and loot, a curated Horde Hunter guide checked against the data, Legacy, and a local Auctionator market. Includes a skill that answers from the same data with a read-only script. No network. Reads only Auctionator.lua inside the folder the user grants.",
   "author": {
     "name": "Cristóbal Muñoz"
   },
