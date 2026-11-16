@@ -1,11 +1,13 @@
 // Selector de personaje: facción → raza → clase, nivel, profesiones y reino.
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Button, Checkbox, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@hermes/plugin-sdk'
 import { perfilParaAgente, razasPara } from '../../../src/perfil.js'
 import { D, FACCIONES, PRINCIPALES, SECUNDARIAS, nombre } from '../datos.js'
 import { C, S } from '../estilos.js'
 import { agregarTextos, t } from '../i18n.js'
 import { Aviso, Origen, Tarjeta } from '../ui.jsx'
+import { construirContextoPersonaje } from '../davi.js'
+import { PreguntarDavi } from './preguntar-davi.jsx'
 
 agregarTextos({
   'perfil.copiar': 'Copiar perfil para el agente',
@@ -22,6 +24,13 @@ agregarTextos({
 const NOMBRES_PROF = Object.fromEntries(Object.entries(D.profesiones.profesiones).map(([id, p]) => [id, p.n]))
 const CLASES = Object.keys(D.personaje.clases).map(Number).sort((a, b) => a - b)
 const esNueva = (raza, clase) => D.personaje.combinaciones.some(([r, c, n]) => r === raza && c === clase && n)
+// De dónde sale el contexto de «Preguntar a DAVI»: los datos del perfil y su build.
+const PROCEDENCIA_PERSONAJE = [
+  'data/personaje.json',
+  'data/profesiones.json',
+  'builds: cliente-forever ' + (D.profesiones.meta?.builds?.['cliente-forever'] || '?')
+    + ' / cmangos-1.12 ' + (D.profesiones.meta?.builds?.['cmangos-1.12'] || '?'),
+]
 
 function Selector({ etiqueta, valor, opciones, onChange, id }) {
   return (
@@ -58,7 +67,11 @@ export function VistaPersonaje({ ctx, perfil, guardarPerfil, razaSupuesta, lang,
     } catch (e) { setEstado(e.message || String(e)) }
   }
 
-  const resumen = perfilParaAgente(p, D.personaje, NOMBRES_PROF)
+  const resumen = perfilParaAgente(p, D.personaje, NOMBRES_PROF, lang)
+  const snapshotDavi = useMemo(
+    () => construirContextoPersonaje({ resumen, procedencia: PROCEDENCIA_PERSONAJE, lang }),
+    [resumen, lang],
+  )
   const copiar = async () => {
     let ok = false
     try { ok = (await ctx.os.writeClipboard(resumen)) === true } catch { ok = false }
@@ -127,6 +140,10 @@ export function VistaPersonaje({ ctx, perfil, guardarPerfil, razaSupuesta, lang,
         </div>
         {copia ? <div style={S.sub} role="status">{t(lang, copia.ok ? 'perfil.copiado' : 'perfil.noCopiado')}</div> : null}
         {copia && !copia.ok ? <pre style={{ ...S.sub, whiteSpace: 'pre-wrap', userSelect: 'text' }}>{copia.texto}</pre> : null}
+      </Tarjeta>
+      <Tarjeta titulo={t(lang, 'davi.boton')}>
+        <PreguntarDavi ctx={ctx} lang={lang} seccion={t(lang, 'tab.personaje')} snapshot={snapshotDavi}
+          preguntaInicial={t(lang, 'davi.personaje')} />
       </Tarjeta>
     </>
   )

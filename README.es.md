@@ -72,6 +72,30 @@ curada. Lo que no está en ninguna fuente publicable se muestra como **sin datos
 Cada importación suma sus días al historial de cada ítem, aunque Auctionator solo guarde unas
 tres semanas.
 
+### Preguntar a DAVI
+
+En **Personaje**, **Profesiones** y **Mercado** hay un botón **Preguntar a DAVI**. Abre un panel
+con tu pregunta (editable) y una vista previa del contexto que se adjuntará: solo lo elegido en
+esa pestaña. Dos conmutadores dejan fuera el **perfil** o los **precios**; la vista previa cambia
+al momento y se **congela** al abrir, así que editar la pregunta o la selección no la altera.
+
+- **Personaje**: facción, raza, clase, nivel y profesiones del perfil cargado a mano.
+- **Profesiones**: la profesión y su skill; si hay una receta seleccionada, esa receta y **solo
+  sus reactivos** (acotados), con costo y margen si hay precios de subasta.
+- **Mercado**: solo con un ítem de detalle abierto; trae el último mínimo anunciado, la oferta
+  máxima diaria observada, el día observado y la fecha de importación. **No** incluye el
+  historial completo ni el archivo `Auctionator.lua`.
+
+El texto siempre aclara que el perfil es **cargado a mano, no el juego en vivo**; que los precios
+son **ofertas anunciadas, no ventas**; y que la referencia de botín/farmeo es **Classic 1.12, no
+verificada en Forever**.
+
+Al confirmar, el plugin inserta el texto en el chat activo con
+`host.composer.insertText(null, texto, { mode: 'block' })`. **Nunca** envía la pregunta por sí
+solo ni toca el borrador (`submit`/`setDraft`). Si no se puede insertar, lo copia al portapapeles;
+si eso falla, el texto queda seleccionable para copia manual. Con éxito confirmado, el botón se
+deshabilita para no insertar dos veces, y no se escribe nada nuevo en el almacenamiento.
+
 ## Qué lee, qué guarda y qué ejecuta
 
 - **Lee** únicamente `Auctionator.lua` dentro de la carpeta que concedes con el selector de

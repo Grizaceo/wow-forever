@@ -3,7 +3,20 @@
 import { Children, createContext, isValidElement, useContext } from 'react'
 
 export const ROUTES_AREA = 'routes', SIDEBAR_NAV_AREA = 'nav', PALETTE_AREA = 'palette'
-export const host = { navigate: (p) => { window.navegado = p } }
+export const host = {
+  navigate: (p) => { window.navegado = p },
+  // El único camino admitido para adjuntar texto. A propósito NO hay submit ni setDraft: si
+  // el plugin los llamara, el test fallaría en vez de pasar desapercibido.
+  composer: {
+    insertText: async (sessionId, text, opts) => {
+      window.insertadas = window.insertadas || []
+      window.insertadas.push({ sessionId, text, opts })
+      if (window.insertarDemora) await new Promise((resolve) => { window.resolverInsercion = resolve })
+      if (window.insertarLanza) throw new Error('insertText falló (simulado)')
+      return window.insertarOk !== false
+    },
+  },
+}
 
 export function Button({ children, variant, size, ...p }) { return <button type="button" data-variant={variant} {...p}>{children}</button> }
 export function Badge({ children, ...p }) { return <span {...p}>{children}</span> }

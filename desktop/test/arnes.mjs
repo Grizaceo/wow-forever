@@ -88,7 +88,14 @@ const ctx = {
       return { ok: true, url: 'data:text/plain;base64,' + b64 }
     },
   },
-  os: { writeClipboard: async (t) => { window.copiado = t; return true } },
+  os: {
+    writeClipboard: async (t) => {
+      window.copiado = t
+      window.copiados = (window.copiados || 0) + 1
+      if (window.portapapelesLanza) throw new Error('portapapeles falló (simulado)')
+      return window.portapapelesOk !== false
+    },
+  },
 }
 plugin.register(ctx)
 window.raiz = createRoot(document.getElementById('root'))

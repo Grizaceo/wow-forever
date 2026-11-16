@@ -32,6 +32,8 @@ minificar) desde `desktop/src/`. Hermes Desktop lo carga en la barra lateral com
 | `src/auctionator.js` | lee `Auctionator.lua` de la carpeta concedida |
 | `src/datos.js` | `data/*.json`, `drop-data`, guías curadas y ayudas |
 | `src/ui.jsx`, `src/estilos.js`, `src/i18n.js` | piezas, estilos y textos comunes |
+| `src/davi.js`, `src/davi-transporte.js` | «Preguntar a DAVI»: contexto puro (allowlist, acotes) y transporte insert → portapapeles → manual |
+| `src/vistas/preguntar-davi.jsx` | botón + panel de las tres pestañas (pregunta, conmutadores, vista previa) |
 | `src/vistas/*.jsx` | una sección por archivo |
 | `../src/perfil.js` | validación del perfil (módulo puro, compartido con tests de Node) |
 

@@ -6,6 +6,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Button, Checkbox, SearchField, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@hermes/plugin-sdk'
 import { leerAuctionator } from '../auctionator.js'
 import { D, GUIAS, guiaCurada, nombre } from '../datos.js'
+import { construirContextoMercado, ofertaMaximaDe } from '../davi.js'
+import { perfilParaAgente } from '../../../src/perfil.js'
 import { C, S } from '../estilos.js'
 import { agregarTextos, t } from '../i18n.js'
 import { Aviso, Dinero, Origen, Tarjeta } from '../ui.jsx'
@@ -17,6 +19,7 @@ import {
 } from '../mercado-logica.js'
 import { DetalleItem } from './mercado/detalle.jsx'
 import { Farmeo } from './mercado/farmeo.jsx'
+import { PreguntarDavi } from './preguntar-davi.jsx'
 
 agregarTextos({
   'mercado.scan.titulo': 'Escaneo de Auctionator',
@@ -530,6 +533,19 @@ export function VistaMercado({ ctx, almacen, estado, recargar, perfil, lang }) {
   const detalle = useMemo(() => items.find((i) => i.sourceKey === detalleKey) || null, [items, detalleKey])
   const detalleMetrica = useMemo(() => (detalle ? metricOf(detalle) : null), [detalle, metricOf])
   const detalleDeal = useMemo(() => (detalle ? dealOf(detalle) : null), [detalle, dealOf])
+  // «Preguntar a DAVI»: solo con un ítem de detalle seleccionado. El contexto lleva el
+  // último precio y la oferta máxima diaria; el historial completo se queda fuera.
+  const resumenPerfilMercado = useMemo(() => perfilParaAgente(perfil, D.personaje, {}, lang), [perfil, lang])
+  const procedenciaMercado = useMemo(() => [
+    'Auctionator.lua (importación del cliente)',
+    'importado: ' + (snapshot?.importedAt ? String(snapshot.importedAt) : 'fecha desconocida'),
+    'DB ' + (snapshot?.sourceVersion || '?'),
+  ], [snapshot])
+  const snapshotDavi = useMemo(() => (!detalle ? null : construirContextoMercado({
+    item: detalle, realm: realmName, available: ofertaMaximaDe(detalle), itemsJson: D.items,
+    catalogo: CATALOGO, importedAt: snapshot?.importedAt ? String(snapshot.importedAt) : null,
+    lang, resumenPerfil: resumenPerfilMercado, procedencia: procedenciaMercado,
+  })), [detalle, realmName, snapshot, lang, resumenPerfilMercado, procedenciaMercado])
 
   const fres = useMemo(() => frescura(snapshot, realmName), [snapshot, realmName])
   const histInfo = useMemo(() => infoHistorial(historial?.store), [historial])
@@ -829,6 +845,13 @@ export function VistaMercado({ ctx, almacen, estado, recargar, perfil, lang }) {
           <DetalleItem item={detalle} lang={lang} catalogo={CATALOGO} metrica={detalleMetrica} deal={detalleDeal}
             onCerrar={() => setDetalleKey(null)} />
         )}
+
+        {detalle && snapshotDavi ? (
+          <Tarjeta titulo={t(lang, 'davi.boton')}>
+            <PreguntarDavi ctx={ctx} lang={lang} seccion={t(lang, 'tab.mercado')} snapshot={snapshotDavi}
+              preguntaInicial={t(lang, 'davi.mercado')} />
+          </Tarjeta>
+        ) : null}
 
         <Farmeo items={items} perfil={perfil} settings={settings} onSettings={guardarFarm} lang={lang} />
       </div>
