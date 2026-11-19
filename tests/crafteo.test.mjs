@@ -138,18 +138,39 @@ test('planDeSubida de Primeros auxilios de 1 a 75 cubre todo y termina', () => {
   assert.deepEqual(planDeSubida(null, 1, 75, new Map(), items), [])
 })
 
-test('dificultadReceta: sin requisito conocido no se presenta como aprendible', () => {
+test('dificultadReceta: requisito desconocido no se presenta como aprendible (Fase 1 ya deriva el del cliente)', () => {
   const herreria = profesiones.profesiones['164'].recetas
-  const nueva = herreria.find((r) => r.n.en === 'Blessed Plate Gauntlet')
-  assert.ok(nueva, 'receta nueva de Forever en los datos')
-  assert.equal(nueva.rango.aprende, null)
-  assert.equal(nueva.como, 'desconocido')
-  assert.equal(dificultad(nueva.rango, 120), 'naranja')          // el umbral solo, sin requisito
-  assert.equal(dificultadReceta(nueva, 120), 'desconocida')
-  assert.equal(dificultadReceta(nueva, 300), 'gris')
+
+  // Fase 1 derivó del cliente Forever el requisito de Blessed Plate Gauntlet: ya NO es un hueco.
+  const bp = herreria.find((r) => r.n.en === 'Blessed Plate Gauntlet')
+  assert.ok(bp, 'receta de Forever en los datos')
+  assert.equal(bp.f, 'cliente-forever')
+  assert.equal(bp.como, 'receta')
+  assert.equal(bp.receta_item, 251440)
+  assert.equal(bp.rango.aprende, 245)
+  assert.equal(bp.rango.amarillo, 265)
+  // Con requisito conocido, dificultadReceta delega en dificultad (no se oculta tras 'desconocida').
+  assert.equal(dificultadReceta(bp, 120), 'no')          // 120 < 245: todavía no se aprende
+  assert.equal(dificultadReceta(bp, 245), 'naranja')
+  assert.equal(dificultadReceta(bp, 300), 'gris')
+  assert.equal(dificultadReceta(bp, 245), dificultad(bp.rango, 245))
+
+  // Hueco real que queda (Fase 3, adquisición del servidor): Sharpening Wheel no trae ítem-plan
+  // en el cliente, así que su `como` sigue siendo 'desconocido' y `aprende` null.
+  const sw = herreria.find((r) => r.n.en === 'Sharpening Wheel')
+  assert.ok(sw, 'receta de Forever sin adquisición conocida')
+  assert.equal(sw.rango.aprende, null)
+  assert.equal(sw.como, 'desconocido')
+  assert.equal(dificultad(sw.rango, 15), 'naranja')      // el umbral solo, sin requisito
+  assert.equal(dificultadReceta(sw, 15), 'desconocida')  // no se presenta como aprendible
+  assert.equal(dificultadReceta(sw, 120), 'gris')        // en gris sí se informa (no engaña)
+
+  // Automática: se aprende al tomar la profesión (aprende null tratado como 0).
   const auto = herreria.find((r) => r.como === 'automatica')
   assert.equal(auto.rango.aprende, null)
-  assert.equal(dificultadReceta(auto, 0), 'naranja')             // automática: se aprende al tomar la profesión
+  assert.equal(dificultadReceta(auto, 0), 'naranja')
+
+  // Receta Classic con requisito conocido: frontera exacta en `aprende`.
   assert.equal(dificultadReceta(VENDA_GRUESA, 39), 'no')
   assert.equal(dificultadReceta(VENDA_GRUESA, 40), dificultad(VENDA_GRUESA.rango, 40))
 })

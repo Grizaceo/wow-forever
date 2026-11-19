@@ -22,6 +22,10 @@ const result = await build({
   platform: 'browser',
   target: 'es2020',
   minify: false,
+  // El gate tests/test_desktop.py::test_legible rechaza líneas de código >400 chars.
+  // esbuild une las cadenas && que el fuente escribe multilínea; lineLimit las vuelve
+  // a partir en límites de token seguros (sin cambiar semántica ni ASI).
+  lineLimit: 200,
   charset: 'utf8',
   legalComments: 'none',
   sourcemap: false,
