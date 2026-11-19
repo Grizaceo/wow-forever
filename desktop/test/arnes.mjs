@@ -49,6 +49,8 @@ const listar = (rel) => {
 }
 const ctx = {
   registerMany: (v) => window.registrado.push(...v),
+  setInterval: (fn, ms) => { (window.sondeos ||= []).push({fn, ms}); return () => {} },
+  onDispose: (fn) => { (window.disposers ||= []).push(fn) },
   storage: {
     get: (k, f = null) => { const v = localStorage.getItem(pref + k); return v === null ? f : JSON.parse(v) },
     set: (k, v) => localStorage.setItem(pref + k, JSON.stringify(v)),
@@ -66,7 +68,7 @@ const ctx = {
     },
     writeText: async (f, rel, text) => {
       if (f !== 'data') return { ok: false, error: 'not-granted' }
-      if (window.fallarEscritura) return { ok: false, error: 'io-error' }
+      if (window.fallarEscritura || (window.fallarMercado && rel.startsWith('market-'))) return { ok: false, error: 'io-error' }
       localStorage.setItem('archivo.' + rel, text); return { ok: true }
     },
     folders: async () => window.concedidas.slice(),

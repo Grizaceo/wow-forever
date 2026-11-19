@@ -36,7 +36,12 @@
 (function () {
   'use strict';
 
+  var Identity = (typeof module === 'object' && module && module.exports)
+    ? require('./market-identity.js')
+    : (typeof globalThis !== 'undefined' && globalThis.HunterIdentity) || (typeof self !== 'undefined' && self.HunterIdentity);
+
   var SCHEMA = 1;
+  var SCHEMA_V2 = 2;
   var DAY_MIN = 0;
   var DAY_MAX = 100000;
   var MAX_REALMS = 100;
@@ -258,11 +263,11 @@
         var kept = h.filter(function (e) { return e.day >= cut; });
         rChanged = true;
         changed = true;
-        return { sourceKey: item.sourceKey, itemId: item.itemId, unitPriceCopper: item.unitPriceCopper, observedDay: item.observedDay, history: kept };
+        return Object.assign({}, item, { history: kept });
       });
-      return rChanged ? { name: realm.name, items: items } : realm;
+      return rChanged ? Object.assign({}, realm, {items:items}) : realm;
     });
-    return changed ? { schemaVersion: snapshot.schemaVersion, importedAt: snapshot.importedAt, sourceVersion: snapshot.sourceVersion, realms: realms, warnings: snapshot.warnings } : snapshot;
+    return changed ? Object.assign({}, snapshot, {realms:realms}) : snapshot;
   }
 
   /* ------------------------------------------------------------- store */
@@ -415,11 +420,11 @@
         if (same) return item;
         rChanged = true;
         changed = true;
-        return { sourceKey: item.sourceKey, itemId: item.itemId, unitPriceCopper: item.unitPriceCopper, observedDay: item.observedDay, history: hist };
+        return Object.assign({}, item, {history:hist});
       });
-      return rChanged ? { name: realm.name, items: items } : realm;
+      return rChanged ? Object.assign({}, realm, {items:items}) : realm;
     });
-    return changed ? { schemaVersion: snapshot.schemaVersion, importedAt: snapshot.importedAt, sourceVersion: snapshot.sourceVersion, realms: realms, warnings: snapshot.warnings } : snapshot;
+    return changed ? Object.assign({}, snapshot, {realms:realms}) : snapshot;
   }
 
   /* --------------------------------------------------------- size fitting */
@@ -518,6 +523,280 @@
     return buildPrefix(loN);
   }
 
+  /* --------------------------- v2: ámbitos aislados (capital/neutral) ------- */
+
+  var LEGACY_SCOPE = 'local:legacy';
+
+  function safeName(s, max) {
+    if (!shortText(s, max)) return false;
+    if (/[\/\\\u0000-\u001f\u007f]/.test(s)) return false;
+    if (/(account|wtf|savedvariables|__proto__|constructor|prototype)/i.test(s)) return false;
+    return true;
+  }
+  function plainObject(o) {
+    if (!o || typeof o !== 'object' || Array.isArray(o)) return false;
+    var p = Object.getPrototypeOf(o);
+    return p === Object.prototype || p === null;
+  }
+  function exactKeys(o, keys) {
+    if (!plainObject(o)) return false;
+    var k = Object.keys(o);
+    if (k.length !== keys.length) return false;
+    for (var i = 0; i < k.length; i++) if (keys.indexOf(k[i]) < 0) return false;
+    return true;
+  }
+  function canonicalScopeKey(k) {
+    if (typeof k !== 'string' || k.charAt(0) !== '[') return false;
+    var arr;
+    try { arr = JSON.parse(k); } catch (e) { return false; }
+    return Array.isArray(arr) && arr.length === 7;
+  }
+  function legacyIdentity(localScope) {
+    return Identity.unknownIdentity('legacy', safeName(localScope, 120) ? localScope : LEGACY_SCOPE);
+  }
+
+  function emptyStoreV2() { return { v: SCHEMA_V2, scopes: {} }; }
+
+  function validStoreV2(s) {
+    if (!exactKeys(s, ['v', 'scopes'])) return false;
+    if (s.v !== SCHEMA_V2 || !plainObject(s.scopes)) return false;
+    var keys = Object.keys(s.scopes);
+    if (keys.length > 100) return false;
+    for (var i = 0; i < keys.length; i++) {
+      var k = keys[i];
+      if (!canonicalScopeKey(k)) return false;
+      var scope = s.scopes[k];
+      if (!exactKeys(scope, ['identity', 'confirmation', 'realms'])) return false;
+      if (!Identity.validateIdentity(scope.identity).ok || Identity.identityKey(scope.identity) !== k) return false;
+      var c = scope.confirmation;
+      if (c !== null && !(exactKeys(c, ['cutoffDay', 'verified']) && isInt(c.cutoffDay) && c.cutoffDay >= DAY_MIN && c.cutoffDay <= DAY_MAX && c.verified === true)) return false;
+      if (!plainObject(scope.realms)) return false;
+      if (!validStore({ v: SCHEMA, realms: scope.realms })) return false;
+      var rnames = Object.keys(scope.realms);
+      for (var r = 0; r < rnames.length; r++) {
+        if (!safeName(rnames[r], MAX_REALM_NAME)) return false;
+        var items = scope.realms[rnames[r]].items;
+        var ikeys = Object.keys(items);
+        for (var j = 0; j < ikeys.length; j++) if (!safeName(ikeys[j], MAX_SOURCE_KEY)) return false;
+      }
+    }
+    return true;
+  }
+
+  function scopeKey(identity) { return Identity.identityKey(identity); }
+
+  // Migración SOLO en memoria: envuelve el store v1 en un ámbito opaco
+  // desconocido. No etiqueta capital/neutral ni reclasifica días antiguos.
+  function migrateStoreV1(store, localScope) {
+    if (store && store.v === SCHEMA_V2) {
+      if (!validStoreV2(store)) throw new Error('invalid v2 store');
+      return store;
+    }
+    if (!validStore(store)) throw new Error('invalid v1 store');
+    var ident = legacyIdentity(localScope);
+    var out = emptyStoreV2();
+    out.scopes[Identity.identityKey(ident)] = { identity: ident, confirmation: null, realms: store.realms };
+    return out;
+  }
+
+  function normalizeStore(store) {
+    if (store && store.v === SCHEMA_V2) {
+      if (!validStoreV2(store)) throw new Error('invalid v2 store');
+      return store;
+    }
+    if (store && store.v === SCHEMA) return migrateStoreV1(store, LEGACY_SCOPE);
+    throw new Error('invalid store');
+  }
+
+  function legacyView(store) {
+    if (!validStoreV2(store)) throw new Error('invalid v2 store');
+    var keys = Object.keys(store.scopes).sort();
+    for (var i = 0; i < keys.length; i++) {
+      var s = store.scopes[keys[i]];
+      if (s.identity.provenance.confidence === 'unknown' && s.confirmation === null) {
+        return { v: SCHEMA, realms: structuredClone(s.realms) };
+      }
+    }
+    return { v: SCHEMA, realms: {} };
+  }
+
+  function scopeForSnapshot(snapshot, realm) {
+    if (realm && Identity.validateIdentity(realm.identity).ok) return realm.identity;
+    return legacyIdentity(LEGACY_SCOPE);
+  }
+
+  function cutoffOf(snapshot, identity) {
+    if (!Identity.validateIdentity(identity).ok || identity.provenance.confidence !== 'verified') return null;
+    var day = snapshot && snapshot.observation && isInt(snapshot.observation.toDay) ? snapshot.observation.toDay : null;
+    if (day === null) {
+      day = 0;
+      var realms = snapshot && Array.isArray(snapshot.realms) ? snapshot.realms : [];
+      for (var i = 0; i < realms.length; i++) {
+        var items = Array.isArray(realms[i].items) ? realms[i].items : [];
+        for (var j = 0; j < items.length; j++) if (isInt(items[j].observedDay) && items[j].observedDay > day) day = items[j].observedDay;
+      }
+    }
+    return day > 0 ? { cutoffDay: day, verified: true } : null;
+  }
+
+  function storeV2FromSnapshot(snapshot) {
+    var out = emptyStoreV2();
+    var realms = snapshot && Array.isArray(snapshot.realms) ? snapshot.realms : [];
+    for (var i = 0; i < realms.length; i++) {
+      var realm = realms[i];
+      if (!realm || typeof realm.name !== 'string') continue;
+      var ident = scopeForSnapshot(snapshot, realm);
+      var key = Identity.identityKey(ident);
+      if (!out.scopes[key]) out.scopes[key] = { identity: ident, confirmation: cutoffOf(snapshot, ident), realms: {} };
+      var sRealm = out.scopes[key].realms[realm.name];
+      if (!sRealm) { sRealm = { items: {} }; out.scopes[key].realms[realm.name] = sRealm; }
+      var items = Array.isArray(realm.items) ? realm.items : [];
+      for (var j = 0; j < items.length; j++) {
+        var item = items[j];
+        if (!item || typeof item.sourceKey !== 'string') continue;
+        var rows = rowsFromHistory(item.history).sort(byDayRow);
+        if (!rows.length) continue;
+        var ex = sRealm.items[item.sourceKey];
+        sRealm.items[item.sourceKey] = ex ? mergeRows(ex, rows) : rows;
+      }
+    }
+    return out;
+  }
+
+  function storeV2Merge(store, snapshot) {
+    var base = normalizeStore(store);
+    var next = storeV2FromSnapshot(snapshot);
+    var out = emptyStoreV2();
+    var keys = Object.keys(base.scopes);
+    for (var i = 0; i < keys.length; i++) out.scopes[keys[i]] = structuredClone(base.scopes[keys[i]]);
+    var nks = Object.keys(next.scopes);
+    for (var q = 0; q < nks.length; q++) {
+      var k = nks[q];
+      if (!out.scopes[k]) { out.scopes[k] = structuredClone(next.scopes[k]); continue; }
+      var dst = out.scopes[k], src = next.scopes[k];
+      if (dst.confirmation === null && src.confirmation !== null) dst.confirmation = src.confirmation;
+      var rks = Object.keys(src.realms);
+      for (var r = 0; r < rks.length; r++) {
+        var rn = rks[r];
+        if (!dst.realms[rn]) { dst.realms[rn] = structuredClone(src.realms[rn]); continue; }
+        var iks = Object.keys(src.realms[rn].items);
+        for (var m = 0; m < iks.length; m++) {
+          var sk = iks[m];
+          var oldRows = dst.realms[rn].items[sk];
+          dst.realms[rn].items[sk] = oldRows ? mergeRows(oldRows, src.realms[rn].items[sk]) : src.realms[rn].items[sk];
+        }
+      }
+    }
+    if (!validStoreV2(out)) throw new Error('merged store v2 invalid');
+    return out;
+  }
+
+  function applyStoreV2(snapshot, store) {
+    if (!snapshot || !validStoreV2(store)) return snapshot;
+    var realms = Array.isArray(snapshot.realms) ? snapshot.realms : [];
+    var changed = false;
+    var outRealms = realms.map(function (realm) {
+      var ident = scopeForSnapshot(snapshot, realm);
+      var key = Identity.identityKey(ident);
+      var scope = store.scopes[key];
+      var sRealm = scope && scope.realms[realm.name];
+      if (!sRealm) return realm;
+      var rChanged = false;
+      var items = (Array.isArray(realm.items) ? realm.items : []).map(function (item) {
+        var rows = item && sRealm.items[item.sourceKey];
+        if (!rows || !rows.length) return item;
+        var merged = mergeRows(rows, rowsFromHistory(item.history).sort(byDayRow));
+        var hist = historyFromRows(merged);
+        var same = hist.length === (item.history || []).length;
+        if (same) {
+          for (var i = 0; i < hist.length; i++) {
+            var a = hist[i], b = item.history[i];
+            if (a.day !== b.day || a.low !== b.low || a.high !== b.high || a.available !== b.available) { same = false; break; }
+          }
+        }
+        if (same) return item;
+        rChanged = true; changed = true;
+        return Object.assign({}, item, {history:hist});
+      });
+      return rChanged ? { name: realm.name, identity: realm.identity, items: items } : realm;
+    });
+    if (!changed) return snapshot;
+    var out = { schemaVersion: snapshot.schemaVersion, realms: outRealms, warnings: snapshot.warnings };
+    if (snapshot.importedAt !== undefined) out.importedAt = snapshot.importedAt;
+    if (snapshot.sourceVersion !== undefined) out.sourceVersion = snapshot.sourceVersion;
+    if (snapshot.observation !== undefined) out.observation = snapshot.observation;
+    if (snapshot.cutoffDay !== undefined) out.cutoffDay = snapshot.cutoffDay;
+    return out;
+  }
+
+  // Recorte GLOBAL por día entre todos los ámbitos (un mismo día cae en todos).
+  function fitStoreV2(store, maxBytes) {
+    if (!validStoreV2(store)) throw new Error('invalid v2 store');
+    var max = Math.max(256, Math.floor(maxBytes));
+    if (byteSize(store) <= max) return store;
+    var keys = Object.keys(store.scopes);
+    var daySet = {};
+    for (var i = 0; i < keys.length; i++) {
+      var rnames = Object.keys(store.scopes[keys[i]].realms);
+      for (var r = 0; r < rnames.length; r++) {
+        var items = store.scopes[keys[i]].realms[rnames[r]].items;
+        var iks = Object.keys(items);
+        for (var j = 0; j < iks.length; j++) {
+          var rows = items[iks[j]];
+          for (var m = 0; m < rows.length; m++) daySet[rows[m][0]] = true;
+        }
+      }
+    }
+    var days = Object.keys(daySet).map(Number).sort(function (a, b) { return a - b; });
+    function build(cutoff) {
+      var out = emptyStoreV2();
+      if (cutoff === null) return out;
+      for (var a = 0; a < keys.length; a++) {
+        var scope = store.scopes[keys[a]];
+        var scoped = null;
+        var rns = Object.keys(scope.realms);
+        for (var b = 0; b < rns.length; b++) {
+          var srcItems = scope.realms[rns[b]].items;
+          var ni = null;
+          var sks = Object.keys(srcItems);
+          for (var c = 0; c < sks.length; c++) {
+            var rows2 = srcItems[sks[c]];
+            var lo = 0, hi = rows2.length;
+            while (lo < hi) {
+              var mid = (lo + hi) >> 1;
+              if (rows2[mid][0] < cutoff) lo = mid + 1; else hi = mid;
+            }
+            if (lo >= rows2.length) continue;
+            if (!ni) ni = {};
+            ni[sks[c]] = rows2.slice(lo);
+          }
+          if (ni) {
+            if (!scoped) scoped = { identity: scope.identity, confirmation: scope.confirmation, realms: {} };
+            scoped.realms[rns[b]] = { items: ni };
+          }
+        }
+        if (scoped) out.scopes[keys[a]] = scoped;
+      }
+      return out;
+    }
+    var loI = 0, hiI = days.length;
+    while (loI < hiI) {
+      var midI = (loI + hiI) >> 1;
+      if (byteSize(build(midI === days.length ? null : days[midI])) <= max) hiI = midI; else loI = midI + 1;
+    }
+    var result = build(loI === days.length ? null : days[loI]);
+    if (byteSize(result) <= max) return result;
+    // Último recurso: conservar ámbitos enteros en orden determinista.
+    var out2 = emptyStoreV2();
+    var sortedKeys = keys.slice().sort();
+    for (var e = 0; e < sortedKeys.length; e++) {
+      var candidate = emptyStoreV2();
+      candidate.scopes[sortedKeys[e]] = result.scopes[sortedKeys[e]];
+      if (byteSize(candidate) <= max) out2.scopes[sortedKeys[e]] = structuredClone(candidate.scopes[sortedKeys[e]]);
+    }
+    return out2;
+  }
+
   var HunterHistory = {
     SCHEMA: SCHEMA,
     entryToRow: entryToRow,
@@ -534,6 +813,17 @@
     applyStore: applyStore,
     fitStore: fitStore,
     byteSize: byteSize,
+    SCHEMA_V2: SCHEMA_V2,
+    emptyStoreV2: emptyStoreV2,
+    validStoreV2: validStoreV2,
+    scopeKey: scopeKey,
+    migrateStoreV1: migrateStoreV1,
+    normalizeStore: normalizeStore,
+    legacyView: legacyView,
+    storeV2FromSnapshot: storeV2FromSnapshot,
+    storeV2Merge: storeV2Merge,
+    applyStoreV2: applyStoreV2,
+    fitStoreV2: fitStoreV2,
   };
 
   var root = typeof globalThis !== 'undefined' ? globalThis : typeof self !== 'undefined' ? self : this;

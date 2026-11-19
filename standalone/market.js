@@ -753,7 +753,33 @@
       return snapshot;
     }
 
-    return { parseAuctionator: parseAuctionator, MAX_BYTES: MAX_BYTES };
+    // Shared data-only reader for other SavedVariables importers. No eval, Lua
+    // runtime or permissive expression parsing. Limits/duplicate-key checks are
+    // the same as Auctionator; plain null-prototype objects cannot pollute JS.
+    function parseSavedVariables(bytes, globalName) {
+      if (!(bytes instanceof Uint8Array) || !bytes.length || bytes.length > MAX_BYTES) fail('invalid input size');
+      var globals = new LuaReader(bytes).globals(), seen = new Set(), selected;
+      for (var i = 0; i < globals.length; i++) {
+        var g = globals[i];
+        if (seen.has(g.name)) fail('duplicate global');
+        seen.add(g.name);
+        if (g.name === globalName) selected = g.value;
+      }
+      if (!(selected instanceof LuaTable)) fail('missing data table');
+      function plain(v) {
+        if (v instanceof LuaStr) return utf8(v.raw);
+        if (!(v instanceof LuaTable)) return v;
+        var out = Object.create(null);
+        for (var j = 0; j < v.entries.length; j++) {
+          var key = plain(v.entries[j][0]);
+          if (Object.prototype.hasOwnProperty.call(out, key)) fail('ambiguous key');
+          out[key] = plain(v.entries[j][1]);
+        }
+        return out;
+      }
+      return plain(selected);
+    }
+    return { parseAuctionator: parseAuctionator, parseSavedVariables: parseSavedVariables, MAX_BYTES: MAX_BYTES };
   }
 
   var HunterMarket = HunterMarketFactory();

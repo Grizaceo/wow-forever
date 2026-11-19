@@ -43,7 +43,7 @@ function perfilInicial(guardado, build) {
   return { perfil: m.perfil, ok: validarPerfil(m.perfil, D.personaje).ok, errores: [], razaSupuesta: m.razaSupuesta }
 }
 
-export function App({ ctx, almacen }) {
+export function App({ ctx, almacen, sincronizador, ventas }) {
   const [estado, setEstado] = useState(null)
   const [error, setError] = useState('')
   const [perfil, setPerfil] = useState(null)
@@ -53,6 +53,12 @@ export function App({ ctx, almacen }) {
   const [vuelta, setVuelta] = useState(0)
 
   const recargar = useCallback(() => setVuelta((v) => v + 1), [])
+  useEffect(() => {
+    let previous = sincronizador?.getState().changed
+    return sincronizador?.subscribe(s => {
+      if (s.changed !== previous) { previous = s.changed; recargar() }
+    })
+  }, [sincronizador, recargar])
   useEffect(() => {
     let vivo = true
     setError('')
@@ -110,7 +116,7 @@ export function App({ ctx, almacen }) {
         {error ? <div role="alert" style={S.aviso}>{error}</div>
           : !estado || !perfil ? <p role="status" style={S.sub}>{t(lang, 'cargando')}</p>
           : <Contencion key={activa}>
-              <Vista ctx={ctx} almacen={almacen} estado={estado} recargar={recargar} perfil={perfil}
+              <Vista ctx={ctx} almacen={almacen} sincronizador={sincronizador} ventas={ventas} estado={estado} recargar={recargar} perfil={perfil}
                 guardarPerfil={guardarPerfil} razaSupuesta={razaSupuesta} lang={lang} irA={cambiarPestana} />
             </Contencion>}
       </div>

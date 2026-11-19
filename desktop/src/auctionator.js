@@ -7,8 +7,30 @@
 // The user should pick WTF/Account/<account>/SavedVariables; a bounded walk
 // inside the grant also finds the file if they picked a parent folder.
 const AUCTION_FILE='Auctionator.lua', AUCTION_MARK='AUCTIONATOR_PRICE_DATABASE', WALK_DIRS=80, WALK_DEPTH=4;
+import HunterIdentity from '../../standalone/market-identity.js';
+
+/* Guard de adquisición: la topología de servidores NO está verificada (task 1).
+   Ninguna ruta, nombre de cuenta, reino, región o facción puede promover un
+   escaneo Auctionator a procedencia conocida. No instalamos addons ni leemos
+   datos privados del juego: solo el archivo que el usuario concedió. */
+export const ACQUISITION_PROVENANCE=Object.freeze({
+  method:'auctionator-raw', confidence:'unknown', comparable:false,
+  reason:'server-topology-unverified', exporter:'none-verified',
+});
+export const verifiedExporter=()=>null;
+export function classifyAcquisition(hit){
+  const identity=HunterIdentity.unknownIdentity('auctionator-raw');
+  return { status:hit?.status||'unknown', identity, provenance:{...ACQUISITION_PROVENANCE},
+    usableForComparison:false,
+    warnings:['Topología de servidores no verificada: no se infiere región, reino, reglas ni canal desde la ruta.'] };
+}
+const withGuard=r=>(r&&typeof r==='object')
+  ? {...r, provenance:{...ACQUISITION_PROVENANCE}, comparable:false,
+     identity:r.status==='ok'?HunterIdentity.unknownIdentity('auctionator-raw'):undefined,
+     usableForComparison:false}
+  : r;
 let auctionBusy=false;
-export const filesApi=ctx=>{const f=ctx?.files;return f&&typeof f.requestFolder==='function'&&typeof f.readText==='function'&&typeof f.list==='function'&&typeof f.folders==='function'?f:null;};
+export const filesApi=ctx=>{const f=ctx?.files;return f&&typeof f.requestFolder==='function'&&typeof f.readText==='function'&&typeof f.list==='function'?f:null;};
 export const dataUrlBytes=url=>{const b64=String(url).slice(String(url).indexOf(',')+1);const bin=atob(b64);const bytes=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)bytes[i]=bin.charCodeAt(i);return bytes;};
 const MARK_BYTES=new TextEncoder().encode(AUCTION_MARK);
 export function contieneBytes(bytes,aguja){
@@ -47,26 +69,46 @@ async function findInFolder(files,folder){
       else if(e.name===AUCTION_FILE)found.push(e.path);
     }
   }
-  let best=null;
-  for(const rel of found){const hit=await readAuction(files,folder,rel).catch(()=>null);if(hit&&(!best||hit.byteSize>best.byteSize))best=hit;}
-  return best;
+  if(queue.length)return {status:'error',error:'limit',message:'La carpeta es demasiado amplia. Elegí WTF/Account/<tu cuenta>/SavedVariables.'};
+  const hits=[];
+  for(const rel of new Set(found)){const hit=await readAuction(files,folder,rel).catch(()=>null);if(hit)hits.push(hit);}
+  if(hits.length>1)return {status:'error',error:'ambiguous',message:'Hay varios Auctionator.lua. Elegí la carpeta SavedVariables de la cuenta que querés seguir.'};
+  return hits[0]||null;
 }
-export async function leerAuctionator(ctx,req={}){
+async function leerAuctionatorRaw(ctx,req={}){
   if(auctionBusy)return {status:'busy'};
   const files=filesApi(ctx);if(!files)return {status:'unavailable'};
   auctionBusy=true;
   try{
     if(!req.pick){
-      const granted=await files.folders().catch(()=>[]);
-      for(const folder of Array.isArray(granted)?granted:[]){
-        const hit=await findInFolder(files,folder).catch(()=>null);
-        if(hit)return {...hit,stored:true};
+      if(req.silent&&typeof files.folders!=='function')return {status:'unavailable'};
+      const granted=typeof files.folders==='function'?await files.folders():[];
+      let preferred=await ctx?.storage?.get?.('auctionator-folder');
+      const available=Array.isArray(granted)?granted:[];
+      if(preferred&&!available.some(f=>f.id===preferred)){
+        preferred=null;
+        await ctx?.storage?.set?.('auctionator-folder',null);
       }
+      const folders=available.filter(f=>!preferred||f.id===preferred);
+      const hits=[];
+      for(const folder of folders){
+        const hit=await findInFolder(files,folder);
+        if(hit?.status==='error')return hit;
+        if(hit)hits.push({...hit,stored:true});
+      }
+      if(hits.length>1)return {status:'error',error:'ambiguous',message:'Hay varias carpetas con precios. Elegí otra carpeta y seleccioná SavedVariables de tu cuenta.'};
+      if(hits.length)return hits[0];
+      if(req.silent)return folders.length ? {status:'error',error:'missing',message:'No se encontró Auctionator.lua. Los precios están en WTF/Account/<tu cuenta>/SavedVariables, no en Interface/AddOns.'} : {status:'no-folder'};
     }
     const picked=await files.requestFolder();
     if(!picked?.ok||!picked.folder)return {status:'cancelled'};
-    const hit=await findInFolder(files,picked.folder).catch(()=>null);
+    const hit=await findInFolder(files,picked.folder);
     if(!hit)return {status:'error',error:'invalid',message:'No hay un Auctionator.lua con precios en esa carpeta. Elegí WTF/Account/<tu cuenta>/SavedVariables.'};
+    if(hit.status==='ok')await ctx?.storage?.set?.('auctionator-folder',picked.folder.id);
     return hit;
   }finally{auctionBusy=false;}
 }
+// API pública: todo resultado (éxito, error o cancelación) queda sellado como
+// desconocido y no comparable. Ningún llamador puede promoverlo sin una fuente
+// aislada verificada explícita (market-source.js).
+export async function leerAuctionator(ctx,req={}){return withGuard(await leerAuctionatorRaw(ctx,req));}

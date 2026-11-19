@@ -316,6 +316,40 @@ export function construirContextoMercado({
   }
 }
 
+// Contexto puro de la comparación capital ↔ neutral. Solo allowlist de filas
+// confirmadas, procedencia y límites. Nunca afirma liquidez ni beneficio, y
+// un resultado bloqueado se traslada como tal sin filas.
+const ETIQUETAS_CAPITAL = {
+  es: { titulo: 'Comparación capital / neutral', filas: 'Filas comparadas', limite1: 'Sin afirmación de liquidez: la oferta observada no garantiza venta.', limite2: 'Beneficio solo como escenario: la comisión debe estar verificada; variantes no se agrupan con su ID base.', limite3: 'Datos futuros, sesgo excesivo o procedencia desconocida bloquean la comparación.' },
+  en: { titulo: 'Capital / neutral comparison', filas: 'Compared rows', limite1: 'No liquidity claim: an observed offer does not guarantee a sale.', limite2: 'Profit is scenario-only: commission must be verified; variants are never merged into a base ID.', limite3: 'Future data, excessive skew or unknown provenance block the comparison.' },
+}
+export function construirContextoComparacionCapitalNeutral({ resultado, lang = 'es' }) {
+  const t = (lang === 'en' ? ETIQUETAS_CAPITAL.en : ETIQUETAS_CAPITAL.es)
+  const r = resultado && typeof resultado === 'object' ? resultado : null
+  const filas = (r && Array.isArray(r.rows) ? r.rows : []).slice(0, 50).map(f => ({
+    sourceKey: texto(f.sourceKey, 300),
+    itemId: Number.isSafeInteger(f.itemId) && f.itemId > 0 ? f.itemId : null,
+    capitalCopper: Number.isSafeInteger(f.a?.netCopper) ? f.a.netCopper : (Number.isSafeInteger(f.a?.unitPriceCopper) ? f.a.unitPriceCopper : null),
+    neutralCopper: Number.isSafeInteger(f.b?.netCopper) ? f.b.netCopper : (Number.isSafeInteger(f.b?.unitPriceCopper) ? f.b.unitPriceCopper : null),
+    deltaCopper: Number.isSafeInteger(f.deltaCopper) ? f.deltaCopper : null,
+    stale: !!(f.a?.stale || f.b?.stale),
+    netScenario: f.netScenario === true,
+    recomendacion: f.recommendation === null || f.recommendation === undefined ? null : texto(f.recommendation, 60),
+  }))
+  return {
+    seccion: 'mercado',
+    titulo: t.titulo,
+    status: r?.status || 'blocked',
+    reason: r && r.status === 'blocked' ? ((r.reasons || []).join(', ') || 'unknown-provenance') : null,
+    partes: { filas },
+    tituloFilas: t.filas,
+    limites: [t.limite1, t.limite2, t.limite3],
+    procedencia: (r && Array.isArray(r.rows) ? r.rows : []).slice(0, 2).flatMap(f =>
+      [f.a?.commission?.sourceLabel, f.b?.commission?.sourceLabel].filter(Boolean)).map(s => texto(s, 60)),
+    liquidityClaim: null,
+  }
+}
+
 /* ----------------------------------------------------------- previsualizar */
 
 export function previsualizarDavi({ pregunta, snapshot, activas, lang = 'es' }) {
