@@ -51,13 +51,11 @@ export function createMarketSync(ctx, almacen) {
   }
   const exclusive = fn => { const out = queue.then(fn); queue = out.catch(() => {}); return out }
   async function enabled() { return (await ctx.storage.get('auctionator-auto')) !== false }
-  async function importBytes(bytes, realm) {
+  // Commit compartido: importBytes (archivo Auctionator) e importRaw (diario
+  // del addon puente) entran por la misma cola exclusiva y la misma guardia de
+  // procedencia. El puente es transporte, no exportador verificado.
+  async function commitRaw(raw, realm) {
     if (stopped) return { status: 'stopped' }
-    bytes = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes)
-    if (!bytes.length || bytes.length > HunterMarket.MAX_BYTES) return { status: 'error', error: 'size' }
-    let raw
-    try { raw = HunterMarket.parseAuctionator(bytes) }
-    catch { return { status: 'error', error: 'parse' } }
     if (!snapshotValido(raw)) return { status: 'error', error: 'invalid' }
     const est = await almacen.read()
     const paired = typeof almacen.commitV2 === 'function' && typeof almacen.backupForMigration === 'function'
@@ -87,9 +85,21 @@ export function createMarketSync(ctx, almacen) {
     publish({ status: 'ok', histOk, changed: (state.changed || 0) + 1 })
     return { status: 'ok', histOk, realm: sel }
   }
+  async function importBytes(bytes, realm) {
+    if (stopped) return { status: 'stopped' }
+    bytes = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes)
+    if (!bytes.length || bytes.length > HunterMarket.MAX_BYTES) return { status: 'error', error: 'size' }
+    let raw
+    try { raw = HunterMarket.parseAuctionator(bytes) }
+    catch { return { status: 'error', error: 'parse' } }
+    return commitRaw(raw, realm)
+  }
   const api = {
     exclusive,
     importBytes: (bytes, realm) => exclusive(() => importBytes(bytes, realm)),
+    // Diario del addon WoWForeverBridge ya adaptado a snapshot crudo: misma
+    // cola, misma guardia. Lo usa bridge-sync; no abre selectores.
+    importRaw: (raw, realm) => exclusive(() => commitRaw(raw, realm)),
     // Fuente aislada verificada: única vía que escribe esquema v2. Exige
     // respaldo durable previo y confirmación conjunta snapshot + store.
     importSeparateSource: text => exclusive(async () => {

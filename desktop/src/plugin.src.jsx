@@ -10,6 +10,7 @@ import { createStore } from './almacen.js'
 import { App } from './app.jsx'
 import { createMarketSync, startMarketSync } from './mercado-auto.js'
 import { createTsmSync, startTsmSync } from './tsm-sync.js'
+import { createBridgeSync, startBridgeSync } from './bridge-sync.js'
 
 const RUTA = '/wow-forever'
 
@@ -25,9 +26,11 @@ export default {
     startMarketSync(ctx, sincronizador)
     const ventas = createTsmSync(ctx)
     startTsmSync(ctx, ventas)
+    const puente = createBridgeSync(ctx, sincronizador)
+    startBridgeSync(ctx, puente)
     ctx.registerMany([
       { id: 'nav', area: SIDEBAR_NAV_AREA, order: 73, data: { path: RUTA, label: 'WoW Forever', codicon: 'target' } },
-      { id: 'route', area: ROUTES_AREA, data: { path: RUTA }, render: () => <App ctx={ctx} almacen={almacen} sincronizador={sincronizador} ventas={ventas} /> },
+      { id: 'route', area: ROUTES_AREA, data: { path: RUTA }, render: () => <App ctx={ctx} almacen={almacen} sincronizador={sincronizador} ventas={ventas} puente={puente} /> },
       { id: 'open', area: PALETTE_AREA, data: { id: 'wow-forever.open', label: 'WoW Forever: abrir guía y mercado',
         keywords: ['wow', 'forever', 'guía', 'auctionator', 'profesiones'], run: () => host.navigate(RUTA) } },
     ])

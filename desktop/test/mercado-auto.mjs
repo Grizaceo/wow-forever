@@ -3,7 +3,7 @@ import { iniciar, PERFILES, PREF } from './arnes.mjs'
 const a = await iniciar(), {check} = a
 const {p,cerrar} = await a.abrir('oscuro',{perfil:PERFILES.cazadorHorda})
 const lua=(day,price)=>`AUCTIONATOR_PRICE_DATABASE={__dbversion=8,["Prueba"]={version=2,["2589"]={m=${price},h={["${day}"]=${price}},a={["${day}"]=5}}}}`
-check('un timer por fuente, de 30 segundos',await p.evaluate(()=>sondeos.length===2&&sondeos.every(t=>t.ms===30000)))
+check('un timer por fuente (Auctionator, TSM y puente), de 30 segundos',await p.evaluate(()=>sondeos.length===3&&sondeos.every(t=>t.ms===30000)))
 check('arranque sin permiso no muestra selector',await p.evaluate(()=>selectorAbierto===0))
 await p.evaluate(fix=>{
  window.carpetaConcedida={name:'WoW',files:{'WTF/Account/cuenta/SavedVariables/Auctionator.lua':fix}}

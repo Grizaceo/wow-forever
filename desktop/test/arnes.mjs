@@ -109,9 +109,12 @@ export async function iniciar({ plugin = process.env.DESKTOP_PLUGIN || path.join
   const { build } = reqLocal('esbuild')
   const { chromium } = await import(process.env.PLAYWRIGHT_MODULE || 'playwright')
   const reactDir = path.dirname(reqDesk.resolve('react/package.json'))
+// pnpm: react y react-dom viven en directorios .pnpm distintos; el bundle del
+// arnés necesita ambos en nodePaths (react-dom/client lo importa la entrada).
+const reactDomDir = path.dirname(reqDesk.resolve('react-dom/package.json'))
   const bundle = await build({
     stdin: { contents: ENTRADA(plugin), resolveDir: raiz, loader: 'js' }, bundle: true, format: 'iife', write: false,
-    jsx: 'automatic', nodePaths: [path.dirname(reactDir)], logLevel: 'error',
+    jsx: 'automatic', nodePaths: [path.dirname(reactDir), path.dirname(reactDomDir)], logLevel: 'error',
     plugins: [{ name: 'sdk-doble', setup(b) { b.onResolve({ filter: /^@hermes\/plugin-sdk$/ }, () => ({ path: path.join(aqui, 'sdk-mock.jsx') })) } }],
   })
   const codigo = bundle.outputFiles[0].text

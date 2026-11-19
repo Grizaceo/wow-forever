@@ -43,7 +43,7 @@ function perfilInicial(guardado, build) {
   return { perfil: m.perfil, ok: validarPerfil(m.perfil, D.personaje).ok, errores: [], razaSupuesta: m.razaSupuesta }
 }
 
-export function App({ ctx, almacen, sincronizador, ventas }) {
+export function App({ ctx, almacen, sincronizador, ventas, puente }) {
   const [estado, setEstado] = useState(null)
   const [error, setError] = useState('')
   const [perfil, setPerfil] = useState(null)
@@ -116,7 +116,7 @@ export function App({ ctx, almacen, sincronizador, ventas }) {
         {error ? <div role="alert" style={S.aviso}>{error}</div>
           : !estado || !perfil ? <p role="status" style={S.sub}>{t(lang, 'cargando')}</p>
           : <Contencion key={activa}>
-              <Vista ctx={ctx} almacen={almacen} sincronizador={sincronizador} ventas={ventas} estado={estado} recargar={recargar} perfil={perfil}
+              <Vista ctx={ctx} almacen={almacen} sincronizador={sincronizador} ventas={ventas} puente={puente} estado={estado} recargar={recargar} perfil={perfil}
                 guardarPerfil={guardarPerfil} razaSupuesta={razaSupuesta} lang={lang} irA={cambiarPestana} />
             </Contencion>}
       </div>

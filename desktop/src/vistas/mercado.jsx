@@ -520,7 +520,32 @@ function FilaVacia({ texto }) {
   return <tr><td style={S.td} colSpan={6}>{texto}</td></tr>
 }
 
-export function VistaMercado({ ctx, almacen, sincronizador, ventas, estado, recargar, perfil, lang }) {
+// Estado del puente de escaneos (addon WoWForeverBridge del repo): diario por
+// día que captura cada escaneo aunque Auctionator sobrescriba su propio archivo.
+function PuenteEstado({ puente, lang }) {
+  const [st, setSt] = useState(puente.getState())
+  useEffect(() => puente.subscribe(setSt), [puente])
+  const cambiar = async () => {
+    try { await puente.setEnabled(!st.enabled); if (!st.enabled) await puente.poll() } catch {}
+  }
+  return (
+    <div data-testid="bridge-panel" style={{ marginTop: 6 }}>
+      <label style={S.sub}>
+        <Checkbox checked={st.enabled} onCheckedChange={cambiar} />
+        {lang === 'en' ? ' Scan bridge (WoWForeverBridge addon) · keeps every scan in a daily journal' : ' Puente de escaneos (addon WoWForeverBridge) · guarda cada escaneo en un diario por día'}
+      </label>
+      <p data-testid="bridge-status" style={S.sub}>
+        {lang === 'en' ? 'Bridge: ' : 'Puente: '}{st.status}
+        {st.entries ? ` · ${st.entries} ${lang === 'en' ? 'day(s)' : 'día(s)'} · ${st.items} ${lang === 'en' ? 'observations' : 'observaciones'}` : ''}
+        {st.lastDay != null ? ` · ${lang === 'en' ? 'last journal day' : 'último día del diario'} ${st.lastDay}` : ''}
+        {st.message ? ` · ${st.message}` : ''}
+        {st.error ? ` · ${st.error}` : ''}
+      </p>
+    </div>
+  )
+}
+
+export function VistaMercado({ ctx, almacen, sincronizador, ventas, puente, estado, recargar, perfil, lang }) {
   const sync = useMemo(() => sincronizador || createMarketSync(ctx, almacen), [sincronizador, ctx, almacen])
   const [auto, setAuto] = useState(sync.getState())
   useEffect(() => sync.subscribe(setAuto), [sync])
@@ -983,6 +1008,7 @@ export function VistaMercado({ ctx, almacen, sincronizador, ventas, estado, reca
             {auto.error && !auto.message ? ` · ${auto.error}` : ''}
             {auto.histOk === false ? (lang === 'en' ? ' · History pending; will retry.' : ' · Historial pendiente; se reintentará.') : ''}
           </p>
+          {puente && <PuenteEstado puente={puente} lang={lang} />}
           <p style={S.sub}>{lang === 'en'
             ? 'Grant WTF/Account/<account>/SavedVariables once (a parent folder only if the bounded search can complete). Not Interface/AddOns. After an in-game scan, use /reload or log out to write prices to disk. Changing tabs does not stop tracking.'
             : 'Autoriza una vez WTF/Account/<cuenta>/SavedVariables (una carpeta superior solo si la búsqueda acotada puede completarse). No Interface/AddOns. Tras escanear en el juego, usa /reload o cierra sesión para guardar los precios en disco. Cambiar de pestaña no detiene el seguimiento.'}</p>

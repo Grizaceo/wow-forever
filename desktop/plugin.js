@@ -55,11 +55,11 @@ var require_market_identity = __commonJS({
         for (var i = 0; i < ks.length; i++) if (keys.indexOf(ks[i]) < 0) return false;
         return true;
       }
-      function isInt(v) {
+      function isInt2(v) {
         return typeof v === "number" && Number.isSafeInteger(v);
       }
       function isDay(v) {
-        return v === null || isInt(v) && v >= 0 && v <= 1e5;
+        return v === null || isInt2(v) && v >= 0 && v <= 1e5;
       }
       function isIso(v) {
         return typeof v === "string" && /^\d{4}-\d\d-\d\dT/.test(v) && Number.isFinite(Date.parse(v));
@@ -233,23 +233,23 @@ var require_market_history = __commonJS({
       var SCHEMA = 1;
       var SCHEMA_V2 = 2;
       var DAY_MIN = 0;
-      var DAY_MAX = 1e5;
+      var DAY_MAX2 = 1e5;
       var MAX_REALMS = 100;
       var MAX_REALM_NAME = 300;
       var MAX_ITEMS_PER_REALM = 1e5;
       var MAX_SOURCE_KEY = 300;
       var MAX_ROWS_PER_ITEM = 1e4;
-      var MAX_ENTRIES = 4e5;
+      var MAX_ENTRIES2 = 4e5;
       var TREND_MIN_DAYS = 4;
       var TREND_EPS = 0.05;
-      function isInt(v) {
+      function isInt2(v) {
         return typeof v === "number" && Number.isSafeInteger(v);
       }
       function posInt(v) {
-        return isInt(v) && v > 0;
+        return isInt2(v) && v > 0;
       }
       function nonNegInt(v) {
-        return isInt(v) && v >= 0;
+        return isInt2(v) && v >= 0;
       }
       function shortText(s, max) {
         return typeof s === "string" && s.length > 0 && s.length <= max;
@@ -270,7 +270,7 @@ var require_market_history = __commonJS({
         var list = Array.isArray(history) ? history : [];
         for (var i = 0; i < list.length; i++) {
           var h = list[i];
-          if (h && isInt(h.day) && posInt(h.low)) out.push(entryToRow(h));
+          if (h && isInt2(h.day) && posInt(h.low)) out.push(entryToRow(h));
         }
         return out;
       }
@@ -385,7 +385,7 @@ var require_market_history = __commonJS({
         for (var i = 0; i < list.length; i++) {
           var h = list[i];
           var e = Array.isArray(h) ? rowToEntry(h) : h;
-          if (e && isInt(e.day) && posInt(e.low)) entries.push(e);
+          if (e && isInt2(e.day) && posInt(e.low)) entries.push(e);
         }
         entries.sort(function(a, b) {
           return a.day - b.day;
@@ -460,7 +460,7 @@ var require_market_history = __commonJS({
       }
       function validRow(r) {
         if (!Array.isArray(r) || r.length < 2 || r.length > 4) return false;
-        if (!isInt(r[0]) || r[0] < DAY_MIN || r[0] > DAY_MAX) return false;
+        if (!isInt2(r[0]) || r[0] < DAY_MIN || r[0] > DAY_MAX2) return false;
         if (!posInt(r[1])) return false;
         if (r.length === 2) return true;
         if (r.length === 3) {
@@ -496,7 +496,7 @@ var require_market_history = __commonJS({
             var rows = items[k];
             if (!Array.isArray(rows) || rows.length > MAX_ROWS_PER_ITEM) return false;
             total += rows.length;
-            if (total > MAX_ENTRIES) return false;
+            if (total > MAX_ENTRIES2) return false;
             var prevDay = -1;
             for (var m = 0; m < rows.length; m++) {
               var row = rows[m];
@@ -731,7 +731,7 @@ var require_market_history = __commonJS({
           if (!exactKeys(scope, ["identity", "confirmation", "realms"])) return false;
           if (!Identity.validateIdentity(scope.identity).ok || Identity.identityKey(scope.identity) !== k) return false;
           var c = scope.confirmation;
-          if (c !== null && !(exactKeys(c, ["cutoffDay", "verified"]) && isInt(c.cutoffDay) && c.cutoffDay >= DAY_MIN && c.cutoffDay <= DAY_MAX && c.verified === true)) return false;
+          if (c !== null && !(exactKeys(c, ["cutoffDay", "verified"]) && isInt2(c.cutoffDay) && c.cutoffDay >= DAY_MIN && c.cutoffDay <= DAY_MAX2 && c.verified === true)) return false;
           if (!plainObject(scope.realms)) return false;
           if (!validStore({ v: SCHEMA, realms: scope.realms })) return false;
           var rnames = Object.keys(scope.realms);
@@ -783,13 +783,13 @@ var require_market_history = __commonJS({
       }
       function cutoffOf(snapshot, identity) {
         if (!Identity.validateIdentity(identity).ok || identity.provenance.confidence !== "verified") return null;
-        var day = snapshot && snapshot.observation && isInt(snapshot.observation.toDay) ? snapshot.observation.toDay : null;
+        var day = snapshot && snapshot.observation && isInt2(snapshot.observation.toDay) ? snapshot.observation.toDay : null;
         if (day === null) {
           day = 0;
           var realms = snapshot && Array.isArray(snapshot.realms) ? snapshot.realms : [];
           for (var i = 0; i < realms.length; i++) {
             var items = Array.isArray(realms[i].items) ? realms[i].items : [];
-            for (var j = 0; j < items.length; j++) if (isInt(items[j].observedDay) && items[j].observedDay > day) day = items[j].observedDay;
+            for (var j = 0; j < items.length; j++) if (isInt2(items[j].observedDay) && items[j].observedDay > day) day = items[j].observedDay;
           }
         }
         return day > 0 ? { cutoffDay: day, verified: true } : null;
@@ -11511,10 +11511,10 @@ var require_market = __commonJS({
         var DEPTH_LIMIT = 32;
         var ENTRIES_LIMIT = 25e4;
         var DAY_MIN = 0;
-        var DAY_MAX = 1e5;
+        var DAY_MAX2 = 1e5;
         var WARN_CAP = 1e3;
-        var MAX_SAFE = 9007199254740991;
-        function fail(msg) {
+        var MAX_SAFE2 = 9007199254740991;
+        function fail2(msg) {
           throw new Error(msg);
         }
         function failAt(msg, pos) {
@@ -11951,12 +11951,12 @@ var require_market = __commonJS({
           var av = ib & 31;
           if (mt === 0) {
             var iv = this.len(av);
-            if (iv > MAX_SAFE) failAt("number overflow", this.p);
+            if (iv > MAX_SAFE2) failAt("number overflow", this.p);
             return iv;
           }
           if (mt === 1) {
             var nv = this.len(av);
-            if (nv > MAX_SAFE) failAt("number overflow", this.p);
+            if (nv > MAX_SAFE2) failAt("number overflow", this.p);
             return -1 - nv;
           }
           if (mt === 2 || mt === 3) {
@@ -12067,7 +12067,7 @@ var require_market = __commonJS({
             for (var i = 0; i < hT.entries.length; i++) {
               var day = dayKey(hT.entries[i][0]);
               var high = hT.entries[i][1];
-              if (day === null || day < DAY_MIN || day > DAY_MAX) {
+              if (day === null || day < DAY_MIN || day > DAY_MAX2) {
                 warn(warnings, "day skipped at offset " + hT.pos);
                 continue;
               }
@@ -12125,11 +12125,11 @@ var require_market = __commonJS({
           if (input && typeof ArrayBuffer !== "undefined" && ArrayBuffer.isView(input)) {
             return new Uint8Array(input.buffer, input.byteOffset, input.byteLength);
           }
-          fail("invalid input");
+          fail2("invalid input");
         }
         function parseAuctionator(input) {
           var bytes = toBytes(input);
-          if (bytes.length > MAX_BYTES) fail("input exceeds maximum size");
+          if (bytes.length > MAX_BYTES) fail2("input exceeds maximum size");
           var warnings = [];
           var snapshot = {
             schemaVersion: 1,
@@ -12147,8 +12147,8 @@ var require_market = __commonJS({
             warn(warnings, "no price database found");
             return snapshot;
           }
-          if (!(db instanceof LuaTable)) fail("unexpected price database");
-          if (db.get("__dbversion") !== 8) fail("unsupported database version");
+          if (!(db instanceof LuaTable)) fail2("unexpected price database");
+          if (db.get("__dbversion") !== 8) fail2("unsupported database version");
           for (var e = 0; e < db.entries.length; e++) {
             var key = keyToString(db.entries[e][0]);
             var val = db.entries[e][1];
@@ -12192,22 +12192,22 @@ var require_market = __commonJS({
           return snapshot;
         }
         function parseSavedVariables(bytes, globalName) {
-          if (!(bytes instanceof Uint8Array) || !bytes.length || bytes.length > MAX_BYTES) fail("invalid input size");
+          if (!(bytes instanceof Uint8Array) || !bytes.length || bytes.length > MAX_BYTES) fail2("invalid input size");
           var globals = new LuaReader(bytes).globals(), seen = /* @__PURE__ */ new Set(), selected;
           for (var i = 0; i < globals.length; i++) {
             var g = globals[i];
-            if (seen.has(g.name)) fail("duplicate global");
+            if (seen.has(g.name)) fail2("duplicate global");
             seen.add(g.name);
             if (g.name === globalName) selected = g.value;
           }
-          if (!(selected instanceof LuaTable)) fail("missing data table");
+          if (!(selected instanceof LuaTable)) fail2("missing data table");
           function plain(v) {
             if (v instanceof LuaStr) return utf8(v.raw);
             if (!(v instanceof LuaTable)) return v;
             var out = /* @__PURE__ */ Object.create(null);
             for (var j = 0; j < v.entries.length; j++) {
               var key = plain(v.entries[j][0]);
-              if (Object.prototype.hasOwnProperty.call(out, key)) fail("ambiguous key");
+              if (Object.prototype.hasOwnProperty.call(out, key)) fail2("ambiguous key");
               out[key] = plain(v.entries[j][1]);
             }
             return out;
@@ -12216,14 +12216,14 @@ var require_market = __commonJS({
         }
         return { parseAuctionator, parseSavedVariables, MAX_BYTES };
       }
-      var HunterMarket3 = HunterMarketFactory();
-      HunterMarket3.workerSource = "(function(){'use strict';var M=(" + HunterMarketFactory.toString() + ")();self.onmessage=function(ev){var out;try{var data=ev&&ev.data;var bytes;if(typeof ArrayBuff\
+      var HunterMarket4 = HunterMarketFactory();
+      HunterMarket4.workerSource = "(function(){'use strict';var M=(" + HunterMarketFactory.toString() + ")();self.onmessage=function(ev){var out;try{var data=ev&&ev.data;var bytes;if(typeof ArrayBuff\
 er!=='undefined'&&data instanceof ArrayBuffer){bytes=new Uint8Array(data);}else if(typeof ArrayBuffer!=='undefined'&&ArrayBuffer.isView(data)){bytes=new Uint8Array(data.buffer,data.byteOffset,data.byt\
 eLength);}else{throw new Error('invalid input');}out={ok:true,snapshot:M.parseAuctionator(bytes)};}catch(err){var msg=(err&&typeof err.message==='string'&&err.message)?err.message.slice(0,200):'parse \
 failed';msg=msg.replace(/[\\r\\n]+/g,' ');out={ok:false,error:msg};}self.postMessage(out);};})();";
       var root = typeof globalThis !== "undefined" ? globalThis : typeof self !== "undefined" ? self : this;
-      if (typeof module === "object" && module && module.exports) module.exports = HunterMarket3;
-      else if (root) root.HunterMarket = HunterMarket3;
+      if (typeof module === "object" && module && module.exports) module.exports = HunterMarket4;
+      else if (root) root.HunterMarket = HunterMarket4;
     })();
   }
 });
@@ -13678,11 +13678,11 @@ var require_market_source = __commonJS({
       function isObj(v) {
         return v !== null && typeof v === "object" && !Array.isArray(v);
       }
-      function isInt(v) {
+      function isInt2(v) {
         return typeof v === "number" && Number.isSafeInteger(v);
       }
       function isDay(v) {
-        return isInt(v) && v >= 0 && v <= 1e5;
+        return isInt2(v) && v >= 0 && v <= 1e5;
       }
       function isIso(v) {
         return typeof v === "string" && /^\d{4}-\d\d-\d\dT/.test(v) && Number.isFinite(Date.parse(v));
@@ -13735,11 +13735,11 @@ var require_market_source = __commonJS({
             seen[it.sourceKey] = true;
             total++;
             if (total > MAX_ITEMS) return false;
-            if (!(isInt(it.unitPriceCopper) && it.unitPriceCopper > 0)) return false;
+            if (!(isInt2(it.unitPriceCopper) && it.unitPriceCopper > 0)) return false;
             if (!isDay(it.observedDay) || it.observedDay < obs.fromDay || it.observedDay > obs.toDay) return false;
-            if (it.available !== null && it.available !== void 0 && !(isInt(it.available) && it.available >= 0)) return false;
+            if (it.available !== null && it.available !== void 0 && !(isInt2(it.available) && it.available >= 0)) return false;
             if (it.itemId !== null && it.itemId !== void 0) {
-              if (!isInt(it.itemId) || it.itemId <= 0) return false;
+              if (!isInt2(it.itemId) || it.itemId <= 0) return false;
               if (!/^[0-9]+$/.test(it.sourceKey) || Number(it.sourceKey) !== it.itemId) return false;
             }
           }
@@ -13838,7 +13838,7 @@ var require_market_compare = __commonJS({
       function isObj(v) {
         return v !== null && typeof v === "object" && !Array.isArray(v);
       }
-      function isInt(v) {
+      function isInt2(v) {
         return typeof v === "number" && Number.isSafeInteger(v);
       }
       function validKey(v) {
@@ -13850,12 +13850,12 @@ var require_market_compare = __commonJS({
       function commissionFor(options, channel, alternate) {
         var map = options && isObj(options.commission) ? options.commission : {};
         var c = alternate || (typeof channel === "string" ? map[channel] : null);
-        if (!isObj(c) || !isInt(c.rateBps) || c.rateBps < 0 || c.rateBps > 1e4) {
+        if (!isObj(c) || !isInt2(c.rateBps) || c.rateBps < 0 || c.rateBps > 1e4) {
           return { present: false, verified: false, rateBps: null, sourceLabel: null, asOfDay: null };
         }
         return {
           present: true,
-          verified: c.verified === true && validKey(String(c.sourceLabel || "")) && isInt(c.asOfDay) && c.asOfDay >= 0 && c.asOfDay <= options.todayDay,
+          verified: c.verified === true && validKey(String(c.sourceLabel || "")) && isInt2(c.asOfDay) && c.asOfDay >= 0 && c.asOfDay <= options.todayDay,
           rateBps: c.rateBps,
           sourceLabel: c.sourceLabel || null,
           asOfDay: c.asOfDay || null
@@ -13877,8 +13877,8 @@ var require_market_compare = __commonJS({
         for (var i = 0; i < pool.rows.length; i++) {
           var c = pool.rows[i].coverage;
           if (isObj(c)) {
-            itemRows += isInt(c.itemRows) ? c.itemRows : 0;
-            scannedRows += isInt(c.scannedRows) ? c.scannedRows : 0;
+            itemRows += isInt2(c.itemRows) ? c.itemRows : 0;
+            scannedRows += isInt2(c.scannedRows) ? c.scannedRows : 0;
           }
         }
         return {
@@ -13891,8 +13891,8 @@ var require_market_compare = __commonJS({
       }
       function compare(pools, options) {
         var opt = isObj(options) ? options : {};
-        var todayDay = isInt(opt.todayDay) ? opt.todayDay : null;
-        var freshDays = isInt(opt.freshDays) && opt.freshDays >= 0 ? opt.freshDays : 3;
+        var todayDay = isInt2(opt.todayDay) ? opt.todayDay : null;
+        var freshDays = isInt2(opt.freshDays) && opt.freshDays >= 0 ? opt.freshDays : 3;
         var skewMax = typeof opt.skewMax === "number" && opt.skewMax >= 0 ? opt.skewMax : 5;
         if (todayDay === null) return blocked(["missing-today"]);
         if (!Array.isArray(pools) || pools.length < 1 || pools.length > 2) return blocked(["pool-count"]);
@@ -13916,10 +13916,10 @@ var require_market_compare = __commonJS({
             if (!isObj(r) || !validKey(r.sourceKey)) return blocked(["invalid-sourceKey"]);
             if (seenKeys[r.sourceKey]) return blocked(["duplicate-sourceKey"]);
             seenKeys[r.sourceKey] = true;
-            if (!isInt(r.unitPriceCopper) || r.unitPriceCopper <= 0) return blocked(["invalid-price"]);
-            if (!isInt(r.observedDay) || r.observedDay > todayDay) return blocked(["future-observation"]);
+            if (!isInt2(r.unitPriceCopper) || r.unitPriceCopper <= 0) return blocked(["invalid-price"]);
+            if (!isInt2(r.observedDay) || r.observedDay > todayDay) return blocked(["future-observation"]);
             if (r.itemId !== null && r.itemId !== void 0) {
-              if (!isInt(r.itemId) || r.itemId <= 0) return blocked(["invalid-itemId"]);
+              if (!isInt2(r.itemId) || r.itemId <= 0) return blocked(["invalid-itemId"]);
               if (!/^[0-9]+$/.test(r.sourceKey) || Number(r.sourceKey) !== r.itemId) return blocked(["variant-promotion"]);
             }
           }
@@ -38109,16 +38109,8 @@ function createMarketSync(ctx, almacen) {
   async function enabled() {
     return await ctx.storage.get("auctionator-auto") !== false;
   }
-  async function importBytes(bytes, realm) {
+  async function commitRaw(raw, realm) {
     if (stopped) return { status: "stopped" };
-    bytes = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
-    if (!bytes.length || bytes.length > import_market.default.MAX_BYTES) return { status: "error", error: "size" };
-    let raw;
-    try {
-      raw = import_market.default.parseAuctionator(bytes);
-    } catch {
-      return { status: "error", error: "parse" };
-    }
     if (!snapshotValido(raw)) return { status: "error", error: "invalid" };
     const est = await almacen.read();
     const paired = typeof almacen.commitV2 === "function" && typeof almacen.backupForMigration === "function";
@@ -38154,9 +38146,24 @@ function createMarketSync(ctx, almacen) {
     publish({ status: "ok", histOk, changed: (state.changed || 0) + 1 });
     return { status: "ok", histOk, realm: sel };
   }
+  async function importBytes(bytes, realm) {
+    if (stopped) return { status: "stopped" };
+    bytes = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
+    if (!bytes.length || bytes.length > import_market.default.MAX_BYTES) return { status: "error", error: "size" };
+    let raw;
+    try {
+      raw = import_market.default.parseAuctionator(bytes);
+    } catch {
+      return { status: "error", error: "parse" };
+    }
+    return commitRaw(raw, realm);
+  }
   const api = {
     exclusive,
     importBytes: (bytes, realm) => exclusive(() => importBytes(bytes, realm)),
+    // Diario del addon WoWForeverBridge ya adaptado a snapshot crudo: misma
+    // cola, misma guardia. Lo usa bridge-sync; no abre selectores.
+    importRaw: (raw, realm) => exclusive(() => commitRaw(raw, realm)),
     // Fuente aislada verificada: única vía que escribe esquema v2. Exige
     // respaldo durable previo y confirmación conjunta snapshot + store.
     importSeparateSource: (text2) => exclusive(async () => {
@@ -39575,7 +39582,32 @@ function Chip2({ children, color }) {
 function FilaVacia({ texto: texto2 }) {
   return /* @__PURE__ */ jsx17("tr", { children: /* @__PURE__ */ jsx17("td", { style: S.td, colSpan: 6, children: texto2 }) });
 }
-function VistaMercado({ ctx, almacen, sincronizador, ventas, estado, recargar, perfil, lang }) {
+function PuenteEstado({ puente, lang }) {
+  const [st, setSt] = useState10(puente.getState());
+  useEffect3(() => puente.subscribe(setSt), [puente]);
+  const cambiar = async () => {
+    try {
+      await puente.setEnabled(!st.enabled);
+      if (!st.enabled) await puente.poll();
+    } catch {
+    }
+  };
+  return /* @__PURE__ */ jsxs17("div", { "data-testid": "bridge-panel", style: { marginTop: 6 }, children: [
+    /* @__PURE__ */ jsxs17("label", { style: S.sub, children: [
+      /* @__PURE__ */ jsx17(Checkbox8, { checked: st.enabled, onCheckedChange: cambiar }),
+      lang === "en" ? " Scan bridge (WoWForeverBridge addon) · keeps every scan in a daily journal" : " Puente de escaneos (addon WoWForeverBridge) · guarda cada escaneo en un diario por día"
+    ] }),
+    /* @__PURE__ */ jsxs17("p", { "data-testid": "bridge-status", style: S.sub, children: [
+      lang === "en" ? "Bridge: " : "Puente: ",
+      st.status,
+      st.entries ? ` · ${st.entries} ${lang === "en" ? "day(s)" : "día(s)"} · ${st.items} ${lang === "en" ? "observations" : "observaciones"}` : "",
+      st.lastDay != null ? ` · ${lang === "en" ? "last journal day" : "último día del diario"} ${st.lastDay}` : "",
+      st.message ? ` · ${st.message}` : "",
+      st.error ? ` · ${st.error}` : ""
+    ] })
+  ] });
+}
+function VistaMercado({ ctx, almacen, sincronizador, ventas, puente, estado, recargar, perfil, lang }) {
   const sync = useMemo14(() => sincronizador || createMarketSync(ctx, almacen), [sincronizador, ctx, almacen]);
   const [auto, setAuto] = useState10(sync.getState());
   useEffect3(() => sync.subscribe(setAuto), [sync]);
@@ -40106,6 +40138,7 @@ rvada: " : s.kind === "chest-obs" ? "Cofre observado: " : "";
         auto.error && !auto.message ? ` · ${auto.error}` : "",
         auto.histOk === false ? lang === "en" ? " · History pending; will retry." : " · Historial pendiente; se reintentará." : ""
       ] }),
+      puente && /* @__PURE__ */ jsx17(PuenteEstado, { puente, lang }),
       /* @__PURE__ */ jsx17("p", { style: S.sub, children: lang === "en" ? "Grant WTF/Account/<account>/SavedVariables once (a parent folder only if the bounded search can complete). Not Interface/Add\
 Ons. After an in-game scan, use /reload or log out to write prices to disk. Changing tabs does not stop tracking." : "Autoriza una vez WTF/Account/<cuenta>/SavedVariables (una carpeta superior solo si\
  la búsqueda acotada puede completarse). No Interface/AddOns. Tras escanear en el juego, usa /reload o cierra sesión para guardar los precios en disco. Cambiar de pestaña no detiene el seguimiento." }),
@@ -43457,7 +43490,7 @@ function perfilInicial(guardado, build) {
   const m = migrarPerfil(viejo, D.personaje);
   return { perfil: m.perfil, ok: validarPerfil(m.perfil, D.personaje).ok, errores: [], razaSupuesta: m.razaSupuesta };
 }
-function App({ ctx, almacen, sincronizador, ventas }) {
+function App({ ctx, almacen, sincronizador, ventas, puente }) {
   const [estado, setEstado] = useState14(null);
   const [error, setError] = useState14("");
   const [perfil, setPerfil] = useState14(null);
@@ -43545,6 +43578,7 @@ function App({ ctx, almacen, sincronizador, ventas }) {
         almacen,
         sincronizador,
         ventas,
+        puente,
         estado,
         recargar,
         perfil,
@@ -43849,6 +43883,326 @@ function startTsmSync(ctx, sync) {
   }, 3e4);
 }
 
+// src/bridge.js
+var import_market3 = __toESM(require_market());
+var BRIDGE_FILE = "WoWForeverBridge.lua";
+var BRIDGE_MAX_BYTES = 8 * 1024 * 1024;
+var MAX_ENTRIES = 62;
+var MAX_ITEMS_PER_ENTRY = 1e5;
+var MAX_OBS_TOTAL = 25e4;
+var DAY_MAX = 1e5;
+var MAX_SAFE = Number.MAX_SAFE_INTEGER;
+function fail(msg) {
+  throw new Error(msg);
+}
+function isInt(v) {
+  return Number.isInteger(v);
+}
+function parseBridge(bytes) {
+  if (!(bytes instanceof Uint8Array) || !bytes.length || bytes.length > BRIDGE_MAX_BYTES) fail("invalid input size");
+  const db = import_market3.default.parseSavedVariables(bytes, "WoWForeverBridgeDB");
+  if (!db || db.version !== 1) fail("unsupported bridge version");
+  if (!db.entries || typeof db.entries !== "object") fail("missing entries");
+  const days = Object.keys(db.entries);
+  if (days.length > MAX_ENTRIES) fail("too many entries");
+  let total = 0;
+  const entries = [];
+  for (const dk of days) {
+    const day = Number(dk);
+    const e = db.entries[dk];
+    if (!isInt(day) || day < 0 || day > DAY_MAX) fail("invalid entry day");
+    if (!e || typeof e !== "object") fail("invalid entry");
+    if (!isInt(e.at) || e.at <= 0) fail("invalid entry timestamp");
+    if (typeof e.realm !== "string" || !e.realm || e.realm.length > 200) fail("invalid entry realm");
+    if (!e.items || typeof e.items !== "object") fail("invalid entry items");
+    const keys = Object.keys(e.items);
+    if (keys.length > MAX_ITEMS_PER_ENTRY) fail("too many items");
+    total += keys.length;
+    if (total > MAX_OBS_TOTAL) fail("too many observations");
+    const items = /* @__PURE__ */ Object.create(null);
+    for (const k of keys) {
+      if (!k || k.length > 200 || k === "__proto__" || k === "constructor" || k === "prototype") fail("invalid item key");
+      const it = e.items[k];
+      if (!it || typeof it !== "object") fail("invalid item");
+      if (!isInt(it.d) || it.d < 0 || it.d > DAY_MAX) fail("invalid item day");
+      for (const f of ["m", "hi", "lo"]) {
+        if (!isInt(it[f]) || it[f] <= 0 || it[f] > MAX_SAFE) fail("invalid item price");
+      }
+      if (it.lo > it.hi) fail("invalid item price range");
+      if (it.av != null && (!isInt(it.av) || it.av < 0 || it.av > MAX_SAFE)) fail("invalid item quantity");
+      items[k] = { d: it.d, m: it.m, hi: it.hi, lo: it.lo, av: it.av == null ? null : it.av };
+    }
+    entries.push({ day, at: e.at, realm: e.realm, items });
+  }
+  entries.sort((a, b) => a.day - b.day || a.at - b.at);
+  const retentionDays = isInt(db.retentionDays) && db.retentionDays >= 1 && db.retentionDays <= 60 ? db.retentionDays : 14;
+  return { version: 1, retentionDays, entries };
+}
+function bridgeToSnapshot(journal, { now = /* @__PURE__ */ new Date() } = {}) {
+  const realms = /* @__PURE__ */ new Map();
+  for (const e of journal.entries) {
+    let r = realms.get(e.realm);
+    if (!r) {
+      r = { name: e.realm, items: /* @__PURE__ */ new Map() };
+      realms.set(e.realm, r);
+    }
+    for (const k of Object.keys(e.items)) {
+      const it = e.items[k];
+      let cur = r.items.get(k);
+      if (!cur) {
+        cur = { sourceKey: k, itemId: /^\d+$/.test(k) ? Number(k) : null, unitPriceCopper: it.m, observedDay: it.d, history: [] };
+        r.items.set(k, cur);
+      }
+      if (it.d >= cur.observedDay) {
+        cur.unitPriceCopper = it.m;
+        cur.observedDay = it.d;
+      }
+      const row = { day: it.d, low: it.lo, high: it.hi, available: it.av };
+      const ix = cur.history.findIndex((h) => h.day === row.day);
+      if (ix >= 0) cur.history[ix] = row;
+      else cur.history.push(row);
+    }
+  }
+  const out = { schemaVersion: 1, importedAt: now.toISOString(), sourceVersion: 8, realms: [], warnings: [] };
+  for (const r of realms.values()) {
+    const items = [...r.items.values()];
+    for (const it of items) it.history.sort((a, b) => a.day - b.day);
+    out.realms.push({ name: r.name, items });
+  }
+  return out;
+}
+
+// src/bridge-sync.js
+var safePath2 = (p) => typeof p === "string" && p.length <= 2048 && !p.includes("\\") && !/[\x00-\x1f]/.test(p) && p.split("/").every((s) => s && s !== "." && s !== ".." && !s.includes(":"));
+async function findBridge(files, folder, read) {
+  if (typeof files.list !== "function") return read(folder, BRIDGE_FILE);
+  const queue = [{ path: "", depth: 0 }], seen = /* @__PURE__ */ new Set(), found = /* @__PURE__ */ new Set();
+  while (queue.length) {
+    const { path, depth } = queue.shift();
+    if (seen.has(path)) continue;
+    if (seen.size >= 120) throw Error("Puente: búsqueda incompleta; carpeta demasiado amplia.");
+    seen.add(path);
+    const result = await files.list(folder.id, path);
+    if (!result?.ok || result.truncated || !Array.isArray(result.entries) || result.entries.length > 4e3) throw Error("Puente: no se pudo completar la búsqueda dentro del permiso.");
+    for (const e of result.entries) {
+      if (!safePath2(e.path) || path && !e.path.startsWith(path + "/") || e.path.slice(path ? path.length + 1 : 0).includes("/") || e.path.split("/").at(-1) !== e.name) throw Error("Puente: ruta de de\
+scubrimiento inválida.");
+      if (e.isDirectory) {
+        if (["Interface", "Data", "Cache", "Logs", ".git"].includes(e.name)) continue;
+        if (depth >= 6 || queue.length + seen.size >= 120) throw Error("Puente: búsqueda incompleta; carpeta demasiado amplia.");
+        queue.push({ path: e.path, depth: depth + 1 });
+      } else if (e.name === BRIDGE_FILE) found.add(e.path);
+    }
+  }
+  if (found.size > 1) throw Error("Hay varias cuentas con el diario del puente. Concede la carpeta SavedVariables de la cuenta que juegas.");
+  return found.size ? { folderId: folder.id, path: [...found][0] } : null;
+}
+async function leerBridge(ctx, { pick = false, silent = false } = {}) {
+  const files = ctx?.files;
+  if (!files?.readText) return { status: "unavailable" };
+  async function read(folder, path) {
+    if (!safePath2(path) || path.split("/").at(-1) !== BRIDGE_FILE) throw Error("Puente: ruta guardada inválida.");
+    let bytes;
+    if (files.readDataUrl) {
+      const r = await files.readDataUrl(folder.id, path);
+      if (r?.ok && typeof r.url === "string") {
+        if (r.url.length > BRIDGE_MAX_BYTES * 1.34 + 200) throw Error("Puente: diario mayor de 8 MiB.");
+        bytes = dataUrlBytes(r.url);
+      }
+    }
+    if (!bytes) {
+      const r = await files.readText(folder.id, path);
+      if (!r?.ok || typeof r.text !== "string") return null;
+      bytes = new TextEncoder().encode(r.text);
+    }
+    if (!bytes.length || bytes.length > BRIDGE_MAX_BYTES) throw Error("Puente: diario vacío o mayor de 8 MiB.");
+    return { status: "ok", bytes, folderId: folder.id, path };
+  }
+  const remember = async (hit) => {
+    const loaded = hit.bytes ? hit : await read({ id: hit.folderId }, hit.path);
+    if (!loaded) return { status: "error", message: "Puente: el diario desapareció durante la búsqueda." };
+    await ctx.storage.set("bridge-location", { folderId: loaded.folderId, path: loaded.path });
+    return loaded;
+  };
+  try {
+    if (!pick) {
+      const granted = typeof files.folders === "function" ? await files.folders() : [];
+      const available = Array.isArray(granted) ? granted : [];
+      let location = await ctx.storage.get("bridge-location");
+      const auctionFolder = await ctx.storage.get("auctionator-folder");
+      const tsmLocation = await ctx.storage.get("tsm-location");
+      let preferred = location?.folderId || auctionFolder || tsmLocation?.folderId || null;
+      if (location && !available.some((f) => f.id === location.folderId)) {
+        const alt = [auctionFolder, tsmLocation?.folderId].find((id) => id && available.some((f) => f.id === id));
+        if (alt) {
+          await ctx.storage.remove("bridge-location");
+          location = null;
+          preferred = alt;
+        } else return { status: "no-folder", message: "Puente: permiso anterior revocado. Autoriza la carpeta SavedVariables para continuar." };
+      } else if (preferred && !available.some((f) => f.id === preferred)) {
+        preferred = null;
+      }
+      if (location && available.some((f) => f.id === location.folderId)) {
+        const hit2 = await read(available.find((f) => f.id === location.folderId), location.path);
+        return hit2 || { status: "error", message: "Puente: el diario seleccionado ya no está disponible; no se cambió de cuenta." };
+      }
+      const folders = preferred ? available.filter((f) => f.id === preferred) : available;
+      const hits = [];
+      for (const folder of folders) {
+        const hit2 = await findBridge(files, folder, read);
+        if (hit2) hits.push(hit2);
+      }
+      if (hits.length > 1) return { status: "error", message: "Hay varias carpetas con el diario del puente. Concede la carpeta SavedVariables de la cuenta que juegas." };
+      if (hits.length) return await remember(hits[0]);
+      if (silent || folders.length) return folders.length ? { status: "no-file", message: "No se encontró WoWForeverBridge.lua. Instala el addon WoWForeverBridge y haz /reload; el diario se guarda en \
+la misma carpeta SavedVariables de Auctionator." } : { status: "no-folder" };
+    }
+    if (typeof files.requestFolder !== "function") return { status: "unavailable" };
+    const picked = await files.requestFolder();
+    if (!picked?.ok || !picked.folder) return { status: "cancelled" };
+    const hit = await findBridge(files, picked.folder, read);
+    return hit ? await remember(hit) : { status: "error", message: "No se encontró WoWForeverBridge.lua. Instala el addon y haz /reload; concede la carpeta SavedVariables, no Interface/AddOns." };
+  } catch (e) {
+    return { status: "error", message: e?.message || "Puente: no se pudo descubrir el diario." };
+  }
+}
+function createBridgeSync(ctx, marketSync) {
+  let state = { status: "idle", enabled: true, message: null, error: null, checkedAt: null, entries: 0, items: 0, lastDay: null, lastCaptureAt: null };
+  let stopped = false, busy = false, lastDigest = null;
+  const listeners = /* @__PURE__ */ new Set();
+  const publish = (patch) => {
+    if (stopped) return;
+    state = { ...state, ...patch, busy, checkedAt: (/* @__PURE__ */ new Date()).toISOString() };
+    listeners.forEach((fn) => {
+      try {
+        fn(state);
+      } catch {
+      }
+    });
+  };
+  const error = (e) => {
+    const r = { status: "error", error: String(e?.message || e).slice(0, 240), message: null };
+    publish(r);
+    return r;
+  };
+  const exclusive = async (fn) => {
+    if (stopped) return { status: "stopped" };
+    if (busy) return { status: "busy" };
+    busy = true;
+    publish({ status: "checking" });
+    try {
+      return await fn();
+    } finally {
+      busy = false;
+      publish({});
+    }
+  };
+  const digest = async (bytes) => {
+    const hash = await crypto.subtle.digest("SHA-256", bytes);
+    return [...new Uint8Array(hash)].map((b) => b.toString(16).padStart(2, "0")).join("");
+  };
+  const ingest = async (bytes) => {
+    const hash = await digest(bytes);
+    if (hash === lastDigest) {
+      publish({ status: "unchanged", message: "Puente sin cambios.", error: null });
+      return { status: "unchanged" };
+    }
+    const journal = parseBridge(bytes);
+    if (!journal.entries.length) {
+      lastDigest = hash;
+      const r2 = { status: "ok", message: "El diario del puente está vacío. Haz un escaneo y /reload.", entries: 0, items: 0, lastDay: null, lastCaptureAt: null, error: null };
+      publish(r2);
+      return r2;
+    }
+    const raw = bridgeToSnapshot(journal);
+    const result = await marketSync.importRaw(raw);
+    if (result?.status !== "ok") throw new Error(result?.message || result?.error || "El mercado no pudo fusionar el diario del puente.");
+    if (stopped) return { status: "stopped" };
+    lastDigest = hash;
+    let items = 0, lastDay = null, lastCaptureAt = null;
+    for (const e of journal.entries) {
+      items += Object.keys(e.items).length;
+      if (lastDay === null || e.day > lastDay) lastDay = e.day;
+      if (lastCaptureAt === null || e.at > lastCaptureAt) lastCaptureAt = e.at;
+    }
+    const r = { status: "ok", message: `Puente: ${journal.entries.length} día(s) fusionados en el histórico.`, entries: journal.entries.length, items, lastDay, lastCaptureAt, error: null };
+    publish(r);
+    return r;
+  };
+  const surface = (r) => {
+    const out = r.status === "error" ? { status: "error", error: r.message || "Puente: error de lectura.", message: null } : { status: "waiting", message: r.message || (r.status === "no-folder" ? "Sin\
+ carpeta concedida para el puente." : null), error: null };
+    publish(out);
+    return out;
+  };
+  const poll = () => exclusive(async () => {
+    if (stopped || !state.enabled) {
+      publish({ status: "paused" });
+      return { status: "paused" };
+    }
+    try {
+      const r = await leerBridge(ctx, { silent: true });
+      if (stopped) return { status: "stopped" };
+      if (r.status !== "ok") return surface(r);
+      return await ingest(r.bytes);
+    } catch (e) {
+      return error(e);
+    }
+  });
+  const api = {
+    getState: () => state,
+    subscribe(fn) {
+      listeners.add(fn);
+      fn(state);
+      return () => listeners.delete(fn);
+    },
+    restore: () => exclusive(async () => {
+      const value = await ctx.storage.get("bridge-auto");
+      if (stopped) return;
+      state = { ...state, enabled: value !== false };
+      publish({ status: state.enabled ? "idle" : "paused" });
+    }),
+    poll,
+    read: ({ pick = false } = {}) => exclusive(async () => {
+      if (stopped) return { status: "stopped" };
+      try {
+        const r = await leerBridge(ctx, { pick });
+        if (r.status === "cancelled") {
+          publish({ status: "idle", message: "Lectura cancelada." });
+          return r;
+        }
+        if (r.status !== "ok") return surface(r);
+        return await ingest(r.bytes);
+      } catch (e) {
+        return error(e);
+      }
+    }),
+    setEnabled: (value) => exclusive(async () => {
+      if (stopped) return;
+      try {
+        await ctx.storage.set("bridge-auto", !!value);
+        state = { ...state, enabled: !!value };
+        publish({ status: value ? "idle" : "paused" });
+      } catch (e) {
+        return error(e);
+      }
+    }),
+    dispose() {
+      stopped = true;
+      listeners.clear();
+      lastDigest = null;
+    }
+  };
+  return api;
+}
+function startBridgeSync(ctx, sync) {
+  ctx.onDispose?.(() => sync.dispose());
+  void sync.restore().then(() => sync.poll());
+  ctx.setInterval?.(() => {
+    void sync.poll();
+  }, 3e4);
+}
+
 // src/plugin.src.jsx
 import { jsx as jsx26 } from "react/jsx-runtime";
 var RUTA = "/wow-forever";
@@ -43865,9 +44219,11 @@ s autorizadas.",
     startMarketSync(ctx, sincronizador);
     const ventas = createTsmSync(ctx);
     startTsmSync(ctx, ventas);
+    const puente = createBridgeSync(ctx, sincronizador);
+    startBridgeSync(ctx, puente);
     ctx.registerMany([
       { id: "nav", area: SIDEBAR_NAV_AREA, order: 73, data: { path: RUTA, label: "WoW Forever", codicon: "target" } },
-      { id: "route", area: ROUTES_AREA, data: { path: RUTA }, render: () => /* @__PURE__ */ jsx26(App, { ctx, almacen, sincronizador, ventas }) },
+      { id: "route", area: ROUTES_AREA, data: { path: RUTA }, render: () => /* @__PURE__ */ jsx26(App, { ctx, almacen, sincronizador, ventas, puente }) },
       { id: "open", area: PALETTE_AREA, data: {
         id: "wow-forever.open",
         label: "WoW Forever: abrir guía y mercado",
