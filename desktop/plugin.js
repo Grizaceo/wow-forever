@@ -14121,6 +14121,26 @@ function validBuild(b) {
     return false;
   }
 }
+var BACKUP_CHUNK_BYTES = 3 * 1024 * 1024;
+var BACKUP_PART_RE = /^pre-v2-backup\.part-\d{3}\.json$/;
+function backupParts(body) {
+  const parts = [];
+  let start = 0, bytes = 0, i = 0;
+  while (i < body.length) {
+    const cp2 = body.codePointAt(i);
+    const units = cp2 > 65535 ? 2 : 1;
+    const w = cp2 <= 127 ? 1 : cp2 <= 2047 ? 2 : cp2 <= 65535 ? 3 : 4;
+    if (bytes + w > BACKUP_CHUNK_BYTES && i > start) {
+      parts.push(body.slice(start, i));
+      start = i;
+      bytes = 0;
+    }
+    bytes += w;
+    i += units;
+  }
+  parts.push(body.slice(start));
+  return parts;
+}
 function createStore(ctx) {
   let queue = Promise.resolve(), cached = null, poisoned = false, v2active = false, v2slot = null;
   const serial = (fn) => {
@@ -14218,6 +14238,33 @@ function createStore(ctx) {
     return ownKeys(b, ["format", "createdAt", "pointers", "slots"]) && b.format === "wow-forever/pre-v2" && text(b.createdAt, 60) && Number.isFinite(Date.parse(b.createdAt)) && ownKeys(b.pointers, ["m\
 arket", "priceHistory"]) && pointer(b.pointers.market) && pointer(b.pointers.priceHistory) && ownKeys(b.slots, ["a", "b"]) && ["a", "b"].every((s) => ownKeys(b.slots[s], ["market", "history"]) && ["ma\
 rket", "history"].every((k) => b.slots[s][k] === null || typeof b.slots[s][k] === "string"));
+  }
+  async function readBackupDoc() {
+    const m = await ctx.files.readText("data", "pre-v2-backup.json");
+    if (!m?.ok) return m;
+    let doc;
+    try {
+      doc = JSON.parse(m.text);
+    } catch {
+      throw new Error("Respaldo previo ilegible; no se sobrescribió.");
+    }
+    if (doc?.format === "wow-forever/pre-v2-chunked") {
+      if (!ownKeys(doc, ["format", "createdAt", "parts"]) || !Array.isArray(doc.parts) || !doc.parts.length || doc.parts.length > 64) throw new Error("Respaldo previo inválido; no se sobrescribió.");
+      let text2 = "";
+      for (const name of doc.parts) {
+        if (typeof name !== "string" || !BACKUP_PART_RE.test(name)) throw new Error("Respaldo previo inválido; no se sobrescribió.");
+        const p = await ctx.files.readText("data", name);
+        if (!p?.ok || typeof p.text !== "string") throw new Error("Respaldo previo incompleto; no se sobrescribió.");
+        text2 += p.text;
+      }
+      try {
+        doc = JSON.parse(text2);
+      } catch {
+        throw new Error("Respaldo previo ilegible; no se sobrescribió.");
+      }
+    }
+    if (!validBackup(doc)) throw new Error("Respaldo previo inválido; no se sobrescribió.");
+    return { ok: true, doc };
   }
   async function persistV2(s, market, history) {
     const slot = v2slot === "a" ? "b" : "a";
@@ -14328,17 +14375,8 @@ rket", "history"].every((k) => b.slots[s][k] === null || typeof b.slots[s][k] ==
     // respaldo legible, nunca se sobrescribe: es la única copia de los datos
     // originales ante un índice incierto o una migración incompleta.
     backupForMigration: () => serial(async () => {
-      const existing = await ctx.files.readText("data", "pre-v2-backup.json");
-      if (existing?.ok) {
-        let doc;
-        try {
-          doc = JSON.parse(existing.text);
-        } catch {
-          throw new Error("Respaldo previo ilegible; no se sobrescribió.");
-        }
-        if (!validBackup(doc)) throw new Error("Respaldo previo inválido; no se sobrescribió.");
-        return { ok: true, alreadyBackedUp: true };
-      }
+      const existing = await readBackupDoc();
+      if (existing?.ok) return { ok: true, alreadyBackedUp: true };
       if (existing?.error && !["not_found", "not-found"].includes(existing.error)) throw Error("No se pudo comprobar el respaldo previo.");
       await load();
       const slots = { a: { market: null, history: null }, b: { market: null, history: null } };
@@ -14354,11 +14392,26 @@ rket", "history"].every((k) => b.slots[s][k] === null || typeof b.slots[s][k] ==
         priceHistory: await ctx.storage.get("price-history-pointer") ?? null
       };
       const body = JSON.stringify({ format: "wow-forever/pre-v2", createdAt: (/* @__PURE__ */ new Date()).toISOString(), pointers, slots });
-      const wrote = await ctx.files.writeText("data", "pre-v2-backup.json", body);
-      if (!wrote?.ok) throw new Error("No se pudo crear el respaldo previo a v2. No se escribió.");
-      const read = await ctx.files.readText("data", "pre-v2-backup.json");
-      if (!read?.ok || read.text !== body) throw new Error("No se confirmó el respaldo previo a v2. No se escribió.");
-      return { ok: true, alreadyBackedUp: false };
+      const confirm = async (name, text2) => {
+        const w = await ctx.files.writeText("data", name, text2);
+        if (!w?.ok) throw new Error("No se pudo crear el respaldo previo a v2. No se escribió." + (w?.error ? ` [${w.error}] ${w.message || ""}`.trim() : ""));
+        const r = await ctx.files.readText("data", name);
+        if (!r?.ok || r.text !== text2) throw new Error("No se confirmó el respaldo previo a v2. No se escribió.");
+      };
+      if (new TextEncoder().encode(body).length <= BACKUP_CHUNK_BYTES) {
+        await confirm("pre-v2-backup.json", body);
+        return { ok: true, alreadyBackedUp: false };
+      }
+      const parts = backupParts(body), names = [];
+      for (let i = 0; i < parts.length; i++) {
+        const name = `pre-v2-backup.part-${String(i).padStart(3, "0")}.json`;
+        await confirm(name, parts[i]);
+        names.push(name);
+      }
+      await confirm("pre-v2-backup.json", JSON.stringify({ format: "wow-forever/pre-v2-chunked", createdAt: (/* @__PURE__ */ new Date()).toISOString(), parts: names }));
+      const assembled = await readBackupDoc();
+      if (!assembled?.ok) throw new Error("No se confirmó el respaldo previo a v2. No se escribió.");
+      return { ok: true, parts: names.length, alreadyBackedUp: false };
     }),
     // Confirmación conjunta de snapshot v2 + store v2, con la misma disciplina
     // A/B, readback byte-exacto yMove de índice que las escrituras clásicas.
@@ -14366,28 +14419,17 @@ rket", "history"].every((k) => b.slots[s][k] === null || typeof b.slots[s][k] ==
       const p = value || {};
       if (!ownKeys(p, ["market", "store", "revision", "hrevision"]) || !validMarket(p.market) || p.market.snapshot?.schemaVersion !== 2 || !validHistoryStore(p.store) || p.store.v !== 2 || !int(p.revision) ||
       !int(p.hrevision)) throw new Error("Estado v2 inválido; no se escribió.");
-      const backup = await ctx.files.readText("data", "pre-v2-backup.json");
+      const backup = await readBackupDoc();
       if (!backup?.ok) throw new Error("Falta el respaldo previo a v2; no se escribió.");
       const s = await load();
       if (p.revision !== s.revision || p.hrevision !== s.hrevision) throw new Error("El mercado cambió en otra vista. Usá Reabrir antes de guardar.");
-      try {
-        if (!validBackup(JSON.parse(backup.text))) throw Error("bad");
-      } catch {
-        throw Error("Respaldo previo inválido.");
-      }
       return persistV2(s, p.market, p.store);
     }),
     // Rollback explícito: restaura los bytes originales de A/B y los punteros.
     rollbackToBackup: () => serial(async () => {
-      const b = await ctx.files.readText("data", "pre-v2-backup.json");
+      const b = await readBackupDoc();
       if (!b?.ok) throw new Error("No hay respaldo previo a v2 para restaurar.");
-      let doc;
-      try {
-        doc = JSON.parse(b.text);
-      } catch {
-        throw new Error("Respaldo previo ilegible.");
-      }
-      if (!validBackup(doc)) throw new Error("Respaldo previo inválido.");
+      const doc = b.doc;
       for (const slot of ["a", "b"]) {
         for (const [kind, prefix] of [["market", "market-"], ["history", "price-history-"]]) {
           const text2 = doc.slots[slot]?.[kind];
