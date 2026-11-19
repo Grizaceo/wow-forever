@@ -45,7 +45,7 @@ agregarTextos({
   'mercado.sinArchivos': 'Las APIs de archivos no están disponibles en este contexto.',
   'mercado.borrando': 'Borrando solo el mercado local…',
   'mercado.borrado': 'Mercado local borrado. El juego y tu personaje no cambiaron.',
-  'mercado.errorBorrar': 'No se confirmó el borrado completo. Usá Reabrir para comprobar los datos guardados. {msg}',
+  'mercado.errorBorrar': 'Se conservan los datos: no se pudo confirmar el borrado. Usá Reabrir para recuperar el estado guardado. {msg}',
   'mercado.errorBorrarParcial': 'No se confirmó el borrado del scan; el historial acumulado sí se vació. Usá Reabrir para comprobar el estado. {msg}',
   'mercado.notaCarpeta': 'Auctionator.lua (carpeta concedida)',
   'mercado.frescura.importado': 'Importado',
@@ -233,7 +233,7 @@ agregarTextos({
   'mercado.sinArchivos': 'File APIs are not available in this context.',
   'mercado.borrando': 'Deleting only the local market…',
   'mercado.borrado': 'Local market deleted. The game and your character are untouched.',
-  'mercado.errorBorrar': 'Complete deletion was not confirmed. Reopen to check saved data. {msg}',
+  'mercado.errorBorrar': 'Data preserved: deletion was not confirmed. Reopen to recover the saved state. {msg}',
   'mercado.errorBorrarParcial': 'Scan deletion was not confirmed; the accumulated history was emptied. Reopen to check saved data. {msg}',
   'mercado.notaCarpeta': 'Auctionator.lua (granted folder)',
   'mercado.frescura.importado': 'Imported',
@@ -793,7 +793,11 @@ export function VistaMercado({ ctx, almacen, sincronizador, ventas, estado, reca
       const key = { parse: 'mercado.errorParse', invalid: 'mercado.errorValido', size: 'mercado.errorTamano' }[r.error] || 'mercado.errorGuardar'
       setMensaje(t(lang, key, { msg: r.message || '' })); setImportando(false); return
     }
-    setRealmName(r.realm); setPagina(0); setDetalleKey(null)
+    // La importación elige explícitamente el realm importado. realmChoice tiene
+    // precedencia (línea del `realm`) y el efecto de realm-por-defecto no lo toca:
+    // si solo se fijara realmName, ese efecto lo pisaría con perfil.reino durante
+    // la ventana asíncrona de recargar() contra el snapshot todavía viejo.
+    setRealmChoice(r.realm); setRealmName(r.realm); setPagina(0); setDetalleKey(null)
     const notaTxt = nota ? ` · ${nota}` : ''
     setMensaje(t(lang, r.histOk ? 'mercado.ok' : 'mercado.okSinHist', { nota: notaTxt }))
     setImportando(false); recargar()

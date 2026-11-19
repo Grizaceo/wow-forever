@@ -38865,7 +38865,7 @@ agregarTextos({
   "mercado.sinArchivos": "Las APIs de archivos no están disponibles en este contexto.",
   "mercado.borrando": "Borrando solo el mercado local…",
   "mercado.borrado": "Mercado local borrado. El juego y tu personaje no cambiaron.",
-  "mercado.errorBorrar": "No se confirmó el borrado completo. Usá Reabrir para comprobar los datos guardados. {msg}",
+  "mercado.errorBorrar": "Se conservan los datos: no se pudo confirmar el borrado. Usá Reabrir para recuperar el estado guardado. {msg}",
   "mercado.errorBorrarParcial": "No se confirmó el borrado del scan; el historial acumulado sí se vació. Usá Reabrir para comprobar el estado. {msg}",
   "mercado.notaCarpeta": "Auctionator.lua (carpeta concedida)",
   "mercado.frescura.importado": "Importado",
@@ -39057,7 +39057,7 @@ s. Ningún número es una venta ni un ingreso garantizado."
   "mercado.sinArchivos": "File APIs are not available in this context.",
   "mercado.borrando": "Deleting only the local market…",
   "mercado.borrado": "Local market deleted. The game and your character are untouched.",
-  "mercado.errorBorrar": "Complete deletion was not confirmed. Reopen to check saved data. {msg}",
+  "mercado.errorBorrar": "Data preserved: deletion was not confirmed. Reopen to recover the saved state. {msg}",
   "mercado.errorBorrarParcial": "Scan deletion was not confirmed; the accumulated history was emptied. Reopen to check saved data. {msg}",
   "mercado.notaCarpeta": "Auctionator.lua (granted folder)",
   "mercado.frescura.importado": "Imported",
@@ -39646,6 +39646,7 @@ function VistaMercado({ ctx, almacen, sincronizador, ventas, estado, recargar, p
       setImportando(false);
       return;
     }
+    setRealmChoice(r.realm);
     setRealmName(r.realm);
     setPagina(0);
     setDetalleKey(null);
