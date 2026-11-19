@@ -14426,7 +14426,7 @@ rket", "history"].every((k) => b.slots[s][k] === null || typeof b.slots[s][k] ==
 }
 
 // src/app.jsx
-import { Component, useCallback as useCallback3, useEffect as useEffect6, useMemo as useMemo16, useState as useState13 } from "react";
+import { Component, useCallback as useCallback3, useEffect as useEffect6, useMemo as useMemo16, useState as useState14 } from "react";
 import { Button as Button11, SegmentedControl as SegmentedControl6, Tabs, TabsList, TabsTrigger } from "@hermes/plugin-sdk";
 
 // ../src/perfil.js
@@ -35590,6 +35590,120 @@ function planDeSubida(recetas, desde, hasta, precios, items) {
   }
   return pasos;
 }
+function costoAdquisicion(receta, precios, items, faccion) {
+  if (!receta || typeof receta !== "object") return { cobre: null, fuente: null, item: null };
+  const como = receta.como;
+  if (como === "entrenador" || como === "automatica") return { cobre: 0, fuente: "gratis", item: null };
+  if (como !== "receta" || receta.receta_item == null) return { cobre: null, fuente: null, item: receta.receta_item ?? null };
+  const iid = receta.receta_item;
+  const f = filaItem(items, iid);
+  const vend = receta.vendedores && typeof receta.vendedores === "object" ? receta.vendedores : {};
+  const facs = faccion ? [faccion] : ["alianza", "horda"];
+  const loVende = facs.some((fa) => Array.isArray(vend[fa]) && vend[fa].length > 0);
+  if (loVende && f && f[10] === 1 && Number.isFinite(f[9]) && f[9] > 0) {
+    return { cobre: f[9], fuente: "vendedor", item: iid };
+  }
+  const p = precioDe(precios, iid);
+  if (p !== null) return { cobre: p, fuente: "subasta", item: iid };
+  return { cobre: null, fuente: null, item: iid };
+}
+function puntosEsperadosAcum(rango, fin) {
+  const cum = new Array(fin + 1);
+  cum[0] = 0;
+  for (let k = 0; k < fin; k++) {
+    const p = probSubida(rango, k);
+    cum[k + 1] = cum[k] + (p > 0 ? p : 0);
+  }
+  return cum;
+}
+function rutaMaxeo(recetas, desde, cap, precios, items, opts = {}) {
+  const faccion = opts && opts.faccion ? opts.faccion : null;
+  const d0 = Math.floor(Number(desde)), h = Math.ceil(Number(cap));
+  const avisoEntrenamiento = "El coste de entrenar los tramos con el trainer no está en los datos (SIN DATOS): no se incluye en el total.";
+  const base = {
+    desde: d0,
+    cap: h,
+    pasos: [],
+    totalMateriales: null,
+    totalAdquisicion: 0,
+    total: null,
+    cobertura: 0,
+    huecos: [],
+    adquisiciones: [],
+    adquisicionesSinDato: [],
+    sinPrecio: [],
+    avisoEntrenamiento
+  };
+  if (!Array.isArray(recetas) || !Number.isFinite(d0) || !Number.isFinite(h) || h <= d0) return base;
+  const fin = Math.min(h, d0 + MAX_PUNTOS);
+  const infos = recetas.filter((r) => r && typeof r === "object" && Number.isFinite(r.spell)).map((r) => ({
+    r,
+    acq: costoAdquisicion(r, precios, items, faccion),
+    costo: costoReceta(r, precios, items),
+    nReact: Array.isArray(r.reactivos) ? r.reactivos.length : 0,
+    cum: puntosEsperadosAcum(r.rango, fin)
+  }));
+  const conAcq = infos.filter((i) => i.acq.cobre !== null);
+  base.adquisicionesSinDato = infos.filter((i) => i.acq.cobre === null).map((i) => ({ spell: i.r.spell, item: i.acq.item, como: i.r.como }));
+  const pagadas = /* @__PURE__ */ new Set();
+  const sinPrecioMap = /* @__PURE__ */ new Map();
+  let totalMat = 0, totalAdq = 0, puntosCubiertos = 0;
+  const pasos = [], huecos2 = [];
+  const elegir = (s) => {
+    let mejor = null;
+    for (const info of conAcq) {
+      const p = probSubida(info.r.rango, s);
+      if (!(p > 0)) continue;
+      if (info.costo.total === null) {
+        if (!sinPrecioMap.has(info.r.spell)) sinPrecioMap.set(info.r.spell, { spell: info.r.spell, faltan: info.costo.faltan });
+        continue;
+      }
+      const pe = info.cum[fin] - info.cum[s];
+      const acqPorPunto = !pagadas.has(info.r.spell) && info.acq.cobre > 0 && pe > 0 ? info.acq.cobre / pe : 0;
+      const eff = info.costo.total / p + acqPorPunto;
+      if (!mejor || eff < mejor.eff || eff === mejor.eff && (info.nReact < mejor.nReact || info.nReact === mejor.nReact && info.r.spell < mejor.spell)) {
+        mejor = { info, p, eff, nReact: info.nReact, spell: info.r.spell };
+      }
+    }
+    return mejor;
+  };
+  for (let s = d0; s < fin; ) {
+    const e = elegir(s);
+    if (!e) {
+      let j2 = s + 1;
+      while (j2 < fin && !elegir(j2)) j2++;
+      huecos2.push({ desde: s, hasta: j2, motivo: sinPrecioMap.size ? "recetas sin precio de reactivos o sin receta conocida" : "ninguna receta conocida sube en este tramo" });
+      s = j2;
+      continue;
+    }
+    const info = e.info, spell = info.r.spell;
+    if (!pagadas.has(spell) && info.acq.cobre > 0) {
+      pagadas.add(spell);
+      totalAdq += info.acq.cobre;
+      base.adquisiciones.push({ spell, item: info.acq.item, cobre: info.acq.cobre, fuente: info.acq.fuente, desde: s });
+    }
+    let j = s + 1, crafteos = 1 / e.p, mat = info.costo.total * crafteos;
+    while (j < fin) {
+      const e2 = elegir(j);
+      if (!e2 || e2.info.r.spell !== spell) break;
+      crafteos += 1 / e2.p;
+      mat += info.costo.total / e2.p;
+      j++;
+    }
+    totalMat += mat;
+    puntosCubiertos += j - s;
+    pasos.push({ desde: s, hasta: j, spell, crafteos: Math.round(crafteos), costo: Math.round(mat) });
+    s = j;
+  }
+  base.pasos = pasos;
+  base.huecos = huecos2;
+  base.sinPrecio = [...sinPrecioMap.values()];
+  base.totalAdquisicion = Math.round(totalAdq);
+  base.totalMateriales = pasos.length ? Math.round(totalMat) : null;
+  base.total = pasos.length ? Math.round(totalMat + totalAdq) : null;
+  base.cobertura = fin > d0 ? puntosCubiertos / (fin - d0) : 0;
+  return base;
+}
 
 // src/davi.js
 var LIMITE_REACTIVOS = 30;
@@ -36849,7 +36963,7 @@ function VistaRuta({ almacen, estado, recargar, perfil, lang }) {
 }
 
 // src/vistas/profesiones.jsx
-import { useMemo as useMemo7, useState as useState6 } from "react";
+import { useMemo as useMemo7, useState as useState7 } from "react";
 import { Button as Button5, Input as Input3, Select as Select2, SelectContent as SelectContent2, SelectItem as SelectItem2, SelectTrigger as SelectTrigger2, SelectValue as SelectValue2 } from "@hermes/plugin-sdk";
 
 // src/vistas/profesiones/tabla.jsx
@@ -37042,7 +37156,7 @@ function TablaRecetas({ prof, skill, precios, items, faccion, lang, sel, onSel }
 }
 
 // src/vistas/profesiones/plan.jsx
-import { useMemo as useMemo5 } from "react";
+import { useMemo as useMemo5, useState as useState6 } from "react";
 import { Button as Button4 } from "@hermes/plugin-sdk";
 import { Fragment as Fragment9, jsx as jsx8, jsxs as jsxs8 } from "react/jsx-runtime";
 agregarTextos({
@@ -37055,7 +37169,26 @@ agregarTextos({
   "prof.plan.total": "Total estimado",
   "prof.plan.crafts": "{n} crafts",
   "prof.plan.sinReceta": "sin receta en este tramo",
-  "prof.plan.obtenibles": "Solo recetas de entrenador, automáticas y objetos receta que vende un vendedor de tu facción."
+  "prof.plan.obtenibles": "Solo recetas de entrenador, automáticas y objetos receta que vende un vendedor de tu facción.",
+  "prof.plan.modo.rapido": "Plan rápido",
+  "prof.plan.modo.maxear": "Maxear a 300",
+  "prof.max.titulo": "Maxear a 300",
+  "prof.max.estimacion": "Ruta golosa por coste esperado por punto: materiales + adquisición de la receta amortizada sobre los puntos que aporta, pagada una sola vez. Incluye recetas verdes. Estimació\
+n con la fórmula aproximada de Classic; no garantiza nada en Forever.",
+  "prof.max.avisoEntrenamiento": "El coste de entrenar los tramos con el trainer no está en los datos (SIN DATOS): no se incluye en el total.",
+  "prof.max.cobertura": "{pct}% del tramo cubierto por la ruta con precio.",
+  "prof.max.adquisicion": "Adquisición de recetas",
+  "prof.max.adquisicion.nota": "Se paga una sola vez. Fuente: gratis (entrenador/automática), vendedor de tu facción o subasta.",
+  "prof.max.materiales": "Materiales",
+  "prof.max.total": "Total estimado (materiales + adquisición)",
+  "prof.max.huecos": "Huecos sin ruta con precio",
+  "prof.max.sinDato": "{n} recetas sin coste de adquisición conocido (SIN DATOS): quedan fuera de la ruta.",
+  "prof.max.sinPrecio": "{n} recetas sin precio de algún reactivo: no entran en la ruta con precio.",
+  "prof.max.sinRuta": "No hay ruta con precio desde tu skill: faltan precios de reactivos o recetas conocidas. Importa más precios en Mercado.",
+  "prof.max.gratis": "gratis",
+  "prof.max.vendedor": "vendedor",
+  "prof.max.subasta": "subasta",
+  "prof.max.desde": "desde {n}"
 }, {
   "prof.plan": "Leveling plan",
   "prof.plan.estimacion": "Estimate: skill-up chance uses the approximate Classic formula; cost uses vendor and auction prices. Not guaranteed on Forever.",
@@ -37066,10 +37199,31 @@ agregarTextos({
   "prof.plan.total": "Estimated total",
   "prof.plan.crafts": "{n} crafts",
   "prof.plan.sinReceta": "no recipe in this range",
-  "prof.plan.obtenibles": "Only trainer recipes, automatic ones and recipe items a vendor of your faction sells."
+  "prof.plan.obtenibles": "Only trainer recipes, automatic ones and recipe items a vendor of your faction sells.",
+  "prof.plan.modo.rapido": "Quick plan",
+  "prof.plan.modo.maxear": "Max to 300",
+  "prof.max.titulo": "Max to 300",
+  "prof.max.estimacion": "Greedy route by expected cost per point: materials + recipe acquisition amortized over the points it yields, paid once. Includes green recipes. Estimate with the approximate \
+Classic formula; not guaranteed on Forever.",
+  "prof.max.avisoEntrenamiento": "The cost of training tiers with the trainer is not in the data (NO DATA): it is not included in the total.",
+  "prof.max.cobertura": "{pct}% of the range covered by the priced route.",
+  "prof.max.adquisicion": "Recipe acquisition",
+  "prof.max.adquisicion.nota": "Paid once. Source: free (trainer/automatic), a vendor of your faction or the auction house.",
+  "prof.max.materiales": "Materials",
+  "prof.max.total": "Estimated total (materials + acquisition)",
+  "prof.max.huecos": "Gaps without a priced route",
+  "prof.max.sinDato": "{n} recipes without a known acquisition cost (NO DATA): left out of the route.",
+  "prof.max.sinPrecio": "{n} recipes missing a reagent price: not in the priced route.",
+  "prof.max.sinRuta": "No priced route from your skill: reagent prices or known recipes are missing. Import more prices in Market.",
+  "prof.max.gratis": "free",
+  "prof.max.vendedor": "vendor",
+  "prof.max.subasta": "auction",
+  "prof.max.desde": "from {n}"
 });
 var num3 = (v) => Number.isFinite(v) ? v : 0;
+var pct1 = (v) => Number.isFinite(v) ? String(Math.round(v * 1e3) / 10) : "—";
 function PlanSubida({ prof, skill, trainers, precios, items, lang, irA, faccion }) {
+  const [maxear, setMaxear] = useState6(false);
   const hasta = useMemo5(() => {
     const deTrainers = trainers.length ? Math.max(...trainers.map((e) => num3(e.max))) : 0;
     if (deTrainers > 0) return Math.min(300, deTrainers);
@@ -37084,51 +37238,135 @@ function PlanSubida({ prof, skill, trainers, precios, items, lang, irA, faccion 
   );
   const porSpell = useMemo5(() => new Map(prof.recetas.map((r) => [r.spell, r])), [prof]);
   const hayPrecios = precios instanceof Map ? precios.size > 0 : false;
+  const ruta = useMemo5(
+    () => maxear && hayPrecios ? rutaMaxeo(prof.recetas, skill, 300, precios, items, { faccion }) : null,
+    [maxear, hayPrecios, prof, skill, precios, items, faccion]
+  );
   const totalCrafts = plan.reduce((a, p) => a + p.crafteos, 0);
   const costos = plan.map((p) => p.costo);
   const totalCosto = costos.every((c) => c !== null) && costos.length ? costos.reduce((a, c) => a + c, 0) : null;
   const fuentes = useMemo5(() => [...new Set(prof.recetas.flatMap((r) => [].concat(r.f || [])))], [prof]);
-  return /* @__PURE__ */ jsxs8(
-    Tarjeta,
-    {
-      titulo: `${t(lang, "prof.plan")} · ${skill} → ${hasta}`,
-      extra: /* @__PURE__ */ jsx8(Origen, { f: fuentes.length ? fuentes : "cmangos-1.12", lang }),
-      children: [
-        /* @__PURE__ */ jsxs8("div", { style: S.sub, children: [
-          t(lang, "prof.plan.estimacion"),
-          " ",
-          t(lang, "prof.plan.obtenibles")
-        ] }),
-        !hayPrecios ? /* @__PURE__ */ jsxs8(Aviso, { children: [
-          t(lang, "prof.plan.sinPrecios"),
-          " ",
-          /* @__PURE__ */ jsx8(Button4, { variant: "outline", size: "xs", onClick: () => irA("mercado"), children: t(lang, "prof.plan.importar") })
-        ] }) : null,
-        skill >= hasta ? /* @__PURE__ */ jsx8("div", { style: S.sub, children: t(lang, "prof.plan.tope", { hasta }) }) : !plan.length ? /* @__PURE__ */ jsx8("div", { style: S.sub, children: t(lang, "p\
-rof.plan.vacio") }) : /* @__PURE__ */ jsxs8(Fragment9, { children: [
-          /* @__PURE__ */ jsx8("div", { style: { maxHeight: 320, overflowY: "auto" }, children: plan.map((p, i) => {
-            const r = p.spell != null ? porSpell.get(p.spell) : null;
+  const toggle = /* @__PURE__ */ jsxs8("div", { style: { display: "flex", gap: 6, marginBottom: 8 }, children: [
+    /* @__PURE__ */ jsx8(Button4, { size: "xs", variant: maxear ? "outline" : "secondary", onClick: () => setMaxear(false), children: t(lang, "prof.plan.modo.rapido") }),
+    /* @__PURE__ */ jsx8(Button4, { size: "xs", variant: maxear ? "secondary" : "outline", onClick: () => setMaxear(true), children: t(lang, "prof.plan.modo.maxear") })
+  ] });
+  const importar = /* @__PURE__ */ jsxs8(Aviso, { children: [
+    t(lang, "prof.plan.sinPrecios"),
+    " ",
+    /* @__PURE__ */ jsx8(Button4, { variant: "outline", size: "xs", onClick: () => irA("mercado"), children: t(lang, "prof.plan.importar") })
+  ] });
+  const origen = /* @__PURE__ */ jsx8(Origen, { f: fuentes.length ? fuentes : "cmangos-1.12", lang });
+  if (maxear) {
+    const pasos = ruta ? ruta.pasos : [];
+    const acqs = ruta ? ruta.adquisiciones : [];
+    return /* @__PURE__ */ jsxs8(Tarjeta, { titulo: `${t(lang, "prof.max.titulo")} · ${skill} → 300`, extra: origen, children: [
+      toggle,
+      /* @__PURE__ */ jsx8("div", { style: S.sub, children: t(lang, "prof.max.estimacion") }),
+      /* @__PURE__ */ jsx8("div", { style: S.sub, children: t(lang, "prof.max.avisoEntrenamiento") }),
+      !hayPrecios ? importar : !ruta || !pasos.length ? /* @__PURE__ */ jsxs8(Fragment9, { children: [
+        /* @__PURE__ */ jsx8("div", { style: S.sub, children: t(lang, "prof.max.sinRuta") }),
+        ruta && ruta.huecos.length ? /* @__PURE__ */ jsxs8("div", { style: { marginTop: 6 }, children: [
+          /* @__PURE__ */ jsx8("div", { style: { ...S.sub, fontWeight: 600 }, children: t(lang, "prof.max.huecos") }),
+          ruta.huecos.map((h, i) => /* @__PURE__ */ jsxs8("div", { style: S.fila, children: [
+            /* @__PURE__ */ jsxs8("span", { style: { minWidth: 110, color: C.texto3, fontVariantNumeric: "tabular-nums" }, children: [
+              h.desde,
+              "–",
+              h.hasta - 1
+            ] }),
+            /* @__PURE__ */ jsx8("span", { style: { flex: 1, ...S.sub }, children: h.motivo })
+          ] }, i))
+        ] }) : null
+      ] }) : /* @__PURE__ */ jsxs8(Fragment9, { children: [
+        /* @__PURE__ */ jsx8("div", { style: { ...S.sub, marginTop: 6 }, children: t(lang, "prof.max.cobertura", { pct: pct1(ruta.cobertura) }) }),
+        /* @__PURE__ */ jsx8("div", { style: { maxHeight: 320, overflowY: "auto", marginTop: 6 }, children: pasos.map((p, i) => {
+          const r = porSpell.get(p.spell);
+          return /* @__PURE__ */ jsxs8("div", { style: S.fila, children: [
+            /* @__PURE__ */ jsxs8("span", { style: { minWidth: 110, color: C.texto3, fontVariantNumeric: "tabular-nums" }, children: [
+              p.desde,
+              "–",
+              p.hasta - 1
+            ] }),
+            /* @__PURE__ */ jsx8("span", { style: { flex: 1 }, children: r ? nombre(r.n, lang) : /* @__PURE__ */ jsx8("span", { style: { color: C.texto3 }, children: t(lang, "prof.plan.sinReceta") }) }),
+            /* @__PURE__ */ jsx8("span", { style: S.sub, children: t(lang, "prof.plan.crafts", { n: p.crafteos }) }),
+            /* @__PURE__ */ jsx8("span", { style: { ...S.sub, fontVariantNumeric: "tabular-nums", minWidth: 80, textAlign: "right" }, children: p.costo === null ? "—" : /* @__PURE__ */ jsx8(Dinero, {
+            cobre: p.costo }) })
+          ] }, i);
+        }) }),
+        acqs.length ? /* @__PURE__ */ jsxs8("div", { style: { marginTop: 8 }, children: [
+          /* @__PURE__ */ jsx8("div", { style: { ...S.sub, fontWeight: 600 }, children: t(lang, "prof.max.adquisicion") }),
+          /* @__PURE__ */ jsx8("div", { style: S.sub, children: t(lang, "prof.max.adquisicion.nota") }),
+          acqs.map((a, i) => {
+            const r = porSpell.get(a.spell);
             return /* @__PURE__ */ jsxs8("div", { style: S.fila, children: [
-              /* @__PURE__ */ jsxs8("span", { style: { minWidth: 110, color: C.texto3, fontVariantNumeric: "tabular-nums" }, children: [
-                p.desde,
-                "–",
-                p.hasta - 1
-              ] }),
-              /* @__PURE__ */ jsx8("span", { style: { flex: 1 }, children: r ? nombre(r.n, lang) : /* @__PURE__ */ jsx8("span", { style: { color: C.texto3 }, children: t(lang, "prof.plan.sinReceta") }) }),
-              /* @__PURE__ */ jsx8("span", { style: S.sub, children: t(lang, "prof.plan.crafts", { n: p.crafteos }) }),
-              /* @__PURE__ */ jsx8("span", { style: { ...S.sub, fontVariantNumeric: "tabular-nums", minWidth: 80, textAlign: "right" }, children: p.costo === null ? "—" : /* @__PURE__ */ jsx8(Dinero,
-              { cobre: p.costo }) })
+              /* @__PURE__ */ jsx8("span", { style: { flex: 1 }, children: r ? nombre(r.n, lang) : a.item != null ? nombre(items[String(a.item)]?.[0], lang) : "—" }),
+              /* @__PURE__ */ jsx8("span", { style: S.sub, children: t(lang, "prof.max." + a.fuente) }),
+              /* @__PURE__ */ jsx8("span", { style: S.sub, children: t(lang, "prof.max.desde", { n: a.desde }) }),
+              /* @__PURE__ */ jsx8("span", { style: { ...S.sub, fontVariantNumeric: "tabular-nums", minWidth: 80, textAlign: "right" }, children: a.cobre === 0 ? t(lang, "prof.max.gratis") : /* @__PURE__ */ jsx8(
+              Dinero, { cobre: a.cobre }) })
             ] }, i);
-          }) }),
-          /* @__PURE__ */ jsxs8("div", { style: { ...S.fila, borderBottom: "none", fontWeight: 600 }, children: [
-            /* @__PURE__ */ jsx8("span", { style: { flex: 1 }, children: t(lang, "prof.plan.total") }),
-            /* @__PURE__ */ jsx8("span", { style: S.sub, children: t(lang, "prof.plan.crafts", { n: totalCrafts }) }),
-            /* @__PURE__ */ jsx8("span", { style: { fontVariantNumeric: "tabular-nums", minWidth: 80, textAlign: "right" }, children: totalCosto === null ? "—" : /* @__PURE__ */ jsx8(Dinero, { cobre: totalCosto }) })
-          ] })
-        ] })
-      ]
-    }
-  );
+          })
+        ] }) : null,
+        /* @__PURE__ */ jsxs8("div", { style: { ...S.fila, borderBottom: "none", fontWeight: 600, marginTop: 6 }, children: [
+          /* @__PURE__ */ jsx8("span", { style: { flex: 1 }, children: t(lang, "prof.max.materiales") }),
+          /* @__PURE__ */ jsx8("span", { style: { fontVariantNumeric: "tabular-nums", minWidth: 80, textAlign: "right" }, children: ruta.totalMateriales === null ? "—" : /* @__PURE__ */ jsx8(Dinero,
+          { cobre: ruta.totalMateriales }) })
+        ] }),
+        /* @__PURE__ */ jsxs8("div", { style: { ...S.fila, borderBottom: "none" }, children: [
+          /* @__PURE__ */ jsx8("span", { style: { flex: 1 }, children: t(lang, "prof.max.adquisicion") }),
+          /* @__PURE__ */ jsx8("span", { style: { fontVariantNumeric: "tabular-nums", minWidth: 80, textAlign: "right" }, children: /* @__PURE__ */ jsx8(Dinero, { cobre: ruta.totalAdquisicion }) })
+        ] }),
+        /* @__PURE__ */ jsxs8("div", { style: { ...S.fila, borderBottom: "none", fontWeight: 600 }, children: [
+          /* @__PURE__ */ jsx8("span", { style: { flex: 1 }, children: t(lang, "prof.max.total") }),
+          /* @__PURE__ */ jsx8("span", { style: { fontVariantNumeric: "tabular-nums", minWidth: 80, textAlign: "right" }, children: ruta.total === null ? "—" : /* @__PURE__ */ jsx8(Dinero, { cobre: ruta.
+          total }) })
+        ] }),
+        ruta.huecos.length ? /* @__PURE__ */ jsxs8("div", { style: { marginTop: 8 }, children: [
+          /* @__PURE__ */ jsx8("div", { style: { ...S.sub, fontWeight: 600 }, children: t(lang, "prof.max.huecos") }),
+          ruta.huecos.map((h, i) => /* @__PURE__ */ jsxs8("div", { style: S.fila, children: [
+            /* @__PURE__ */ jsxs8("span", { style: { minWidth: 110, color: C.texto3, fontVariantNumeric: "tabular-nums" }, children: [
+              h.desde,
+              "–",
+              h.hasta - 1
+            ] }),
+            /* @__PURE__ */ jsx8("span", { style: { flex: 1, ...S.sub }, children: h.motivo })
+          ] }, i))
+        ] }) : null,
+        ruta.adquisicionesSinDato.length ? /* @__PURE__ */ jsx8("div", { style: S.sub, children: t(lang, "prof.max.sinDato", { n: ruta.adquisicionesSinDato.length }) }) : null,
+        ruta.sinPrecio.length ? /* @__PURE__ */ jsx8("div", { style: S.sub, children: t(lang, "prof.max.sinPrecio", { n: ruta.sinPrecio.length }) }) : null
+      ] })
+    ] });
+  }
+  return /* @__PURE__ */ jsxs8(Tarjeta, { titulo: `${t(lang, "prof.plan")} · ${skill} → ${hasta}`, extra: origen, children: [
+    toggle,
+    /* @__PURE__ */ jsxs8("div", { style: S.sub, children: [
+      t(lang, "prof.plan.estimacion"),
+      " ",
+      t(lang, "prof.plan.obtenibles")
+    ] }),
+    !hayPrecios ? importar : null,
+    skill >= hasta ? /* @__PURE__ */ jsx8("div", { style: S.sub, children: t(lang, "prof.plan.tope", { hasta }) }) : !plan.length ? /* @__PURE__ */ jsx8("div", { style: S.sub, children: t(lang, "prof.\
+plan.vacio") }) : /* @__PURE__ */ jsxs8(Fragment9, { children: [
+      /* @__PURE__ */ jsx8("div", { style: { maxHeight: 320, overflowY: "auto" }, children: plan.map((p, i) => {
+        const r = p.spell != null ? porSpell.get(p.spell) : null;
+        return /* @__PURE__ */ jsxs8("div", { style: S.fila, children: [
+          /* @__PURE__ */ jsxs8("span", { style: { minWidth: 110, color: C.texto3, fontVariantNumeric: "tabular-nums" }, children: [
+            p.desde,
+            "–",
+            p.hasta - 1
+          ] }),
+          /* @__PURE__ */ jsx8("span", { style: { flex: 1 }, children: r ? nombre(r.n, lang) : /* @__PURE__ */ jsx8("span", { style: { color: C.texto3 }, children: t(lang, "prof.plan.sinReceta") }) }),
+          /* @__PURE__ */ jsx8("span", { style: S.sub, children: t(lang, "prof.plan.crafts", { n: p.crafteos }) }),
+          /* @__PURE__ */ jsx8("span", { style: { ...S.sub, fontVariantNumeric: "tabular-nums", minWidth: 80, textAlign: "right" }, children: p.costo === null ? "—" : /* @__PURE__ */ jsx8(Dinero, { cobre: p.
+          costo }) })
+        ] }, i);
+      }) }),
+      /* @__PURE__ */ jsxs8("div", { style: { ...S.fila, borderBottom: "none", fontWeight: 600 }, children: [
+        /* @__PURE__ */ jsx8("span", { style: { flex: 1 }, children: t(lang, "prof.plan.total") }),
+        /* @__PURE__ */ jsx8("span", { style: S.sub, children: t(lang, "prof.plan.crafts", { n: totalCrafts }) }),
+        /* @__PURE__ */ jsx8("span", { style: { fontVariantNumeric: "tabular-nums", minWidth: 80, textAlign: "right" }, children: totalCosto === null ? "—" : /* @__PURE__ */ jsx8(Dinero, { cobre: totalCosto }) })
+      ] })
+    ] })
+  ] });
 }
 
 // src/vistas/profesiones/fuentes.jsx
@@ -37291,9 +37529,9 @@ function VistaProfesiones({ ctx, estado, perfil, lang, irA }) {
     const set = new Set(elegidas);
     return [...elegidas, ...ORDEN_BASE.filter((id) => !set.has(id))];
   }, [perfil, datos]);
-  const [pid, setPid] = useState6(() => orden[0]);
-  const [skills, setSkills] = useState6({});
-  const [sel, setSel] = useState6(null);
+  const [pid, setPid] = useState7(() => orden[0]);
+  const [skills, setSkills] = useState7({});
+  const [sel, setSel] = useState7(null);
   const pidReal = datos[String(pid)] ? pid : orden[0];
   const prof = datos[String(pidReal)];
   const skillDe = (id) => {
@@ -37312,7 +37550,7 @@ function VistaProfesiones({ ctx, estado, perfil, lang, irA }) {
     } catch {
     }
   };
-  const [todosEntr, setTodosEntr] = useState6(false);
+  const [todosEntr, setTodosEntr] = useState7(false);
   const precios = useMemo7(() => preciosDelMercado(estado.market, perfil.reino), [estado.market, perfil.reino]);
   const trainers = prof && prof.entrenadores ? prof.entrenadores[perfil.faccion] || [] : [];
   const siguiente = Math.min(Infinity, ...trainers.map((e) => num5(e.max)).filter((m) => m > skill));
@@ -37458,7 +37696,7 @@ function VistaProfesiones({ ctx, estado, perfil, lang, irA }) {
 }
 
 // src/vistas/dungeons.jsx
-import { useMemo as useMemo9, useState as useState7 } from "react";
+import { useMemo as useMemo9, useState as useState8 } from "react";
 import { Checkbox as Checkbox5, SegmentedControl as SegmentedControl3 } from "@hermes/plugin-sdk";
 
 // src/vistas/dungeons/tarjeta.jsx
@@ -37630,9 +37868,9 @@ agregarTextos({
   "dungeon.intro": "Those in your range (±5 levels) come open. The curated loot tick saves itself."
 });
 function VistaDungeons({ almacen, estado, recargar, perfil, lang }) {
-  const [filtro, setFiltro] = useState7("rango");
-  const [soloUtil, setSoloUtil] = useState7(false);
-  const [aviso, setAviso] = useState7("");
+  const [filtro, setFiltro] = useState8("rango");
+  const [soloUtil, setSoloUtil] = useState8(false);
+  const [aviso, setAviso] = useState8("");
   const build = useMemo9(() => leerBuild(estado && estado.build), [estado && estado.build]);
   const lista = useMemo9(() => listaDungeons(D.dungeons), []);
   const visibles = useMemo9(() => dungeonsVisibles(lista, filtro, perfil.nivel), [lista, filtro, perfil.nivel]);
@@ -37700,7 +37938,7 @@ function VistaDungeons({ almacen, estado, recargar, perfil, lang }) {
 }
 
 // src/vistas/mercado.jsx
-import { useCallback, useEffect as useEffect3, useMemo as useMemo14, useRef as useRef2, useState as useState9 } from "react";
+import { useCallback, useEffect as useEffect3, useMemo as useMemo14, useRef as useRef2, useState as useState10 } from "react";
 import { Button as Button8, Checkbox as Checkbox8, SearchField as SearchField2, Select as Select4, SelectContent as SelectContent4, SelectItem as SelectItem4, SelectTrigger as SelectTrigger4, SelectValue as SelectValue4 } from "@hermes/plugin-sdk";
 
 // src/auctionator.js
@@ -38577,7 +38815,7 @@ function Farmeo({ items, perfil, settings, onSettings, lang }) {
 }
 
 // src/vistas/mercado/mis-ventas.jsx
-import { useEffect as useEffect2, useMemo as useMemo13, useState as useState8 } from "react";
+import { useEffect as useEffect2, useMemo as useMemo13, useState as useState9 } from "react";
 import { Button as Button7, Checkbox as Checkbox7 } from "@hermes/plugin-sdk";
 
 // src/tsm.js
@@ -38677,9 +38915,9 @@ function resumenTsm(snapshot, realmName) {
 // src/vistas/mercado/mis-ventas.jsx
 import { Fragment as Fragment13, jsx as jsx16, jsxs as jsxs16 } from "react/jsx-runtime";
 function MisVentas({ ventas, auctionSnapshot, perfil, lang }) {
-  const [state, setState] = useState8(() => ventas?.getState() || { status: "unavailable", enabled: false, snapshot: null });
-  const [busy, setBusy] = useState8(false), [confirm, setConfirm] = useState8(false);
-  const [selected, setSelected] = useState8(""), [search, setSearch] = useState8(""), [page, setPage] = useState8(0);
+  const [state, setState] = useState9(() => ventas?.getState() || { status: "unavailable", enabled: false, snapshot: null });
+  const [busy, setBusy] = useState9(false), [confirm, setConfirm] = useState9(false);
+  const [selected, setSelected] = useState9(""), [search, setSearch] = useState9(""), [page, setPage] = useState9(0);
   useEffect2(() => ventas?.subscribe(setState), [ventas]);
   const en = lang === "en", tr = (es, english) => en ? english : es;
   const snap = state.snapshot;
@@ -39338,7 +39576,7 @@ function FilaVacia({ texto: texto2 }) {
 }
 function VistaMercado({ ctx, almacen, sincronizador, ventas, estado, recargar, perfil, lang }) {
   const sync = useMemo14(() => sincronizador || createMarketSync(ctx, almacen), [sincronizador, ctx, almacen]);
-  const [auto, setAuto] = useState9(sync.getState());
+  const [auto, setAuto] = useState10(sync.getState());
   useEffect3(() => sync.subscribe(setAuto), [sync]);
   const cambiarAuto = async () => {
     try {
@@ -39351,34 +39589,34 @@ function VistaMercado({ ctx, almacen, sincronizador, ventas, estado, recargar, p
   const mercado = estado?.market;
   const historial = estado?.history;
   const snapshot = useMemo14(() => snapshotVisible(mercado, historial), [mercado, historial]);
-  const [mensaje, setMensaje] = useState9("");
-  const [importando, setImportando] = useState9(false);
-  const [confirmBorrar, setConfirmBorrar] = useState9(false);
-  const [realmName, setRealmName] = useState9("");
-  const [realmChoice, setRealmChoice] = useState9("");
+  const [mensaje, setMensaje] = useState10("");
+  const [importando, setImportando] = useState10(false);
+  const [confirmBorrar, setConfirmBorrar] = useState10(false);
+  const [realmName, setRealmName] = useState10("");
+  const [realmChoice, setRealmChoice] = useState10("");
   const realmId = (r) => snapshot?.realms.filter((x) => x.name === r.name).length > 1 ? JSON.stringify([import_market_identity2.default.identityKey(r.identity), r.name]) : r.name;
-  const [busqueda, setBusqueda] = useState9("");
-  const [soloRecientes, setSoloRecientes] = useState9(false);
-  const [conFuente, setConFuente] = useState9(false);
-  const [soloFarmable, setSoloFarmable] = useState9(false);
-  const [soloOfertas, setSoloOfertas] = useState9(false);
-  const [orden, setOrden] = useState9("precio");
-  const [pagina, setPagina] = useState9(0);
-  const [detalleKey, setDetalleKey] = useState9(null);
-  const [farmGuardado, setFarmGuardado] = useState9(null);
+  const [busqueda, setBusqueda] = useState10("");
+  const [soloRecientes, setSoloRecientes] = useState10(false);
+  const [conFuente, setConFuente] = useState10(false);
+  const [soloFarmable, setSoloFarmable] = useState10(false);
+  const [soloOfertas, setSoloOfertas] = useState10(false);
+  const [orden, setOrden] = useState10("precio");
+  const [pagina, setPagina] = useState10(0);
+  const [detalleKey, setDetalleKey] = useState10(null);
+  const [farmGuardado, setFarmGuardado] = useState10(null);
   const fileRef = useRef2(null);
   const revM = useRef2(0);
   const revH = useRef2(0);
-  const [scopesMemoria, setScopesMemoria] = useState9([]);
-  const [scopeA, setScopeA] = useState9("");
-  const [scopeB, setScopeB] = useState9("");
-  const [errorFuente, setErrorFuente] = useState9("");
-  const [bloqueoV2, setBloqueoV2] = useState9("");
-  const [ultimaFuente, setUltimaFuente] = useState9("");
-  const [guardandoV2, setGuardandoV2] = useState9(false);
-  const [confirmGuardarV2, setConfirmGuardarV2] = useState9(false);
-  const [confirmRollback, setConfirmRollback] = useState9(false);
-  const [comision, setComision] = useState9({
+  const [scopesMemoria, setScopesMemoria] = useState10([]);
+  const [scopeA, setScopeA] = useState10("");
+  const [scopeB, setScopeB] = useState10("");
+  const [errorFuente, setErrorFuente] = useState10("");
+  const [bloqueoV2, setBloqueoV2] = useState10("");
+  const [ultimaFuente, setUltimaFuente] = useState10("");
+  const [guardandoV2, setGuardandoV2] = useState10(false);
+  const [confirmGuardarV2, setConfirmGuardarV2] = useState10(false);
+  const [confirmRollback, setConfirmRollback] = useState10(false);
+  const [comision, setComision] = useState10({
     capital: { bps: "", verificada: false, etiqueta: "", dia: "" },
     neutral: { bps: "", verificada: false, etiqueta: "", dia: "" }
   });
@@ -40279,7 +40517,7 @@ x 0" }, children: [
 }
 
 // src/vistas/guia.jsx
-import { useCallback as useCallback2, useEffect as useEffect5, useMemo as useMemo15, useRef as useRef4, useState as useState12 } from "react";
+import { useCallback as useCallback2, useEffect as useEffect5, useMemo as useMemo15, useRef as useRef4, useState as useState13 } from "react";
 import { Button as Button10, Checkbox as Checkbox10, Input as Input5, SegmentedControl as SegmentedControl5, Select as Select5, SelectContent as SelectContent5, SelectItem as SelectItem5, SelectTrigger as SelectTrigger5,
 SelectValue as SelectValue5 } from "@hermes/plugin-sdk";
 
@@ -40685,7 +40923,7 @@ function aplicarSimc(state, d, ctx) {
 var SIMC_GUIA = { warrior: "warrior", hunter: "hunter", shaman: "shaman" };
 
 // src/vistas/guia/piezas.jsx
-import { useState as useState10 } from "react";
+import { useState as useState11 } from "react";
 import { Fragment as Fragment15, jsx as jsx18, jsxs as jsxs18 } from "react/jsx-runtime";
 agregarTextos({
   "guia.ficha.retrato": "Retrato de {clase}",
@@ -41136,7 +41374,7 @@ function Icono({ n, size = 16, color }) {
   );
 }
 function Detalle({ titulo, meta, extra, children, abierto, estilo, resumenExtra }) {
-  const [open, setOpen] = useState10(!!abierto);
+  const [open, setOpen] = useState11(!!abierto);
   return /* @__PURE__ */ jsxs18(
     "details",
     {
@@ -41801,7 +42039,7 @@ function VistaArmas({ v, lang }) {
 }
 
 // src/vistas/guia/macros.jsx
-import { useEffect as useEffect4, useRef as useRef3, useState as useState11 } from "react";
+import { useEffect as useEffect4, useRef as useRef3, useState as useState12 } from "react";
 import { Button as Button9, SearchField as SearchField3, SegmentedControl as SegmentedControl4 } from "@hermes/plugin-sdk";
 import { Fragment as Fragment17, jsx as jsx21, jsxs as jsxs21 } from "react/jsx-runtime";
 agregarTextos({
@@ -42051,7 +42289,7 @@ function MacroCard({ m, i, v, lang, onJump, flash, registerRef }) {
   const ok = usableFor(m, v.lvl, build.spec);
   const talOk = !m.tal || m.tal === build.spec;
   const key = MACRO_KEY[m.n];
-  const [cop, setCop] = useState11("");
+  const [cop, setCop] = useState12("");
   const specN = (G.specs || {})[build.spec] || build.spec;
   const copiar = async () => {
     try {
@@ -42104,10 +42342,10 @@ function VistaMacros({ v, lang }) {
   const { G, build, guardar, ctx } = v;
   const mcr = G.macros || [];
   const cats = macroCats(mcr);
-  const [mq, setMq] = useState11("");
+  const [mq, setMq] = useState12("");
   const cardRefs = useRef3(/* @__PURE__ */ new Map());
-  const [pendingJump, setPendingJump] = useState11(null);
-  const [flash, setFlash] = useState11(-1);
+  const [pendingJump, setPendingJump] = useState12(null);
+  const [flash, setFlash] = useState12(-1);
   const flashT = useRef3(null);
   const mf = curMf(build.mf, cats);
   const q = mq.trim().toLowerCase();
@@ -42398,20 +42636,20 @@ guia.sinGuiaClase") }) });
 function GuiaPrincipal({ ctx, almacen, estado, recargar, perfil, guardarPerfil, lang, curada }) {
   const { guia: G, fac: facKey, datos: GF } = curada;
   const ctxGuia = useMemo15(() => ({ G, GF, facKey, perfil }), [G, GF, facKey, perfil]);
-  const [build, setBuild] = useState12(() => leerBuild2(estado.build, ctxGuia));
+  const [build, setBuild] = useState13(() => leerBuild2(estado.build, ctxGuia));
   const ref = useRef4(build);
   useEffect5(() => {
     const b = leerBuild2(estado.build, ctxGuia);
     ref.current = b;
     setBuild(b);
   }, [estado.build, ctxGuia]);
-  const [errorG, setErrorG] = useState12("");
-  const [sub, setSub] = useState12(() => SUBTABS.includes(build.tab) ? build.tab : "rec");
-  const [simcOpen, setSimcOpen] = useState12(false);
-  const [simcTxt, setSimcTxt] = useState12("");
-  const [simcErr, setSimcErr] = useState12("");
-  const [simcNota, setSimcNota] = useState12("");
-  const [dpsTxt, setDpsTxt] = useState12(String(build.customDps || ""));
+  const [errorG, setErrorG] = useState13("");
+  const [sub, setSub] = useState13(() => SUBTABS.includes(build.tab) ? build.tab : "rec");
+  const [simcOpen, setSimcOpen] = useState13(false);
+  const [simcTxt, setSimcTxt] = useState13("");
+  const [simcErr, setSimcErr] = useState13("");
+  const [simcNota, setSimcNota] = useState13("");
+  const [dpsTxt, setDpsTxt] = useState13(String(build.customDps || ""));
   const avatarRef = useRef4(null);
   useEffect5(() => {
     setDpsTxt(String(build.customDps || ""));
@@ -43137,13 +43375,13 @@ function perfilInicial(guardado, build) {
   return { perfil: m.perfil, ok: validarPerfil(m.perfil, D.personaje).ok, errores: [], razaSupuesta: m.razaSupuesta };
 }
 function App({ ctx, almacen, sincronizador, ventas }) {
-  const [estado, setEstado] = useState13(null);
-  const [error, setError] = useState13("");
-  const [perfil, setPerfil] = useState13(null);
-  const [razaSupuesta, setRazaSupuesta] = useState13(false);
-  const [lang, setLang] = useState13(() => ctx.storage.get("idioma", "es") === "en" ? "en" : "es");
-  const [pestana, setPestana] = useState13(() => ctx.storage.get("pestana", "personaje"));
-  const [vuelta, setVuelta] = useState13(0);
+  const [estado, setEstado] = useState14(null);
+  const [error, setError] = useState14("");
+  const [perfil, setPerfil] = useState14(null);
+  const [razaSupuesta, setRazaSupuesta] = useState14(false);
+  const [lang, setLang] = useState14(() => ctx.storage.get("idioma", "es") === "en" ? "en" : "es");
+  const [pestana, setPestana] = useState14(() => ctx.storage.get("pestana", "personaje"));
+  const [vuelta, setVuelta] = useState14(0);
   const recargar = useCallback3(() => setVuelta((v) => v + 1), []);
   useEffect6(() => {
     let previous = sincronizador?.getState().changed;

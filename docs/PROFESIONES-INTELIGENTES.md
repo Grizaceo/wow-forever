@@ -13,7 +13,7 @@ recetas** separado del de los reactivos. Dos mitades con paridad verificada: el 
 | 0 | Bundle desktop reconciliado (mercado v2 + DAVI + datos) | hecha (`d90637e`) |
 | 1 | Extracción Forever-nativa del cliente: `receta_item`, `aprende` (naranja real desde `ItemSparse.RequiredSkillRank`), `como`, `vendedores`, `tiers`, `huecos` | hecha (generador `tools/build-datos-juego.py`) |
 | 2 | **Motor de coste con adquisición + CLI `maxeo` + paridad JS↔Python** | **hecha (este documento)** |
-| 3 | UI desktop «maxear a 300», export de precios del mercado al CLI, coste de entrenamiento de tramos, ROI con histórico, cierre de huecos de adquisición | pendiente |
+| 3 | UI desktop «maxear a 300» (**hecha**), export de precios al CLI, coste de entrenamiento de tramos, ROI con histórico, cierre de huecos de adquisición | en curso |
 
 ## El motor (Fase 2)
 
@@ -134,11 +134,33 @@ consultar.py profesion herreria --skill 120 --faccion horda
   `cd desktop && node build.mjs`, `python3 scripts/check_desktop_bundle.py desktop/plugin.js`,
   harness Chromium (`desktop/test/navegador.mjs` + `vista-profesiones.mjs`).
 
+## UI desktop: modo «Maxear a 300» (Fase 3, hecha)
+
+`desktop/src/vistas/profesiones/plan.jsx` — `PlanSubida` tiene ahora un toggle **Plan rápido /
+Maxear a 300**. El plan rápido (`planDeSubida`, sin adquisición) queda intacto como default.
+
+- **Maxear a 300** consume `rutaMaxeo(prof.recetas, skill, 300, precios, items, {faccion})` con los
+  precios del mercado importado (`estado.market` + `perfil.reino`) y la facción del perfil.
+- Muestra: pasos de la ruta (tramo, receta, crafts, coste de materiales), **adquisiciones pagadas**
+  (receta, fuente vendedor/subasta, desde qué skill, coste), **cobertura %** del tramo, totales
+  separados (materiales + adquisición = total), **huecos** con motivo, y notas honestas de
+  **SIN DATOS** (adquisiciones sin coste conocido) y recetas sin precio de reactivo.
+- El aviso de **entrenamiento de tramos SIN DATOS** se muestra siempre en este modo (no se inventa).
+- Sin precios importados: invita a importar en Mercado (no calcula una ruta falsa).
+- Solo lista adquisiciones **pagadas** (`cobre>0`); las gratis (entrenador/automática) entran en la
+  ruta pero no se listan como coste. i18n es/en.
+
+Verificación: harness Chromium `vista-profesiones.mjs` **27 ✓** (17 anteriores + 10 del modo maxear:
+sin mercado, ruta completa con adquisiciones pagadas y cobertura 100% sobre un fixture data-driven de
+Herrería, ruta parcial honesta, toggle de vuelta al plan rápido), `navegador.mjs` **34 ✓**, 0 red /
+0 errores JS. Build + `check_desktop_bundle.py` OK. Bundle desplegado en
+`~/.hermes/desktop-plugins/wow-forever` (sha verificado; harness contra el bundle instalado 27 ✓).
+
 ## Pendiente (Fase 3)
 
-1. **UI desktop**: modo «maxear a 300» en `PlanSubida` que consuma `rutaMaxeo` (adquisiciones +
-   total + cobertura), y botón en Mercado para **exportar el snapshot de precios** en formato
-   canónico y alimentar el CLI sin rutas privadas.
+1. **Export de precios al CLI**: botón en Mercado para exportar el snapshot en formato canónico y
+   alimentar el CLI sin rutas privadas. (El modo «maxear a 300» de la UI ya está hecho, ver arriba;
+   el CLI ya lee el bundle legacy directo con `--precios` — falta el affordance de export en la UI.)
 2. **Coste de entrenamiento de tramos**: hoy SIN DATOS. Fuente posible: trainers de CMaNGOS
    (`spell` de entrenamiento con precio) — requiere derivarlo del cliente/SQL, no inventarlo.
 3. **ROI con histórico**: `price-history-*.json` (v2, `scopes`) para coste medio móvil y

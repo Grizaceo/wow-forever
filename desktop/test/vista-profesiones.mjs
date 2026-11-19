@@ -16,6 +16,25 @@ const MERCADO = {
   } }) },
 }
 
+// Fixture de mercado data-driven para Herrería (164): precios planos para todos sus
+// reactivos y objetos-receta, para ejercitar la ruta de maxeo completa con adquisiciones pagadas.
+const { readFileSync } = await import('node:fs')
+const profData = JSON.parse(readFileSync(new URL('../../data/profesiones.json', import.meta.url), 'utf8'))
+const profs = profData.profesiones || profData
+const idsHerreria = new Set()
+for (const r of profs['164'].recetas) {
+  for (const par of (r.reactivos || [])) idsHerreria.add(Number(Array.isArray(par) ? par[0] : par))
+  if (r.receta_item != null) idsHerreria.add(Number(r.receta_item))
+}
+const mercadoHerreria = {
+  storage: { 'market-pointer': { slot: 'a', revision: 1 } },
+  archivos: { 'market-a.json': JSON.stringify({ revision: 1, values: { realm: 'Prueba', snapshot: {
+    schemaVersion: 1, sourceVersion: 8, importedAt: '2026-11-10T12:00:00.000Z', warnings: [],
+    realms: [{ name: 'Prueba', items: [...idsHerreria].filter(Number.isFinite).map((id) => ({
+      sourceKey: String(id), itemId: id, unitPriceCopper: 100, observedDay: 2140,
+      history: [{ day: 2140, low: 100, high: 110, available: 20 }] })) }] } } }) },
+}
+
 const a = await iniciar()
 const { check } = a
 const cuentaAprendibles = (p) => p.evaluate(() => {
@@ -105,5 +124,62 @@ for (const tema of ['claro', 'oscuro']) {
   check(tema + ': sin errores ni alertas', await p.locator('[role="alert"]').count() === 0)
   await cerrar()
 }
+
+// 7) Modo «Maxear a 300» (rutaMaxeo): adquisición, cobertura, huecos y SIN DATOS declarados.
+// 7a) Sin mercado: el modo maxear invita a importar precios y declara el trainer SIN DATOS.
+;({ p, cerrar } = await a.abrir('claro', { perfil: PERFILES.paladinHorda }))
+await p.click('[data-tab="profesiones"]')
+await p.getByRole('button', { name: 'Maxear a 300' }).click()
+await p.getByText('Sin precios de mercado').waitFor()
+check('maxear sin mercado: aviso de importar + nota SIN DATOS del trainer',
+  await p.getByText(/SIN DATOS/).count() > 0
+  && await p.getByRole('button', { name: 'Importar precios en Mercado' }).count() > 0)
+await cerrar()
+
+// 7b) Mercado completo de Herrería: ruta con pasos, adquisiciones pagadas, cobertura y total.
+;({ p, cerrar } = await a.abrir('claro', { perfil: PERFILES.paladinHorda, ...mercadoHerreria }))
+await p.click('[data-tab="profesiones"]')
+await p.fill('#wf-skill-164', '1')
+await p.waitForTimeout(80)
+await p.getByRole('button', { name: 'Maxear a 300' }).click()
+await p.getByText('Adquisición de recetas').first().waitFor()
+check('maxear: título de la tarjeta y nota de entrenamiento SIN DATOS',
+  await p.evaluate(() => document.body.innerText.includes('Maxear a 300'))
+  && await p.getByText(/SIN DATOS/).count() > 0)
+check('maxear: cobertura del tramo declarada', await p.getByText(/% del tramo cubierto/).count() > 0)
+check('maxear: hay pasos de ruta con crafts', await p.evaluate(() => document.body.innerText.includes('crafts')))
+check('maxear: sección de adquisición con fuente vendedor/subasta',
+  await p.getByText('Adquisición de recetas').count() > 0
+  && (await p.getByText('vendedor').count() > 0 || await p.getByText('subasta').count() > 0))
+check('maxear: total materiales + adquisición',
+  await p.getByText('Total estimado (materiales + adquisición)').count() > 0)
+check('maxear: sin errores ni alertas', await p.locator('[role="alert"]').count() === 0)
+await cerrar()
+
+// 7c) Mercado parcial (solo Paño de lino): Primeros auxilios declara cobertura o falta de ruta, honesto.
+;({ p, cerrar } = await a.abrir('claro', { perfil: PERFILES.chamanAlianza, ...MERCADO }))
+await p.click('[data-tab="profesiones"]')
+await p.selectOption('#wf-profesion', '129')
+await p.fill('#wf-skill-129', '1')
+await p.waitForTimeout(80)
+await p.getByRole('button', { name: 'Maxear a 300' }).click()
+await p.waitForFunction(() => document.body.innerText.includes('Maxear a 300'))
+check('maxear parcial: cobertura o falta de ruta, con SIN DATOS del trainer',
+  await p.getByText(/SIN DATOS/).count() > 0
+  && (await p.getByText(/% del tramo cubierto/).count() > 0
+      || await p.getByText(/No hay ruta con precio/).count() > 0))
+check('maxear parcial: sin alertas', await p.locator('[role="alert"]').count() === 0)
+await cerrar()
+
+// 7d) El toggle vuelve al plan rápido anterior (intacto).
+;({ p, cerrar } = await a.abrir('claro', { perfil: PERFILES.paladinHorda, ...mercadoHerreria }))
+await p.click('[data-tab="profesiones"]')
+await p.getByRole('button', { name: 'Maxear a 300' }).click()
+await p.getByText('Adquisición de recetas').first().waitFor()
+await p.getByRole('button', { name: 'Plan rápido' }).click()
+await p.getByText(/Plan de subida ·/).waitFor()
+check('toggle de vuelta al plan rápido (comportamiento anterior intacto)',
+  await p.getByText(/Plan de subida ·/).count() > 0)
+await cerrar()
 
 await a.terminar('vista-profesiones')
