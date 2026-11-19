@@ -70,16 +70,29 @@ Por profesión (ID de SkillLine: 171 Alquimia, 164 Herrería, 333 Encantamiento,
   - `crea` es `null` en los encantamientos: aplican un efecto, no crean un ítem.
   - `como`: el entrenador de 1.12 lista el hechizo que enseña la receta y se traduce
     al de la receta; `automatica` es una receta que se aprende sola al tomar la
-    profesión (`AcquireMethod = 1` en el cliente). Las recetas nuevas de Forever quedan
-    casi todas en `desconocido`: cómo se aprenden es dato del servidor.
+    profesión (`AcquireMethod = 1` en el cliente). En Forever, el ítem-plan que enseña
+    cada receta se deriva del cliente (`ItemEffect` TriggerType=6 LEARN + `ItemXItemEffect`
+    + `Item.csv`): las recetas nuevas con plan pasan a `receta` con su `receta_item`.
+    Solo quedan en `desconocido` las que el cliente no expone cómo se aprenden (dato del
+    servidor: entrenador/loot/misión de Forever). El relleno es aditivo: no altera ninguna
+    receta `cmangos-1.12`.
   - `amarillo` y `gris` vienen del cliente (`TrivialSkillLineRankLow/High`); `verde` es
-    su punto medio (regla de Classic); `aprende` es el requisito del entrenador o del
-    objeto receta. Si no se conoce, es `null`.
+    su punto medio (regla de Classic); `aprende` es el umbral de aprendizaje: requisito del
+    entrenador (1.12) o `RequiredSkillRank` del ítem-plan (`ItemSparse` del cliente). En
+    Forever `MinSkillLineRank` NO es el umbral (viene 1 en casi todas las recetas), no se
+    usa. Si no se conoce, es `null`. Puede superar al `amarillo` (Forever rebalanceó los
+    colores); esas anomalías quedan declaradas en `huecos`.
   - Entran las recetas del cliente que existen en 1.12 o que crean o usan ítems del
     rango de Forever (ID 240000 o más). Las del rango 200000–239999 son restos de
     Season of Discovery que trae el cliente y se excluyen. El recuento de excluidas
     queda en `meta`.
-- `huecos`.
+- `tiers`: `[{id, indice}]` — skilllines hijas de la profesión en el cliente
+  (`SkillLine.ParentSkillLineID`/`ParentTierIndex`). Es la estructura de tiers del
+  cliente, NO los tramos de rango (75/150/225/300), que siguen viniendo de los
+  entrenadores de 1.12 (`max`) y pueden diferir en Forever.
+- `huecos`: incluye los huecos de recetas de Forever (`adquisicion_forever`,
+  `naranja_forever`), las anomalías de umbral (`umbral_sobre_amarillo`) y los planes
+  Classic que el cliente reeditó (`plan_cliente_vs_cmangos`, se conserva CMaNGOS).
 
 ### `data/items.json`
 

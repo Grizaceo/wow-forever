@@ -29,6 +29,8 @@ NEEDED = [
     os.path.join(SRC, 'wowf', 'CharBaseInfo.csv'),
     os.path.join(SRC, 'wowf', 'ItemSparse.csv'),
     os.path.join(SRC, 'wowf', 'SkillLineAbility.csv'),
+    os.path.join(SRC, 'wowf', 'ItemEffect.csv'),
+    os.path.join(SRC, 'wowf', 'ItemXItemEffect.csv'),
     os.path.join(SRC, 'wowf', 'esMX', 'SpellName.csv'),
 ]
 

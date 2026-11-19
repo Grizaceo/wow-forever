@@ -106,9 +106,19 @@
      "sha256": "037ac6248ce1fceaad391fb0ec717cdb7ae1e8999e8c976c11b086a05deb5c57"
     },
     {
+     "tabla": "ItemEffect",
+     "destino": "ItemEffect.csv",
+     "sha256": "4e6090e887ab2e82d2aac7e5526a5b8aea6366aeaebfc10a272e2c513eaa7bc4"
+    },
+    {
      "tabla": "ItemSparse",
      "destino": "ItemSparse.csv",
      "sha256": "ced52fc6e5ca345805cfe3c015c05426c138aebd23ff1ad8a26cff5f1fe08be9"
+    },
+    {
+     "tabla": "ItemXItemEffect",
+     "destino": "ItemXItemEffect.csv",
+     "sha256": "4a0604e047f72390991e3a7914fe3e309829fb8773c36f5e4aff5628b7913f88"
     },
     {
      "tabla": "LFGDungeons",

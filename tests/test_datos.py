@@ -471,6 +471,57 @@ class TestDatos(unittest.TestCase):
 
 
 
+    def test_recetas_forever_con_plan_cliente(self):
+        # Las recetas de Forever con ítem-plan en el cliente traen como=receta,
+        # receta_item con ficha, y aprende>0 cuando el plan publica RequiredSkillRank.
+        profs = self.profesiones['profesiones']
+        items = self.items['items']
+        con_plan = [r for p in profs.values() for r in p['recetas']
+                    if r['f'] == 'cliente-forever' and r['receta_item'] is not None]
+        self.assertGreater(len(con_plan), 800)
+        for r in con_plan:
+            self.assertEqual(r['como'], 'receta', r['spell'])
+            self.assertIn(str(r['receta_item']), items, r['spell'])
+            self.assertNotIn(r['receta_item'], EXCL, r['spell'])
+        con_naranja = [r for r in con_plan if r['rango']['aprende'] is not None]
+        self.assertGreater(len(con_naranja), 800)
+        for r in con_naranja:
+            self.assertGreater(r['rango']['aprende'], 0, r['spell'])
+
+    def test_plan_forever_conocido(self):
+        # Gemmed Copper Boots (herrería Forever): plan 251332, umbral 35, amarillo 40.
+        recs = self.profesiones['profesiones']['164']['recetas']
+        r = next(x for x in recs if x['spell'] == 1252229)
+        self.assertEqual(r['receta_item'], 251332)
+        self.assertEqual(r['como'], 'receta')
+        self.assertEqual(r['rango']['aprende'], 35)
+        self.assertEqual(r['rango']['amarillo'], 40)
+        self.assertEqual(r['f'], 'cliente-forever')
+
+    def test_recetas_classic_intactas(self):
+        # El relleno de Fase 1 es aditivo: ninguna receta Classic cambia.
+        recs = self.profesiones['profesiones']['164']['recetas']
+        rbb = next(x for x in recs if x['spell'] == 2671)   # Rough Bronze Bracers
+        self.assertEqual(rbb['receta_item'], 5577)
+        self.assertEqual(rbb['f'], 'cmangos-1.12')
+        bbk = next(x for x in recs if x['spell'] == 3491)   # Big Bronze Knife
+        self.assertEqual(bbk['como'], 'entrenador')
+
+    def test_tiers_cliente(self):
+        # Skilllines hijas del cliente (ParentTierIndex), no los tramos de rango.
+        for pid, p in self.profesiones['profesiones'].items():
+            self.assertIn('tiers', p, pid)
+            self.assertIsInstance(p['tiers'], list, pid)
+            for t in p['tiers']:
+                self.assertEqual(sorted(t), ['id', 'indice'], pid)
+                self.assertIsInstance(t['id'], int, pid)
+
+    def test_huecos_recetas_forever(self):
+        temas = {h.get('tema') for h in self.profesiones['huecos']}
+        self.assertIn('adquisicion_forever', temas)
+        self.assertIn('naranja_forever', temas)
+
+
 class TestCatalogoMercado(unittest.TestCase):
     """standalone/market-catalog.js se regenera desde data/ byte a byte (sin entradas externas)."""
 

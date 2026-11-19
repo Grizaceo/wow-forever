@@ -87,8 +87,14 @@ class TestScript(unittest.TestCase):
         self.assertEqual(c, 0)
         recetas, plan = s.split('Plan de subida')
         self.assertIn('Brazales de bronce estampados', recetas)
-        self.assertNotIn('Blessed Plate', recetas)  # nueva de Forever sin requisito: no se ofrece
-        self.assertIn('no traen el skill para aprenderlas', recetas)
+        # Blessed Plate: nueva de Forever con requisito 240, aún no se ofrece a skill 120.
+        self.assertNotIn('Blessed Plate', recetas)
+        # Fase 1: las recetas de Forever con plan del cliente YA traen aprende y objeto
+        # receta; el hueco «no traen el skill para aprenderlas» se cerró a skill 120.
+        self.assertNotIn('no traen el skill para aprenderlas', recetas)
+        self.assertIn('Leotardos de plata esterlina', recetas)
+        self.assertIn('objeto receta', recetas)
+        self.assertIn('aprende 105', recetas)
         primer_paso = plan.splitlines()[1]
         self.assertTrue(primer_paso.startswith('- 120→125: Brazales de bronce estampados'), primer_paso)
         self.assertIn('120→150', plan)

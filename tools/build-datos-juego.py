@@ -133,6 +133,8 @@ def load_all(src):
     d['item_sparse'] = idx(jload(w, 'ItemSparse.csv'), 'ID')
     d['item_sparse_es'] = idx(jload(we, 'ItemSparse.csv'), 'ID')
     d['item'] = idx(jload(w, 'Item.csv'), 'ID')
+    d['item_effect'] = jload(w, 'ItemEffect.csv')
+    d['item_x_effect'] = jload(w, 'ItemXItemEffect.csv')
     d['sla'] = jload(w, 'SkillLineAbility.csv')
     d['spe'] = jload(w, 'SpellEffect.csv')
     d['sre'] = jload(w, 'SpellReagents.csv')
@@ -435,6 +437,36 @@ def build_quests(d, cm, zt, loc, maps):
 
 
 # ----------------------------------------------------------------- recetas
+def client_recipe_items(d):
+    """Ítem-plan que enseña cada hechizo de receta, desde el cliente Forever.
+
+    ItemEffect TriggerType=6 (LEARN) -> SpellID; ItemXItemEffect liga ese efecto
+    con el/los ítem(s) que lo disparan. Se elige el menor ID presente en Item.csv
+    (universo completo del cliente). El umbral de aprendizaje sale de
+    ItemSparse.RequiredSkillRank cuando el ítem lo publica.
+
+    MinSkillLineRank NO se usa: en Forever viene 1 en 2130/2146 recetas (campo
+    repurposed), no es el umbral. Lógica portada de wow-profession-journal (MIT,
+    build-data.mjs), adaptada a Item.csv + ItemSparse del pipeline propio.
+    """
+    items = d['item']                      # {id: fila Item.csv}
+    by_eff = collections.defaultdict(list)
+    for x in d['item_x_effect']:
+        by_eff[inum(x, 'ItemEffectID')].append(inum(x, 'ItemID'))
+    ri = {}
+    for e in d['item_effect']:
+        if inum(e, 'TriggerType') != 6:    # 6 = LEARN_SPELL
+            continue
+        sp = inum(e, 'SpellID')
+        # Excluir el rango SoD (ITEM_EXCL): build_items no lo incluye en items.json,
+        # y citar ese plan dropearía la receta en build_profesiones.
+        cands = sorted(i for i in by_eff.get(inum(e, 'ID'), [])
+                       if i in items and not (ITEM_EXCL_LO <= i <= ITEM_EXCL_HI))
+        if cands and sp not in ri:
+            ri[sp] = cands[0]
+    return ri
+
+
 def build_recipes(d, cm, names):
     cm_spells = {t['Id'] for t in d['db']['spell_template']}
     crea = collections.defaultdict(list)
@@ -457,6 +489,9 @@ def build_recipes(d, cm, names):
             rows.append(r)
     excluded_range = 0
     por_skill = collections.defaultdict(list)
+    client_ri = client_recipe_items(d)
+    stats = {'forever_plan': 0, 'forever_plan_orange': 0, 'forever_noplan': [],
+             'forever_auto': 0, 'learn_gt_yellow': [], 'classic_plan_mismatch': []}
     for r in rows:
         sl, sid = int(r['SkillLine']), int(r['Spell'])
         if sl not in PROF_IDS:
@@ -495,6 +530,16 @@ def build_recipes(d, cm, names):
         elif rit is not None:
             req = inum(cm['items'].get(rit, {}), 'RequiredSkillRank')
             aprende = req if req > 0 else None
+        # Fase 1: plan + umbral desde el cliente Forever, SOLO donde CMaNGOS no
+        # trae plan y la receta es de Forever. Aditivo: no toca recetas Classic.
+        if rit is None and como == 'desconocido' and sid not in cm_spells and sid in client_ri:
+            rit = client_ri[sid]
+            como = 'receta'
+            req = inum(d['item_sparse'].get(rit, {}), 'RequiredSkillRank')
+            if req > 0:
+                aprende = req
+                stats['forever_plan_orange'] += 1
+            stats['forever_plan'] += 1
         rango['aprende'] = aprende
         por_skill[sl].append({
             'spell': sid, 'skillline': sl, 'n': names['spell'](sid),
@@ -503,7 +548,18 @@ def build_recipes(d, cm, names):
             'rango': rango, 'como': como, 'receta_item': rit,
             'vendedores': {'alianza': [], 'horda': []},
             'f': 'cmangos-1.12' if sid in cm_spells else 'cliente-forever'})
-    return por_skill, excluded_range
+        if sid not in cm_spells:           # receta de Forever
+            if como == 'automatica':
+                stats['forever_auto'] += 1
+            elif como == 'desconocido':
+                stats['forever_noplan'].append({'spell': sid, 'n': names['spell'](sid).get('en') or ''})
+            if aprende is not None and rango['amarillo'] and aprende > rango['amarillo']:
+                stats['learn_gt_yellow'].append({'spell': sid, 'n': names['spell'](sid).get('en') or '',
+                                                 'aprende': aprende, 'amarillo': rango['amarillo']})
+        elif rit is not None and sid in client_ri and client_ri[sid] != rit:
+            stats['classic_plan_mismatch'].append({'spell': sid, 'n': names['spell'](sid).get('en') or '',
+                                                   'cmangos': rit, 'cliente': client_ri[sid]})
+    return por_skill, excluded_range, stats
 
 
 # ------------------------------------------------------------------ items
@@ -748,10 +804,13 @@ def build_profesiones(d, cm, loc, maps, recipes_by_sl, items_keys, huecos):
                 huecos.append({'tema': 'entrenadores', 'profesion': pid,
                                'faccion': key,
                                'motivo': 'sin entrenador de profesion en CMaNGOS'})
+        tiers = sorted(({'id': inum(c, 'ID'), 'indice': inum(c, 'ParentTierIndex')}
+                        for c in d['skillline'].values()
+                        if inum(c, 'ParentSkillLineID') == pid), key=lambda t: t['id'])
         out[str(pid)] = {'n': {'es': es or en, 'en': en or es}, 'tipo': tipo,
                          'recoleccion': reco,
                          'entrenadores': {'alianza': tr['a'], 'horda': tr['h']},
-                         'recetas': recs,
+                         'recetas': recs, 'tiers': tiers,
                          'f': fval('cmangos-1.12', 'cliente-forever')}
     return out, dropped
 
@@ -1000,7 +1059,7 @@ def main():
     # ---- recolectar datos ----
     huecos_per = collections.defaultdict(list)
     quests = build_quests(d, cm, zt, loc, era_maps)
-    recipes_by_sl, excl_range = build_recipes(d, cm, names)
+    recipes_by_sl, excl_range, rstats = build_recipes(d, cm, names)
     d['recipes_by_sl'] = recipes_by_sl
     cm['boss_loot'] = build_boss_loot(d, cm, loot, names)
     inst_maps = {t['map'] for t in d['db']['instance_template']}
@@ -1013,6 +1072,33 @@ def main():
     profs, n_rec_sin_item = build_profesiones(d, cm, loc, era_maps,
                                             recipes_by_sl, items_keys,
                                             huecos_per['profesiones'])
+    # Huecos de recetas (Fase 1): lo que el cliente Forever no expone, declarado.
+    pf = huecos_per['profesiones']
+    if rstats['forever_noplan']:
+        pf.append({'tema': 'adquisicion_forever',
+                   'motivo': ('%d recetas de Forever sin ítem-plan en el cliente: cómo se aprenden '
+                              'es dato del servidor (Fase 3: fuente servidor o captura in-game)')
+                             % len(rstats['forever_noplan']),
+                   'recetas': rstats['forever_noplan']})
+    sin_naranja = (len(rstats['forever_noplan']) + rstats['forever_auto']
+                   + rstats['forever_plan'] - rstats['forever_plan_orange'])
+    if sin_naranja:
+        pf.append({'tema': 'naranja_forever',
+                   'motivo': ('%d recetas de Forever sin umbral de aprendizaje: el cliente no lo expone '
+                              '(MinSkillLineRank=1 en Forever; RequiredSkillRank solo en planes con '
+                              'ItemSparse). No se inventa.') % sin_naranja})
+    if rstats['learn_gt_yellow']:
+        pf.append({'tema': 'umbral_sobre_amarillo',
+                   'motivo': ('%d recetas con umbral de aprendizaje (plan) por encima del amarillo: '
+                              'Forever rebalanceó los colores; verificar in-game')
+                             % len(rstats['learn_gt_yellow']),
+                   'recetas': rstats['learn_gt_yellow']})
+    if rstats['classic_plan_mismatch']:
+        pf.append({'tema': 'plan_cliente_vs_cmangos',
+                   'motivo': ('%d recetas Classic cuyo ítem-plan del cliente difiere del de CMaNGOS 1.12 '
+                              '(posible reedición Forever). Se conserva CMaNGOS (f=cmangos-1.12); '
+                              'reconciliar en Fase 3') % len(rstats['classic_plan_mismatch']),
+                   'recetas': rstats['classic_plan_mismatch']})
     # filtrar botin a items.json
     for lst in cm['boss_loot'].values():
         for j in lst:
@@ -1067,6 +1153,9 @@ def main():
     resumen = {'archivos': {k: {'bytes': v} for k, v in sorted(archivos.items())},
                'recetas_excluidas_rango_sod': excl_range,
                'recetas_sin_item': n_rec_sin_item,
+               'forever_con_plan_cliente': rstats['forever_plan'],
+               'forever_con_naranja': rstats['forever_plan_orange'],
+               'forever_sin_plan': len(rstats['forever_noplan']),
                'items_cmangos_fallback': n_items_cm,
                'items_sin_nombre': n_items_sin_nom,
                'huecos': {k: len(v) for k, v in sorted(huecos_per.items())}}
