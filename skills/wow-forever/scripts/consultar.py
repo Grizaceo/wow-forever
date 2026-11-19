@@ -586,6 +586,219 @@ def cargar_precios(path, reino=None):
     return out, meta
 
 
+def pct(x):
+    """Ratio -> porcentaje entero, o '—' si None."""
+    return f"{x * 100:.0f}%" if x is not None else "—"
+
+
+def valor_creado(r, precios, items):
+    """Valor de lo que crea la receta: subasta del ítem creado (× cantidad) o, sin subasta,
+    venta al vendedor (col.5 × cantidad). None en encantamientos (crea null) o sin referencia.
+    Paridad con valorCreado de src/crafteo.js."""
+    if not isinstance(r, dict) or r.get("crea") is None:
+        return None
+    par = r["crea"]
+    iid = par[0] if isinstance(par, list) else par
+    cant = par[1] if isinstance(par, list) and len(par) > 1 and isinstance(par[1], (int, float)) and par[1] > 0 else 1
+    pr = precios.get(str(iid)) if precios else None
+    if isinstance(pr, (int, float)) and math.isfinite(pr) and pr > 0:
+        return pr * cant
+    tabla = items.get("items", items) if isinstance(items, dict) else {}
+    f = tabla.get(str(iid))
+    if isinstance(f, list) and len(f) > 5 and isinstance(f[5], (int, float)) and math.isfinite(f[5]):
+        return f[5] * cant
+    return None
+
+
+def serie_historico(raw):
+    """Normaliza la serie de un ítem a [{'day','low','avail'}] ordenada por día ascendente.
+    Acepta triples v1 [day,low,avail] y objetos del snapshot {day,low,available}. Descarta
+    observaciones sin día entero o sin mínimo positivo. Paridad con serieHistorico."""
+    if not isinstance(raw, list):
+        return []
+    out = []
+    for e in raw:
+        if isinstance(e, list):
+            day = e[0] if len(e) > 0 else None
+            low = e[1] if len(e) > 1 else None
+            avail = e[2] if len(e) > 2 else None
+        elif isinstance(e, dict):
+            day, low = e.get("day"), e.get("low")
+            avail = e.get("available", e.get("avail"))
+        else:
+            continue
+        if not isinstance(day, int) or isinstance(day, bool) or not isinstance(low, (int, float)) \
+                or not math.isfinite(low) or low <= 0:
+            continue
+        out.append({"day": day, "low": low,
+                    "avail": avail if isinstance(avail, (int, float)) and math.isfinite(avail) else None})
+    out.sort(key=lambda x: x["day"])
+    return out
+
+
+def media_movil(series, ventana=None):
+    """Media de los mínimos diarios de los últimos `ventana` días (None/0 = todos).
+    {'media':cobre redondeado,'n','desde','hasta'} o None si vacío. Paridad con mediaMovil."""
+    s = series if isinstance(series, list) else []
+    if not s:
+        return None
+    w = ventana if isinstance(ventana, int) and not isinstance(ventana, bool) and ventana > 0 else len(s)
+    ult = s[-w:]
+    suma = sum(e["low"] for e in ult)
+    return {"media": _round(suma / len(ult)), "n": len(ult), "desde": ult[0]["day"], "hasta": ult[-1]["day"]}
+
+
+def tendencia(series):
+    """Cambio % del último mínimo diario respecto al primero. {'direccion','deltaPct'} o None
+    con <2 puntos. 'plana' si |Δ|<2%. Paridad con tendencia."""
+    s = series if isinstance(series, list) else []
+    if len(s) < 2:
+        return None
+    first, last = s[0]["low"], s[-1]["low"]
+    if not first > 0:
+        return None
+    delta = ((last - first) / first) * 100
+    direccion = "sube" if delta > 2 else ("baja" if delta < -2 else "plana")
+    return {"direccion": direccion, "deltaPct": _round(delta * 10) / 10}
+
+
+def precios_historicos(history_items, ventana=None):
+    """Mapa {id(str):media(cobre int)} + meta por ítem desde series históricas crudas.
+    Paridad con preciosHistoricos (JS devuelve Map; aquí dict str->int). Devuelve (precios, meta)."""
+    precios, meta = {}, {}
+    if not isinstance(history_items, dict):
+        return precios, meta
+    for key, raw in history_items.items():
+        try:
+            iid = int(key)
+        except (TypeError, ValueError):
+            continue
+        if iid <= 0:
+            continue
+        s = serie_historico(raw)
+        mm = media_movil(s, ventana)
+        if not mm:
+            continue
+        precios[str(iid)] = mm["media"]
+        t = tendencia(s)
+        meta[str(iid)] = {"media": mm["media"], "n": mm["n"], "desde": mm["desde"], "hasta": mm["hasta"],
+                          "direccion": t["direccion"] if t else None, "deltaPct": t["deltaPct"] if t else None}
+    return precios, meta
+
+
+def roi_ruta(recetas, desde, cap, precios, items, faccion=None, meta=None):
+    """ROI de la ruta de maxeo: coste (ruta_maxeo) vs valor recuperable de los crafts al subir.
+    retornoVendedor = suelo garantizado (col.5 × crafteos × yield). retornoEstimado = mejor valor
+    realizable (AH si hay precio medio, si no vendedor; el mayor). La liquidez AH NO está garantizada
+    (avail es oferta, no ventas). crafts sin valor (crea null) se declaran SIN DATOS. Paridad con roiRuta."""
+    ruta = ruta_maxeo(recetas, desde, cap, precios, items, faccion)
+    por_spell = {}
+    for r in (recetas if isinstance(recetas, list) else []):
+        if isinstance(r, dict) and isinstance(r.get("spell"), int):
+            por_spell[r["spell"]] = r
+    tabla = items.get("items", items) if isinstance(items, dict) else {}
+    ret_vend, ret_est, con_valor, sin_valor = 0.0, 0.0, 0, 0
+    reactivos = set()
+    for paso in ruta["pasos"]:
+        r = por_spell.get(paso["spell"])
+        for par in ((r.get("reactivos") or []) if isinstance(r, dict) else []):
+            reactivos.add(par[0] if isinstance(par, list) else par)
+        if not isinstance(r, dict) or r.get("crea") is None:
+            sin_valor += 1
+            continue
+        par = r["crea"]
+        cid = par[0] if isinstance(par, list) else par
+        cant = par[1] if isinstance(par, list) and len(par) > 1 and isinstance(par[1], (int, float)) and par[1] > 0 else 1
+        f = tabla.get(str(cid))
+        vend = f[5] * cant if isinstance(f, list) and len(f) > 5 and isinstance(f[5], (int, float)) and math.isfinite(f[5]) else None
+        pr = precios.get(str(cid)) if precios else None
+        ah = pr * cant if isinstance(pr, (int, float)) and math.isfinite(pr) and pr > 0 else None
+        if vend is None and ah is None:
+            sin_valor += 1
+            continue
+        con_valor += 1
+        if vend is not None:
+            ret_vend += paso["crafteos"] * vend
+        unit_est = max(ah, vend) if (ah is not None and vend is not None) else (ah if ah is not None else vend)
+        ret_est += paso["crafteos"] * unit_est
+    coste = ruta["total"]
+
+    def roi(ret):
+        return ret / coste if (coste is not None and coste > 0) else None
+
+    tend_res = None
+    if meta:
+        suben = bajan = planas = sin_hist = 0
+        for iid in reactivos:
+            m = meta.get(str(iid))
+            if m is None:
+                m = meta.get(iid)
+            if not m or not m.get("direccion"):
+                sin_hist += 1
+                continue
+            d = m["direccion"]
+            if d == "sube":
+                suben += 1
+            elif d == "baja":
+                bajan += 1
+            else:
+                planas += 1
+        tend_res = {"suben": suben, "bajan": bajan, "planas": planas, "sinHist": sin_hist}
+    aviso = ("Retorno vendedor = suelo garantizado. Retorno estimado = subasta si hay precio medio, "
+             "si no vendedor (el mayor); la liquidez en subasta NO está garantizada (la cantidad "
+             "disponible es oferta, no ventas). Media de mínimos diarios observados. Entrenamiento de tramos: SIN DATOS.")
+    return {"desde": ruta["desde"], "cap": ruta["cap"], "cobertura": ruta["cobertura"],
+            "coste": coste, "totalMateriales": ruta["totalMateriales"], "totalAdquisicion": ruta["totalAdquisicion"],
+            "retornoVendedor": _round(ret_vend), "retornoEstimado": _round(ret_est),
+            "roiVendedor": roi(ret_vend), "roiEstimado": roi(ret_est),
+            "netoVendedor": _round(ret_vend - coste) if coste is not None else None,
+            "netoEstimado": _round(ret_est - coste) if coste is not None else None,
+            "pasosConValor": con_valor, "pasosSinValor": sin_valor,
+            "tendenciaResumen": tend_res, "huecos": len(ruta["huecos"]), "aviso": aviso}
+
+
+def cargar_historico(path, reino=None):
+    """Series por ítem {id(str):serie} desde price-history-*.json v1 ({revision,store:{v:1,
+    realms:{<realm>:{items:{...}}}}}) o histórico v2 embebido ({history:{v:2,scopes:{<identidad>:
+    {realms:{<realm>:{items:{...}}}}}}}). Reino: el pedido (case-insensitive) o el primero.
+    Devuelve (items, meta{reino,v})."""
+    with open(path, encoding="utf-8") as f:
+        d = json.load(f)
+    if not isinstance(d, dict):
+        raise ErrorConsulta("formato de histórico no reconocido (se esperaba un objeto JSON)")
+
+    def pick_realm(realms):
+        if not isinstance(realms, dict) or not realms:
+            return None
+        if reino:
+            k = next((x for x in realms if str(x).lower() == str(reino).lower()), None)
+            if k is not None:
+                return k
+        return next(iter(realms))
+
+    store = d.get("store")
+    if isinstance(store, dict) and isinstance(store.get("realms"), dict):
+        nr = pick_realm(store["realms"])
+        if nr is None or nr not in store["realms"]:
+            raise ErrorConsulta(f"reino «{reino}» no está en el histórico; hay: {', '.join(store['realms'])}")
+        items = store["realms"][nr].get("items") or {}
+        return {str(k): v for k, v in items.items()}, {"reino": nr, "v": store.get("v", 1)}
+    hist = d.get("history")
+    if isinstance(hist, dict) and isinstance(hist.get("scopes"), dict):
+        merged, nr_used = {}, None
+        for sc in hist["scopes"].values():
+            realms = (sc or {}).get("realms")
+            nr = pick_realm(realms) if isinstance(realms, dict) else None
+            if nr is None:
+                continue
+            nr_used = nr_used or nr
+            for k, v in (realms[nr].get("items") or {}).items():
+                merged.setdefault(str(k), v)
+        if merged:
+            return merged, {"reino": nr_used, "v": 2}
+    raise ErrorConsulta("histórico sin store.realms (v1) ni history.scopes (v2) con ítems")
+
+
 def imprimir_ruta(D, ruta, por_spell, lang, out, max_filas=15):
     out("")
     out(f"Ruta de maxeo con precios {ruta['desde']}→{ruta['cap']} (materiales + adquisición de recetas):")
@@ -961,6 +1174,56 @@ def cmd_maxeo(D, a, out):
     return 0
 
 
+def cmd_roi(D, a, out):
+    if not a.historico:
+        raise ErrorConsulta("roi necesita --historico FILE (price-history-*.json o bundle con history)")
+    hist_items, hmeta = cargar_historico(a.historico, a.reino)
+    ventana = a.ventana if a.ventana and a.ventana > 0 else None
+    precios, meta = precios_historicos(hist_items, ventana)
+    n_spot = 0
+    if a.precios:
+        spot, _ = cargar_precios(a.precios, a.reino)
+        for k, v in spot.items():
+            if k not in precios:
+                precios[k] = v
+                n_spot += 1
+    if not precios:
+        raise ErrorConsulta("el histórico no produjo ningún precio (¿reino correcto?)")
+    dias = [m["desde"] for m in meta.values()] + [m["hasta"] for m in meta.values()]
+    rango = f"{min(dias)}→{max(dias)}" if dias else "?"
+    extra = f", {n_spot} con precio spot de respaldo" if n_spot else ""
+    out(f"ROI de maxear a 300 con media móvil de mínimos diarios ({hmeta.get('reino', '?')}, días {rango}, "
+        f"{len(meta)} ítems con histórico{extra}).")
+    out("Retorno vendedor = suelo garantizado; retorno estimado = AH (media) o vendedor, el mayor. "
+        "Liquidez AH NO garantizada (oferta≠ventas). Entrenamiento de tramos: SIN DATOS.")
+    profs = D.profesiones["profesiones"]
+    faccion = faccion_de(a.faccion) if a.faccion else None
+    skill = a.skill if a.skill is not None else 1
+    pid_filtro = resolver_profesion(D, a.profesion) if a.profesion else None
+    filas = []
+    for pid, p in profs.items():
+        if pid_filtro and pid != pid_filtro:
+            continue
+        roi = roi_ruta(p["recetas"], skill, 300, precios, D.items, faccion, meta)
+        filas.append((nombre(p["n"], a.lang), roi))
+        if a.detalle:
+            out("")
+            out(f"=== {nombre(p['n'], a.lang)} ===")
+            out(f"Coste (media móvil): materiales {dinero(roi['totalMateriales'])} + adquisición {dinero(roi['totalAdquisicion'])} = {dinero(roi['coste'])}")
+            out(f"Retorno vendedor (suelo): {dinero(roi['retornoVendedor'])} | ROI {pct(roi['roiVendedor'])} | neto {dinero(roi['netoVendedor'])}")
+            out(f"Retorno estimado (AH/vendedor): {dinero(roi['retornoEstimado'])} | ROI {pct(roi['roiEstimado'])} | neto {dinero(roi['netoEstimado'])}")
+            tr = roi["tendenciaResumen"]
+            if tr:
+                out(f"Tendencia de reactivos: {tr['suben']} suben, {tr['bajan']} bajan, {tr['planas']} planas, {tr['sinHist']} sin histórico")
+            out(f"Cobertura {roi['cobertura'] * 100:.0f}% | pasos con valor {roi['pasosConValor']}, sin valor (SIN DATOS) {roi['pasosSinValor']} | huecos {roi['huecos']}")
+    out("")
+    out(f"{'Profesión':<30}{'Coste':>13}{'Ret.vend':>13}{'ROI vend':>9}{'Ret.est':>13}{'ROI est':>9}{'Cob':>7}")
+    for nm, roi in filas:
+        out(f"{nm:<30}{dinero(roi['coste']):>13}{dinero(roi['retornoVendedor']):>13}{pct(roi['roiVendedor']):>9}"
+            f"{dinero(roi['retornoEstimado']):>13}{pct(roi['roiEstimado']):>9}{roi['cobertura'] * 100:>6.0f}%")
+    return 0
+
+
 def parser():
     p = argparse.ArgumentParser(prog="consultar.py", description=__doc__.split("\n\n")[0])
     p.add_argument("--datos", help="carpeta data/ (por defecto, la del plugin instalado)")
@@ -1010,6 +1273,12 @@ def parser():
     s.add_argument("--precios", required=True); s.add_argument("--reino")
     s.add_argument("--skill", type=int); s.add_argument("--faccion")
     s.add_argument("--profesion"); s.add_argument("--detalle", action="store_true")
+    s = orden("roi", cmd_roi, "ROI de maxear a 300 con media móvil histórica y tendencia")
+    s.add_argument("--historico", required=True, help="price-history-*.json (v1) o bundle con history (v2)")
+    s.add_argument("--reino"); s.add_argument("--ventana", type=int, help="días de la media móvil (por defecto todos)")
+    s.add_argument("--skill", type=int); s.add_argument("--faccion")
+    s.add_argument("--profesion"); s.add_argument("--detalle", action="store_true")
+    s.add_argument("--precios", help="precios spot de respaldo para ítems sin histórico")
     return p
 
 

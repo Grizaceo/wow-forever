@@ -348,3 +348,127 @@ export function rutaMaxeo(recetas, desde, cap, precios, items, opts = {}) {
   base.cobertura = fin > d0 ? puntosCubiertos / (fin - d0) : 0
   return base
 }
+// ── ROI con histórico de precios ─────────────────────────────────────────────
+// El histórico guarda, por ítem y día, el MÍNIMO observado (low) y la cantidad
+// disponible (avail = oferta, NO ventas). La media móvil es la media de esos mínimos
+// diarios: no es un precio de mercado garantizado ni liquidez probada. El retorno en
+// subasta es una estimación; el retorno al vendedor es el suelo garantizado.
+
+// Normaliza la serie de un ítem a [{day, low, avail}] ordenada por día ascendente.
+// Acepta triples v1 [day, low, avail] y objetos del snapshot {day, low, available}.
+// Descarta observaciones sin día entero o sin mínimo positivo.
+export function serieHistorico(raw) {
+  if (!Array.isArray(raw)) return []
+  const out = []
+  for (const e of raw) {
+    let day, low, avail
+    if (Array.isArray(e)) { day = e[0]; low = e[1]; avail = e[2] }
+    else if (e && typeof e === 'object') { day = e.day; low = e.low; avail = e.available ?? e.avail }
+    else continue
+    if (!Number.isInteger(day) || !Number.isFinite(low) || low <= 0) continue
+    out.push({ day, low, avail: Number.isFinite(avail) ? avail : null })
+  }
+  out.sort((a, b) => a.day - b.day)
+  return out
+}
+
+// Media móvil de los mínimos diarios: media de los últimos `ventana` días (ventana
+// null/0/undefined = todos). {media (cobre redondeado), n, desde, hasta} o null si vacío.
+export function mediaMovil(series, ventana) {
+  const s = Array.isArray(series) ? series : []
+  if (!s.length) return null
+  const w = Number.isInteger(ventana) && ventana > 0 ? ventana : s.length
+  const ult = s.slice(-w)
+  const suma = ult.reduce((a, e) => a + e.low, 0)
+  return { media: Math.round(suma / ult.length), n: ult.length, desde: ult[0].day, hasta: ult[ult.length - 1].day }
+}
+
+// Tendencia del mínimo diario: cambio % del último respecto al primero observado.
+// {direccion:'sube'|'baja'|'plana', deltaPct} o null con <2 puntos. Plana si |Δ|<2%.
+export function tendencia(series) {
+  const s = Array.isArray(series) ? series : []
+  if (s.length < 2) return null
+  const first = s[0].low, last = s[s.length - 1].low
+  if (!(first > 0)) return null
+  const deltaPct = ((last - first) / first) * 100
+  const direccion = deltaPct > 2 ? 'sube' : deltaPct < -2 ? 'baja' : 'plana'
+  return { direccion, deltaPct: Math.round(deltaPct * 10) / 10 }
+}
+
+// Mapa de precios por media móvil histórica + metadatos por ítem. historyItems:
+// {id: serieCruda}; ventana: días (null = todos). Devuelve {precios: Map(id->media),
+// meta: {id: {media,n,desde,hasta,direccion,deltaPct}}}.
+export function preciosHistoricos(historyItems, ventana) {
+  const precios = new Map(), meta = {}
+  if (!historyItems || typeof historyItems !== 'object') return { precios, meta }
+  for (const key of Object.keys(historyItems)) {
+    const id = Number(key)
+    if (!Number.isInteger(id) || id <= 0) continue
+    const s = serieHistorico(historyItems[key])
+    const mm = mediaMovil(s, ventana)
+    if (!mm) continue
+    precios.set(id, mm.media)
+    const t = tendencia(s)
+    meta[id] = { media: mm.media, n: mm.n, desde: mm.desde, hasta: mm.hasta,
+      direccion: t ? t.direccion : null, deltaPct: t ? t.deltaPct : null }
+  }
+  return { precios, meta }
+}
+
+// ROI de la ruta de maxeo: coste total (rutaMaxeo) frente al valor recuperable de los
+// crafts producidos al subir. Dos retornos honestos y separados:
+//  - retornoVendedor: SUELO garantizado (venta al vendedor col.5 × crafteos × yield).
+//  - retornoEstimado: mejor valor realizable por craft (AH si hay precio medio, si no
+//    vendedor; el mayor de ambos). La liquidez en AH NO está garantizada (avail es
+//    oferta, no ventas): es estimación. `precios` puede ser la media móvil histórica.
+// `opts.meta` (opcional) aporta tendencia por ítem para un resumen sobre los reactivos.
+// null donde no hay dato. Los crafts sin valor (crea null, p.ej. encantamientos) se
+// declaran SIN DATOS y quedan fuera del retorno.
+export function roiRuta(recetas, desde, cap, precios, items, opts = {}) {
+  const ruta = rutaMaxeo(recetas, desde, cap, precios, items, opts)
+  const porSpell = new Map()
+  for (const r of (Array.isArray(recetas) ? recetas : [])) if (r && Number.isFinite(r.spell)) porSpell.set(r.spell, r)
+  const meta = opts && opts.meta ? opts.meta : null
+  let retVend = 0, retEst = 0, conValor = 0, sinValor = 0
+  const reactivos = new Set()
+  for (const paso of ruta.pasos) {
+    const r = porSpell.get(paso.spell)
+    for (const par of (r && Array.isArray(r.reactivos) ? r.reactivos : [])) reactivos.add(Array.isArray(par) ? par[0] : par)
+    if (!r || r.crea == null) { sinValor++; continue }
+    const par = r.crea
+    const cid = Array.isArray(par) ? par[0] : par
+    const cant = Array.isArray(par) && Number.isFinite(par[1]) && par[1] > 0 ? par[1] : 1
+    const f = filaItem(items, cid)
+    const vend = f && Number.isFinite(f[5]) ? f[5] * cant : null
+    const sub = precioDe(precios, cid)
+    const ah = sub !== null ? sub * cant : null
+    if (vend === null && ah === null) { sinValor++; continue }
+    conValor++
+    if (vend !== null) retVend += paso.crafteos * vend
+    const unitEst = ah !== null ? (vend !== null ? Math.max(ah, vend) : ah) : vend
+    retEst += paso.crafteos * unitEst
+  }
+  const coste = ruta.total
+  const roi = (ret) => (coste !== null && coste > 0 ? ret / coste : null)
+  let tendenciaResumen = null
+  if (meta) {
+    let suben = 0, bajan = 0, planas = 0, sinHist = 0
+    for (const id of reactivos) {
+      const m = meta[id] ?? meta[String(id)]
+      if (!m || !m.direccion) { sinHist++; continue }
+      if (m.direccion === 'sube') suben++; else if (m.direccion === 'baja') bajan++; else planas++
+    }
+    tendenciaResumen = { suben, bajan, planas, sinHist }
+  }
+  return {
+    desde: ruta.desde, cap: ruta.cap, cobertura: ruta.cobertura,
+    coste, totalMateriales: ruta.totalMateriales, totalAdquisicion: ruta.totalAdquisicion,
+    retornoVendedor: Math.round(retVend), retornoEstimado: Math.round(retEst),
+    roiVendedor: roi(retVend), roiEstimado: roi(retEst),
+    netoVendedor: coste !== null ? Math.round(retVend - coste) : null,
+    netoEstimado: coste !== null ? Math.round(retEst - coste) : null,
+    pasosConValor: conValor, pasosSinValor: sinValor,
+    tendenciaResumen, huecos: ruta.huecos.length,
+    aviso: 'Retorno vendedor = suelo garantizado. Retorno estimado = subasta si hay precio medio, si no vendedor (el mayor); la liquidez en subasta NO está garantizada (la cantidad disponible es oferta, no ventas). Media de mínimos diarios observados. Entrenamiento de tramos: SIN DATOS.',
+  }
+}

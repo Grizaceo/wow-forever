@@ -13,7 +13,7 @@ recetas** separado del de los reactivos. Dos mitades con paridad verificada: el 
 | 0 | Bundle desktop reconciliado (mercado v2 + DAVI + datos) | hecha (`d90637e`) |
 | 1 | Extracción Forever-nativa del cliente: `receta_item`, `aprende` (naranja real desde `ItemSparse.RequiredSkillRank`), `como`, `vendedores`, `tiers`, `huecos` | hecha (generador `tools/build-datos-juego.py`) |
 | 2 | **Motor de coste con adquisición + CLI `maxeo` + paridad JS↔Python** | **hecha (este documento)** |
-| 3 | UI desktop «maxear a 300» (**hecha**), export de precios al CLI (**hecho**), coste de entrenamiento de tramos, ROI con histórico, cierre de huecos de adquisición | en curso |
+| 3 | UI desktop «maxear a 300» (**hecha**), export de precios al CLI (**hecho**), ROI con histórico (**hecho**), coste de entrenamiento de tramos, cierre de huecos de adquisición | en curso |
 
 ## El motor (Fase 2)
 
@@ -177,12 +177,72 @@ contra el bundle instalado **55 ✓**. **Round-trip e2e**: el canónico exportad
 (Herrería 679o 40p 79c, 100% cobertura). Build + check OK; node 229, python 70; sha del bundle
 idéntico en repo/install/agent-half (`d7fbf4f2…`).
 
+## ROI con histórico (Fase 3, hecho)
+
+Coste de maxear a 300 valorado con la **media móvil de los mínimos diarios** del histórico
+de precios, más el **retorno** de los crafts producidos al subir y su **tendencia**. Motor
+compartido con paridad exacta JS↔Python y subcomando `roi` del CLI.
+
+### Datos: el histórico real en disco es v1, no v2
+
+Los `price-history-*.json` son **v1 legacy**:
+`{revision, store:{v:1, realms:{<reino>:{items:{<id>:[[día, low, avail], …]}}}}}`.
+`low` = mínimo diario en cobre; `avail` = **oferta disponible, NO ventas**. El piloto
+(`price-history-b.json`, reino PvP) trae 6732 ítems, días 2504→2511 (hasta 8 observaciones
+por ítem, 40453 observaciones). La doc anterior decía «v2, `scopes`»: incorrecto para lo que
+hay en disco. `cargar_historico` lee v1 (`store.realms`) y tolera v2 (`history.scopes`) si
+aparece. Los días son relativos (sin epoch conocido): se etiquetan «día N», no se inventan fechas.
+
+### Semántica honesta del retorno
+
+- **Inversión** = `totalMateriales + totalAdquisicion` de `rutaMaxeo`/`ruta_maxeo`, con los
+  reactivos valorados a la media móvil histórica (no al snapshot puntual).
+- **Retorno vendedor (suelo garantizado)** = `venta_cobre` (col.5) × crafteos × yield. Lo que
+  el vendedor paga siempre; no depende de liquidez.
+- **Retorno estimado (AH)** = por craft, el **mayor** de {precio medio AH × yield, vendedor}.
+  Es una **estimación**: la media es de mínimos diarios observados y `avail` es oferta, no
+  volumen negociado → **la liquidez en subasta NO está garantizada**.
+- **ROI** = retorno / inversión; **neto** = retorno − inversión. `null` si no hay ruta con
+  precio (coste `null`).
+- Crafts sin valor (`crea:null`, p.ej. encantamientos; o ítem sin fila ni precio) se declaran
+  **SIN DATOS** y quedan fuera del retorno (`pasosSinValor`).
+- **Tendencia**: cambio % del último mínimo diario respecto al primero; `sube`/`baja`/`plana`
+  (plana si |Δ|<2%). Resumen sobre los reactivos de la ruta. Serie <2 puntos → SIN DATOS.
+- El **coste de entrenamiento de tramos sigue SIN DATOS** (no entra en el ROI).
+
+### CLI
+
+    python3 skills/wow-forever/scripts/consultar.py roi \
+      --historico ~/.config/Hermes/plugin-files/data/wow-hunter-guide/price-history-b.json \
+      --reino PvP --faccion horda [--profesion herreria] [--detalle] [--ventana N] [--precios spot.json]
+
+`--ventana N` limita la media a los últimos N días (por defecto todos). `--precios` añade
+precios spot de respaldo para ítems sin histórico. Sin `--historico` → exit 2. La tabla
+muestra coste, retorno vendedor, ROI vendedor, retorno estimado, ROI estimado y cobertura;
+`--detalle` añade neto, tendencia de reactivos y pasos con/sin valor.
+
+Piloto verificado (PvP, horda, días 2504→2511): Herrería 1→300 coste **721o 51p 93c**
+(materiales 701o 95p 29c + adquisición 19o 56p 64c), retorno vendedor **217o 97p 96c**
+(ROI 30%, neto −504o 46p 3c), estimado **298o 41p 2c** (ROI 41%, neto −424o 89p 9c);
+17 reactivos suben, 11 bajan; 100% cobertura, 27 pasos con valor, 0 SIN DATOS. Encantamiento:
+retorno 0 (`crea:null` → SIN DATOS). Recolección: cobertura baja (no hay ruta de crafteo).
+
+### Paridad y tests
+
+`serieHistorico`/`mediaMovil`/`tendencia`/`preciosHistoricos`/`roiRuta` (JS) ↔
+`serie_historico`/`media_movil`/`tendencia`/`precios_historicos`/`roi_ruta` + `valor_creado`
+(Python). `tests/roi.test.mjs` (13) y `tests/test_roi.py` (17, incluida paridad real sobre
+Herrería con histórico sintético: `roi`, `precios` y `meta` idénticos). `_round` half-up;
+desempate de ruta heredado de `rutaMaxeo`. Los exports ROI **no** los importa la UI →
+esbuild los tree-shakea: el bundle desktop no cambia por esta feature (verificado: el delta
+de un build fresco no contiene ningún identificador ROI).
+
 ## Pendiente (Fase 3)
 
 1. **Coste de entrenamiento de tramos**: hoy SIN DATOS. Fuente posible: trainers de CMaNGOS
    (`spell` de entrenamiento con precio) — requiere derivarlo del cliente/SQL, no inventarlo.
-2. **ROI con histórico**: `price-history-*.json` (v2, `scopes`) para coste medio móvil y
-   tendencia, no solo el snapshot puntual.
-3. **Huecos de adquisición**: 266 recetas de herrería sin objeto-plan conocido (drop/quest).
+2. **Huecos de adquisición**: 266 recetas de herrería sin objeto-plan conocido (drop/quest).
    Cruzar con `huecos.adquisicion_forever` y fuentes curadas; declarar, no rellenar a ciegas.
-4. **Recolección**: modelo propio (nodos/pescado por punto) si se quiere «maxeo» de gathering.
+3. **Recolección**: modelo propio (nodos/pescado por punto) si se quiere «maxeo» de gathering.
+4. **ROI en la UI desktop**: hoy es motor+CLI; falta la vista (importaría `roiRuta`, que
+   entonces sí entraría al bundle y exigiría rebuild+deploy).
