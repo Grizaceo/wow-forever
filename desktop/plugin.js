@@ -39476,6 +39476,7 @@ Farm.configure({
 var fmt = Farm.fmt || {};
 var ORDENES = ["nombre", "precio", "ofertas", "roi", "gph"];
 var cp = (lang, es, en) => lang === "en" ? en : es;
+var DATA_CLI = "~/.config/Hermes/plugin-files/data/wow-hunter-guide";
 var MOTIVOS = {
   "unknown-provenance": ["procedencia desconocida", "unknown provenance"],
   "unknown-provenance-legacy": ["Auctionator real: procedencia desconocida, sin exportador verificado", "real Auctionator: UNKNOWN provenance, no verified exporter"],
@@ -39616,6 +39617,8 @@ function VistaMercado({ ctx, almacen, sincronizador, ventas, estado, recargar, p
   const [guardandoV2, setGuardandoV2] = useState10(false);
   const [confirmGuardarV2, setConfirmGuardarV2] = useState10(false);
   const [confirmRollback, setConfirmRollback] = useState10(false);
+  const [exportandoCli, setExportandoCli] = useState10(false);
+  const [exportCli, setExportCli] = useState10(null);
   const [comision, setComision] = useState10({
     capital: { bps: "", verificada: false, etiqueta: "", dia: "" },
     neutral: { bps: "", verificada: false, etiqueta: "", dia: "" }
@@ -40036,6 +40039,41 @@ rvada: " : s.kind === "chest-obs" ? "Cofre observado: " : "";
     const d = iso ? new Date(iso) : null;
     return d && Number.isFinite(d.getTime()) ? d.toLocaleString(lang === "en" ? "en" : "es") : "—";
   };
+  const exportarPreciosCli = async () => {
+    if (!realm || !snapshot || exportandoCli) return;
+    setExportandoCli(true);
+    setExportCli(null);
+    try {
+      const valores = {};
+      for (const it of realm.items || []) {
+        const id = it?.itemId, pr = it?.unitPriceCopper;
+        if (Number.isSafeInteger(id) && id > 0 && Number.isSafeInteger(pr) && pr > 0) valores[String(id)] = pr;
+      }
+      const n = Object.keys(valores).length;
+      if (!n) {
+        setExportCli({ ok: false, error: cp(
+          lang,
+          "el reino seleccionado no tiene precios con ID de ítem válido.",
+          "the selected realm has no prices with a valid item ID."
+        ) });
+        return;
+      }
+      const body = JSON.stringify({ schemaVersion: 1, reino: realm.name, fecha: snapshot.importedAt || null, valores }, null, 2);
+      const wrote = await ctx.files.writeText("data", "precios-cli.json", body);
+      if (!wrote?.ok) throw new Error(wrote?.message || wrote?.error || "io-error");
+      const read = await ctx.files.readText("data", "precios-cli.json");
+      if (!read?.ok || read.text !== body) throw new Error(cp(
+        lang,
+        "no se confirmó la escritura del archivo.",
+        "the file write was not confirmed."
+      ));
+      setExportCli({ ok: true, n, reino: realm.name, cmd: `consultar.py maxeo --precios ${DATA_CLI}/precios-cli.json` });
+    } catch (e) {
+      setExportCli({ ok: false, error: String(e?.message || e) });
+    } finally {
+      setExportandoCli(false);
+    }
+  };
   return /* @__PURE__ */ jsx17("div", { style: S.pagina, children: /* @__PURE__ */ jsxs17("div", { style: S.cuerpo, children: [
     /* @__PURE__ */ jsx17(MisVentas, { ventas, auctionSnapshot: snapshot, perfil, lang }),
     /* @__PURE__ */ jsxs17(Tarjeta, { titulo: t(lang, "mercado.scan.titulo"), extra: /* @__PURE__ */ jsx17("span", { style: S.chip, children: t(lang, "mercado.tusDatos") }), children: [
@@ -40044,7 +40082,17 @@ rvada: " : s.kind === "chest-obs" ? "Cofre observado: " : "";
         /* @__PURE__ */ jsx17(Button8, { variant: "outline", onClick: () => leerCarpeta(true), disabled: importando, children: t(lang, "mercado.otra") }),
         /* @__PURE__ */ jsx17(Button8, { variant: "outline", onClick: () => fileRef.current?.click(), disabled: importando, children: t(lang, "mercado.archivo") }),
         /* @__PURE__ */ jsx17("input", { ref: fileRef, type: "file", accept: ".lua", onChange: onArchivo, style: { display: "none" } }),
-        /* @__PURE__ */ jsx17(Button8, { variant: "outline", onClick: borrar, disabled: importando || !snapshot, children: confirmBorrar ? t(lang, "mercado.borrarSi") : t(lang, "mercado.borrar") })
+        /* @__PURE__ */ jsx17(Button8, { variant: "outline", onClick: borrar, disabled: importando || !snapshot, children: confirmBorrar ? t(lang, "mercado.borrarSi") : t(lang, "mercado.borrar") }),
+        /* @__PURE__ */ jsx17(
+          Button8,
+          {
+            variant: "outline",
+            "data-testid": "export-cli",
+            onClick: exportarPreciosCli,
+            disabled: importando || exportandoCli || !snapshot || !realm,
+            children: exportandoCli ? cp(lang, "Exportando…", "Exporting…") : cp(lang, "Exportar precios para el CLI", "Export prices for CLI")
+          }
+        )
       ] }),
       /* @__PURE__ */ jsxs17("label", { style: S.sub, children: [
         /* @__PURE__ */ jsx17(Checkbox8, { checked: auto.enabled, onCheckedChange: cambiarAuto, disabled: importando }),
@@ -40076,6 +40124,41 @@ Ons. After an in-game scan, use /reload or log out to write prices to disk. Chan
         ] }),
         histInfo.days > 0 && /* @__PURE__ */ jsx17("span", { children: t(lang, "mercado.frescura.hist", { dias: histInfo.days, entradas: histInfo.entries }) })
       ] }),
+      exportCli && /* @__PURE__ */ jsx17("div", { "data-testid": "export-cli-estado", role: "status", "aria-live": "polite", style: { ...S.sub, marginTop: 8 }, children: exportCli.ok ? /* @__PURE__ */ jsxs17(
+      Fragment14, { children: [
+        /* @__PURE__ */ jsxs17("span", { style: { color: C.verde }, children: [
+          "✓ ",
+          cp(
+            lang,
+            `Exportado precios-cli.json · reino ${exportCli.reino} · ${exportCli.n} ítems con precio.`,
+            `Exported precios-cli.json · realm ${exportCli.reino} · ${exportCli.n} priced items.`
+          )
+        ] }),
+        /* @__PURE__ */ jsxs17("div", { style: { display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginTop: 4 }, children: [
+          /* @__PURE__ */ jsx17("code", { style: { fontSize: 11, color: C.texto2 }, children: exportCli.cmd }),
+          /* @__PURE__ */ jsx17(
+            Button8,
+            {
+              variant: "outline",
+              "data-testid": "export-cli-copiar",
+              onClick: () => {
+                Promise.resolve(ctx.os.writeClipboard(exportCli.cmd)).catch(() => {
+                });
+              },
+              children: cp(lang, "Copiar comando", "Copy command")
+            }
+          )
+        ] }),
+        /* @__PURE__ */ jsx17("p", { style: { margin: "4px 0 0", fontSize: 11, color: C.texto3 }, children: cp(
+          lang,
+          "Queda en la carpeta de datos del plugin (Ajustes → Plugins → revelar carpeta). Formato canónico {valores, reino, fecha} que lee consultar.py maxeo --precios.",
+          "Lands in the plugin data folder (Settings → Plugins → reveal folder). Canonical {valores, reino, fecha} format read by consultar.py maxeo --precios."
+        ) })
+      ] }) : /* @__PURE__ */ jsxs17("span", { style: { color: C.rojo }, children: [
+        "✗ ",
+        cp(lang, "No se exportó: ", "Export failed: "),
+        exportCli.error
+      ] }) }),
       fres?.aviso && /* @__PURE__ */ jsx17(Aviso, { children: t(lang, "mercado.frescura.aviso") }),
       (snapshot?.warnings || []).map((w, i) => /* @__PURE__ */ jsxs17("p", { style: S.sub, children: [
         "⚠ ",

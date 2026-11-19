@@ -417,6 +417,12 @@ const ORDENES = ['nombre', 'precio', 'ofertas', 'roi', 'gph']
 // Textos nuevos, deliberadamente fuera del catálogo i18n grande: son avisos de
 // límite, no nombres de datos del juego.
 const cp = (lang, es, en) => (lang === 'en' ? en : es)
+
+// Carpeta de datos del plugin para el export al CLI. El SDK (ctx.files 'data') no expone la ruta
+// absoluta; se muestra la convención documentada de Hermes para este plugin (id interno
+// 'wow-hunter-guide', ver plugin.src.jsx). El fichero se escribe solo en la carpeta de datos del
+// plugin: el usuario no tiene que localizar las rutas privadas de los slots del bundle.
+const DATA_CLI = '~/.config/Hermes/plugin-files/data/wow-hunter-guide'
 const MOTIVOS = {
   'unknown-provenance': ['procedencia desconocida', 'unknown provenance'],
   'unknown-provenance-legacy': ['Auctionator real: procedencia desconocida, sin exportador verificado', 'real Auctionator: UNKNOWN provenance, no verified exporter'],
@@ -553,6 +559,8 @@ export function VistaMercado({ ctx, almacen, sincronizador, ventas, estado, reca
   const [guardandoV2, setGuardandoV2] = useState(false)
   const [confirmGuardarV2, setConfirmGuardarV2] = useState(false)
   const [confirmRollback, setConfirmRollback] = useState(false)
+  const [exportandoCli, setExportandoCli] = useState(false)
+  const [exportCli, setExportCli] = useState(null)
   const [comision, setComision] = useState({
     capital: { bps: '', verificada: false, etiqueta: '', dia: '' },
     neutral: { bps: '', verificada: false, etiqueta: '', dia: '' },
@@ -913,6 +921,39 @@ export function VistaMercado({ ctx, almacen, sincronizador, ventas, estado, reca
     return d && Number.isFinite(d.getTime()) ? d.toLocaleString(lang === 'en' ? 'en' : 'es') : '—'
   }
 
+  // Exporta el snapshot del reino seleccionado en formato canónico {valores, reino, fecha}
+  // (el primero que reconoce consultar.py cargar_precios) a data/precios-cli.json, con
+  // confirmación de lectura. Sin precios con ID válido no escribe nada (no inventa).
+  const exportarPreciosCli = async () => {
+    if (!realm || !snapshot || exportandoCli) return
+    setExportandoCli(true); setExportCli(null)
+    try {
+      const valores = {}
+      for (const it of realm.items || []) {
+        const id = it?.itemId, pr = it?.unitPriceCopper
+        if (Number.isSafeInteger(id) && id > 0 && Number.isSafeInteger(pr) && pr > 0) valores[String(id)] = pr
+      }
+      const n = Object.keys(valores).length
+      if (!n) {
+        setExportCli({ ok: false, error: cp(lang,
+          'el reino seleccionado no tiene precios con ID de ítem válido.',
+          'the selected realm has no prices with a valid item ID.') })
+        return
+      }
+      const body = JSON.stringify({ schemaVersion: 1, reino: realm.name, fecha: snapshot.importedAt || null, valores }, null, 2)
+      const wrote = await ctx.files.writeText('data', 'precios-cli.json', body)
+      if (!wrote?.ok) throw new Error(wrote?.message || wrote?.error || 'io-error')
+      const read = await ctx.files.readText('data', 'precios-cli.json')
+      if (!read?.ok || read.text !== body) throw new Error(cp(lang,
+        'no se confirmó la escritura del archivo.', 'the file write was not confirmed.'))
+      setExportCli({ ok: true, n, reino: realm.name, cmd: `consultar.py maxeo --precios ${DATA_CLI}/precios-cli.json` })
+    } catch (e) {
+      setExportCli({ ok: false, error: String(e?.message || e) })
+    } finally {
+      setExportandoCli(false)
+    }
+  }
+
   return (
     <div style={S.pagina}>
       <div style={S.cuerpo}>
@@ -925,6 +966,10 @@ export function VistaMercado({ ctx, almacen, sincronizador, ventas, estado, reca
             <input ref={fileRef} type="file" accept=".lua" onChange={onArchivo} style={{ display: 'none' }} />
             <Button variant="outline" onClick={borrar} disabled={importando || !snapshot}>
               {confirmBorrar ? t(lang, 'mercado.borrarSi') : t(lang, 'mercado.borrar')}
+            </Button>
+            <Button variant="outline" data-testid="export-cli" onClick={exportarPreciosCli}
+              disabled={importando || exportandoCli || !snapshot || !realm}>
+              {exportandoCli ? cp(lang, 'Exportando…', 'Exporting…') : cp(lang, 'Exportar precios para el CLI', 'Export prices for CLI')}
             </Button>
           </div>
           <label style={S.sub}>
@@ -947,6 +992,29 @@ export function VistaMercado({ ctx, almacen, sincronizador, ventas, estado, reca
               <span>{t(lang, 'mercado.frescura.importado')}: {fmtFecha(fres.importedAt)}</span>
               <span>{t(lang, 'mercado.frescura.max')}: {fres.fechaMax || '—'}{fres.diasDesde != null ? ` (${t(lang, 'mercado.frescura.hace', { dias: fres.diasDesde })})` : ''}</span>
               {histInfo.days > 0 && <span>{t(lang, 'mercado.frescura.hist', { dias: histInfo.days, entradas: histInfo.entries })}</span>}
+            </div>
+          )}
+          {exportCli && (
+            <div data-testid="export-cli-estado" role="status" aria-live="polite" style={{ ...S.sub, marginTop: 8 }}>
+              {exportCli.ok ? (
+                <>
+                  <span style={{ color: C.verde }}>✓ {cp(lang,
+                    `Exportado precios-cli.json · reino ${exportCli.reino} · ${exportCli.n} ítems con precio.`,
+                    `Exported precios-cli.json · realm ${exportCli.reino} · ${exportCli.n} priced items.`)}</span>
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginTop: 4 }}>
+                    <code style={{ fontSize: 11, color: C.texto2 }}>{exportCli.cmd}</code>
+                    <Button variant="outline" data-testid="export-cli-copiar"
+                      onClick={() => { Promise.resolve(ctx.os.writeClipboard(exportCli.cmd)).catch(() => {}) }}>
+                      {cp(lang, 'Copiar comando', 'Copy command')}
+                    </Button>
+                  </div>
+                  <p style={{ margin: '4px 0 0', fontSize: 11, color: C.texto3 }}>{cp(lang,
+                    'Queda en la carpeta de datos del plugin (Ajustes → Plugins → revelar carpeta). Formato canónico {valores, reino, fecha} que lee consultar.py maxeo --precios.',
+                    'Lands in the plugin data folder (Settings → Plugins → reveal folder). Canonical {valores, reino, fecha} format read by consultar.py maxeo --precios.')}</p>
+                </>
+              ) : (
+                <span style={{ color: C.rojo }}>✗ {cp(lang, 'No se exportó: ', 'Export failed: ')}{exportCli.error}</span>
+              )}
             </div>
           )}
           {fres?.aviso && <Aviso>{t(lang, 'mercado.frescura.aviso')}</Aviso>}

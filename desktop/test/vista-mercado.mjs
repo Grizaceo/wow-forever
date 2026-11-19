@@ -39,6 +39,7 @@ await p.click('[data-tab="mercado"]')
 await p.getByText('Todavía no importaste precios').first().waitFor()
 check('mercado vacío invita a importar', true)
 check('la pestaña Mercado existe sin datos', await p.locator('[data-tab="mercado"]').count() === 1)
+check('export CLI deshabilitado sin snapshot', await p.getByRole('button', { name: 'Exportar precios para el CLI' }).first().isDisabled())
 
 // Carpeta concedida con Auctionator.lua dentro del permiso.
 await p.evaluate((fix) => { window.carpetaConcedida = { name: 'SavedVariables', files: { 'Auctionator.lua': fix } } }, FIXTURE)
@@ -101,6 +102,22 @@ check('persistió puntero conjunto v2', vp?.revision>=1,vp)
 const vb=JSON.parse(previo.archivos[`market-v2-${vp.slot}.json`])
 check('bundle contiene mercado e historial v2',vb.market.snapshot.schemaVersion===2 && vb.history.v===2)
 check('respaldo legado durable',!!previo.archivos['pre-v2-backup.json'])
+
+// ---------- Export de precios al CLI: formato canónico {valores, reino, fecha} ----------
+await p.getByRole('button', { name: 'Exportar precios para el CLI' }).first().click()
+await esperar(p, /Exportado precios-cli\.json/)
+check('export CLI: confirma reino e ítems exportados', /reino Prueba/.test(await texto(p)) && /2 ítems con precio/.test(await texto(p)))
+const cli = JSON.parse(await p.evaluate(() => localStorage.getItem('archivo.precios-cli.json')))
+check('export CLI: formato canónico (schemaVersion/reino/fecha/valores)', cli.schemaVersion === 1 && cli.reino === 'Prueba' && typeof cli.fecha === 'string' && cli.valores && typeof cli.valores === 'object', cli)
+check('export CLI: precios exactos del reino seleccionado', cli.valores['2589'] === 120 && cli.valores['6469'] === 99999 && Object.keys(cli.valores).length === 2, cli.valores)
+check('export CLI: muestra el comando consultar.py maxeo --precios', /consultar\.py maxeo --precios/.test(await texto(p)) && /precios-cli\.json/.test(await texto(p)))
+await p.getByRole('button', { name: 'Copiar comando' }).first().click()
+check('export CLI: copiar comando va al portapapeles', await p.evaluate(() => window.copiados >= 1 && /precios-cli\.json/.test(window.copiado || '')), await p.evaluate(() => window.copiado))
+await p.evaluate(() => { window.fallarEscritura = true })
+await p.getByRole('button', { name: 'Exportar precios para el CLI' }).first().click()
+await esperar(p, /No se exportó/)
+check('export CLI: fallo de escritura muestra error (no confirma éxito)', /No se exportó/.test(await texto(p)) && !/Exportado precios-cli\.json/.test(await texto(p)))
+await p.evaluate(() => { window.fallarEscritura = false })
 await cerrar()
 
 // ---------- Sesión 2: oscuro, mismos datos → persisten; import manual ----------

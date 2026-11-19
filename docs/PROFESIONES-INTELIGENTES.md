@@ -13,7 +13,7 @@ recetas** separado del de los reactivos. Dos mitades con paridad verificada: el 
 | 0 | Bundle desktop reconciliado (mercado v2 + DAVI + datos) | hecha (`d90637e`) |
 | 1 | Extracción Forever-nativa del cliente: `receta_item`, `aprende` (naranja real desde `ItemSparse.RequiredSkillRank`), `como`, `vendedores`, `tiers`, `huecos` | hecha (generador `tools/build-datos-juego.py`) |
 | 2 | **Motor de coste con adquisición + CLI `maxeo` + paridad JS↔Python** | **hecha (este documento)** |
-| 3 | UI desktop «maxear a 300» (**hecha**), export de precios al CLI, coste de entrenamiento de tramos, ROI con histórico, cierre de huecos de adquisición | en curso |
+| 3 | UI desktop «maxear a 300» (**hecha**), export de precios al CLI (**hecho**), coste de entrenamiento de tramos, ROI con histórico, cierre de huecos de adquisición | en curso |
 
 ## El motor (Fase 2)
 
@@ -156,15 +156,33 @@ Herrería, ruta parcial honesta, toggle de vuelta al plan rápido), `navegador.m
 0 errores JS. Build + `check_desktop_bundle.py` OK. Bundle desplegado en
 `~/.hermes/desktop-plugins/wow-forever` (sha verificado; harness contra el bundle instalado 27 ✓).
 
+## Export de precios al CLI (Fase 3, hecho)
+
+`desktop/src/vistas/mercado.jsx` — botón **«Exportar precios para el CLI»** en la tarjeta de scan
+(junto a importar/borrar), habilitado solo con snapshot y reino seleccionado.
+
+- Escribe `data/precios-cli.json` en la **carpeta de datos del plugin** (`ctx.files.writeText`, con
+  confirmación de lectura) en el **formato canónico** `{schemaVersion:1, reino, fecha, valores:{id:cobre}}`
+  — el primero que reconoce `cargar_precios`. Exporta el **reino seleccionado**; solo ítems con
+  `itemId`/`unitPriceCopper` enteros seguros > 0 (sin ID válido no escribe nada: no inventa).
+- El usuario no localiza las rutas privadas de los slots del bundle: el fichero queda en la carpeta
+  de datos del plugin y la UI muestra el comando `consultar.py maxeo --precios …/precios-cli.json`
+  con botón **Copiar comando** (`ctx.os.writeClipboard`).
+- Fallo de escritura → error visible, no confirma éxito. i18n es/en.
+
+Verificación: harness `vista-mercado.mjs` **55 ✓** (+7: botón deshabilitado sin snapshot, formato
+canónico, precios exactos del reino, comando visible, copiar al portapapeles, fallo de escritura);
+contra el bundle instalado **55 ✓**. **Round-trip e2e**: el canónico exportado del mercado real
+(PvP, 6732 ítems, 2026-11-16) da stdout **idéntico** a `maxeo --precios market-a.json --reino PvP`
+(Herrería 679o 40p 79c, 100% cobertura). Build + check OK; node 229, python 70; sha del bundle
+idéntico en repo/install/agent-half (`d7fbf4f2…`).
+
 ## Pendiente (Fase 3)
 
-1. **Export de precios al CLI**: botón en Mercado para exportar el snapshot en formato canónico y
-   alimentar el CLI sin rutas privadas. (El modo «maxear a 300» de la UI ya está hecho, ver arriba;
-   el CLI ya lee el bundle legacy directo con `--precios` — falta el affordance de export en la UI.)
-2. **Coste de entrenamiento de tramos**: hoy SIN DATOS. Fuente posible: trainers de CMaNGOS
+1. **Coste de entrenamiento de tramos**: hoy SIN DATOS. Fuente posible: trainers de CMaNGOS
    (`spell` de entrenamiento con precio) — requiere derivarlo del cliente/SQL, no inventarlo.
-3. **ROI con histórico**: `price-history-*.json` (v2, `scopes`) para coste medio móvil y
+2. **ROI con histórico**: `price-history-*.json` (v2, `scopes`) para coste medio móvil y
    tendencia, no solo el snapshot puntual.
-4. **Huecos de adquisición**: 266 recetas de herrería sin objeto-plan conocido (drop/quest).
+3. **Huecos de adquisición**: 266 recetas de herrería sin objeto-plan conocido (drop/quest).
    Cruzar con `huecos.adquisicion_forever` y fuentes curadas; declarar, no rellenar a ciegas.
-5. **Recolección**: modelo propio (nodos/pescado por punto) si se quiere «maxeo» de gathering.
+4. **Recolección**: modelo propio (nodos/pescado por punto) si se quiere «maxeo» de gathering.
