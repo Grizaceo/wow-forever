@@ -219,3 +219,132 @@ export function planDeSubida(recetas, desde, hasta, precios, items) {
   }
   return pasos
 }
+
+// Coste de CONSEGUIR la receta (no los reactivos). 0 si se aprende gratis (entrenador o
+// automática al tomar la profesión); el precio de compra del objeto receta si lo vende un
+// vendedor de la facción; si no, el precio de subasta del objeto receta; null si no se sabe
+// cómo se consigue (drop sin precio, desconocido). El coste de ENTRENAR los tramos con el
+// trainer no está en los datos: se declara aparte, no se inventa.
+export function costoAdquisicion(receta, precios, items, faccion) {
+  if (!receta || typeof receta !== 'object') return { cobre: null, fuente: null, item: null }
+  const como = receta.como
+  if (como === 'entrenador' || como === 'automatica') return { cobre: 0, fuente: 'gratis', item: null }
+  if (como !== 'receta' || receta.receta_item == null) return { cobre: null, fuente: null, item: receta.receta_item ?? null }
+  const iid = receta.receta_item
+  const f = filaItem(items, iid)
+  const vend = receta.vendedores && typeof receta.vendedores === 'object' ? receta.vendedores : {}
+  const facs = faccion ? [faccion] : ['alianza', 'horda']
+  const loVende = facs.some((fa) => Array.isArray(vend[fa]) && vend[fa].length > 0)
+  if (loVende && f && f[10] === 1 && Number.isFinite(f[9]) && f[9] > 0) {
+    return { cobre: f[9], fuente: 'vendedor', item: iid }
+  }
+  const p = precioDe(precios, iid)
+  if (p !== null) return { cobre: p, fuente: 'subasta', item: iid }
+  return { cobre: null, fuente: null, item: iid }
+}
+
+// Puntos de skill que se espera que una receta aporte desde `s` hasta `e` (suma de
+// probSubida en cada punto). Prefijo acumulativo para no recalcular en cada candidato.
+function puntosEsperadosAcum(rango, fin) {
+  const cum = new Array(fin + 1)
+  cum[0] = 0
+  for (let k = 0; k < fin; k++) {
+    const p = probSubida(rango, k)
+    cum[k + 1] = cum[k] + (p > 0 ? p : 0)
+  }
+  return cum
+}
+
+// Ruta de maxeo con precios: de `desde` a `cap` (tope de la profesión; 300 en Classic).
+// A diferencia de planDeSubida, SÍ incluye el coste de adquirir las recetas de objeto
+// (vendedor o subasta), amortizado sobre los puntos que se espera que aporten, y cobra
+// esa adquisición una sola vez. En cada punto elige la receta con menor coste esperado
+// por punto (materiales / prob + adquisición amortizada). Incluye verdes (prob > 0) para
+// poder llegar al tope. Las recetas sin coste de adquisición conocido quedan fuera de la
+// ruta con precio y se listan aparte; las que tienen adquisición pero falta el precio de
+// algún reactivo se listan como «sin precio». El entrenamiento de tramos no tiene coste en
+// los datos: se declara. Devuelve pasos contiguos y totales; null donde no hay dato.
+export function rutaMaxeo(recetas, desde, cap, precios, items, opts = {}) {
+  const faccion = opts && opts.faccion ? opts.faccion : null
+  const d0 = Math.floor(Number(desde)), h = Math.ceil(Number(cap))
+  const avisoEntrenamiento = 'El coste de entrenar los tramos con el trainer no está en los datos (SIN DATOS): no se incluye en el total.'
+  const base = {
+    desde: d0, cap: h, pasos: [], totalMateriales: null, totalAdquisicion: 0, total: null,
+    cobertura: 0, huecos: [], adquisiciones: [], adquisicionesSinDato: [], sinPrecio: [],
+    avisoEntrenamiento,
+  }
+  if (!Array.isArray(recetas) || !Number.isFinite(d0) || !Number.isFinite(h) || h <= d0) return base
+  const fin = Math.min(h, d0 + MAX_PUNTOS)
+  const infos = recetas
+    .filter((r) => r && typeof r === 'object' && Number.isFinite(r.spell))
+    .map((r) => ({
+      r, acq: costoAdquisicion(r, precios, items, faccion),
+      costo: costoReceta(r, precios, items),
+      nReact: Array.isArray(r.reactivos) ? r.reactivos.length : 0,
+      cum: puntosEsperadosAcum(r.rango, fin),
+    }))
+  const conAcq = infos.filter((i) => i.acq.cobre !== null)
+  base.adquisicionesSinDato = infos.filter((i) => i.acq.cobre === null)
+    .map((i) => ({ spell: i.r.spell, item: i.acq.item, como: i.r.como }))
+  const pagadas = new Set()
+  const sinPrecioMap = new Map()
+  let totalMat = 0, totalAdq = 0, puntosCubiertos = 0
+  const pasos = [], huecos = []
+  const elegir = (s) => {
+    let mejor = null
+    for (const info of conAcq) {
+      const p = probSubida(info.r.rango, s)
+      if (!(p > 0)) continue
+      if (info.costo.total === null) {
+        if (!sinPrecioMap.has(info.r.spell)) sinPrecioMap.set(info.r.spell, { spell: info.r.spell, faltan: info.costo.faltan })
+        continue
+      }
+      const pe = info.cum[fin] - info.cum[s]
+      const acqPorPunto = (!pagadas.has(info.r.spell) && info.acq.cobre > 0 && pe > 0) ? info.acq.cobre / pe : 0
+      const eff = info.costo.total / p + acqPorPunto
+      if (!mejor || eff < mejor.eff || (eff === mejor.eff && (info.nReact < mejor.nReact
+        || (info.nReact === mejor.nReact && info.r.spell < mejor.spell)))) {
+        mejor = { info, p, eff, nReact: info.nReact, spell: info.r.spell }
+      }
+    }
+    return mejor
+  }
+  for (let s = d0; s < fin;) {
+    const e = elegir(s)
+    if (!e) {
+      // hueco: ningún candidato con precio en s. Buscar el siguiente punto con candidato.
+      let j = s + 1
+      while (j < fin && !elegir(j)) j++
+      huecos.push({ desde: s, hasta: j, motivo: sinPrecioMap.size ? 'recetas sin precio de reactivos o sin receta conocida' : 'ninguna receta conocida sube en este tramo' })
+      s = j
+      continue
+    }
+    const info = e.info, spell = info.r.spell
+    if (!pagadas.has(spell) && info.acq.cobre > 0) {
+      pagadas.add(spell)
+      totalAdq += info.acq.cobre
+      base.adquisiciones.push({ spell, item: info.acq.item, cobre: info.acq.cobre, fuente: info.acq.fuente, desde: s })
+    }
+    let j = s + 1, crafteos = 1 / e.p, mat = info.costo.total * crafteos
+    while (j < fin) {
+      const e2 = elegir(j)
+      if (!e2 || e2.info.r.spell !== spell) break
+      crafteos += 1 / e2.p
+      mat += info.costo.total / e2.p
+      j++
+    }
+    totalMat += mat
+    puntosCubiertos += j - s
+    pasos.push({ desde: s, hasta: j, spell, crafteos: Math.round(crafteos), costo: Math.round(mat) })
+    s = j
+  }
+  base.pasos = pasos
+  base.huecos = huecos
+  base.sinPrecio = [...sinPrecioMap.values()]
+  base.totalAdquisicion = Math.round(totalAdq)
+  // Sin pasos no hay ruta: el total es null (sin estimación), no 0.
+  base.totalMateriales = pasos.length ? Math.round(totalMat) : null
+  base.total = pasos.length ? Math.round(totalMat + totalAdq) : null
+  base.cobertura = fin > d0 ? puntosCubiertos / (fin - d0) : 0
+  return base
+}

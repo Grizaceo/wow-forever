@@ -383,6 +383,237 @@ def plan_de_subida(recetas, desde, hasta):
     return pasos
 
 
+def _round(x):
+    """Math.round de JS (mitad hacia arriba) para paridad exacta con src/crafteo.js."""
+    return math.floor(x + 0.5)
+
+
+def costo_unidad(iid, precios, items):
+    """Coste de conseguir un reactivo: vendedor (col.10==1, col.9>0) o subasta; null si no."""
+    tabla = items.get("items", items) if isinstance(items, dict) else {}
+    f = tabla.get(str(iid))
+    if isinstance(f, list) and len(f) > 10 and f[10] == 1 and isinstance(f[9], (int, float)) and f[9] > 0:
+        return {"cobre": int(f[9]), "fuente": "vendedor"}
+    pr = precios.get(str(iid)) if precios else None
+    if isinstance(pr, (int, float)) and pr > 0:
+        return {"cobre": int(pr), "fuente": "subasta"}
+    return {"cobre": None, "fuente": None}
+
+
+def costo_receta(r, precios, items):
+    """Coste de los reactivos de una receta. total null si falta el precio de alguno."""
+    partes = []
+    for par in (r.get("reactivos") or []):
+        iid = par[0] if isinstance(par, list) else par
+        cant = par[1] if isinstance(par, list) and len(par) > 1 and isinstance(par[1], (int, float)) and par[1] > 0 else 1
+        u = costo_unidad(iid, precios, items)
+        partes.append({"item": iid, "cant": cant, "cobre": u["cobre"], "fuente": u["fuente"]})
+    faltan = [x["item"] for x in partes if x["cobre"] is None]
+    total = None if faltan else sum(x["cobre"] * x["cant"] for x in partes)
+    return {"total": total, "partes": partes, "faltan": faltan}
+
+
+def costo_adquisicion(r, precios, items, faccion=None):
+    """Coste de CONSEGUIR la receta (no los reactivos): 0 gratis (entrenador/automática);
+    compra del objeto receta si lo vende un vendedor de la facción; si no, subasta del
+    objeto receta; null si no se sabe. El entrenamiento de tramos no está en los datos."""
+    tabla = items.get("items", items) if isinstance(items, dict) else {}
+    if not isinstance(r, dict):
+        return {"cobre": None, "fuente": None, "item": None}
+    como = r.get("como")
+    if como in ("entrenador", "automatica"):
+        return {"cobre": 0, "fuente": "gratis", "item": None}
+    iid = r.get("receta_item")
+    if como != "receta" or iid is None:
+        return {"cobre": None, "fuente": None, "item": iid}
+    f = tabla.get(str(iid))
+    vend = r.get("vendedores") or {}
+    facs = [faccion] if faccion else ["alianza", "horda"]
+    lo_vende = any(isinstance(vend.get(fa), list) and len(vend[fa]) > 0 for fa in facs)
+    if lo_vende and isinstance(f, list) and len(f) > 10 and f[10] == 1 and isinstance(f[9], (int, float)) and f[9] > 0:
+        return {"cobre": int(f[9]), "fuente": "vendedor", "item": iid}
+    pr = precios.get(str(iid)) if precios else None
+    if isinstance(pr, (int, float)) and pr > 0:
+        return {"cobre": int(pr), "fuente": "subasta", "item": iid}
+    return {"cobre": None, "fuente": None, "item": iid}
+
+
+def _cum_prob(rango, fin):
+    """Puntos esperados acumulados 0..fin (suma de prob_subida). Para amortizar adquisición."""
+    cum = [0.0] * (fin + 1)
+    for k in range(fin):
+        pr = prob_subida(rango, k)
+        cum[k + 1] = cum[k] + (pr if (pr is not None and pr > 0) else 0.0)
+    return cum
+
+
+def ruta_maxeo(recetas, desde, cap, precios, items, faccion=None):
+    """Ruta de maxeo con precios, paridad con rutaMaxeo de src/crafteo.js. Incluye el coste
+    de adquirir las recetas de objeto (vendedor/subasta) amortizado sobre los puntos que se
+    espera que aporten, cobrado una vez. Menor coste esperado por punto (materiales/prob +
+    adquisición amortizada). Incluye verdes. Las de adquisición sin dato quedan fuera y se
+    listan; las de adquisición conocida pero reactivo sin precio, también. El entrenamiento
+    de tramos no tiene coste en los datos: se declara. total null si no hay ruta."""
+    d0, h = math.floor(desde), math.ceil(cap)
+    aviso = ("El coste de entrenar los tramos con el trainer no está en los datos (SIN DATOS): "
+             "no se incluye en el total.")
+    base = {"desde": d0, "cap": h, "pasos": [], "totalMateriales": None, "totalAdquisicion": 0,
+            "total": None, "cobertura": 0.0, "huecos": [], "adquisiciones": [],
+            "adquisicionesSinDato": [], "sinPrecio": [], "avisoEntrenamiento": aviso}
+    if not isinstance(recetas, list) or h <= d0:
+        return base
+    fin = min(h, d0 + 1000)
+    infos = []
+    for r in recetas:
+        if not isinstance(r, dict) or not isinstance(r.get("spell"), int):
+            continue
+        infos.append({"r": r, "acq": costo_adquisicion(r, precios, items, faccion),
+                      "costo": costo_receta(r, precios, items),
+                      "nReact": len(r.get("reactivos") or []), "cum": _cum_prob(r.get("rango"), fin)})
+    con_acq = [i for i in infos if i["acq"]["cobre"] is not None]
+    base["adquisicionesSinDato"] = [{"spell": i["r"]["spell"], "item": i["acq"]["item"], "como": i["r"].get("como")}
+                                    for i in infos if i["acq"]["cobre"] is None]
+    pagadas, sin_precio = set(), {}
+    total_mat, total_adq, puntos = 0.0, 0, 0
+    pasos, huecos = [], []
+
+    def elegir(s):
+        mejor = None
+        for info in con_acq:
+            pr = prob_subida(info["r"].get("rango"), s)
+            if pr is None or pr <= 0:
+                continue
+            if info["costo"]["total"] is None:
+                sp = info["r"]["spell"]
+                if sp not in sin_precio:
+                    sin_precio[sp] = {"spell": sp, "faltan": info["costo"]["faltan"]}
+                continue
+            pe = info["cum"][fin] - info["cum"][s]
+            acq_pp = (info["acq"]["cobre"] / pe) if (info["r"]["spell"] not in pagadas
+                      and info["acq"]["cobre"] > 0 and pe > 0) else 0.0
+            eff = info["costo"]["total"] / pr + acq_pp
+            if (mejor is None or eff < mejor["eff"] or (eff == mejor["eff"] and (
+                    info["nReact"] < mejor["nReact"] or (info["nReact"] == mejor["nReact"]
+                    and info["r"]["spell"] < mejor["spell"])))):
+                mejor = {"info": info, "p": pr, "eff": eff, "nReact": info["nReact"], "spell": info["r"]["spell"]}
+        return mejor
+
+    s = d0
+    while s < fin:
+        e = elegir(s)
+        if e is None:
+            j = s + 1
+            while j < fin and elegir(j) is None:
+                j += 1
+            huecos.append({"desde": s, "hasta": j,
+                           "motivo": "recetas sin precio de reactivos o sin receta conocida" if sin_precio
+                           else "ninguna receta conocida sube en este tramo"})
+            s = j
+            continue
+        info, spell = e["info"], e["spell"]
+        if spell not in pagadas and info["acq"]["cobre"] > 0:
+            pagadas.add(spell)
+            total_adq += info["acq"]["cobre"]
+            base["adquisiciones"].append({"spell": spell, "item": info["acq"]["item"],
+                                          "cobre": info["acq"]["cobre"], "fuente": info["acq"]["fuente"], "desde": s})
+        j, crafteos = s + 1, 1 / e["p"]
+        mat = info["costo"]["total"] * crafteos
+        while j < fin:
+            e2 = elegir(j)
+            if e2 is None or e2["spell"] != spell:
+                break
+            crafteos += 1 / e2["p"]
+            mat += info["costo"]["total"] / e2["p"]
+            j += 1
+        total_mat += mat
+        puntos += j - s
+        pasos.append({"desde": s, "hasta": j, "spell": spell, "crafteos": _round(crafteos), "costo": _round(mat)})
+        s = j
+    base["pasos"], base["huecos"], base["sinPrecio"] = pasos, huecos, list(sin_precio.values())
+    base["totalAdquisicion"] = _round(total_adq)
+    base["totalMateriales"] = _round(total_mat) if pasos else None
+    base["total"] = _round(total_mat + total_adq) if pasos else None
+    base["cobertura"] = puntos / (fin - d0) if fin > d0 else 0.0
+    return base
+
+
+def cargar_precios(path, reino=None):
+    """Mapa itemId(str)->cobre(int) desde un fichero de precios. Formatos: canónico
+    {valores:{id:cobre},reino,fecha}; plano {id:cobre}; bundle legacy del mercado
+    {values:{snapshot:{realms:[{name,items:[{itemId,unitPriceCopper}]}]}}}; extracción
+    {precios_por_reino:{name:{id:cobre}}}. Devuelve (dict, meta)."""
+    with open(path, encoding="utf-8") as f:
+        d = json.load(f)
+    if not isinstance(d, dict):
+        raise ErrorConsulta("formato de precios no reconocido (se esperaba un objeto JSON)")
+    meta, vals = {}, None
+    if isinstance(d.get("valores"), dict):
+        vals = d["valores"]
+        meta = {k: d[k] for k in ("reino", "fecha", "schemaVersion") if k in d}
+    elif isinstance(d.get("precios_por_reino"), dict):
+        por = d["precios_por_reino"]
+        nr = reino or (d.get("meta") or {}).get("reino") or next(iter(por), None)
+        if nr not in por:
+            raise ErrorConsulta(f"reino «{nr}» no está en el fichero; hay: {', '.join(por)}")
+        vals, meta = por[nr], {"reino": nr, **(d.get("meta") or {})}
+    elif isinstance(d.get("values"), dict) and isinstance(d["values"].get("snapshot"), dict):
+        snap = d["values"]["snapshot"]
+        realms = snap.get("realms") or []
+        r = None
+        if reino:
+            r = next((x for x in realms if str(x.get("name", "")).lower() == str(reino).lower()), None)
+        r = r or (realms[0] if realms else None)
+        if not r:
+            raise ErrorConsulta("el bundle de mercado no tiene realms con ítems")
+        vals = {}
+        for it in r.get("items") or []:
+            iid, pr = it.get("itemId"), it.get("unitPriceCopper")
+            if isinstance(iid, int) and iid > 0 and isinstance(pr, (int, float)) and pr > 0:
+                vals[str(iid)] = int(pr)
+        meta = {"reino": r.get("name"), "importedAt": snap.get("importedAt")}
+    else:
+        vals = {str(k): v for k, v in d.items() if str(k).isdigit() and isinstance(v, (int, float)) and v > 0}
+    out = {}
+    for k, v in (vals or {}).items():
+        try:
+            iv = int(v)
+            if iv > 0:
+                out[str(k)] = iv
+        except (TypeError, ValueError):
+            pass
+    if not out:
+        raise ErrorConsulta(f"no se extrajo ningún precio positivo de {path}")
+    return out, meta
+
+
+def imprimir_ruta(D, ruta, por_spell, lang, out, max_filas=15):
+    out("")
+    out(f"Ruta de maxeo con precios {ruta['desde']}→{ruta['cap']} (materiales + adquisición de recetas):")
+    for x in ruta["pasos"][:max_filas]:
+        r = por_spell.get(x["spell"])
+        nm = nombre(r["n"], lang) if r else f"spell {x['spell']}"
+        out(f"- {x['desde']}→{x['hasta']}: {nm} ×~{x['crafteos']} — materiales {dinero(x['costo'])}")
+    if len(ruta["pasos"]) > max_filas:
+        out(f"  ... y {len(ruta['pasos']) - max_filas} pasos más (usa --max)")
+    for h in ruta["huecos"]:
+        out(f"- {h['desde']}→{h['hasta']}: SIN DATOS: {h['motivo']}")
+    if ruta["adquisiciones"]:
+        out("Adquisición de recetas (se paga una sola vez):")
+        for ad in ruta["adquisiciones"][:max_filas]:
+            r = por_spell.get(ad["spell"])
+            nm = nombre(r["n"], lang) if r else f"spell {ad['spell']}"
+            out(f"- {nm}: objeto {ad['item']} — {dinero(ad['cobre'])} ({ad['fuente']})")
+        if len(ruta["adquisiciones"]) > max_filas:
+            out(f"  ... y {len(ruta['adquisiciones']) - max_filas} adquisiciones más")
+    out(f"Total materiales: {dinero(ruta['totalMateriales'])} | adquisición: {dinero(ruta['totalAdquisicion'])} | TOTAL: {dinero(ruta['total'])}")
+    out(f"Cobertura: {ruta['cobertura'] * 100:.0f}% de los puntos del tramo con receta con precio.")
+    if ruta["adquisicionesSinDato"]:
+        out(f"  {len(ruta['adquisicionesSinDato'])} recetas sin coste de adquisición conocido (SIN DATOS): fuera de la ruta con precio.")
+    if ruta["sinPrecio"]:
+        out(f"  {len(ruta['sinPrecio'])} recetas con adquisición conocida pero sin precio de algún reactivo: fuera de la ruta.")
+    out(ruta["avisoEntrenamiento"])
+
+
 COMO = {"entrenador": "entrenador", "receta": "objeto receta", "automatica": "automática al aprender la profesión",
         "desconocido": "cómo se aprende: SIN DATOS (dato del servidor)"}
 
@@ -457,12 +688,27 @@ def cmd_profesion(D, a, out):
     if sin_req:
         out(f"  ({sin_req} recetas más, casi todas nuevas de Forever, no traen el skill para aprenderlas "
             "ni cómo se consiguen: SIN DATOS, no se puede decir si ya te sirven)")
+    precios, meta_p = None, {}
+    if getattr(a, "precios", None):
+        precios, meta_p = cargar_precios(a.precios, getattr(a, "reino", None))
+    if getattr(a, "maxeo", False) and precios is None:
+        raise ErrorConsulta("--maxeo necesita --precios FILE (export del mercado o bundle legacy)")
+    if precios is not None:
+        objetivo = a.hasta or (300 if getattr(a, "maxeo", False)
+                               else next((t for t in TRAMOS_PROFESION if t > skill), 300))
+        ruta = ruta_maxeo(recetas, skill, objetivo, precios, D.items, faccion)
+        por_spell = {r["spell"]: r for r in recetas}
+        out("")
+        out(f"Precios: {meta_p.get('reino', '?')} ({meta_p.get('fecha') or meta_p.get('importedAt') or 'fecha desconocida'}), {len(precios)} ítems con precio.")
+        imprimir_ruta(D, ruta, por_spell, a.lang, out, a.max)
+        return 0
     hasta = a.hasta or next((t for t in TRAMOS_PROFESION if t > skill), 300)
     if hasta > skill:
-        out(f"\nPlan de subida estimado {skill}→{hasta}, como el de la página: solo recetas de entrenador, "
+        out("")
+        out(f"Plan de subida estimado {skill}→{hasta}, como el de la página: solo recetas de entrenador, "
             "automáticas o de objeto receta que vende un vendedor" + (f" de la {NOMBRE_FACCION[faccion]}" if faccion
             else " (de cualquier facción: pasa --faccion)") + "; sin precios prefiere naranja y menos reactivos; "
-            "crafteos esperados con la regla de Classic:")
+            "crafteos esperados con la regla de Classic. Pasa --precios FILE para la ruta con costes (--maxeo para llegar a 300):")
         for d, h, r, n in plan_de_subida(obtenibles(recetas, faccion), skill, hasta):
             if r is None:
                 out(f"- {d}→{h}: SIN DATOS: ninguna receta conocida sube en este tramo")
@@ -685,6 +931,36 @@ def cmd_fuentes(D, a, out):
 
 # ---------------------------------------------------------------- CLI
 
+def cmd_maxeo(D, a, out):
+    if not a.precios:
+        raise ErrorConsulta("maxeo necesita --precios FILE (export del mercado o bundle legacy)")
+    precios, meta = cargar_precios(a.precios, a.reino)
+    out(f"Coste estimado de maxear a 300 con precios de {meta.get('reino', '?')} "
+        f"({meta.get('fecha') or meta.get('importedAt') or 'fecha desconocida'}), {len(precios)} ítems con precio.")
+    out("Materiales + adquisición de recetas (vendedor/subasta). El entrenamiento de tramos NO tiene coste en los datos: SIN DATOS, no incluido.")
+    profs = D.profesiones["profesiones"]
+    faccion = faccion_de(a.faccion) if a.faccion else None
+    skill = a.skill if a.skill is not None else 1
+    pid_filtro = resolver_profesion(D, a.profesion) if a.profesion else None
+    filas = []
+    for pid, p in profs.items():
+        if pid_filtro and pid != pid_filtro:
+            continue
+        recetas = p["recetas"]
+        ruta = ruta_maxeo(recetas, skill, 300, precios, D.items, faccion)
+        filas.append((nombre(p["n"], a.lang), ruta))
+        if a.detalle:
+            out("")
+            out(f"=== {nombre(p['n'], a.lang)} ===")
+            imprimir_ruta(D, ruta, {r["spell"]: r for r in recetas}, a.lang, out, a.max)
+    out("")
+    out(f"{'Profesión':<30}{'Materiales':>13}{'Adquisición':>14}{'TOTAL':>13}{'Cobertura':>11}{'Huecos':>8}")
+    for nm, ruta in filas:
+        out(f"{nm:<30}{dinero(ruta['totalMateriales']):>13}{dinero(ruta['totalAdquisicion']):>14}"
+            f"{dinero(ruta['total']):>13}{ruta['cobertura'] * 100:>10.0f}%{len(ruta['huecos']):>8}")
+    return 0
+
+
 def parser():
     p = argparse.ArgumentParser(prog="consultar.py", description=__doc__.split("\n\n")[0])
     p.add_argument("--datos", help="carpeta data/ (por defecto, la del plugin instalado)")
@@ -714,6 +990,9 @@ def parser():
     s = orden("profesion", cmd_profesion, "entrenadores, recetas que suben y plan de subida")
     s.add_argument("profesion"); s.add_argument("--skill", type=int); s.add_argument("--hasta", type=int)
     s.add_argument("--faccion")
+    s.add_argument("--precios", help="fichero de precios (export del mercado, bundle legacy o plano id:cobre)")
+    s.add_argument("--reino", help="reino del fichero de precios (si tiene varios)")
+    s.add_argument("--maxeo", action="store_true", help="ruta con costes hasta 300 (requiere --precios)")
     s = orden("receta", cmd_receta, "buscar una receta por nombre")
     s.add_argument("texto")
     s = orden("item", cmd_item, "buscar un ítem por id o nombre, y de dónde sale")
@@ -727,6 +1006,10 @@ def parser():
     s = orden("huecos", cmd_huecos, "datos que faltan, declarados en data/")
     s.add_argument("--tema"); s.add_argument("--faccion")
     orden("fuentes", cmd_fuentes, "fuentes, versiones y licencias de los datos")
+    s = orden("maxeo", cmd_maxeo, "coste estimado de maxear profesiones a 300 con precios de mercado")
+    s.add_argument("--precios", required=True); s.add_argument("--reino")
+    s.add_argument("--skill", type=int); s.add_argument("--faccion")
+    s.add_argument("--profesion"); s.add_argument("--detalle", action="store_true")
     return p
 
 
