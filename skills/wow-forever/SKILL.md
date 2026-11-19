@@ -24,6 +24,7 @@ recetas nuevas, y el sistema Legacy. No es un servidor privado.
 
 El perfil vive en el almacenamiento de la página de Desktop y tú no lo ves. Consíguelo así:
 
+- Puede usar **Preguntar a DAVI** en **Personaje**, **Profesiones** o el detalle de un ítem en **Mercado**: revisa la pregunta y el contexto, elige incluir perfil/precios y confirma la inserción en el borrador del chat. No se envía automáticamente; si no hay compositor disponible, se copia para pegar o queda texto seleccionable. Trata ese contexto como una instantánea, no como lectura del juego en vivo.
 - Pide que pulse **Copiar perfil para el agente** en la pestaña **Personaje** de la guía y lo
   pegue. Llega como una línea así:
   `Mi personaje de WoW Forever (plugin wow-forever): Horda · No-muerto (Undead, raza 5) · Paladín (Paladin, clase 2) · nivel 24 · profesiones: Herrería (Blacksmithing, id 164)`
@@ -106,18 +107,80 @@ curada (las de Guerrero y Chamán se retiraron por errores): dilo y usa los dato
 
 Los precios importados de Auctionator viven en la página, no en `data/`, y tú no los ves.
 
-- Para importarlos: en el juego, hacer un **full scan** con Auctionator, luego `/reload`, y en la
-  guía ir a **Mercado** → **Leer Auctionator.lua**. La primera vez, Hermes pide elegir la carpeta
-  `WTF/Account/<cuenta>/SavedVariables`. La guía solo lee ese archivo dentro de esa carpeta.
-  Si la carpeta concedida antes no lo tiene, la guía abre el selector; **Elegir otra carpeta**
-  lo abre cuando el usuario quiera. También puede usar **Importar archivo .lua**.
+- Para activar el seguimiento: en el juego, hacer un **full scan** con Auctionator, luego
+  `/reload`, y en **Mercado** → **Leer Auctionator.lua** conceder una vez la carpeta
+  `WTF/Account/<cuenta>/SavedVariables` (no `Interface/AddOns/Auctionator`). También se admite
+  una carpeta superior, con búsqueda acotada; si hay varias cuentas, elegir SavedVariables
+  de la cuenta concreta. **Elegir otra carpeta** cambia esa preferencia.
+- Con **Seguimiento automático** activo, el plugin sondea cada 30 segundos mientras Hermes
+  esté abierto, incluso fuera de la pestaña Mercado. No abre selectores en segundo plano.
+  Solo importa bytes distintos y válidos, fusionando el histórico local. Borrar precios
+  pausa el sondeo para no repoblar lo borrado; se puede reanudar con el conmutador.
+- Los precios que solo estén en memoria del juego requieren `/reload` o cerrar sesión para
+  llegar al disco. No confundir un sondeo sin cambios con un fallo del importador. También
+  puede usar **Importar archivo .lua**, pero eso no concede acceso automático a su carpeta.
+- Al reparar este flujo, verificar bytes con `readDataUrl` (hay blobs CBOR no UTF-8), cola
+  compartida para importación manual/automática/borrado, revisiones leídas dentro de la cola
+  y reintento si no se pudo guardar el histórico. `docs/DESKTOP.md` describe el diseño y
+  `desktop/test/mercado-auto.mjs` prueba el ciclo de vida con Chromium y reloj controlado.
+- Al corregir lifecycle, cancelar importaciones encoladas y comprobar `stopped` antes de
+  la primera escritura; si el snapshot ya empezó a guardarse, terminar el historial sin
+  publicar tras `dispose`, porque cortar entre ambos puede perder días. Probar con promesas
+  bloqueadas, no solo invocar un poll después de descargar.
+- Probar recuperación de carpeta revocada, limpieza de errores anteriores y fallos en la
+  segunda fase del borrado: no prometer conservación de datos si el historial ya se vació
+  o el commit quedó incierto. Mantener el rechazo de búsquedas incompletas/ambiguas.
 - Si el usuario te pega números de la página: `m` es el último mínimo unitario observado, en
   cobre (1 oro = 10000), no una venta. Oro por hora, ROI y ofertas son **estimaciones** con
   drops de Classic 1.12 y sin datos de población.
 
+## 6. Mis ventas · contabilidad TSM
+
+- Separa siempre las operaciones personales TSM de los precios anunciados Auctionator. La
+  página importa ventas, compras, expiraciones y cancelaciones; tú no ves su contenido salvo
+  que el usuario lo comparta. No leas SavedVariables reales para comprobarlo.
+- Descubrir TSM automáticamente desde grants SDK: priorizar `auctionator-folder`, buscar
+  nombre exacto hasta 120 directorios/6 niveles y rechazar ambigüedad/listado incompleto.
+  Completar la búsqueda aun con coincidencia en raíz: una copia suelta no debe ganar sobre
+  una cuenta anidada; leer solo después de probar unicidad (salvo SDK antiguo sin list).
+  No obligar a elegir archivos ni a conceder otra carpeta si Auctionator ya tiene acceso.
+  Sin permisos solo el usuario concede juego/WTF/SavedVariables una vez en la app; nunca
+  abrir selector en fondo. No explorar desde herramientas del agente las cuentas reales.
+- Fijar fuente en `tsm-location` (grant/ruta relativa). Ante archivo desaparecido o grant
+  revocado no cambiar de cuenta. Excluir Interface/Data/Cache/Logs/.git y nunca leer Config,
+  credenciales ni .bak. Seguimiento inicial activo cada 30 s fuera de Mercado; respetar una
+  pausa guardada y el borrado. `/reload` o cerrar sesión escribe los datos del juego.
+- Probar descubrimiento desde raíz con fixtures anidadas y concesión Auctionator en Chromium,
+  comprobando cero selectores TSM y cero lecturas Config/.bak. Al añadir fuentes independientes,
+  los tests de controles deben seleccionar por nombre, nunca el primer checkbox de la página.
+- Preserva la sustitución **completa** del snapshot: TSM modifica cantidades acumulativas de
+  filas existentes; anexar o deduplicar por hashes de fila duplicaría operaciones. Un archivo
+  idéntico no reescribe; uno inválido no sustituye lo anterior. Los recortes del addon también
+  se reflejan: no prometer un archivo histórico independiente del origen.
+- Conserva `price` como cobre unitario y `quantity` como unidades totales: no multiplicar otra
+  vez por `stackSize`. Revisa `Transactions.lua`/`Auctions.lua` del código del addon al cambiar
+  esquemas, no el archivo privado del jugador. Descarta nombres y `profileKeys` en el parser.
+- No llames beneficio neto a ingresos ni unidades expiradas/canceladas a ventas perdidas:
+  pueden ser intentos repetidos del mismo objeto. Las medias son ponderadas por unidades;
+  los importes de ventas por correo ya descuentan comisión (`floor((bid-ahcut)/quantity+0.5)`
+  en `Ledger/Mail.lua`). No reconstruir bruto ni descontar comisión dos veces: faltan depósitos
+  y fabricación para beneficio. La referencia Auctionator
+  requiere mismo reino y objeto base sin variantes.
+- TSM usa su propia cola, slots e índice (`tsm-a/b.json`, `tsm-pointer`); nunca reutilizar los
+  snapshots de Auctionator. Verificar archivo e índice por lectura, bloquear tras índice
+  incierto hasta Reabrir TSM; si falta el índice, comprobar ambos slots antes de asumir vacío
+  y bloquear si sobreviven archivos (incluso corruptos), evitando sobrescribir respaldos.
+  Comprobar `stopped` inmediatamente antes de la primera escritura.
+  Si esta ya empezó, completar commit sin publicar tras descarga. Pausar al borrar y avisar
+  honestamente de fallos. Borrado lógico, no borrado seguro del soporte.
+- Probar `node --test tests/tsm.test.mjs` y `node desktop/test/tsm.mjs`: fixtures sintéticas,
+  promesas bloqueadas, fallo tras commit del índice, readback corrupto, importación repetida,
+  cantidades mutables, restauración y Chromium claro/oscuro. No confundir esto con validación
+  de una cuenta real. Diseño y límites en `docs/DESKTOP.md`.
+
 ## Reglas
 
 - Nunca leas tú archivos del juego, `WTF/Config.wtf`, credenciales ni rutas con nombres de
-  cuenta, y nunca ejecutes Lua. El usuario elige sus archivos en la app.
+  cuenta, y nunca ejecutes Lua. Solo la app descubre los archivos dentro de permisos concedidos por el usuario; el agente no lee las cuentas.
 - No prometas ingresos, drops ni tiempos: todo número del mercado o del farmeo es estimado.
 - Si el plugin no está instalado: `hermes plugins install Grizaceo/wow-forever`.

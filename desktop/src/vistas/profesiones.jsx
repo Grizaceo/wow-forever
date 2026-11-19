@@ -4,13 +4,17 @@
 import { useMemo, useState } from 'react'
 import { Button, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@hermes/plugin-sdk'
 import { preciosDelMercado } from '../../../src/crafteo.js'
+import { perfilParaAgente } from '../../../src/perfil.js'
 import { D, PRINCIPALES, SECUNDARIAS, nombre, zona } from '../datos.js'
 import { C, S } from '../estilos.js'
 import { agregarTextos, t } from '../i18n.js'
 import { Hueco, Origen, Tarjeta } from '../ui.jsx'
+import { construirContextoProfesion } from '../davi.js'
+import { catalogoMercado } from '../mercado-logica.js'
 import { TablaRecetas } from './profesiones/tabla.jsx'
 import { PlanSubida } from './profesiones/plan.jsx'
 import { FuentesReceta } from './profesiones/fuentes.jsx'
+import { PreguntarDavi } from './preguntar-davi.jsx'
 
 agregarTextos({
   'prof.skill': 'Skill',
@@ -43,6 +47,16 @@ agregarTextos({
 const ORDEN_BASE = [...PRINCIPALES, ...SECUNDARIAS]
 const num = (v) => (Number.isFinite(v) ? v : 0)
 const pct = (v) => (Number.isFinite(v) ? String(Math.round(v * 10) / 10) : '—')
+const NOMBRES_PROF = Object.fromEntries(
+  Object.entries(D.profesiones.profesiones).map(([id, p]) => [id, p.n]),
+)
+// De dónde sale el contexto de «Preguntar a DAVI» en Profesiones.
+const PROCEDENCIA_PROF = [
+  'data/profesiones.json',
+  'data/items.json',
+  'builds: cliente-forever ' + (D.profesiones.meta?.builds?.['cliente-forever'] || '?')
+    + ' / cmangos-1.12 ' + (D.profesiones.meta?.builds?.['cmangos-1.12'] || '?'),
+]
 
 export function VistaProfesiones({ ctx, estado, perfil, lang, irA }) {
   const datos = D.profesiones.profesiones
@@ -87,6 +101,17 @@ export function VistaProfesiones({ ctx, estado, perfil, lang, irA }) {
     porZona.get(z).push(e)
   }
   const enPerfil = new Set([...(perfil.profesiones || []), ...(perfil.secundarias || [])])
+  const catalogo = useMemo(() => catalogoMercado(D.items, D.dungeons), [])
+  const resumenPerfil = useMemo(() => perfilParaAgente(perfil, D.personaje, NOMBRES_PROF, lang), [perfil, lang])
+  // Receta seleccionada (su spell); si no hay ninguna, solo se adjunta la profesión y el skill.
+  const recetaSel = useMemo(
+    () => (prof && sel == null ? null : prof ? prof.recetas.find((r) => r.spell === sel) || null : null),
+    [prof, sel],
+  )
+  const snapshotDavi = useMemo(() => (!prof ? null : construirContextoProfesion({
+    id: pidReal, nombre: prof.n, skill, receta: recetaSel, itemsJson: D.items, catalogo,
+    precios, lang, resumenPerfil, procedencia: PROCEDENCIA_PROF, market: estado.market, reino: perfil.reino,
+  })), [prof, pidReal, skill, recetaSel, catalogo, precios, lang, resumenPerfil, estado.market, perfil.reino])
 
   if (!prof) return <Tarjeta titulo={t(lang, 'tab.profesiones')}><Hueco lang={lang}>{t(lang, 'prof.huecoEntrenadores')}</Hueco></Tarjeta>
 
@@ -152,6 +177,11 @@ export function VistaProfesiones({ ctx, estado, perfil, lang, irA }) {
 
       <FuentesReceta prof={prof} sel={sel} precios={precios} items={D.items.items}
         faccion={perfil.faccion} lang={lang} />
+
+      <Tarjeta titulo={t(lang, 'davi.boton')}>
+        <PreguntarDavi ctx={ctx} lang={lang} seccion={t(lang, 'tab.profesiones')} snapshot={snapshotDavi}
+          preguntaInicial={t(lang, 'davi.profesiones')} />
+      </Tarjeta>
     </>
   )
 }

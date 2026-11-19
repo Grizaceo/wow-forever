@@ -96,10 +96,11 @@ check('estimaciones marcadas como approx', await p.getByText(/Estimaciones aprox
 check('nivel y facción del perfil', await p.getByText(/vos nv 30/).count() > 0)
 
 const previo = await exportar(p)
-check('persistió market-pointer', previo.storage['market-pointer']?.revision >= 1, previo.storage['market-pointer'])
-check('persistió price-history-pointer', previo.storage['price-history-pointer']?.revision >= 1, previo.storage['price-history-pointer'])
-check('persistió market-a/b.json', Object.keys(previo.archivos).some((k) => /^market-[ab]\.json$/.test(k)))
-check('persistió price-history-a/b.json', Object.keys(previo.archivos).some((k) => /^price-history-[ab]\.json$/.test(k)))
+const vp=previo.storage['market-v2-pointer']
+check('persistió puntero conjunto v2', vp?.revision>=1,vp)
+const vb=JSON.parse(previo.archivos[`market-v2-${vp.slot}.json`])
+check('bundle contiene mercado e historial v2',vb.market.snapshot.schemaVersion===2 && vb.history.v===2)
+check('respaldo legado durable',!!previo.archivos['pre-v2-backup.json'])
 await cerrar()
 
 // ---------- Sesión 2: oscuro, mismos datos → persisten; import manual ----------
@@ -111,7 +112,7 @@ check('oscuro: historial acumulado informado', await p.getByText(/Historial acum
 check('oscuro:realm sigue en Prueba', await p.locator('select[aria-label="Realm de subasta"]').inputValue() === 'Prueba')
 
 // Importación manual por <input type=file>.
-await p.locator('input[type="file"]').setInputFiles({ name: 'Auctionator.lua', mimeType: 'text/plain', buffer: Buffer.from(FIXTURE_MANUAL, 'utf8') })
+await p.locator('input[type="file"][accept=".lua"]').setInputFiles({ name: 'Auctionator.lua', mimeType: 'text/plain', buffer: Buffer.from(FIXTURE_MANUAL, 'utf8') })
 await esperar(p, /Importación guardada/)
 check('importación manual desde archivo .lua', await p.getByText('Importación guardada').count() === 1)
 await p.waitForFunction(() => document.querySelector('select[aria-label="Realm de subasta"]')?.value === 'Manual', null, { timeout: 10000 })
@@ -121,7 +122,7 @@ check('precio manual 200c = 2s', /2s/.test(await texto(p)))
 
 // Fallo de escritura: se conserva lo anterior.
 await p.evaluate(() => { window.fallarEscritura = true })
-await p.locator('input[type="file"]').setInputFiles({ name: 'Auctionator.lua', mimeType: 'text/plain', buffer: Buffer.from(FIXTURE, 'utf8') })
+await p.locator('input[type="file"][accept=".lua"]').setInputFiles({ name: 'Auctionator.lua', mimeType: 'text/plain', buffer: Buffer.from(FIXTURE, 'utf8') })
 await esperar(p, /no se pudo guardar/i)
 check('fallo de escritura muestra error', await p.getByText(/no se pudo guardar/i).count() === 1)
 check('fallo de escritura conserva el scan anterior', await p.locator('select[aria-label="Realm de subasta"]').inputValue() === 'Manual' && /1 de 1 claves/.test(await texto(p)))
@@ -167,4 +168,19 @@ await esperar(p, /Importación guardada|No se importó/)
 check('sin readDataUrl, readText sigue importando un archivo UTF-8', await p.getByText('Importación guardada').count() === 1)
 await cerrar()
 
+// Fallo del bundle v2: ni mercado ni histórico se eliminan a medias.
+;({ p, cerrar } = await a.abrir('claro', previo))
+await p.click('[data-tab="mercado"]')
+await p.getByText('Paño de lino').first().waitFor()
+await p.evaluate(() => { window.fallarMercado = true })
+await p.getByRole('button', { name: 'Borrar precios locales' }).first().click()
+await p.getByRole('button', { name: '¿Confirmar borrado?' }).first().click()
+await esperar(p, /Se conservan los datos/)
+check('fallo atómico conserva los datos', /Se conservan los datos/.test(await texto(p)))
+check('borrado parcial conserva el snapshot', await p.getByText('Paño de lino').count() >= 1)
+check('borrado parcial deja automático pausado', await p.getByRole('checkbox', { name: /Seguimiento automático/ }).isChecked() === false)
+const parcial=await exportar(p)
+const hp=parcial.storage['market-v2-pointer']
+check('histórico intacto en disco', JSON.stringify(hp)===JSON.stringify(previo.storage['market-v2-pointer']) && parcial.archivos[`market-v2-${hp.slot}.json`]===previo.archivos[`market-v2-${hp.slot}.json`])
+await cerrar()
 await a.terminar('mercado')

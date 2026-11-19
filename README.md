@@ -72,6 +72,31 @@ data**.
 Each import adds its days to every item's history, even though Auctionator keeps only about
 three weeks.
 
+### Ask DAVI
+
+The **Ask DAVI** button on the **Character**, **Professions** and **Market** tabs opens a panel
+with your question (editable) and a preview of the context that will be attached: only what you
+picked on that tab. Two toggles drop the **profile** or the **prices**; the preview updates right
+away and is **frozen** when the panel opens, so editing the question or the selection does not
+change it.
+
+- **Character**: faction, race, class, level and professions from the hand-entered profile.
+- **Professions**: the profession and its skill; if a recipe is selected, that recipe and **only
+  its reagents** (bounded), with cost and margin when auction prices exist.
+- **Market**: only with a detail item open; it carries the last posted minimum, the observed
+  peak daily supply, the observed day and the import date. It does **not** include the full
+  history or the `Auctionator.lua` file.
+
+The text always states that the profile is **hand-entered, not the live game**; that prices are
+**posted offers, not sales**; and that loot/farming reference is **Classic 1.12, not verified in
+Forever**.
+
+On confirm, the plugin inserts the text into the active chat with
+`host.composer.insertText(null, text, { mode: 'block' })`. It **never** sends the question by
+itself and never touches the draft (`submit`/`setDraft`). If it cannot insert, it copies to the
+clipboard; if that fails, the text stays selectable for manual copy. Once a confirm succeeds the
+button is disabled so it cannot insert twice, and nothing new is written to storage.
+
 ## What it reads, stores and runs
 
 - **Reads** only `Auctionator.lua` inside the folder you grant with the Hermes picker (it looks

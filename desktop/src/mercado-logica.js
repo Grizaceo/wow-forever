@@ -8,8 +8,11 @@ import HunterHistory from '../../standalone/market-history.js'
 import HunterDeals from '../../standalone/market-deals.js'
 import HunterChart from '../../standalone/market-chart.js'
 import FarmModule from '../../standalone/market-farm.js'
+import HunterIdentity from '../../standalone/market-identity.js'
+import HunterSource from '../../standalone/market-source.js'
+import HunterCompare from '../../standalone/market-compare.js'
 
-export { HunterMarket, HunterHistory, HunterDeals, HunterChart }
+export { HunterMarket, HunterHistory, HunterDeals, HunterChart, HunterIdentity, HunterSource, HunterCompare }
 export const Farm = FarmModule
 
 export const PAGE_SIZE = 50
@@ -228,14 +231,48 @@ export function snapshotVisible(mercado, historial) {
   const s = mercado?.snapshot
   if (!s) return null
   const st = historial?.store
-  return st ? HunterHistory.applyStore(s, st) : s
+  if (!st) return s
+  if (st.v === 2) return s.schemaVersion === 2 ? HunterHistory.applyStoreV2(s, st) : s
+  return HunterHistory.applyStore(s, st)
 }
 
 // Plan de commit de una importación (puro): snapshot recortado + store
 // acumulado. El guardado lo hace la vista con almacen.market/history.
 // `snapshotActual` debe ser el snapshot visible (applyStore), como en
 // commitSnapshot de market-ui.js donde `snapshot` ya lleva la serie completa.
+export function snapshotSinIdentificar(raw) {
+  if (!raw) return null
+  if (raw.schemaVersion === 2) return raw
+  // Reuse the legacy scope, never promote its old observations to any known pool.
+  const legacy = HunterHistory.migrateStoreV1(HunterHistory.emptyStore(), 'local:legacy')
+  const identity = Object.values(legacy.scopes)[0].identity
+  return { ...raw, schemaVersion:2,
+    observation:{scope:'legacy',fromDay:null,toDay:null,capturedAt:raw.importedAt},
+    realms:raw.realms.map(r=>({...r,identity:structuredClone(identity)})) }
+}
 export function planImportacion(raw, { snapshotActual = null, historyStore = null } = {}) {
+  const v2 = raw?.schemaVersion === 2 || historyStore?.v === 2 || snapshotActual?.schemaVersion === 2
+  if (v2) {
+    raw = snapshotSinIdentificar(raw)
+    snapshotActual = snapshotSinIdentificar(snapshotActual)
+    // Replace only this exact source scope, preserving other pools with the
+    // same raw realm label. History remains separate from current observations.
+    const key = r => JSON.stringify([HunterIdentity.identityKey(r.identity), r.name])
+    const byScope = new Map((snapshotActual?.schemaVersion === 2 ? snapshotActual.realms : []).map(r => [key(r), r]))
+    for (const r of raw.realms) byScope.set(key(r), r)
+    const combined = { ...raw, realms: [...byScope.values()] }
+    const snapshot = HunterHistory.trimSnapshotHistory(combined, SNAPSHOT_KEEP_DAYS)
+    const base = historyStore && historyStore.v === 2
+      ? historyStore
+      : (historyStore
+        ? HunterHistory.migrateStoreV1(historyStore, 'local:legacy')
+        : (snapshotActual && snapshotActual.schemaVersion === 2
+          ? HunterHistory.storeV2FromSnapshot(snapshotActual)
+          : HunterHistory.emptyStoreV2()))
+    const budget = Math.max(256, HISTORY_MAX_BYTES - HunterHistory.byteSize(snapshot))
+    const store = HunterHistory.fitStoreV2(HunterHistory.storeV2Merge(base, raw), budget)
+    return { snapshot, store }
+  }
   const snapshot = HunterHistory.trimSnapshotHistory(raw, SNAPSHOT_KEEP_DAYS)
   const base = historyStore || (snapshotActual ? HunterHistory.storeFromSnapshot(snapshotActual) : HunterHistory.emptyStore())
   const store = HunterHistory.fitStore(HunterHistory.storeMerge(base, raw), HISTORY_MAX_BYTES)
@@ -256,15 +293,45 @@ const realmValido = (r) =>
   typeof r.name === 'string' && Array.isArray(r.items) && r.items.length <= 100000 && r.items.every(itemValido)
 
 export function snapshotValido(s) {
+  if (s?.schemaVersion === 2) {
+    const o = s.observation
+    const realmOk = r => typeof r.name === 'string' && Array.isArray(r.items) &&
+      HunterIdentity.validateIdentity(r.identity).ok &&
+      r.items.length <= 100000 && r.items.every(itemValido)
+    return s.sourceVersion === 8 && typeof s.importedAt === 'string' && Number.isFinite(Date.parse(s.importedAt)) &&
+      ((o?.scope === 'fresh-scan' && Number.isSafeInteger(o.fromDay) && Number.isSafeInteger(o.toDay) && o.toDay >= o.fromDay) ||
+       (o?.scope === 'legacy' && o.fromDay === null && o.toDay === null)) &&
+      typeof o.capturedAt === 'string' && Number.isFinite(Date.parse(o.capturedAt)) &&
+      Array.isArray(s.warnings) && s.warnings.length <= 1000 && s.warnings.every(w => typeof w === 'string') &&
+      Array.isArray(s.realms) && s.realms.length > 0 && s.realms.length <= 100 && s.realms.every(realmOk)
+  }
   return s?.schemaVersion === 1 && s.sourceVersion === 8 &&
     typeof s.importedAt === 'string' && Number.isFinite(Date.parse(s.importedAt)) &&
     Array.isArray(s.warnings) && s.warnings.length <= 1000 && s.warnings.every((w) => typeof w === 'string') &&
     Array.isArray(s.realms) && s.realms.length > 0 && s.realms.length <= 100 && s.realms.every(realmValido)
 }
 
+// Parser validado de fuente aislada. Nunca acepta el export crudo de
+// Auctionator: exige identidad acreditada y observación fresca explícita.
+export const parsearFuenteAislada = (text, adapterVerified = false) => HunterSource.parseSeparateSourceObservations(text, adapterVerified)
+
+// Comparación pura. Bloquea procedencia desconocida antes de mirar precios.
+export const compararPools = (pools, options) => HunterCompare.compare(pools, options)
+
 // Días y entradas del store acumulado (para el pie de estado del historial).
 export function infoHistorial(store) {
-  if (!store || !HunterHistory.validStore(store)) return { days: 0, entries: 0 }
+  if (!store) return { days: 0, entries: 0 }
+  if (store.v === 2) {
+    if (!HunterHistory.validStoreV2(store)) return { days: 0, entries: 0 }
+    const seen = new Set(); let entries = 0
+    for (const scope of Object.values(store.scopes)) {
+      for (const realm of Object.values(scope.realms)) {
+        for (const rows of Object.values(realm.items)) for (const r of rows) { entries++; seen.add(r[0]) }
+      }
+    }
+    return { days: seen.size, entries }
+  }
+  if (!HunterHistory.validStore(store)) return { days: 0, entries: 0 }
   const seen = new Set()
   let entries = 0
   for (const rn of Object.keys(store.realms || {})) {

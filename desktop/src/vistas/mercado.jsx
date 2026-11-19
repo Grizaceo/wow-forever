@@ -4,19 +4,24 @@
 // React reutilizando los módulos puros de standalone/ sin copiarlos.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Button, Checkbox, SearchField, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@hermes/plugin-sdk'
-import { leerAuctionator } from '../auctionator.js'
+import { classifyAcquisition, leerAuctionator, verifiedExporter } from '../auctionator.js'
+import { createMarketSync } from '../mercado-auto.js'
 import { D, GUIAS, guiaCurada, nombre } from '../datos.js'
+import { construirContextoComparacionCapitalNeutral, construirContextoMercado, ofertaMaximaDe } from '../davi.js'
+import { perfilParaAgente } from '../../../src/perfil.js'
 import { C, S } from '../estilos.js'
 import { agregarTextos, t } from '../i18n.js'
 import { Aviso, Dinero, Origen, Tarjeta } from '../ui.jsx'
 import {
-  Farm, HunterChart, HunterDeals, HunterHistory, HunterMarket,
-  PAGE_SIZE, ajustesFarm, catalogoMercado, edadItem, fechaDe, filtrarMercado,
-  frescura, fuentesItem, hubZonesDe, infoHistorial, nombreItem, ordenarMercado,
-  perfilMotor, planImportacion, snapshotValido, snapshotVisible, textosBusqueda,
+  Farm, HunterChart, HunterDeals, HunterHistory, HunterIdentity, HunterMarket,
+  PAGE_SIZE, ajustesFarm, catalogoMercado, compararPools, edadItem, fechaDe, filtrarMercado,
+  fmtCobre, frescura, fuentesItem, hoy, hubZonesDe, infoHistorial, nombreItem, ordenarMercado,
+  parsearFuenteAislada, perfilMotor, snapshotVisible, textosBusqueda,
 } from '../mercado-logica.js'
 import { DetalleItem } from './mercado/detalle.jsx'
 import { Farmeo } from './mercado/farmeo.jsx'
+import { PreguntarDavi } from './preguntar-davi.jsx'
+import { MisVentas } from './mercado/mis-ventas.jsx'
 
 agregarTextos({
   'mercado.scan.titulo': 'Escaneo de Auctionator',
@@ -40,8 +45,8 @@ agregarTextos({
   'mercado.sinArchivos': 'Las APIs de archivos no están disponibles en este contexto.',
   'mercado.borrando': 'Borrando solo el mercado local…',
   'mercado.borrado': 'Mercado local borrado. El juego y tu personaje no cambiaron.',
-  'mercado.errorBorrar': 'No se pudo borrar. Se conservan los datos. {msg}',
-  'mercado.errorBorrarParcial': 'No se pudo borrar el scan; el historial acumulado sí se vació. {msg}',
+  'mercado.errorBorrar': 'No se confirmó el borrado completo. Usá Reabrir para comprobar los datos guardados. {msg}',
+  'mercado.errorBorrarParcial': 'No se confirmó el borrado del scan; el historial acumulado sí se vació. Usá Reabrir para comprobar el estado. {msg}',
   'mercado.notaCarpeta': 'Auctionator.lua (carpeta concedida)',
   'mercado.frescura.importado': 'Importado',
   'mercado.frescura.max': 'Día observado más reciente',
@@ -228,8 +233,8 @@ agregarTextos({
   'mercado.sinArchivos': 'File APIs are not available in this context.',
   'mercado.borrando': 'Deleting only the local market…',
   'mercado.borrado': 'Local market deleted. The game and your character are untouched.',
-  'mercado.errorBorrar': 'Could not delete. Data is kept. {msg}',
-  'mercado.errorBorrarParcial': 'Could not delete the scan; the accumulated history was emptied. {msg}',
+  'mercado.errorBorrar': 'Complete deletion was not confirmed. Reopen to check saved data. {msg}',
+  'mercado.errorBorrarParcial': 'Scan deletion was not confirmed; the accumulated history was emptied. Reopen to check saved data. {msg}',
   'mercado.notaCarpeta': 'Auctionator.lua (granted folder)',
   'mercado.frescura.importado': 'Imported',
   'mercado.frescura.max': 'Most recent observed day',
@@ -408,6 +413,90 @@ Farm.configure({ HunterDropData: D.dropData, HunterMarketCatalog: CATALOGO, Hunt
 const fmt = Farm.fmt || {}
 const ORDENES = ['nombre', 'precio', 'ofertas', 'roi', 'gph']
 
+/* ------------------------------------------------ procedencia / comparación */
+// Textos nuevos, deliberadamente fuera del catálogo i18n grande: son avisos de
+// límite, no nombres de datos del juego.
+const cp = (lang, es, en) => (lang === 'en' ? en : es)
+const MOTIVOS = {
+  'unknown-provenance': ['procedencia desconocida', 'unknown provenance'],
+  'unknown-provenance-legacy': ['Auctionator real: procedencia desconocida, sin exportador verificado', 'real Auctionator: UNKNOWN provenance, no verified exporter'],
+  'missing-two-scopes': ['faltan dos ámbitos aislados con identidad verificada', 'two isolated scopes with verified identity are required'],
+  'same-scope': ['los dos lados son el mismo ámbito', 'both sides are the same scope'],
+  'invalid-comparison-input': ['entrada de comparación inválida', 'invalid comparison input'],
+  'invalid-identity': ['identidad inválida', 'invalid identity'],
+  'different-game': ['juegos distintos', 'different games'],
+  'different-region': ['regiones distintas', 'different regions'],
+  'different-ruleset': ['reglas distintas', 'different rulesets'],
+  'different-local-scope': ['ámbitos de observación distintos', 'different observation scopes'],
+  'different-source': ['fuentes distintas', 'different sources'],
+  'missing-today': ['sin día actual', 'missing current day'],
+  'pool-count': ['número de ámbitos inválido', 'invalid scope count'],
+  'invalid-pool': ['ámbito inválido', 'invalid scope'],
+  'invalid-sourceKey': ['clave de origen inválida', 'invalid source key'],
+  'invalid-price': ['precio inválido', 'invalid price'],
+  'future-observation': ['observación en el futuro', 'future observation'],
+  'invalid-itemId': ['ID de ítem inválido', 'invalid item ID'],
+  'variant-promotion': ['variante promovida a ID base', 'variant promoted to base ID'],
+  'excessive-skew': ['diferencia de precios excesiva entre las dos fuentes', 'excessive price skew between the two sources'],
+  'shared-pool-use-single-series': ['misma piscina de subastas: no son dos fuentes; usar una sola serie con canal alternativo', 'same auction pool: not two sources; use a single series with an alternate channel'],
+  'duplicate-sourceKey': ['clave de origen duplicada', 'duplicate source key'],
+  'commission-unknown': ['comisión desconocida', 'unknown commission'],
+  'commission-unverified': ['comisión no verificada', 'unverified commission'],
+  'commission-overflow': ['comisión desborda el cálculo', 'commission overflow'],
+  'delta-overflow': ['diferencia desborda el cálculo', 'delta overflow'],
+}
+const motivo = (code, lang) => {
+  const par = MOTIVOS[code]
+  return par ? cp(lang, par[0], par[1]) : String(code)
+}
+
+function identidadTexto(id, lang) {
+  const p = id && id.provenance
+  if (!p || p.confidence !== 'verified') {
+    return cp(lang, 'DESCONOCIDA — sin identidad acreditada', 'UNKNOWN — no accredited identity')
+  }
+  const s = p.scope || {}
+  const ventana = Number.isSafeInteger(s.fromDay) && Number.isSafeInteger(s.toDay)
+    ? `${fechaDe(s.fromDay)} – ${fechaDe(s.toDay)}` : '—'
+  return [
+    `${cp(lang, 'Etiqueta', 'Label')}: ${s.sourceLabel || '—'}`,
+    `${cp(lang, 'Región', 'Region')}: ${id.region}`,
+    `${cp(lang, 'Reglas', 'Ruleset')}: ${id.ruleset}`,
+    `${cp(lang, 'Pool económico', 'Economic pool')}: ${id.auctionPool}`,
+    `${cp(lang, 'Canal', 'Channel')}: ${id.postingChannel == null ? '—' : id.postingChannel}`,
+    `${cp(lang, 'Ventana', 'Window')}: ${ventana}`,
+  ].join(' · ')
+}
+
+// Un ámbito es una identidad verificada, NUNCA un nombre de reino. La clave
+// canónica evita colisiones entre reinos con el mismo nombre en fuentes distintas.
+function scopesDeSnapshot(snap, origen) {
+  if (!snap || snap.schemaVersion !== 2 || !Array.isArray(snap.realms)) return []
+  const out = []
+  for (const realm of snap.realms) {
+    if (!realm || !realm.identity || realm.identity.provenance?.confidence !== 'verified') continue
+    if (!HunterIdentity.validateIdentity(realm.identity).ok) continue
+    let key
+    try { key = HunterIdentity.identityKey(realm.identity) } catch { continue }
+    out.push({
+      key, origen, realm: realm.name, identity: realm.identity,
+      rows: (realm.items || []).map((i) => ({
+        sourceKey: i.sourceKey, itemId: i.itemId == null ? null : i.itemId,
+        unitPriceCopper: i.unitPriceCopper, observedDay: i.observedDay,
+        available: i.available == null ? null : i.available,
+        confirmed: i.confirmed === true, coverage: i.coverage || null,
+      })),
+    })
+  }
+  return out
+}
+
+function etiquetaCorta(scope, lang) {
+  const id = scope.identity
+  const etiqueta = id.provenance?.scope?.sourceLabel || cp(lang, 'aislada', 'isolated')
+  return `${etiqueta} · ${id.postingChannel || '—'} · ${scope.key.slice(1, 14)}…`
+}
+
 function InsigniaOferta({ deal, lang }) {
   if (!deal || (deal.kind !== 'oferta' && deal.kind !== 'sobreprecio')) return null
   const pct = Math.round(Math.abs(deal.discount) * 100)
@@ -425,7 +514,14 @@ function FilaVacia({ texto }) {
   return <tr><td style={S.td} colSpan={6}>{texto}</td></tr>
 }
 
-export function VistaMercado({ ctx, almacen, estado, recargar, perfil, lang }) {
+export function VistaMercado({ ctx, almacen, sincronizador, ventas, estado, recargar, perfil, lang }) {
+  const sync = useMemo(() => sincronizador || createMarketSync(ctx, almacen), [sincronizador, ctx, almacen])
+  const [auto, setAuto] = useState(sync.getState())
+  useEffect(() => sync.subscribe(setAuto), [sync])
+  const cambiarAuto = async () => {
+    try { await sync.setEnabled(!auto.enabled); if (!auto.enabled) await sync.poll() }
+    catch (e) { setMensaje(String(e.message || e)) }
+  }
   const mercado = estado?.market
   const historial = estado?.history
   const snapshot = useMemo(() => snapshotVisible(mercado, historial), [mercado, historial])
@@ -434,6 +530,8 @@ export function VistaMercado({ ctx, almacen, estado, recargar, perfil, lang }) {
   const [importando, setImportando] = useState(false)
   const [confirmBorrar, setConfirmBorrar] = useState(false)
   const [realmName, setRealmName] = useState('')
+  const [realmChoice, setRealmChoice] = useState('')
+  const realmId = r => (snapshot?.realms.filter(x=>x.name===r.name).length>1 ? JSON.stringify([HunterIdentity.identityKey(r.identity),r.name]) : r.name)
   const [busqueda, setBusqueda] = useState('')
   const [soloRecientes, setSoloRecientes] = useState(false)
   const [conFuente, setConFuente] = useState(false)
@@ -444,11 +542,22 @@ export function VistaMercado({ ctx, almacen, estado, recargar, perfil, lang }) {
   const [detalleKey, setDetalleKey] = useState(null)
   const [farmGuardado, setFarmGuardado] = useState(null)
   const fileRef = useRef(null)
-  const estadoRef = useRef(estado)
   const revM = useRef(0)
   const revH = useRef(0)
+  const [scopesMemoria, setScopesMemoria] = useState([])
+  const [scopeA, setScopeA] = useState('')
+  const [scopeB, setScopeB] = useState('')
+  const [errorFuente, setErrorFuente] = useState('')
+  const [bloqueoV2, setBloqueoV2] = useState('')
+  const [ultimaFuente, setUltimaFuente] = useState('')
+  const [guardandoV2, setGuardandoV2] = useState(false)
+  const [confirmGuardarV2, setConfirmGuardarV2] = useState(false)
+  const [confirmRollback, setConfirmRollback] = useState(false)
+  const [comision, setComision] = useState({
+    capital: { bps: '', verificada: false, etiqueta: '', dia: '' },
+    neutral: { bps: '', verificada: false, etiqueta: '', dia: '' },
+  })
 
-  useEffect(() => { estadoRef.current = estado }, [estado])
   useEffect(() => {
     revM.current = estado?.revision ?? 0
     revH.current = estado?.history?.revision ?? 0
@@ -473,7 +582,7 @@ export function VistaMercado({ ctx, almacen, estado, recargar, perfil, lang }) {
     setRealmName(preferido)
   }, [snapshot, perfil?.reino, mercado?.realm, realmName])
 
-  const realm = useMemo(() => snapshot?.realms?.find((r) => r.name === realmName) || null, [snapshot, realmName])
+  const realm = (snapshot?.realms || []).find(r=>realmId(r)===realmChoice) || snapshot?.realms?.find(r=>r.name===realmName) || null
   const items = useMemo(() => realm?.items || [], [realm])
   const nivel = perfil?.nivel || 12
 
@@ -491,7 +600,7 @@ export function VistaMercado({ ctx, almacen, estado, recargar, perfil, lang }) {
 
   // Cachés de métricas/deals por clave de ítem, invalidadas al cambiar de
   // perfil, ajustes, realm o importación (igual que market-ui.js).
-  const mkey = JSON.stringify([motorProfile, settings, realmName, snapshot?.importedAt || ''])
+  const mkey = JSON.stringify([motorProfile, settings, realm ? realmId(realm) : realmName, snapshot?.importedAt || ''])
   const mcache = useRef({ key: '', map: new Map() })
   const metricOf = useCallback((item) => {
     if (!item?.itemId) return null
@@ -501,7 +610,7 @@ export function VistaMercado({ ctx, almacen, estado, recargar, perfil, lang }) {
     }
     return mcache.current.map.get(item.sourceKey)
   }, [mkey, motorProfile, settings])
-  const dkey = `${snapshot?.importedAt || ''}|${realmName}`
+  const dkey = `${snapshot?.importedAt || ''}|${realm ? realmId(realm) : realmName}`
   const dcache = useRef({ key: '', map: new Map() })
   const dealOf = useCallback((item) => {
     if (dcache.current.key !== dkey) dcache.current = { key: dkey, map: new Map() }
@@ -530,52 +639,164 @@ export function VistaMercado({ ctx, almacen, estado, recargar, perfil, lang }) {
   const detalle = useMemo(() => items.find((i) => i.sourceKey === detalleKey) || null, [items, detalleKey])
   const detalleMetrica = useMemo(() => (detalle ? metricOf(detalle) : null), [detalle, metricOf])
   const detalleDeal = useMemo(() => (detalle ? dealOf(detalle) : null), [detalle, dealOf])
+  // «Preguntar a DAVI»: solo con un ítem de detalle seleccionado. El contexto lleva el
+  // último precio y la oferta máxima diaria; el historial completo se queda fuera.
+  const resumenPerfilMercado = useMemo(() => perfilParaAgente(perfil, D.personaje, {}, lang), [perfil, lang])
+  const procedenciaMercado = useMemo(() => [
+    'Auctionator.lua (importación del cliente)',
+    'importado: ' + (snapshot?.importedAt ? String(snapshot.importedAt) : 'fecha desconocida'),
+    'DB ' + (snapshot?.sourceVersion || '?'),
+  ], [snapshot])
+  const snapshotDavi = useMemo(() => (!detalle ? null : construirContextoMercado({
+    item: detalle, realm: realmName, available: ofertaMaximaDe(detalle), itemsJson: D.items,
+    catalogo: CATALOGO, importedAt: snapshot?.importedAt ? String(snapshot.importedAt) : null,
+    lang, resumenPerfil: resumenPerfilMercado, procedencia: procedenciaMercado,
+  })), [detalle, realmName, snapshot, lang, resumenPerfilMercado, procedenciaMercado])
 
-  const fres = useMemo(() => frescura(snapshot, realmName), [snapshot, realmName])
+  const fres = useMemo(() => frescura(realm ? {...snapshot,realms:[realm]} : snapshot, realmName), [snapshot, realmName, realm])
   const histInfo = useMemo(() => infoHistorial(historial?.store), [historial])
+
+  // Un ámbito se elige por identidad canónica, nunca por nombre de reino: dos
+  // fuentes pueden usar la misma clave de reino y ser economías distintas.
+  const esLegacy = !!(estado?.legacyMarket || mercado?.snapshot?.schemaVersion === 1 || mercado?.snapshot?.realms?.some(r=>r.identity?.provenance?.confidence!=='verified'))
+  const scopes = useMemo(() => {
+    const mapa = new Map()
+    for (const s of [...scopesDeSnapshot(mercado?.snapshot, 'guardado'), ...scopesMemoria]) mapa.set(s.key, s)
+    return [...mapa.values()]
+  }, [mercado?.snapshot, scopesMemoria])
+  useEffect(() => {
+    const claves = scopes.map((s) => s.key)
+    setScopeA((prev) => (claves.includes(prev) ? prev : (claves[0] || '')))
+    setScopeB((prev) => (claves.includes(prev) && prev !== claves[0] ? prev : (claves.find((k) => k !== claves[0]) || '')))
+  }, [scopes])
+  const scopeAObj = scopes.find((s) => s.key === scopeA) || null
+  const scopeBObj = scopes.find((s) => s.key === scopeB) || null
+  const comisiones = useMemo(() => {
+    const out = {}
+    for (const [lado, scope] of [['capital', scopeAObj], ['neutral', scopeBObj]]) {
+      const ch = scope?.identity?.postingChannel
+      const cfg = comision[lado]
+      const bps = Number(cfg.bps), dia = Number(cfg.dia)
+      if (ch && cfg.verificada && cfg.etiqueta.trim() && cfg.bps !== '' && cfg.dia !== '' &&
+          Number.isSafeInteger(bps) && bps >= 0 && bps <= 10000 && Number.isSafeInteger(dia)) {
+        out[ch] = { rateBps: bps, verified: true, sourceLabel: cfg.etiqueta.trim(), asOfDay: dia }
+      }
+    }
+    return out
+  }, [comision, scopeAObj, scopeBObj])
+  const resultadoCmp = useMemo(() => {
+    if (!scopeAObj || !scopeBObj) {
+      return { status: 'blocked', reasons: [esLegacy ? 'unknown-provenance-legacy' : 'missing-two-scopes'], rows: [], coverage: {}, liquidityClaim: null }
+    }
+    if (scopeAObj.key === scopeBObj.key) {
+      return { status: 'blocked', reasons: ['same-scope'], rows: [], coverage: {}, liquidityClaim: null }
+    }
+    try {
+      const mismaPiscina = scopeAObj.identity.game === scopeBObj.identity.game &&
+        scopeAObj.identity.region === scopeBObj.identity.region &&
+        scopeAObj.identity.ruleset === scopeBObj.identity.ruleset &&
+        scopeAObj.identity.localScope === scopeBObj.identity.localScope &&
+        scopeAObj.identity.auctionPool === scopeBObj.identity.auctionPool
+      const canalB = scopeBObj.identity.postingChannel
+      const poolA = {
+        id: 'capital', identity: scopeAObj.identity, rows: scopeAObj.rows,
+        ...(mismaPiscina && canalB ? {
+          alternateChannel: { channel: canalB, commission: comisiones[canalB] || {} },
+        } : {}),
+      }
+      const pools = mismaPiscina ? [poolA] : [poolA, { id: 'neutral', identity: scopeBObj.identity, rows: scopeBObj.rows }]
+      return compararPools(pools, { todayDay: hoy(), freshDays: 3, skewMax: 5, commission: comisiones })
+    } catch {
+      return { status: 'blocked', reasons: ['invalid-comparison-input'], rows: [], coverage: {}, liquidityClaim: null }
+    }
+  }, [scopeAObj, scopeBObj, comisiones, esLegacy])
+  const ctxCmp = useMemo(() => construirContextoComparacionCapitalNeutral({ resultado: resultadoCmp, lang }), [resultadoCmp, lang])
+  const esSerieUnica = resultadoCmp.status === 'single-pool'
+  const rollbackDisponible = !!(estado?.market?.snapshot?.schemaVersion === 2 && typeof almacen?.rollbackToBackup === 'function')
+
+  /* ---------------------------- procedencia / fuentes aisladas (comparar) */
+  const cargarFuente = async (e) => {
+    const f = e.target.files?.[0]
+    e.target.value = ''
+    if (!f) return
+    setErrorFuente(''); setBloqueoV2('')
+    try {
+      const texto = await f.text()
+      const snap = parsearFuenteAislada(texto)
+      const nuevos = scopesDeSnapshot(snap, 'memoria')
+      if (!nuevos.length) throw new Error('sin-ambitos-verificados')
+      setScopesMemoria((prev) => {
+        const mapa = new Map(prev.map((s) => [s.key, s]))
+        for (const s of nuevos) mapa.set(s.key, s)
+        return [...mapa.values()]
+      })
+      setUltimaFuente(texto)
+      setMensaje(cp(lang,
+        `Observación aislada cargada (${nuevos.length} ámbito(s)). Etiqueta declarada y validada por esquema; no acredita datos del juego.`,
+        `Isolated observation loaded (${nuevos.length} scope(s)). Label declared and schema-validated; it does not accredit game data.`))
+    } catch {
+      setErrorFuente(cp(lang,
+        'No se cargó: no hay un adaptador verificado para acreditar esta fuente. No se marcó como fuente acreditada.',
+        'Not loaded: no verified adapter is available to accredit this source. It was not marked as an accredited source.'))
+    }
+  }
+
+  const guardarV2 = async () => {
+    if (!ultimaFuente || guardandoV2) return
+    if (!confirmGuardarV2) { setConfirmGuardarV2(true); return }
+    setConfirmGuardarV2(false); setGuardandoV2(true); setBloqueoV2('')
+    try {
+      const fn = sync.importSeparateSource || sync.importObservations
+      if (typeof fn !== 'function') throw new Error('storage-v2-unavailable')
+      const r = await fn.call(sync, ultimaFuente)
+      const estadoSync = sync.getState?.() || {}
+      if (estadoSync.status === 'blocked' || r?.status === 'blocked') {
+        const reason = r?.reason || estadoSync.reason || 'unknown-provenance'
+        setBloqueoV2(`${cp(lang, 'Importación bloqueada', 'Import blocked')}: ${motivo(reason, lang)}`)
+      } else if (r?.status !== 'ok') {
+        setBloqueoV2(`${cp(lang, 'No se guardó', 'Not saved')}: ${r?.error || 'save'}`)
+      } else {
+        setMensaje(cp(lang,
+          'Observación aislada guardada como esquema v2 con respaldo. Sigue siendo un escenario, no una prueba del juego.',
+          'Isolated observation saved as v2 schema with a backup. It is still a scenario, not game proof.'))
+        recargar()
+      }
+    } catch (e) {
+      setBloqueoV2(`${cp(lang, 'No se guardó', 'Not saved')}: ${e?.message || String(e)}`)
+    } finally { setGuardandoV2(false) }
+  }
+
+  const rollback = async () => {
+    if (!confirmRollback) { setConfirmRollback(true); return }
+    setConfirmRollback(false)
+    try {
+      await sync.setEnabled(false)
+      await sync.exclusive(async()=>{await almacen.rollbackToBackup();await almacen.reset()})
+      setScopesMemoria([]); setUltimaFuente(''); setScopeA(''); setScopeB('')
+      setMensaje(cp(lang,
+        'Respaldo previo a v2 restaurado. Se recargaron los precios guardados antes de la migración.',
+        'Pre-v2 backup restored. Prices saved before the migration were reloaded.'))
+      recargar()
+    } catch {
+      setMensaje(cp(lang,
+        'No se pudo restaurar el respaldo. Revisá los datos guardados antes de seguir.',
+        'Could not restore the backup. Check saved data before continuing.'))
+    }
+  }
 
   /* ---------------------------------------------------------- importación */
   const commitBytes = async (bytes, nota) => {
-    // Parseo en el hilo principal dentro de setTimeout: la interfaz pinta el
-    // estado "leyendo" antes de ceder el turno al parser síncrono.
-    let raw
-    try {
-      raw = await new Promise((res, rej) => setTimeout(() => {
-        try { res(HunterMarket.parseAuctionator(bytes)) } catch (e) { rej(e) }
-      }, 30))
-    } catch {
-      setMensaje(t(lang, 'mercado.errorParse')); setImportando(false); return
+    let r
+    try { r = await sync.importBytes(bytes, realmName) }
+    catch (e) { r = { status: 'error', error: 'save', message: e?.message || String(e) } }
+    if (r.status !== 'ok') {
+      const key = { parse: 'mercado.errorParse', invalid: 'mercado.errorValido', size: 'mercado.errorTamano' }[r.error] || 'mercado.errorGuardar'
+      setMensaje(t(lang, key, { msg: r.message || '' })); setImportando(false); return
     }
-    if (!snapshotValido(raw)) {
-      setMensaje(t(lang, 'mercado.errorValido')); setImportando(false); return
-    }
-    const est = estadoRef.current
-    const { snapshot: shallow, store } = planImportacion(raw, {
-      snapshotActual: snapshotVisible(est?.market, est?.history),
-      historyStore: est?.history?.store || null,
-    })
-    const sel = raw.realms.some((r) => r.name === realmName) ? realmName : raw.realms[0]?.name
-    try {
-      const r = await almacen.market({ values: { snapshot: shallow, realm: sel }, revision: revM.current })
-      revM.current = r.revision
-    } catch (e) {
-      setMensaje(t(lang, 'mercado.errorGuardar', { msg: e?.message || String(e) }))
-      setImportando(false); return
-    }
-    // El scan ya quedó persistido; si el historial falla se conserva el anterior
-    // y la próxima importación reintenta el merge (aditivo e idempotente).
-    let histOk = true
-    try {
-      const hr = await almacen.history({ store, revision: revH.current })
-      revH.current = hr.revision
-    } catch { histOk = false }
-    setRealmName(sel); setPagina(0); setDetalleKey(null)
+    setRealmName(r.realm); setPagina(0); setDetalleKey(null)
     const notaTxt = nota ? ` · ${nota}` : ''
-    setMensaje(histOk
-      ? t(lang, 'mercado.ok', { nota: notaTxt })
-      : t(lang, 'mercado.okSinHist', { nota: notaTxt }))
-    setImportando(false)
-    recargar()
+    setMensaje(t(lang, r.histOk ? 'mercado.ok' : 'mercado.okSinHist', { nota: notaTxt }))
+    setImportando(false); recargar()
   }
 
   const leerCarpeta = async (pick) => {
@@ -620,25 +841,27 @@ export function VistaMercado({ ctx, almacen, estado, recargar, perfil, lang }) {
     if (importando) return
     if (!confirmBorrar) { setConfirmBorrar(true); return }
     setConfirmBorrar(false); setImportando(true); setMensaje(t(lang, 'mercado.borrando'))
+    let historialVaciado = false
     try {
-      // Historial primero: si el mercado fallara después no quedan días
-      // huérfanos que puedan resucitar ítems en la próxima importación.
-      const hr = await almacen.history({ store: HunterHistory.emptyStore(), revision: revH.current })
-      revH.current = hr.revision
+      await sync.setEnabled(false)
+      await sync.exclusive(async () => {
+        const latest = await almacen.read()
+        if(latest.market?.snapshot?.schemaVersion===2){
+          const r=await almacen.market({values:{},revision:latest.revision})
+          revM.current=r.revision;revH.current=r.hrevision;historialVaciado=true;return
+        }
+        // Historial primero: no quedan días huérfanos que puedan resucitar ítems.
+        const hr = await almacen.history({ store: HunterHistory.emptyStore(), revision: latest.history?.revision || 0 })
+        revH.current = hr.revision
+        historialVaciado = true
+        const r = await almacen.market({ values: {}, revision: latest.revision })
+        revM.current = r.revision
+      })
+      setRealmName(''); setPagina(0); setDetalleKey(null)
+      setMensaje(t(lang, 'mercado.borrado')); recargar()
     } catch (e) {
-      setMensaje(t(lang, 'mercado.errorBorrar', { msg: e?.message || String(e) }))
-      setImportando(false); return
-    }
-    try {
-      const r = await almacen.market({ values: {}, revision: revM.current })
-      revM.current = r.revision
-    } catch (e) {
-      setMensaje(t(lang, 'mercado.errorBorrarParcial', { msg: e?.message || String(e) }))
-      setImportando(false); recargar(); return
-    }
-    setRealmName(''); setPagina(0); setDetalleKey(null)
-    setMensaje(t(lang, 'mercado.borrado'))
-    setImportando(false); recargar()
+      setMensaje(t(lang, historialVaciado ? 'mercado.errorBorrarParcial' : 'mercado.errorBorrar', { msg: e?.message || String(e) })); recargar()
+    } finally { setImportando(false) }
   }
 
   /* ------------------------------------------------------------- render */
@@ -689,6 +912,7 @@ export function VistaMercado({ ctx, almacen, estado, recargar, perfil, lang }) {
   return (
     <div style={S.pagina}>
       <div style={S.cuerpo}>
+        <MisVentas ventas={ventas} auctionSnapshot={snapshot} perfil={perfil} lang={lang} />
         <Tarjeta titulo={t(lang, 'mercado.scan.titulo')} extra={<span style={S.chip}>{t(lang, 'mercado.tusDatos')}</span>}>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
             <Button onClick={() => leerCarpeta(false)} disabled={importando}>{t(lang, 'mercado.leer')}</Button>
@@ -699,6 +923,20 @@ export function VistaMercado({ ctx, almacen, estado, recargar, perfil, lang }) {
               {confirmBorrar ? t(lang, 'mercado.borrarSi') : t(lang, 'mercado.borrar')}
             </Button>
           </div>
+          <label style={S.sub}>
+            <Checkbox checked={auto.enabled} onCheckedChange={cambiarAuto} disabled={importando} />
+            {lang === 'en' ? ' Automatic tracking · every 30 s while Hermes is open' : ' Seguimiento automático · cada 30 s con Hermes abierto'}
+          </label>
+          <p data-testid="auctionator-auto-status" style={S.sub}>
+            {lang === 'en' ? 'Automatic status: ' : 'Estado automático: '}{auto.status}
+            {auto.checkedAt ? ` · ${fmtFecha(auto.checkedAt)}` : ''}
+            {auto.message ? ` · ${auto.message}` : ''}
+            {auto.error && !auto.message ? ` · ${auto.error}` : ''}
+            {auto.histOk === false ? (lang === 'en' ? ' · History pending; will retry.' : ' · Historial pendiente; se reintentará.') : ''}
+          </p>
+          <p style={S.sub}>{lang === 'en'
+            ? 'Grant WTF/Account/<account>/SavedVariables once (a parent folder only if the bounded search can complete). Not Interface/AddOns. After an in-game scan, use /reload or log out to write prices to disk. Changing tabs does not stop tracking.'
+            : 'Autoriza una vez WTF/Account/<cuenta>/SavedVariables (una carpeta superior solo si la búsqueda acotada puede completarse). No Interface/AddOns. Tras escanear en el juego, usa /reload o cierra sesión para guardar los precios en disco. Cambiar de pestaña no detiene el seguimiento.'}</p>
           <p role="status" aria-live="polite" style={{ ...S.sub, margin: 0 }}>{mensaje || (snapshot ? t(lang, 'mercado.restaurado') : t(lang, 'mercado.vacio.scan'))}</p>
           {snapshot && fres && (
             <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', fontSize: 12, color: C.texto2 }}>
@@ -709,6 +947,14 @@ export function VistaMercado({ ctx, almacen, estado, recargar, perfil, lang }) {
           )}
           {fres?.aviso && <Aviso>{t(lang, 'mercado.frescura.aviso')}</Aviso>}
           {(snapshot?.warnings || []).map((w, i) => <p key={i} style={S.sub}>⚠ {w}</p>)}
+          {(esLegacy || (snapshot && !scopes.length)) ? (
+            <div role="status" data-testid="procedencia-desconocida" style={{ ...S.aviso, marginTop: 10 }}>
+              <strong>{cp(lang, 'Procedencia DESCONOCIDA (UNKNOWN)', 'UNKNOWN provenance')}</strong>{' — '}
+              {cp(lang,
+                'Estos precios vienen de Auctionator sin exportador verificado: la región, las reglas, la casa y el canal son desconocidos. No se pueden comparar con otra casa ni usar para recomendar ventas.',
+                'These prices come from Auctionator with no verified exporter: region, ruleset, house and posting channel are unknown. They cannot be compared with another house or used to recommend sales.')}
+            </div>
+          ) : null}
           <details style={{ fontSize: 12 }}>
             <summary style={{ cursor: 'pointer', color: C.texto3 }}>{t(lang, 'mercado.privacidad.titulo')}</summary>
             <p style={S.sub}>{t(lang, 'mercado.privacidad.texto')}</p>
@@ -719,15 +965,246 @@ export function VistaMercado({ ctx, almacen, estado, recargar, perfil, lang }) {
           <p style={{ ...S.sub, margin: 0 }}>{t(lang, 'mercado.aviso.texto')}</p>
         </Tarjeta>
 
+        <Tarjeta titulo={cp(lang, 'Procedencia y ámbitos aislados', 'Provenance and isolated scopes')}>
+          <p style={S.sub}>
+            {cp(lang,
+              'Sin exportador verificado: las etiquetas son declaradas por quien entregó el archivo y validadas por esquema. No prueban la economía del juego, pueden ser sintéticas y nunca se presentan como importación acreditada.',
+              'No verified exporter: labels are declared by the file provider and schema-validated. They do not prove the game economy, may be synthetic and are never presented as an accredited import.')}
+          </p>
+          <p style={S.sub}>
+            {cp(lang, 'Exportador', 'Exporter')}: {verifiedExporter() || cp(lang, 'sin exportador verificado', 'no verified exporter')}
+            {' · '}{classifyAcquisition({ status: 'ok' }).warnings.map((w) => motivo(w, lang)).join(' · ')}
+          </p>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginTop: 8 }}>
+            <label style={{ ...S.campo, minWidth: 240 }}>
+              <span style={S.etiqueta}>{cp(lang, 'Observación aislada (archivo .json)', 'Isolated observation (.json file)')}</span>
+              <input data-testid="fuente-aislada" type="file" accept=".json,.txt,application/json,text/plain"
+                onChange={cargarFuente} style={{ fontSize: 12, maxWidth: 300 }} />
+            </label>
+            {ultimaFuente ? (
+              <Button variant="outline" onClick={guardarV2} disabled={guardandoV2}>
+                {confirmGuardarV2
+                  ? cp(lang, 'Confirmar guardado v2', 'Confirm v2 save')
+                  : cp(lang, 'Guardar como v2 (con respaldo)', 'Save as v2 (with backup)')}
+              </Button>
+            ) : null}
+            {rollbackDisponible ? (
+              <Button variant="outline" onClick={rollback}>
+                {confirmRollback
+                  ? cp(lang, 'Confirmar restauración del respaldo', 'Confirm backup restore')
+                  : cp(lang, 'Restaurar respaldo previo a v2', 'Restore pre-v2 backup')}
+              </Button>
+            ) : null}
+          </div>
+          {errorFuente ? <p role="status" data-testid="error-fuente" style={{ ...S.aviso, marginTop: 8 }}>{errorFuente}</p> : null}
+          {bloqueoV2 ? <p role="status" data-testid="fuente-bloqueada" style={{ ...S.aviso, marginTop: 8 }}>{bloqueoV2}</p> : null}
+          {scopes.length ? (
+            <ul data-testid="identidades-fuente" style={{ ...S.sub, marginTop: 8, paddingLeft: 18 }}>
+              {scopes.map((s) => (
+                <li key={s.key} style={{ marginBottom: 4 }}>
+                  <Chip color={C.azul}>{etiquetaCorta(s, lang)}</Chip>
+                  {' — '}{identidadTexto(s.identity, lang)}
+                  {' — '}{cp(lang, 'clave de reino opaca', 'opaque realm key')}: {s.realm}
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p data-testid="identidades-fuente" style={S.sub}>
+              {cp(lang, 'Sin ámbitos verificados: la comparación permanece bloqueada.', 'No verified scopes: comparison stays blocked.')}
+            </p>
+          )}
+        </Tarjeta>
+
+        <div data-testid="comparacion-card">
+          <Tarjeta titulo={cp(lang, 'Comparación capital / neutral (escenario)', 'Capital / neutral comparison (scenario)')}>
+            <p style={S.sub}>
+              {cp(lang,
+                'Solo entre fuentes aisladas verificadas. El resultado no promete venta ni ganancia: es un escenario de precios observados.',
+                'Only between verified isolated sources. The result promises no sale or profit: it is a scenario of observed prices.')}
+            </p>
+            <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+              {[['A', scopeA, setScopeA], ['B', scopeB, setScopeB]].map(([lado, valor, setValor]) => (
+                <label key={lado} style={{ ...S.campo, flex: 1, minWidth: 220 }}>
+                  <span style={S.etiqueta}>{cp(lang, `Ámbito ${lado} (origen aislado)`, `Scope ${lado} (isolated source)`)}</span>
+                  <Select value={valor} onValueChange={setValor} disabled={scopes.length < 2}>
+                    <SelectTrigger id={`ambito-${lado.toLowerCase()}`}
+                      aria-label={cp(lang, `Ámbito ${lado} (origen aislado)`, `Scope ${lado} (isolated source)`)}>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__none__">—</SelectItem>
+                      {scopes.map((s) => <SelectItem key={s.key} value={s.key}>{etiquetaCorta(s, lang)}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </label>
+              ))}
+            </div>
+            <p style={{ ...S.sub, marginTop: 10 }}>
+              {cp(lang,
+                'Comisión: solo si la tasa está verificada y fechada. En blanco, el neto se muestra como escenario; no se asume ningún porcentaje.',
+                'Commission: only when the rate is verified and dated. If blank, net is shown as a scenario; no percentage is assumed.')}
+            </p>
+            {['capital', 'neutral'].map((lado) => (
+              <div key={lado} style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center', marginTop: 4 }}>
+                <span style={{ ...S.etiqueta, minWidth: 64 }}>{lado}</span>
+                <input data-testid={`comision-${lado}-bps`} aria-label={`comision-${lado}-bps`} type="number" min="0" max="10000"
+                  value={comision[lado].bps} placeholder="pbs" style={{ width: 90 }}
+                  onChange={(e) => setComision((c) => ({ ...c, [lado]: { ...c[lado], bps: e.target.value } }))} />
+                <Checkbox data-testid={`comision-${lado}-verificada`} aria-label={`comision-${lado}-verificada`}
+                  checked={comision[lado].verificada}
+                  onCheckedChange={(v) => setComision((c) => ({ ...c, [lado]: { ...c[lado], verificada: v === true } }))} />
+                <span style={S.etiqueta}>{cp(lang, 'tasa verificada', 'verified rate')}</span>
+                <input data-testid={`comision-${lado}-fuente`} aria-label={`comision-${lado}-fuente`}
+                  value={comision[lado].etiqueta} placeholder={cp(lang, 'etiqueta de la fuente', 'source label')} style={{ width: 160 }}
+                  onChange={(e) => setComision((c) => ({ ...c, [lado]: { ...c[lado], etiqueta: e.target.value } }))} />
+                <input data-testid={`comision-${lado}-dia`} aria-label={`comision-${lado}-dia`} type="number"
+                  value={comision[lado].dia} placeholder={cp(lang, 'día', 'day')} style={{ width: 90 }}
+                  onChange={(e) => setComision((c) => ({ ...c, [lado]: { ...c[lado], dia: e.target.value } }))} />
+              </div>
+            ))}
+            {(Number(comision.capital.dia) > hoy() || Number(comision.neutral.dia) > hoy()) ? (
+              <p data-testid="comision-futura" style={{ ...S.aviso, marginTop: 6 }}>
+                {cp(lang, 'Día futuro: la comisión se rechaza y el neto queda como escenario.',
+                  'Future day: the commission is rejected and net stays a scenario.')}
+              </p>
+            ) : null}
+            {esSerieUnica ? (
+              <p data-testid="serie-unica" style={{ ...S.sub, marginTop: 6 }}>
+                {cp(lang, 'Una sola serie de precios: los canales son la misma piscina, no dos fuentes. Sin delta entre ellos.',
+                  'A single price series: the channels are the same pool, not two sources. No delta between them.')}
+              </p>
+            ) : null}
+            {resultadoCmp.status === 'blocked' ? (
+              <div role="status" data-testid="comparacion-bloqueada" style={{ ...S.aviso, marginTop: 10 }}>
+                <strong>{cp(lang, 'Comparación bloqueada', 'Comparison blocked')}</strong>
+                <ul style={{ margin: '6px 0 0', paddingLeft: 18 }}>
+                  {(resultadoCmp.reasons || []).map((r, i) => <li key={i}>{motivo(r, lang)}</li>)}
+                </ul>
+                {esLegacy ? (
+                  <p style={{ margin: '6px 0 0' }}>
+                    {cp(lang,
+                      'Los precios Auctionator reales importados tienen procedencia desconocida: no se usan como ninguno de los dos lados.',
+                      'Imported real Auctionator prices have UNKNOWN provenance: they are not used as either side.')}
+                  </p>
+                ) : null}
+                <p style={{ margin: '6px 0 0' }}>{cp(lang, 'No se recomienda dónde vender.', 'No sell recommendation.')}</p>
+              </div>
+            ) : (
+              <div style={{ overflowX: 'auto', marginTop: 10 }}>
+                <table style={S.tabla}>
+                  <thead>
+                    <tr>
+                      {(esSerieUnica
+                        ? [cp(lang, 'Ítem', 'Item'), cp(lang, 'Canales de una sola serie', 'Channels of one series'),
+                          cp(lang, 'Δ', 'Δ')]
+                        : [cp(lang, 'Ítem', 'Item'), cp(lang, 'Capital (bruto / neto)', 'Capital (gross / net)'),
+                          cp(lang, 'Neutral (bruto / neto)', 'Neutral (gross / net)'), cp(lang, 'Δ neutral − capital', 'Δ neutral − capital')]
+                      ).concat([cp(lang, 'Fecha / antigüedad', 'Date / age'), cp(lang, 'Cobertura', 'Coverage'),
+                        cp(lang, 'Motivos', 'Reasons')]).map((h) => <th key={h} style={S.th}>{h}</th>)}
+                    </tr>
+                  </thead>
+                  <tbody data-testid="comparacion-filas">
+                    {resultadoCmp.rows.slice(0, 50).map((f, i) => {
+                      const d = f.deltaCopper
+                      const delta = Number.isSafeInteger(d)
+                        ? `Δ ${d > 0 ? '+' : d < 0 ? '−' : ''}${fmtCobre(Math.abs(d))}` : '—'
+                      return (
+                        <tr key={`${f.sourceKey}-${i}`}>
+                          <td style={S.td}>
+                            {nombreItem({ sourceKey: f.sourceKey, itemId: f.itemId }, D.items, CATALOGO, lang)}
+                            <div style={{ fontSize: 10, color: C.texto3 }}>{f.itemId == null ? f.sourceKey : `id ${f.itemId}`}</div>
+                          </td>
+                          {esSerieUnica ? (f.channels || []).map((ch, j) => (
+                            <td key={j} style={S.td} data-testid="cmp-canal">
+                              <div>{cp(lang, 'Canal', 'Channel')}: {ch.channel}</div>
+                              <div>{cp(lang, 'Bruto', 'Gross')}: <Dinero cobre={ch.grossCopper} /></div>
+                              <div>{ch.netCopper == null
+                                ? cp(lang, 'Neto: escenario', 'Net: scenario')
+                                : <>{cp(lang, 'Neto', 'Net')}: <Dinero cobre={ch.netCopper} /></>}</div>
+                            </td>
+                          )) : (
+                            <>
+                              <td style={S.td} data-testid="cmp-capital">
+                                {!f.a ? (
+                                  <Chip color={C.rojo}>
+                                    {cp(lang, 'Ausente en capital (falta de datos, no precio 0)', 'Missing in capital (no data, not price 0)')}
+                                  </Chip>
+                                ) : (
+                                  <>
+                                    <div>{cp(lang, 'Bruto', 'Gross')}: <Dinero cobre={f.a.grossCopper} /></div>
+                                    <div>{f.netScenario
+                                      ? cp(lang, 'Neto: escenario (comisión no verificada)', 'Net: scenario (unverified commission)')
+                                      : <>{cp(lang, 'Neto', 'Net')}: <Dinero cobre={f.a.netCopper} /></>}</div>
+                                  </>
+                                )}
+                              </td>
+                              <td style={S.td} data-testid="cmp-neutral">
+                                {f.b ? (
+                                  <>
+                                    <div>{cp(lang, 'Bruto', 'Gross')}: <Dinero cobre={f.b.grossCopper} /></div>
+                                    <div>{f.netScenario
+                                      ? cp(lang, 'Neto: escenario', 'Net: scenario')
+                                      : <>{cp(lang, 'Neto', 'Net')}: <Dinero cobre={f.b.netCopper} /></>}</div>
+                                  </>
+                                ) : (
+                                  <Chip color={C.rojo}>
+                                    {cp(lang, 'Ausente en neutral (falta de datos, no precio 0)', 'Missing in neutral (no data, not price 0)')}
+                                  </Chip>
+                                )}
+                              </td>
+                            </>
+                          )}
+                          <td style={S.td} data-testid="cmp-delta">{esSerieUnica ? '—' : delta}</td>
+                          <td style={S.td} data-testid="cmp-fecha">
+                            <div>{fechaDe(f.a?.observedDay) || '—'}{f.b ? ` / ${fechaDe(f.b.observedDay) || '—'}` : ''}</div>
+                            <div style={{ fontSize: 10, color: C.texto3 }}>
+                              {f.a?.observedDay != null
+                                ? `${cp(lang, 'hace', 'ago')} ${hoy() - f.a.observedDay} ${cp(lang, 'días', 'd')}` : '—'}
+                              {(f.a?.stale || f.b?.stale)
+                                ? <Chip color={C.naranja}>{cp(lang, ' antiguo', ' stale')}</Chip> : null}
+                            </div>
+                          </td>
+                          <td style={S.td} data-testid="cmp-cobertura">
+                            {cp(lang, 'filas', 'rows')}: {f.coverage?.a?.itemRows ?? '—'} / {f.coverage?.b?.itemRows ?? '—'}
+                          </td>
+                          <td style={S.td} data-testid="cmp-motivos">
+                            {(f.reasons || []).length
+                              ? (f.reasons || []).map((r, j) => <span key={j}>{motivo(r, lang)}{j < f.reasons.length - 1 ? ', ' : ''}</span>)
+                              : '—'}
+                            {f.recommendation === 'scenario'
+                              ? <div style={{ fontSize: 10, color: C.naranja }}>{cp(lang, 'escenario, no recomendación', 'scenario, not a recommendation')}</div> : null}
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+                {resultadoCmp.rows.length > 50 ? (
+                  <p style={S.sub}>{cp(lang, `Mostradas 50 de ${resultadoCmp.rows.length}.`, `Showing 50 of ${resultadoCmp.rows.length}.`)}</p>
+                ) : null}
+              </div>
+            )}
+            <div data-testid="cmp-limites" style={{ ...S.sub, marginTop: 10 }}>
+              {(ctxCmp.limites || []).map((x, i) => <p key={i} style={{ margin: '2px 0' }}>• {x}</p>)}
+            </div>
+            {ctxCmp.liquidityClaim == null ? (
+              <p data-testid="sin-afirmacion-liquidez" style={S.sub}>
+                {cp(lang, 'Sin afirmación de liquidez: que existan ofertas no garantiza que se venda.',
+                  'No liquidity claim: existing offers do not guarantee a sale.')}
+              </p>
+            ) : null}
+          </Tarjeta>
+        </div>
+
         <Tarjeta titulo={t(lang, 'mercado.tabla.titulo')}
           extra={<Origen f={['cliente-forever', 'cmangos-1.12']} lang={lang} />}>
           <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-end' }}>
             <label style={S.campo}>
               <span style={S.etiqueta}>{t(lang, 'mercado.realm')}</span>
-              <Select value={realmName} onValueChange={(v) => { setRealmName(v); setPagina(0); setDetalleKey(null) }} disabled={!snapshot}>
+              <Select value={realm ? realmId(realm) : realmName} onValueChange={(v) => { const r=snapshot.realms.find(r=>realmId(r)===v);setRealmChoice(v);setRealmName(r?.name||'');setPagina(0);setDetalleKey(null) }} disabled={!snapshot}>
                 <SelectTrigger aria-label={t(lang, 'mercado.realm')}><SelectValue placeholder="—" /></SelectTrigger>
                 <SelectContent>
-                  {(snapshot?.realms || []).map((r) => <SelectItem key={r.name} value={r.name}>{r.name}</SelectItem>)}
+                  {(snapshot?.realms || []).map((r) => <SelectItem key={realmId(r)} value={realmId(r)}>{r.name}{snapshot.realms.filter(x=>x.name===r.name).length>1 ? ` · ${r.identity?.auctionPool || 'UNKNOWN'} · ${r.identity?.postingChannel || '—'}` : ''}</SelectItem>)}
                 </SelectContent>
               </Select>
             </label>
@@ -829,6 +1306,13 @@ export function VistaMercado({ ctx, almacen, estado, recargar, perfil, lang }) {
           <DetalleItem item={detalle} lang={lang} catalogo={CATALOGO} metrica={detalleMetrica} deal={detalleDeal}
             onCerrar={() => setDetalleKey(null)} />
         )}
+
+        {detalle && snapshotDavi ? (
+          <Tarjeta titulo={t(lang, 'davi.boton')}>
+            <PreguntarDavi ctx={ctx} lang={lang} seccion={t(lang, 'tab.mercado')} snapshot={snapshotDavi}
+              preguntaInicial={t(lang, 'davi.mercado')} />
+          </Tarjeta>
+        ) : null}
 
         <Farmeo items={items} perfil={perfil} settings={settings} onSettings={guardarFarm} lang={lang} />
       </div>
