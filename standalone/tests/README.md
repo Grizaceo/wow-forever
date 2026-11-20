@@ -19,7 +19,7 @@ No dependencies are installed automatically.
 Local environment used for the verified run:
 
 ```sh
-PLAYWRIGHT_MODULE=/home/gris96/dike-desk/node_modules/.pnpm/playwright@1.64.1/node_modules/playwright/index.mjs \
+PLAYWRIGHT_MODULE=/home/gris96/.hermes/hermes-agent/node_modules/.pnpm/playwright@1.64.0/node_modules/playwright/index.mjs \
 CHROMIUM_PATH=/home/gris96/.cache/ms-playwright/chromium-1248/chrome-linux64/chrome \
 REPORT_PATH=/home/gris96/.hermes/cache/scratch/wow-hunter-after-fixes-tests.json \
 node tests/browser.mjs
@@ -41,7 +41,7 @@ node tests/market.cjs
 node tests/market-history.cjs
 node tests/market-deals.cjs
 node tests/market-chart.cjs
-python tests/catalog.py
+# catálogo: tests/test_datos.py en la raíz (python3 -m unittest tests.test_datos)
 ```
 
 The market browser harness uses the same `PLAYWRIGHT_MODULE`, `CHROMIUM_PATH`
@@ -94,10 +94,10 @@ risk labels, progression, the market table farm column/filters/sorting, the
 skinning toggle, per-item price sparklines + median-vs-today metrics in the
 farm cards, and mobile overflow — all offline.
 
-`node tests/public-build.mjs` needs no browser: it builds the private and
-`--public` desktop plugins to a temp dir and asserts the public bundle ships
-the GPL drop dataset but no `HunterDropDataPrivate=`/`HunterMarketLocalScan=`
-payloads or RareScanner table data, and that the CSP is unchanged in both.
+`node tests/public-build.mjs` está **vacío actualmente**: el split público/privado
+del plugin fue retirado (build único `desktop/build.mjs`, sin `--public` ni
+`market-local-scan.js`). El archivo quedó como placeholder, pendiente de retiro o
+reimplementación.
 
 ## Scope
 

@@ -1,5 +1,11 @@
 # Mercado local de Auctionator
 
+> **Alcance:** este documento describe la **app standalone** (`index.html`, `file://`,
+> IndexedDB) y su motor de mercado compartido. El **plugin Desktop** actual (React en
+> `desktop/src/`, almacén v2, puente WoWForeverBridge, TSM, sondeo 30 s, build
+> `desktop/build.mjs`) se documenta en **`docs/DESKTOP.md`**. Las secciones de precarga
+> (`market-local-scan.js`) y build público (`--public`) son **históricas**: fueron retiradas.
+
 ## Uso
 
 Abrir `index.html`, pestaña **Mercado local**.
@@ -400,17 +406,17 @@ ficha del hunter. El guardado de la ficha sigue siendo independiente.
 - `market-catalog.js`: catálogo estático derivado, sin datos de cuentas.
 - `drop-data.js` / `drop-data-private.js`: datasets públicos/privados de drops
   (generados, no editar a mano).
-- `tools/build-market-catalog.py`: reconstrucción local del catálogo.
+- `tools/build-catalogo-mercado.py`: reconstrucción del catálogo desde `data/` (`--out FILE`).
 - `tools/build-drop-data.py`: generación de los datasets de drops.
-- `tools/build-desktop-plugin.py`: bundle del plugin, split público/privado.
+- `desktop/build.mjs`: bundle del plugin Desktop (`node build.mjs [--out FILE]`).
 - `tests/market.cjs`: pruebas unitarias del parser, fixtures sintéticas.
 - `tests/market-history.cjs`: merge, store compacto, stats y presupuesto.
 - `tests/market-chart.cjs`: SVG determinista, ejes, formatos y fixture real.
-- `tests/catalog.py`: pruebas del extractor.
+- `tests/test_datos.py` (raíz): pruebas del catálogo/datos, incluye `test_catalogo_reproducible`.
 - `tests/market-browser.mjs`: flujo offline en Chromium aislado.
 - `tests/history-browser.mjs`: acumulación de historial entre importaciones.
 - `tests/farm-browser.mjs`: recomendador de farmeo en Chromium aislado.
-- `tests/public-build.mjs`: verificación del split público/privado del plugin.
+- `tests/public-build.mjs`: vacío actualmente; el split público/privado fue retirado.
 - `tests/browser.mjs`: regresiones del resto de la guía y pestaña nueva.
 
 Ver `tests/README.md` para los comandos de navegador. Las pruebas sintéticas
@@ -425,39 +431,32 @@ split público/privado del plugin, 8 de la precarga local, 17+33 de
 escritorio y 76 regresiones de la guía, todas verdes. El flujo real en Chromium aislado importó 4480 ítems,
 verificó paginación y recarga, sin errores JavaScript ni solicitudes HTTP(S).
 
-El catálogo incluye 1000 ítems y 1156 relaciones con fuentes en 35 dungeons.
-Tres drops con ID desconocido (0) en el addon se omiten explícitamente; el
-detalle figura en su cobertura. Para regenerarlo tras actualizar el addon:
-`python3 tools/build-market-catalog.py --source "<directorio ForeverDungeonJournal>"`.
-El extractor lee solo las tres tablas del addon; no accede a SavedVariables.
+El catálogo se genera **solo desde `data/`** (CMaNGOS classic-db + tablas del cliente
+WoW Forever), reemplazando al extractor antiguo del addon ForeverDungeonJournal. Para
+regenerarlo: `python3 tools/build-catalogo-mercado.py [--out FILE]`. Es determinista y
+byte-idéntico a `standalone/market-catalog.js` (lo verifica
+`tests/test_datos.py::test_catalogo_reproducible`). No accede a SavedVariables ni a
+entradas externas; la cobertura exacta se declara en `market-catalog.js`.
 
 ## Variante plugin de Hermes Desktop
 
-La misma app corre como plugin privado "WoW Forever" dentro de Hermes Desktop
-(`~/.hermes/desktop-plugins/wow-hunter-guide/plugin.js`, ruta
-`/wow-hunter-guide`, entrada en la barra lateral). El mercado usa otra puerta
-de almacenamiento: en vez de IndexedDB, el snapshot normalizado vive en
-`ctx.files` con dos slots (`data/market-a.json` / `market-b.json`) y un puntero
-en `ctx.storage`. Cada guardado escribe solo el slot inactivo, verifica la
-relectura byte a byte y recién ahí mueve el puntero — dos slots porque
-`writeText` trunca antes de escribir y rename no reemplaza destinos. Límite:
-4 MiB normalizado. El historial acumulado usa el mismo patrón en
-`data/price-history-a.json` / `price-history-b.json` con su propio puntero y
-contador de revisión (op `history` del bridge). La build de la ficha usa
-`ctx.storage`. Si una confirmación falla, el almacén queda "envenenado" hasta
-pulsar **Reabrir** en el encabezado del plugin, que relee el estado durable.
+El plugin Desktop **ya no es un bundle de esta app standalone**: es una implementación
+React separada en `desktop/src/`, compilada con `desktop/build.mjs` (esbuild) a
+`desktop/plugin.js` y desplegada en `~/.hermes/desktop-plugins/wow-forever/` (ruta
+`/wow-forever`). El namespace de datos sigue siendo el legacy `wow-hunter-guide`
+(`~/.config/Hermes/plugin-files/data/wow-hunter-guide/`) por compatibilidad.
 
-El plugin embebe `market-local-scan.js` con los precios reales: es privado,
-no publicable ni commiteable. Regenerar tras tocar `index.html`, `market*.js`
-o `desktop/*` con `python3 tools/build-desktop-plugin.py`. La app standalone
-`file://` sigue disponible con IndexedDB y no requiere Hermes.
+En vez de IndexedDB, el plugin usa `ctx.files`: mercado e historial en un **bundle v2**
+(`market-v2-*`, `price-history-v2-*`) con puntero `market-v2-pointer`, respaldo pre-v2
+troceado (≤3 MiB + manifiesto) y rollback en dos pasos. El detalle completo (almacén v2,
+puente WoWForeverBridge, sondeo 30 s, TSM) está en **`docs/DESKTOP.md`**. Este documento
+describe la app standalone (`index.html`, `file://`, IndexedDB), que sigue disponible sin
+Hermes.
 
-## Build público del plugin (`--public`)
-
-`tools/build-desktop-plugin.py --public` genera `dist/wow-forever-public/plugin.js`
-**sin** `market-local-scan.js` ni datos de subasta embebidos: cada usuario importa
-su propio `Auctionator.lua` (o usa el escaneo local si su addon lo permite).
-El build por defecto sigue siendo privado e incluye el scan normalizado.
+Regenerar el bundle Desktop tras tocar `desktop/*`: `cd desktop && node build.mjs`. La
+precarga `market-local-scan.js` y el split público/privado (`--public`, `dist/`) fueron
+**retirados**: el build es único y cada usuario importa sus propias fuentes (Auctionator,
+TSM, diario del puente).
 
 ## Guías por clase/facción
 

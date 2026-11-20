@@ -5,6 +5,11 @@ archivos de `data/`. Los genera `tools/build-datos-juego.py` a partir de las ent
 fijadas en `tools/fuentes.json` (se bajan con `tools/descargar-fuentes.py`). Ninguno se
 edita a mano: lo curado vive aparte y se declara como curado.
 
+> **Alcance:** este documento describe los **datos curados/generados** de `data/` y el
+> perfil del jugador. El **almacenamiento runtime** del mercado/historial (bundle v2,
+> respaldo pre-v2 troceado, diario del puente WoWForeverBridge, rollback) se documenta
+> en **`docs/DESKTOP.md`**.
+
 ## Fuentes y cómo se marcan
 
 | Clave `f` | Qué es | Fidelidad a Forever |
