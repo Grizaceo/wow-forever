@@ -1,6 +1,6 @@
 ---
 name: wow-forever
-description: "Asiste a jugadores de World of Warcraft: Forever (juego oficial de Blizzard, cliente 1.60, basado en Classic) con los datos del plugin wow-forever de Hermes: entrenadores, hechizos y misiones de clase, zonas por nivel, profesiones (recetas, plan de subida, materiales), dungeons con jefes y botín, ítems, la guía curada del Cazador de la Horda, Legacy y el mercado Auctionator local. Usar cuando el usuario juegue WoW Forever o pregunte por su personaje, dónde entrenar o subir de nivel, profesiones, drops, dungeons, precios o farmeo. Assists WoW Forever players (any race, class and faction) with the plugin's offline game data."
+description: "Asiste a jugadores de World of Warcraft: Forever (juego oficial de Blizzard, cliente 1.60, basado en Classic) con los datos del plugin wow-forever de Hermes: entrenadores, hechizos y misiones de clase, zonas por nivel, profesiones (recetas, plan de subida, materiales), dungeons con jefes y botín, ítems, la guía curada del Cazador de la Horda, Legacy y el mercado local (Auctionator, contabilidad TSM y diario del puente WoWForeverBridge). Usar cuando el usuario juegue WoW Forever o pregunte por su personaje, dónde entrenar o subir de nivel, profesiones, drops, dungeons, precios o farmeo. Assists WoW Forever players (any race, class and faction) with the plugin's offline game data."
 version: 2.0.0
 author: Cristóbal Muñoz
 license: GPL-3.0-or-later
@@ -105,7 +105,9 @@ curada (las de Guerrero y Chamán se retiraron por errores): dilo y usa los dato
 
 ## 5. Mercado y farmeo
 
-Los precios importados de Auctionator viven en la página, no en `data/`, y tú no los ves.
+Los precios del mercado viven en la página, no en `data/`, y tú no los ves. Se alimentan de
+tres fuentes locales: **Auctionator** (precios anunciados), la **contabilidad TSM** (§6) y el
+**diario del puente WoWForeverBridge** (abajo).
 
 - Para activar el seguimiento: en el juego, hacer un **full scan** con Auctionator, luego
   `/reload`, y en **Mercado** → **Leer Auctionator.lua** conceder una vez la carpeta
@@ -116,6 +118,15 @@ Los precios importados de Auctionator viven en la página, no en `data/`, y tú 
   esté abierto, incluso fuera de la pestaña Mercado. No abre selectores en segundo plano.
   Solo importa bytes distintos y válidos, fusionando el histórico local. Borrar precios
   pausa el sondeo para no repoblar lo borrado; se puede reanudar con el conmutador.
+- **Diario del puente WoWForeverBridge**: un addon compañero (v1.0.1) captura cada escaneo de
+  Auctionator en un diario por día (`WoWForeverBridge.lua`, SavedVariables `WoWForeverBridgeDB`)
+  que sobrevive la poda de ~21 días de Auctionator. El plugin lo sondea con el mismo
+  seguimiento automático (30 s) desde la misma carpeta concedida; no abre otro selector. Es
+  **transporte, no exportador verificado**: sus precios se marcan **UNKNOWN** por diseño. Si el
+  usuario pregunta por qué hay historial aunque Auctionator pode sus días, es el diario del
+  puente. El addon se instala en el juego (la primera vez requiere reiniciar el cliente,
+  `/reload` no basta) y la retención se configura con `/wfb days N` (1–60, por defecto 14);
+  otros comandos: `/wfb capture`, `/wfb purge`, `/wfb` (estado).
 - Los precios que solo estén en memoria del juego requieren `/reload` o cerrar sesión para
   llegar al disco. No confundir un sondeo sin cambios con un fallo del importador. También
   puede usar **Importar archivo .lua**, pero eso no concede acceso automático a su carpeta.
