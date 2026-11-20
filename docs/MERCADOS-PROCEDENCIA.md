@@ -28,7 +28,7 @@ Cuando faltan procedencia, tasas o fechas compatibles, la interfaz debe explicar
 
 ## Seguimiento local
 
-La actualización automática observa cambios de un archivo dentro de una carpeta concedida a la app. No consulta todos los mercados en vivo. Después de escanear en el juego, `/reload` o cerrar sesión permite que el addon escriba sus SavedVariables. Importar hoy un histórico antiguo no vuelve recientes sus observaciones.
+La actualización automática sondea **cada 30 s** tres fuentes locales dentro de la carpeta concedida a la app: `Auctionator.lua` (precios anunciados), `TradeSkillMaster.lua` (contabilidad personal, como datos CSV) y el diario `WoWForeverBridge.lua` (una entrada por día que sobrevive la poda de ~21 días de Auctionator). No consulta todos los mercados en vivo. Después de escanear en el juego, `/reload` o cerrar sesión permite que el addon escriba sus SavedVariables. Importar hoy un histórico antiguo no vuelve recientes sus observaciones. El puente es **transporte, no exportador verificado**: sus precios, como los de un Auctionator real sin exportador, se etiquetan **UNKNOWN** por diseño.
 
 El agente no necesita abrir archivos privados de cuenta para probar estas reglas. Las pruebas automatizadas usan fixtures sintéticas y un SDK simulado; no certifican el comportamiento del servidor.
 
@@ -46,4 +46,4 @@ Las observaciones aisladas se eligen por su **identidad verificada** (región, r
 
 La tabla de comparación distingue bruto, neto y su fecha de observación. El neto sólo se calcula con una comisión verificada, etiquetada, fechada y no futura; si falta, se rotula **escenario**. Las filas ausentes en un lado se explican como falta de datos, nunca como precio cero, y cada fila muestra sus motivos. No se muestran porcentajes inventados (5 %/15 %) ni afirmaciones de liquidez o beneficio garantizado.
 
-Dos ámbitos de la **misma piscina** no se cuentan como dos fuentes: se muestran como una sola serie con canales alternativos y sin delta. Sólo se comparan entre sí piscinas distintas dentro de la misma región, ruleset y ámbito de observación. El botón de restauración del respaldo previo a v2 exige una confirmación explícita en dos pasos.
+Dos ámbitos de la **misma piscina** no se cuentan como dos fuentes: se muestran como una sola serie con canales alternativos y sin delta. Sólo se comparan entre sí piscinas distintas dentro de la misma región, ruleset y ámbito de observación. El botón de restauración del respaldo previo a v2 exige una confirmación explícita en dos pasos. Ese respaldo (`pre-v2-backup.json`) se guarda **troceado en partes ≤3 MiB + manifiesto** cuando supera el tope de 4 MiB por archivo del host (`electron/plugin-files-ops.ts`); `readBackupDoc` reensambla el documento lógico al leer. Si el rollback falla, el respaldo nunca se sobrescribe: es la única copia del estado v1.

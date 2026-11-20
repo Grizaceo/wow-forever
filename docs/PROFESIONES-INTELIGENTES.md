@@ -183,15 +183,16 @@ Coste de maxear a 300 valorado con la **media móvil de los mínimos diarios** d
 de precios, más el **retorno** de los crafts producidos al subir y su **tendencia**. Motor
 compartido con paridad exacta JS↔Python y subcomando `roi` del CLI.
 
-### Datos: el histórico real en disco es v1, no v2
+### Datos: histórico activo v2; v1 retenido para rollback
 
-Los `price-history-*.json` son **v1 legacy**:
-`{revision, store:{v:1, realms:{<reino>:{items:{<id>:[[día, low, avail], …]}}}}}`.
-`low` = mínimo diario en cobre; `avail` = **oferta disponible, NO ventas**. El piloto
-(`price-history-b.json`, reino PvP) trae 6732 ítems, días 2504→2511 (hasta 8 observaciones
-por ítem, 40453 observaciones). La doc anterior decía «v2, `scopes`»: incorrecto para lo que
-hay en disco. `cargar_historico` lee v1 (`store.realms`) y tolera v2 (`history.scopes`) si
-aparece. Los días son relativos (sin epoch conocido): se etiquetan «día N», no se inventan fechas.
+El histórico **activo es v2**: el bundle `market-v2-*.json` trae `history:{v:2, scopes:{…}}`
+(y existe `price-history-v2-*.json`). En disco (2026-11-19, reino PvP) hay **7300 ítems /
+57 863 filas**, días 2504→2514. Los `price-history-*.json` **v1 legacy**
+(`{revision, store:{v:1, realms:{<reino>:{items:{<id>:[[día, low, avail], …]}}}}}`, piloto
+6732 ítems, días 2504→2511) se **retienen** para el rollback pre-v2; ya no son el histórico
+activo. `cargar_historico` lee ambos: v1 (`store.realms`) y v2 (`history.scopes`).
+`low` = mínimo diario en cobre; `avail` = **oferta disponible, NO ventas**. Los días son
+relativos: se etiquetan «día N», no se inventan fechas.
 
 ### Semántica honesta del retorno
 
@@ -213,7 +214,7 @@ aparece. Los días son relativos (sin epoch conocido): se etiquetan «día N», 
 ### CLI
 
     python3 skills/wow-forever/scripts/consultar.py roi \
-      --historico ~/.config/Hermes/plugin-files/data/wow-hunter-guide/price-history-b.json \
+      --historico ~/.config/Hermes/plugin-files/data/wow-hunter-guide/market-v2-b.json \
       --reino PvP --faccion horda [--profesion herreria] [--detalle] [--ventana N] [--precios spot.json]
 
 `--ventana N` limita la media a los últimos N días (por defecto todos). `--precios` añade
@@ -221,11 +222,12 @@ precios spot de respaldo para ítems sin histórico. Sin `--historico` → exit 
 muestra coste, retorno vendedor, ROI vendedor, retorno estimado, ROI estimado y cobertura;
 `--detalle` añade neto, tendencia de reactivos y pasos con/sin valor.
 
-Piloto verificado (PvP, horda, días 2504→2511): Herrería 1→300 coste **721o 51p 93c**
-(materiales 701o 95p 29c + adquisición 19o 56p 64c), retorno vendedor **217o 97p 96c**
-(ROI 30%, neto −504o 46p 3c), estimado **298o 41p 2c** (ROI 41%, neto −424o 89p 9c);
-17 reactivos suben, 11 bajan; 100% cobertura, 27 pasos con valor, 0 SIN DATOS. Encantamiento:
-retorno 0 (`crea:null` → SIN DATOS). Recolección: cobertura baja (no hay ruta de crafteo).
+Piloto verificado sobre el **v2 activo** (PvP, horda, días 2504→2514, 7300 ítems): Herrería
+1→300 coste **668o 96p 13c** (materiales 655o 18p 60c + adquisición 13o 77p 53c), retorno
+vendedor **222o 64p 59c** (ROI 33%, neto −447o 68p 46c), estimado **430o 55p 78c** (ROI 64%,
+neto −239o 59p 65c); 11 reactivos suben, 17 bajan; 100% cobertura, 26 pasos con valor,
+0 SIN DATOS. Encantamiento: retorno 0 (`crea:null` → SIN DATOS). Recolección: cobertura baja
+(no hay ruta de crafteo).
 
 ### Paridad y tests
 
