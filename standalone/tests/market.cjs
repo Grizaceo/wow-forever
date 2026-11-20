@@ -417,6 +417,15 @@ test('real SavedVariables fixture (in place, redacted metrics only)', () => {
     return;
   }
 
+  // Contrato de privacidad: por defecto solo stat (existencia/bytes). Leer el
+  // contenido de SavedVariables vivos requiere opt-in explícito:
+  //   WOW_FOREVER_REAL_FIXTURE=1 node tests/market.cjs
+  const st = fs.statSync(target);
+  if (process.env.WOW_FOREVER_REAL_FIXTURE !== '1') {
+    console.log(`REAL FIXTURE: presente (${st.size} bytes, stat-only; WOW_FOREVER_REAL_FIXTURE=1 para validar contenido)`);
+    return;
+  }
+
   const bytes = new Uint8Array(fs.readFileSync(target));
   const r = parseAuctionator(bytes);
 

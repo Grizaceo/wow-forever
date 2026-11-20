@@ -28,6 +28,10 @@ const KEEP_GOING = process.argv.includes('--keep-going');
 const EXPECT_NODE = 261;
 const EXPECT_PY = 87;
 const EXPECT_LUA = 52;
+// Tests unitarios del motor en standalone/tests/*.cjs (node:test). Los «real
+// fixture» son stat-only por defecto; WOW_FOREVER_REAL_FIXTURE=1 los hace leer
+// contenido de SavedVariables (solo para diagnóstico manual, nunca en gates).
+const EXPECT_CJS = 78;
 const BROWSER = [
   ['navegador', 34], ['mercado-auto', 11], ['mercado-procedencia', 24],
   ['tsm', 28], ['vista-mercado', 55], ['vista-davi', 50], ['vista-guia', 28],
@@ -103,6 +107,18 @@ console.log(`raíz: ${ROOT}\n`);
   const ran = num(/Ran (\d+) tests?/, r.out);
   const ok = r.code === 0 && /\bOK\b/.test(r.out) && ran === EXPECT_PY;
   record('python tests/', EXPECT_PY, ran, ok, ok ? 'OK' : tail(r.out));
+}
+
+// 2b) node --test standalone/tests/*.cjs  (cobertura única del motor:
+//     parser, historial, deals, chart — fixtures sintéticos, real-fixture stat-only)
+{
+  const r = sh('node', ['--test',
+    'standalone/tests/market.cjs', 'standalone/tests/market-history.cjs',
+    'standalone/tests/market-deals.cjs', 'standalone/tests/market-chart.cjs']);
+  const pass = num(/(?:ℹ|#)\s+pass (\d+)/, r.out);
+  const fail = num(/(?:ℹ|#)\s+fail (\d+)/, r.out);
+  const ok = r.code === 0 && fail === 0 && pass === EXPECT_CJS;
+  record('node motor .cjs', EXPECT_CJS, pass, ok, ok ? '' : `fail=${fail}\n${tail(r.out)}`);
 }
 
 // 3) lua addon/tests/test_bridge.lua  (diario del puente)

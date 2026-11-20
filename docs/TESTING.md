@@ -56,35 +56,41 @@ store pnpm no es transitivo. Si el arnés no arranca, recrear esos symlinks (ver
 
 `standalone/` es la **capa motor** compartida (`market.js`, `market-history.js`, …) que
 `desktop/src/` importa, más la app standalone vieja (`index.html`, `file://`,
-IndexedDB). Sus tests son un harness aparte, **fuera del runner canónico**:
+IndexedDB). Sus tests son un harness aparte; solo los `.cjs` del motor entran al
+runner canónico (ver abajo), las suites navegador de la app legada no:
 
 - `market.cjs`, `market-history.cjs`, `market-deals.cjs`, `market-chart.cjs`: tests
   unitarios directos del motor (`node:test`). Cobertura **única** de parser/deals/chart
-  que no duplica `tests/`. Fixtures sintéticos.
+  que no duplica `tests/`. **Sí entran al runner canónico** (gate `node motor .cjs`,
+  78 pass / 2 skipped) desde que su sección «real fixture» quedó neutralizada.
 - `browser.mjs`, `market-browser.mjs`, `history-browser.mjs`, `deals-browser.mjs`,
   `farm-browser.mjs`, `local-scan-browser.mjs`: suites Playwright de la **app standalone
   legada** (`index.html`), no del bundle Desktop.
 - **Retirado** (Fase 2 del plan de orden): `desktop-state.mjs` importaba
   `../desktop/state.mjs`, módulo inexistente → `ERR_MODULE_NOT_FOUND`; su cobertura la
   reemplazaron `tests/market-atomic.test.mjs` y `tests/market-storage-v2.test.mjs`.
-- `public-build.mjs`: archivo **vacío**, placeholder del split público/privado `--public`
-  ya retirado (build único `desktop/build.mjs`). Pendiente de retiro/reimplementación.
+- `public-build.mjs`: ya no existe (era un placeholder vacío del split público/privado
+  `--public` retirado; build único `desktop/build.mjs`).
 
-### ⚠️ Privacidad: por qué los `.cjs` NO entran al runner canónico
+### Privacidad: «real fixture» de los `.cjs` neutralizado (stat-only + opt-in)
 
-`market.cjs` y `market-history.cjs` tienen una sección opcional «real fixture» que
-**busca y lee el contenido** de `Auctionator.lua` bajo
+`market.cjs`, `market-history.cjs` y `market-chart.cjs` buscaban y **leían el
+contenido** de `Auctionator.lua` bajo
 `~/Games/battlenet/drive_c/Program Files (x86)/World of Warcraft/_forever_/WTF` si ese
-árbol existe (en este host **existe**), y reporta métricas agregadas. Leer contenido de
-SavedVariables vivos choca con el contrato de privacidad del proyecto (**solo stat**:
-existencia/mtime/bytes; nunca contenido ni nombres/rutas de cuenta). Por eso el runner
-canónico **no ejecuta** esos `.cjs`. El stack canónico (`tests/`, `desktop/test/`) usa
-fixtures sintéticos y dobles de la carpeta concedida, sin tocar SavedVariables reales.
+árbol existe, lo que violaba el contrato de privacidad del proyecto (**solo stat**:
+existencia/mtime/bytes; nunca contenido ni nombres/rutas de cuenta).
 
-Para conservar la cobertura única del motor sin el riesgo, la sección «real fixture»
-debería neutralizarse (stat-only o fixture sintético commiteado) o migrarse a `tests/`
-ESM con fixture sintético. Queda como **deuda abierta** (decisión del usuario); no se
-cambia en esta fase.
+**Resuelto:** las tres secciones ahora hacen solo `statSync` (bytes) por defecto y se
+marcan `skipped`. La validación de contenido contra el archivo real sigue disponible
+como diagnóstico manual opt-in:
+
+```bash
+WOW_FOREVER_REAL_FIXTURE=1 node --test standalone/tests/market.cjs
+```
+
+Por eso el runner canónico **sí ejecuta** los `.cjs` (sin la variable: jamás leen
+SavedVariables). El stack canónico (`tests/`, `desktop/test/`) usa fixtures sintéticos
+y dobles de la carpeta concedida.
 
 ## Reproducibilidad
 

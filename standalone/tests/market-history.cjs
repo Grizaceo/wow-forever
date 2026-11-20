@@ -407,6 +407,14 @@ function findRealFixture() {
 test('real Auctionator.lua: store compaction keeps data valid (redacted metrics)', async (t) => {
   const file = findRealFixture();
   if (!file) { t.skip('no real Auctionator.lua fixture found'); return; }
+  // Contrato de privacidad: stat-only por defecto; leer contenido exige opt-in:
+  //   WOW_FOREVER_REAL_FIXTURE=1 node tests/market-history.cjs
+  const fst = fs.statSync(file);
+  if (process.env.WOW_FOREVER_REAL_FIXTURE !== '1') {
+    t.diagnostic(`real fixture presente: ${fst.size} bytes (stat-only)`);
+    t.skip('stat-only: WOW_FOREVER_REAL_FIXTURE=1 habilita la validación de contenido');
+    return;
+  }
   const buf = fs.readFileSync(file);
   const snap = parseAuctionator(new Uint8Array(buf.buffer, buf.byteOffset, buf.byteLength));
   const totalItems = snap.realms.reduce((n, r) => n + r.items.length, 0);

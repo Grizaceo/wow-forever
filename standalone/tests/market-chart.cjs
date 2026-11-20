@@ -193,6 +193,14 @@ function findRealFixture() {
 test('real Auctionator fixture: chart renders accumulated multi-day history', (t) => {
   const file = findRealFixture();
   if (!file) { t.skip('sin fixture real Auctionator.lua'); return; }
+  // Contrato de privacidad: stat-only por defecto; leer contenido exige opt-in:
+  //   WOW_FOREVER_REAL_FIXTURE=1 node tests/market-chart.cjs
+  const st = fs.statSync(file);
+  if (process.env.WOW_FOREVER_REAL_FIXTURE !== '1') {
+    t.diagnostic(`real fixture presente: ${st.size} bytes (stat-only)`);
+    t.skip('stat-only: WOW_FOREVER_REAL_FIXTURE=1 habilita la validación de contenido');
+    return;
+  }
   const buf = fs.readFileSync(file);
   const snap = parseAuctionator(new Uint8Array(buf.buffer, buf.byteOffset, buf.byteLength));
   const store = H.fitStore(H.storeMerge(H.emptyStore(), snap), 4194304 - 4096);
