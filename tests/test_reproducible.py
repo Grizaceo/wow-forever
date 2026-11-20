@@ -9,6 +9,7 @@ Se salta con un mensaje claro si faltan las entradas fijadas en
 import hashlib
 import json
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -57,6 +58,14 @@ class TestReproducible(unittest.TestCase):
     def setUpClass(cls):
         os.makedirs(TMPBASE, exist_ok=True)
         cls.tmp = tempfile.mkdtemp(prefix='repro-', dir=TMPBASE)
+
+    @classmethod
+    def tearDownClass(cls):
+        # Limpia el temp regenerado (data/ + drops) para no acumular artefactos
+        # en .workshop/tmp/ corrida tras corrida (leak de ~12 MB por corrida).
+        tmp = getattr(cls, 'tmp', None)
+        if tmp:
+            shutil.rmtree(tmp, ignore_errors=True)
 
     def _gen(self, outdir):
         r = subprocess.run(
