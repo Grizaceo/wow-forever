@@ -46,8 +46,8 @@ permiso de carpeta. La ruta pasa de `/wow-hunter-guide` a `/wow-forever`.
   tramo.
 - **Dungeons**: jefes en orden con su botín, filtro de lo que tu clase puede usar, y los 9
   dungeons nuevos de Forever con sus jefes.
-- **Mercado**: importa tu `Auctionator.lua`, acumula el historial, marca ofertas y recomienda
-  dónde farmear.
+- **Mercado**: importa tu `Auctionator.lua`, la contabilidad TSM y el diario del puente
+  WoWForeverBridge; acumula el historial, marca ofertas y recomienda dónde farmear.
 - **Guía curada** del Cazador de la Horda y **Legacy**. Un test las compara con los datos generados
   (ítems, botín, misiones, hechizos, razas); las demás clases usan solo los datos generados.
 - **Skill del agente**: responde preguntas como «soy Paladín no-muerto nivel 24, ¿dónde
@@ -58,7 +58,12 @@ La interfaz está en español, con un botón para inglés, en tema claro u oscur
 viene de WoW Classic 1.12 (aproximado para Forever), del cliente de Forever o de la guía
 curada. Lo que no está en ninguna fuente publicable se muestra como **sin datos**.
 
-### Precios de Auctionator
+### Fuentes de precios
+
+El mercado se alimenta de tres fuentes locales, todas leídas como datos (nunca ejecutadas)
+desde la carpeta SavedVariables que concedes una vez:
+
+**Auctionator** — precios anunciados.
 
 1. En el juego, haz un **full scan** con Auctionator.
 2. Escribe `/reload` o vuelve a entrar, para que el juego guarde los datos.
@@ -71,6 +76,22 @@ curada. Lo que no está en ninguna fuente publicable se muestra como **sin datos
 
 Cada importación suma sus días al historial de cada ítem, aunque Auctionator solo guarde unas
 tres semanas.
+
+**Contabilidad TSM** — tus ventas, compras, expiraciones y cancelaciones personales
+(`TradeSkillMaster.lua`, campos `csvSales/csvBuys/csvExpired/csvCancelled`). Cada lectura
+válida reemplaza el snapshot completo (TSM modifica filas acumulativas); son operaciones
+ejecutadas, no precios anunciados, y se mantienen separadas del mercado Auctionator. Ver
+**Mercado → Mis ventas**.
+
+**Diario WoWForeverBridge** — el addon compañero (`WoWForeverBridge` v1.0.1, SavedVariables
+`WoWForeverBridgeDB`) captura cada escaneo de Auctionator en un diario por día
+(`WoWForeverBridge.lua`) que sobrevive la poda de ~21 días del propio Auctionator. La
+retención se configura en el juego con `/wfb days N`. El puente es un transporte, no un
+exportador verificado: los precios que trae se etiquetan con procedencia **UNKNOWN** por diseño.
+
+**Sondeo automático** — las tres fuentes se sondean cada 30 s mientras Hermes esté abierto y
+el plugin habilitado, aunque Mercado no esté montado. Concede la carpeta SavedVariables una
+vez; el sondeo nunca abre un selector en segundo plano y espera si falta o se revocó el permiso.
 
 ### Preguntar a DAVI
 
@@ -98,11 +119,14 @@ deshabilita para no insertar dos veces, y no se escribe nada nuevo en el almacen
 
 ## Qué lee, qué guarda y qué ejecuta
 
-- **Lee** únicamente `Auctionator.lua` dentro de la carpeta que concedes con el selector de
-  Hermes (lo busca hasta 4 niveles de subcarpetas dentro de ella), y sus propios `data/`.
-  El archivo se interpreta como datos: nunca se ejecuta Lua.
+- **Lee** únicamente `Auctionator.lua`, `TradeSkillMaster.lua` y `WoWForeverBridge.lua` dentro
+  de la carpeta que concedes con el selector de Hermes (búsqueda acotada de subcarpetas), y
+  sus propios `data/`. Cada archivo se interpreta como datos: nunca se ejecuta Lua.
 - **Guarda** tu perfil, el progreso de la guía y los precios normalizados en el almacenamiento
-  propio del plugin, en tu máquina. Puedes borrarlos desde la app.
+  propio del plugin, en tu máquina. Precios e historial usan el almacén v2 (`market-v2-*`,
+  `price-history-v2-*`); los datos v1 previos a la migración se conservan en un respaldo
+  `pre-v2-backup` troceado (partes ≤3 MiB + manifiesto, bajo el tope de 4 MiB por archivo del
+  host) para poder volver atrás. Puedes borrarlos desde la app.
 - **Sin red**: la página bloquea toda conexión (`connect-src 'none'`). No hay telemetría.
 - **Sin procesos** ni acceso al juego en ejecución. La página no lanza nada.
 - **La skill** no registra herramientas. Trae un script de Python de solo lectura,

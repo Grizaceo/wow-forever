@@ -45,8 +45,8 @@ grant carry over. The route changes from `/wow-hunter-guide` to `/wow-forever`.
   for your next tier.
 - **Dungeons**: bosses in order with their loot, a filter for what your class can use, and the
   9 new Forever dungeons with their bosses.
-- **Market**: imports your `Auctionator.lua`, builds up price history, flags deals and suggests
-  where to farm.
+- **Market**: imports your `Auctionator.lua`, TSM accounting and the WoWForeverBridge daily
+  diary; builds up price history, flags deals and suggests where to farm.
 - **Curated guide** for the Horde Hunter, and **Legacy**. A test checks them against the generated
   data (items, loot, quests, spells, races); the other classes use the generated data only.
 - **Agent skill**: answers questions such as "I'm a level 24 Undead Paladin, where do I
@@ -58,7 +58,12 @@ data says whether it comes from WoW Classic 1.12 (approximate for Forever), from
 client or from the curated guide. Whatever no publishable source covers is shown as **no
 data**.
 
-### Auctionator prices
+### Price sources
+
+The market feeds on three local sources, all read as data (never executed) from the
+SavedVariables folder you grant once:
+
+**Auctionator** — asking prices.
 
 1. In the game, run a **full scan** with Auctionator.
 2. Type `/reload` or log out and back in, so the game saves the data.
@@ -71,6 +76,21 @@ data**.
 
 Each import adds its days to every item's history, even though Auctionator keeps only about
 three weeks.
+
+**TSM accounting** — your personal sales, buys, expirations and cancellations
+(`TradeSkillMaster.lua`, fields `csvSales/csvBuys/csvExpired/csvCancelled`). Each valid read
+replaces the whole snapshot (TSM mutates cumulative rows); these are executed operations, not
+asking prices, and are kept separate from the Auctionator market. See **Market → My sales**.
+
+**WoWForeverBridge diary** — the companion addon (`WoWForeverBridge` v1.0.1, SavedVariables
+`WoWForeverBridgeDB`) captures every Auctionator scan into a daily journal
+(`WoWForeverBridge.lua`) that survives Auctionator's own ~21-day prune. Retention is
+configurable in-game with `/wfb days N`. The bridge is a transport, not a verified exporter:
+prices it carries are labelled **UNKNOWN** provenance by design.
+
+**Automatic polling** — all three sources are polled every 30 s while Hermes is open and the
+plugin enabled, even when Market is not mounted. Grant the SavedVariables folder once; the
+poll never opens a picker in the background and waits if the grant is missing or revoked.
 
 ### Ask DAVI
 
@@ -99,11 +119,13 @@ button is disabled so it cannot insert twice, and nothing new is written to stor
 
 ## What it reads, stores and runs
 
-- **Reads** only `Auctionator.lua` inside the folder you grant with the Hermes picker (it looks
-  up to 4 subfolder levels inside it), and its own `data/`. The file is parsed as data: Lua is
-  never run.
+- **Reads** only `Auctionator.lua`, `TradeSkillMaster.lua` and `WoWForeverBridge.lua` inside
+  the folder you grant with the Hermes picker (bounded subfolder search), and its own `data/`.
+  Every file is parsed as data: Lua is never run.
 - **Stores** your profile, guide progress and normalized prices in the plugin's own storage on
-  your machine. You can delete them from the app.
+  your machine. Prices and history use the v2 store (`market-v2-*`, `price-history-v2-*`); the
+  pre-migration v1 data is kept in a chunked `pre-v2-backup` (≤3 MiB parts + manifest, under
+  the host's 4 MiB per-file cap) so you can roll back. You can delete them from the app.
 - **No network**: the page blocks every connection (`connect-src 'none'`). No telemetry.
 - **No processes** and no access to the running game. The page launches nothing.
 - **The skill** registers no tools. It ships a read-only Python script,
