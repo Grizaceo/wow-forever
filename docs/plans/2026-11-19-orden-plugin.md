@@ -273,3 +273,55 @@ copia → sha256 byte-idéntico → suite bridge contra bundle instalado
 
 Informe final: gates antes/después, tamaños antes/después, lista de commits, deudas abiertas y
 por qué. Actualizar la skill `wow-forever-local-data` con las lecciones (no log de la sesión).
+
+
+---
+
+## 6. Cierre de Fases 1–3 (2026-11-19) — EJECUTADO Y VERDE
+
+**Estado:** Fases 1–3 (aprobadas) completas. **10 commits locales**, ahead 23, árbol limpio,
+**sin push**. Bundle **byte-idéntico** al deploy (`dad16865…`, 6.745.191 B) → **sin deploy**
+(ninguna fase tocó `desktop/src/`). Gates verificados **2× con el runner único nuevo**
+(`node scripts/run-gates.mjs` → **16/16**, exit 0).
+
+| Gate | Baseline Fase 0 | Tras Fases 1–3 |
+|---|---|---|
+| node --test tests/ | 261 / 0 fail | 261 ✓ |
+| python3 -m unittest | 87 OK | 87 ✓ |
+| lua test_bridge.lua | 52 / 0 | 52 ✓ |
+| 10 suites navegador | 307 (red 0, err 0) | 307 ✓ |
+| build + bundle-check | OK · 6.745.191 B | OK · 6.745.191 B ✓ |
+
+Load-time baseline (Fase 0): **3085 ms**. `.workshop/tmp`: **0 B** tras el fix del leak.
+
+**Commits:** Fase 0 `b163e02` (plan) · Fase 1 `986c481` `3d94de0` `2e6b49a` `05962cc` `1dacab0`
+(docs + skill repo) · Fase 2 `6362969` (retiro desktop-state roto) `84ffcfc` (fix leak tearDownClass)
+`01bbce5` (runner + docs/TESTING.md) · Fase 3 `4e092aa` (docs/ARQUITECTURA.md + punteros README).
+
+**Deudas cerradas con evidencia:** 1 (standalone = motor 11 módulos + app legada 4, documentado,
+NO renombrado) · 2 (legacy.jsx VIVO en app.jsx:34, no se retira) · 5 (stack canónico + runner único) ·
+6 (docs bilingües alineados + skill global `wow-forever-local-data` **v1.5.0** sin duplicar) ·
+8 (higiene caches + leak fix; .gitignore intacto).
+
+### ⚠️ Incidente de privacidad (Fase 0) — reconocido y mitigado
+En la investigación baseline (~21:17) se ejecutaron `standalone/tests/*.cjs`; su «real fixture»
+(`market.cjs:420`, `market-history.cjs:410`) hace `readFileSync`+`parseAuctionator` sobre
+`Auctionator.lua` VIVO del WTF concedido → **violó el límite stat-only**. Solo se loguearon
+agregados (conteos/bytes/rango días/estadísticos de muestra), sin nombres de cuenta/personaje ni
+contenido crudo. **Correctivo:** runner canónico los EXCLUYE; documentado en docs/TESTING.md +
+skill global; artefactos (`cjs-*.log`, `leveldb.txt`) borrados de scratch. No se repitió en Fases 1–3.
+**Fix permanente (neutralizar real-fixture → stat-only/sintético) PENDIENTE de OK** (cambio de código de test).
+
+### Deudas abiertas (requieren OK explícito)
+- **Fase 4 · Bundle (deuda 3):** ~92 % datos (data/*.json ~60 % + drop-data.js ~29 %), código ~7,7 %.
+  `minify:false` deliberado (gate test_legible ≤400 chars/línea); host prohíbe `import()` dinámico →
+  sin code-splitting. Margen limitado sin cambio de comportamiento; enfoque a aprobar o cerrar *by-design*.
+- **Fase 5 · Limpieza condicional:** grant fósil `auction-path` (0 refs, muerto) en grants.json;
+  retiro app standalone legada (index.html+market-ui.js+market-catalog.js); **neutralizar real-fixture .cjs**.
+- **Deuda 7 · Namespace wow-hunter-guide→wow-forever:** intencional (compatibilidad). Renombrar toca
+  data dir+grants+storage → solo plan de migración + OK explícito, NO ejecutado.
+
+**Skill global actualizada:** `wow-forever-local-data` v1.5.0 (runner único, conteos 261/87/52/307,
+standalone doble rol, ⚠️ privacidad .cjs, leak fix). Sin duplicar la sección de puente existente.
+
+**Posición:** PARADO en espera del visto bueno de Cristóbal para Fases 4–5 y el fix de privacidad.
