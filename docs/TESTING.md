@@ -52,25 +52,18 @@ vía symlinks en `desktop/node_modules`; no están en el `package.json` del repo
 store pnpm no es transitivo. Si el arnés no arranca, recrear esos symlinks (ver
 `docs/DESKTOP.md`). Los gates de navegador no requieren instalar nada en el repo.
 
-## Harness legado de `standalone/tests/` (NO canónico)
+## Tests del motor en `standalone/tests/` (gate `node motor .cjs`)
 
-`standalone/` es la **capa motor** compartida (`market.js`, `market-history.js`, …) que
-`desktop/src/` importa, más la app standalone vieja (`index.html`, `file://`,
-IndexedDB). Sus tests son un harness aparte; solo los `.cjs` del motor entran al
-runner canónico (ver abajo), las suites navegador de la app legada no:
+`standalone/` es la **capa motor** compartida (`market.js`, `market-history.js`, …)
+que `desktop/src/` importa. Sus tests unitarios `.cjs` (`node:test`) cubren el motor
+de forma **única** (parser/deals/chart) y **sí entran al runner canónico**:
 
-- `market.cjs`, `market-history.cjs`, `market-deals.cjs`, `market-chart.cjs`: tests
-  unitarios directos del motor (`node:test`). Cobertura **única** de parser/deals/chart
-  que no duplica `tests/`. **Sí entran al runner canónico** (gate `node motor .cjs`,
-  78 pass / 2 skipped) desde que su sección «real fixture» quedó neutralizada.
-- `browser.mjs`, `market-browser.mjs`, `history-browser.mjs`, `deals-browser.mjs`,
-  `farm-browser.mjs`, `local-scan-browser.mjs`: suites Playwright de la **app standalone
-  legada** (`index.html`), no del bundle Desktop.
-- **Retirado** (Fase 2 del plan de orden): `desktop-state.mjs` importaba
-  `../desktop/state.mjs`, módulo inexistente → `ERR_MODULE_NOT_FOUND`; su cobertura la
-  reemplazaron `tests/market-atomic.test.mjs` y `tests/market-storage-v2.test.mjs`.
-- `public-build.mjs`: ya no existe (era un placeholder vacío del split público/privado
-  `--public` retirado; build único `desktop/build.mjs`).
+- `market.cjs`, `market-history.cjs`, `market-deals.cjs`, `market-chart.cjs`: 80 tests,
+  78 pass / 2 skipped.
+- **Retirados** (Fase 5 del plan de orden): la app standalone legada `index.html` +
+  `market-ui.js` + `market-catalog.js` + sus 6 suites Playwright `.mjs` (reemplazada
+  por las vistas React del Desktop). También antes (Fase 2): `desktop-state.mjs`
+  (importaba `../desktop/state.mjs` inexistente → `ERR_MODULE_NOT_FOUND`).
 
 ### Privacidad: «real fixture» de los `.cjs` neutralizado (stat-only + opt-in)
 
@@ -94,8 +87,6 @@ y dobles de la carpeta concedida.
 
 ## Reproducibilidad
 
-- `tests/test_datos.py::test_catalogo_reproducible`: regenera `market-catalog.js` con
-  `tools/build-catalogo-mercado.py --out TMP` y exige byte-idéntico al commiteado.
 - `tests/test_reproducible.py`: regenera `data/` + `drop-data.js` desde las entradas
   fijadas en `~/.cache/wow-forever-drops` y compara hashes/MANIFEST. Se salta si faltan
   esas entradas. Usa un temp bajo `.workshop/tmp/` y **lo limpia al terminar**

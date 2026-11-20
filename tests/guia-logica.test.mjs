@@ -1,7 +1,6 @@
 // node --test tests/guia-logica.test.mjs — lógica pura de la guía curada.
 // Los guide-*.js son UMD de navegador (window.GUIDE_*), así que acá van fixtures
-// mínimas con la misma forma; el parser /simc usa los textos sintéticos de
-// standalone/tests/browser.mjs.
+// mínimas con la misma forma; el parser /simc usa textos sintéticos propios.
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
@@ -179,7 +178,7 @@ test('fmtDps marca aproximados con ~', () => {
   assert.equal(fmtDps({ dps: 9.64 }), '9.6')
 })
 
-// ---- /simc (textos sintéticos de standalone/tests/browser.mjs) ----
+// ---- /simc (textos sintéticos) ----
 const SIMC_PET = 'hunter="Fixture"\nlevel=19\npet_family=raptor\npet_level=<b id="level-marker">html</b>\npet_happiness=<b id="happy-marker">html</b>'
 const SIMC_PET_ONLY = 'pet_family=raptor\npet_level=19'
 const SIMC_FULL = 'hunter="Fixture"\nlevel=28\nrace=troll\nserver=camwow_us1_pvp\nprofessions=skinning=200\n# Barbarian War Axe (28)\nmain_hand=,id=3201\n# Venomstrike (24)\nranged=,id=6469\n# character_stats=health:700/mana:1600/strength:50/agility:90/stamina:58/intellect:85/spirit:72\n# weapon_damage=mainhand:90:110:3.3/ranged:76:94:2.18'

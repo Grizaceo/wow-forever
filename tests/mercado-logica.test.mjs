@@ -113,7 +113,7 @@ test('orden: nombre, precio, ofertas, roi/gph', () => {
     item('c', { itemId: null, sourceKey: '9999:1', unitPriceCopper: 10 }),
   ]
   const porPrecio = ordenarMercado(items, 'precio', { lang: 'es', itemsJson, catalogo: CATALOGO })
-  assert.deepEqual(porPrecio.map((i) => i.sourceKey), ['a', 'b', '9999:1'], 'precio descendente como market-ui')
+  assert.deepEqual(porPrecio.map((i) => i.sourceKey), ['a', 'b', '9999:1'], 'precio descendente como el catálogo')
   const porNombre = ordenarMercado(items, 'nombre', { lang: 'es', itemsJson, catalogo: CATALOGO })
   // "Paño de lino" antes que "Venomstrike"; la variante ordena por su clave
   assert.ok(porNombre.findIndex((i) => i.sourceKey === 'b') < porNombre.findIndex((i) => i.sourceKey === 'a'))

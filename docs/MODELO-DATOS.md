@@ -140,12 +140,6 @@ misión es de un dungeon; `categoria` es el `ZoneOrSort` negativo (clase, profes
   (`LFGDungeons`), con sus jefes del cliente y `botin: null`, más un hueco `botin`
   por cada uno: el botín es dato del servidor.
 
-### `standalone/market-catalog.js`
-
-Catálogo del mercado de la app standalone (`window.HunterMarketCatalog`), generado
-desde `data/` por `tools/build-catalogo-mercado.py`: nombre, jefe, dungeon y rango de
-niveles de cada ítem del botín de jefes.
-
 ### `data/MANIFEST.json`
 
 sha256 y bytes de cada archivo de `data/`, las fuentes y sus builds. Un test regenera

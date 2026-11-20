@@ -1,53 +1,36 @@
-# Mercado local de Auctionator
+# Mercado local de Auctionator — motor compartido
 
-> **Alcance:** este documento describe la **app standalone** (`index.html`, `file://`,
-> IndexedDB) y su motor de mercado compartido. El **plugin Desktop** actual (React en
+> **Alcance:** este documento describe la **semántica del motor de mercado**
+> (`market*.js`, `drop-data.js`), compartido por el plugin Desktop (React en
 > `desktop/src/`, almacén v2, puente WoWForeverBridge, TSM, sondeo 30 s, build
-> `desktop/build.mjs`) se documenta en **`docs/DESKTOP.md`**. Las secciones de precarga
-> (`market-local-scan.js`) y build público (`--public`) son **históricas**: fueron retiradas.
+> `desktop/build.mjs`). La **app standalone** (`index.html`, `file://`,
+> IndexedDB) fue **retirada** (Fase 5 del plan de orden): sus secciones de uso,
+> precarga y persistencia IndexedDB eran propias de esa app. El plugin Desktop
+> se documenta en **`docs/DESKTOP.md`**.
 
 ## Uso
 
-Abrir `index.html`, pestaña **Mercado local**.
+En el plugin Desktop: pestaña **Mercado**, botón de importación
+(**Leer Auctionator.lua del juego** / **Elegir carpeta TSM** / diario del
+puente). El flujo es el mismo que tenía la app: full scan en Auctionator dentro
+del juego, `/reload` para que WoW escriba SavedVariables, importar el archivo
+desde la carpeta concedida, elegir el realm de subasta y buscar por ID, nombre,
+dungeon o boss.
 
-1. Hacer un full scan en Auctionator dentro del juego.
-2. Usar `/reload` o cerrar sesión para que WoW escriba SavedVariables.
-3. En Hermes Desktop, el botón **Leer Auctionator.lua del juego** busca el
-   archivo solo: recorre el home en busca de `SavedVariables/Auctionator.lua`
-   (priorizando rutas típicas de WoW), prefiere el que contiene la base de
-   precios y el más grande entre varios candidatos, y recuerda la ruta para
-   las próximas lecturas. Si no lo encuentra, abre una vez el selector de
-   archivos. Fuera de Hermes, o como alternativa, seleccionar `Auctionator.lua`
-   desde el selector de la app. Es el archivo de SavedVariables, no el código
-   del addon. No hace falta copiar toda la carpeta WTF ni ningún archivo de
-   configuración o credenciales.
-4. Seleccionar el realm de subasta. Es independiente del selector geográfico
-   Kalimdor/Reinos del Este de la guía.
-5. Buscar por ID, nombre conocido, dungeon o boss; abrir un ítem para ver
-   historial y referencias locales.
-
-La app no vigila archivos ni ejecuta el Lua: la selección (o el permiso de
-carpeta otorgado una vez) autoriza la lectura de ese archivo en memoria. Solo
-se conserva el resultado normalizado de precios: no el Lua original, rutas,
-cuentas, personajes ni otras variables. No se envían datos a servicios ni
-modelos.
+Solo se conserva el resultado normalizado de precios: no el Lua original,
+rutas, cuentas, personajes ni otras variables. No se envían datos a servicios
+ni modelos.
 
 ## Qué significan los valores
 
-### Scan precargado en esta instalación local
+### Scan precargado (histórico, retirado)
 
-Por petición del usuario, `market-local-scan.js` contiene únicamente el snapshot
-normalizado del SavedVariables más reciente al preparar la precarga (4480 ítems,
-un realm; archivo guardado el 2026-11-09 a las 21:48, UTC-03). Es un archivo local
-privado: no publicarlo junto con la guía. No contiene el Lua, cuentas ni personajes.
-
-Al recargar la guía se guarda una sola vez, en la misma transacción que su marca
-de aplicación. No sustituye una importación de navegador posterior a la preparación
-de la precarga. Las siguientes importaciones manuales tienen prioridad. Borrar los
-precios mantiene la marca para que no reaparezcan al recargar ese perfil. El botón
-borra IndexedDB, no este archivo: otro perfil nuevo puede volver a precargarlo.
-Esto no vigila el juego ni incorpora automáticamente futuros scans; para ellos
-se usa el selector habitual.
+La sección «Scan precargado en esta instalación local» describía
+`market-local-scan.js`, un snapshot normalizado privado que la app standalone
+precargaba en IndexedDB. **Ambos fueron retirados** junto con la app: el plugin
+Desktop importa siempre las fuentes del usuario (Auctionator, TSM, diario del
+puente) y no tiene precarga. Se conserva el significado de los campos porque el
+formato del snapshot normalizado es el mismo que usa el motor.
 
 - `m`: último mínimo unitario anunciado observado, en cobre. No es mediana ni
   precio al que se haya realizado una venta. 1 oro = 10000 cobre.
@@ -164,10 +147,11 @@ detalle. Todo approx: son ofertas anunciadas, no ventas.
 
 ## Fuentes y filtro por nivel
 
-El catálogo estático se extrae del addon ForeverDungeonJournal instalado, con
-referencias de archivo/línea y hashes SHA-256 del material fuente. No usa datos
-Retail ni una consulta externa. La cobertura exacta está declarada en
-`market-catalog.js` y se muestra en la pantalla.
+El catálogo se construye en runtime desde `data/` (`items.json` +
+`dungeons.json`, vía `catalogoMercado()` en `desktop/src/mercado-logica.js`):
+nombre, jefe, dungeon y rango de niveles de cada ítem del botín de jefes. No
+usa datos Retail ni una consulta externa; la cobertura exacta se declara en
+`data/` (`huecos`) y se muestra en la pantalla.
 
 Los nombres se resuelven solo para IDs simples conocidos. Los demás permanecen
 como `Ítem #ID` o variante sin ID simple; se pueden buscar por clave.
@@ -195,13 +179,14 @@ generados offline. Nada se consulta en red ni en el juego.
   atribución en `LICENSE-DATA.md`. Los nombres de World of Warcraft son
   marcas/derechos de Blizzard Entertainment: uso no comercial, sin afiliación.
 - **Privada — `drop-data-private.js` → `window.HunterDropDataPrivate`**
-  (All Rights Reserved, solo local): rares y contenedores observados por el
-  addon **RareScanner** instalado, con probabilidades de drop observadas y
-  uiMapIDs de hotspots conocidos. Nunca se publica ni se commitea; el build
-  `--public` la excluye. Es opcional: si falta, la app funciona igual sin la
-  capa observada.
-- **Catálogo — `market-catalog.js` → `window.HunterMarketCatalog`**: nombres y
-  fuentes de dungeon del addon ForeverDungeonJournal (ver sección anterior).
+  (All Rights Reserved, solo local, gitignored): rares y contenedores
+  observados por el addon **RareScanner** instalado, con probabilidades de
+  drop observadas y uiMapIDs de hotspots conocidos. Nunca se publica ni se
+  commitea. Es opcional: si falta, el motor funciona igual sin la capa
+  observada.
+- **Catálogo**: nombre/fuente de cada ítem del botín, construido en runtime
+  desde `data/` (`catalogoMercado()`); ya no existe el archivo pre-construido
+  `market-catalog.js` (era exclusivo de la app retirada).
 
 ### Regeneración
 
@@ -374,102 +359,80 @@ DB 8 rechaza el archivo; realms con versión interior distinta de 2 se omiten
 con aviso, conservando los realms compatibles. Los ítems inválidos se omiten
 con aviso y los datos truncados se rechazan: no se inventan precios plausibles.
 
-El scan normalizado se guarda en IndexedDB (`wowhunter-market-v1`, store
-`market`) del navegador/origen que abre la app. El reemplazo de snapshot y realm
-es transaccional y lee de vuelta el snapshot antes de completar. No se actualiza
-la vista de datos hasta confirmar el guardado. Un error de lectura, validación
-o almacenamiento conserva el último scan válido. Durante el breve commit la
-cancelación se deshabilita para no prometer un rollback que no pueda garantizar.
+El snapshot normalizado se guarda en el almacén del plugin Desktop
+(`ctx.files`, bundle v2 — ver `docs/DESKTOP.md` y `docs/MODELO-DATOS.md`). La
+app standalone lo guardaba en IndexedDB (`wowhunter-market-v1`); esa
+persistencia ya no existe.
 
 Desde la fase de historial acumulado, cada importación hace dos guardados:
-primero el snapshot con ventana reciente (transacción de siempre) y después
-el store compacto del historial (clave `history`). Si el segundo falla, el
-scan igual queda guardado y la próxima importación reintenta el merge, que es
-aditivo. **Borrar precios locales** elimina ambos canales.
+primero el snapshot con ventana reciente y después el store compacto del
+historial. Si el segundo falla, el scan igual queda guardado y la próxima
+importación reintenta el merge, que es aditivo. **Borrar precios locales**
+elimina ambos canales.
 
-Cambiar de navegador, perfil, origen o mover la app puede separar el almacén.
-El modo privado o borrar datos del navegador puede eliminarlo. No se incluye en
-el enlace de build ni se comparte al copiarlo. **Borrar precios locales** pide
-confirmación y elimina solo datos de mercado de esta app, no el juego ni la
-ficha del hunter. El guardado de la ficha sigue siendo independiente.
+El merge es aditivo e idempotente: re-importar el mismo archivo no duplica
+días ni cambia el resultado. Cambiar de navegador, perfil u origen puede
+separar el almacén; borrarlo elimina los datos de mercado, no el juego ni la
+ficha del personaje.
 
 ## Desarrollo y verificación
 
-- `market.js`: parser y fuente autocontenida del Worker.
-- `market-ui.js`: importación, IndexedDB, búsqueda, tablas, historial,
-  filtros y integración del farmeo.
+- `market.js`: parser Auctionator/TSM/puente y fuente autocontenida del Worker.
 - `market-history.js`: merge determinista de historiales, store compacto,
   estadísticas y ajuste al presupuesto de bytes.
-- `market-chart.js`: gráficos SVG deterministas del historial (detalle y
-  tarjetas de farmeo).
-- `market-farm.js`: motor puro de recomendación de farmeo + renderer.
-- `market-catalog.js`: catálogo estático derivado, sin datos de cuentas.
+- `market-chart.js`: gráficos SVG deterministas del historial.
+- `market-deals.js`: detección de ofertas vs mediana histórica.
+- `market-farm.js`: motor puro de recomendación de farmeo.
+- `market-identity.js`, `market-source.js`, `market-compare.js`: identidad de
+  ítems, procedencia de fuentes y comparación de pools.
 - `drop-data.js` / `drop-data-private.js`: datasets públicos/privados de drops
   (generados, no editar a mano).
-- `tools/build-catalogo-mercado.py`: reconstrucción del catálogo desde `data/` (`--out FILE`).
 - `tools/build-drop-data.py`: generación de los datasets de drops.
 - `desktop/build.mjs`: bundle del plugin Desktop (`node build.mjs [--out FILE]`).
-- `tests/market.cjs`: pruebas unitarias del parser, fixtures sintéticas.
-- `tests/market-history.cjs`: merge, store compacto, stats y presupuesto.
-- `tests/market-chart.cjs`: SVG determinista, ejes, formatos y fixture real.
-- `tests/test_datos.py` (raíz): pruebas del catálogo/datos, incluye `test_catalogo_reproducible`.
-- `tests/market-browser.mjs`: flujo offline en Chromium aislado.
-- `tests/history-browser.mjs`: acumulación de historial entre importaciones.
-- `tests/farm-browser.mjs`: recomendador de farmeo en Chromium aislado.
-- `tests/public-build.mjs`: vacío actualmente; el split público/privado fue retirado.
-- `tests/browser.mjs`: regresiones del resto de la guía y pestaña nueva.
+- `tests/market.cjs`, `tests/market-history.cjs`, `tests/market-chart.cjs`,
+  `tests/market-deals.cjs`: pruebas unitarias del motor (`node:test`), dentro
+  del runner canónico (`node motor .cjs`).
+- Las suites de la app retirada (`*.mjs` de navegador) ya no existen; la
+  cobertura de UI vive en `desktop/test/` (10 suites, 307 checks).
 
-Ver `tests/README.md` para los comandos de navegador. Las pruebas sintéticas
-comprueban el contrato; no demuestran mecánicas ni compatibilidad del servidor.
-Una importación real de SavedVariables se valida por separado y sin publicar
-contenido bruto ni nombres de cuenta.
+Los tests usan fixtures sintéticas; no demuestran mecánicas ni compatibilidad
+del servidor. La validación contra un `Auctionator.lua` real es opt-in manual
+(`WOW_FOREVER_REAL_FIXTURE=1`, ver `docs/TESTING.md`) y nunca publica contenido
+bruto ni nombres de cuenta.
 
-Comprobación local de esta implementación: 24 pruebas del parser, 28 del
-historial acumulado, 15 de los gráficos, 52 del catálogo, 39 del flujo de
-mercado, 18 del flujo de acumulación, 38 del recomendador de farmeo, 14 del
-split público/privado del plugin, 8 de la precarga local, 17+33 de
-escritorio y 76 regresiones de la guía, todas verdes. El flujo real en Chromium aislado importó 4480 ítems,
-verificó paginación y recarga, sin errores JavaScript ni solicitudes HTTP(S).
+El catálogo del mercado ya no es un archivo generado: Desktop lo construye en
+runtime con `catalogoMercado()` (`desktop/src/mercado-logica.js`) desde
+`data/items.json` + `data/dungeons.json`. Es determinista y no accede a
+SavedVariables ni a entradas externas; la cobertura exacta se declara en
+`data/` (`huecos`).
 
-El catálogo se genera **solo desde `data/`** (CMaNGOS classic-db + tablas del cliente
-WoW Forever), reemplazando al extractor antiguo del addon ForeverDungeonJournal. Para
-regenerarlo: `python3 tools/build-catalogo-mercado.py [--out FILE]`. Es determinista y
-byte-idéntico a `standalone/market-catalog.js` (lo verifica
-`tests/test_datos.py::test_catalogo_reproducible`). No accede a SavedVariables ni a
-entradas externas; la cobertura exacta se declara en `market-catalog.js`.
+## Plugin de Hermes Desktop
 
-## Variante plugin de Hermes Desktop
-
-El plugin Desktop **ya no es un bundle de esta app standalone**: es una implementación
-React separada en `desktop/src/`, compilada con `desktop/build.mjs` (esbuild) a
-`desktop/plugin.js` y desplegada en `~/.hermes/desktop-plugins/wow-forever/` (ruta
-`/wow-forever`). El namespace de datos sigue siendo el legacy `wow-hunter-guide`
+El plugin es una implementación React en `desktop/src/`, compilada con
+`desktop/build.mjs` (esbuild) a `desktop/plugin.js` y desplegada en
+`~/.hermes/desktop-plugins/wow-forever/` (ruta `/wow-forever`). El namespace de
+datos sigue siendo el legacy `wow-hunter-guide`
 (`~/.config/Hermes/plugin-files/data/wow-hunter-guide/`) por compatibilidad.
 
-En vez de IndexedDB, el plugin usa `ctx.files`: mercado e historial en un **bundle v2**
-(`market-v2-*`, `price-history-v2-*`) con puntero `market-v2-pointer`, respaldo pre-v2
-troceado (≤3 MiB + manifiesto) y rollback en dos pasos. El detalle completo (almacén v2,
-puente WoWForeverBridge, sondeo 30 s, TSM) está en **`docs/DESKTOP.md`**. Este documento
-describe la app standalone (`index.html`, `file://`, IndexedDB), que sigue disponible sin
-Hermes.
+Usa `ctx.files` en vez de IndexedDB: mercado e historial en un **bundle v2**
+(`market-v2-*`, `price-history-v2-*`) con puntero `market-v2-pointer`, respaldo
+pre-v2 troceado (≤3 MiB + manifiesto) y rollback en dos pasos. El detalle
+completo (almacén v2, puente WoWForeverBridge, sondeo 30 s, TSM) está en
+**`docs/DESKTOP.md`**.
 
-Regenerar el bundle Desktop tras tocar `desktop/*`: `cd desktop && node build.mjs`. La
-precarga `market-local-scan.js` y el split público/privado (`--public`, `dist/`) fueron
-**retirados**: el build es único y cada usuario importa sus propias fuentes (Auctionator,
-TSM, diario del puente).
+Regenerar el bundle Desktop tras tocar `desktop/*`: `cd desktop && node build.mjs`.
+La precarga `market-local-scan.js`, el split público/privado (`--public`,
+`dist/`) y la app `index.html` fueron **retirados**: el build es único y cada
+usuario importa sus propias fuentes (Auctionator, TSM, diario del puente).
 
 ## Guías por clase/facción
 
-`index.html` ya no contiene el contenido de una sola clase: cada guía vive en
-`guide-<clase>.js` (`window.GUIDE_*`) con specs, armas por facción, macros,
-barras, bandas de zonas, milestones, loot de dungeons y hooks `recExtra`.
-Selector de Clase + Bando en la barra lateral; el progreso (armas/ruta/equipo)
-se reinicia al cambiar de guía (con confirmación). Estado nuevo: `cls`, `fac`
-(los builds viejos cargan como hunter/Horda). Deep-links incluyen `cls`/`fac`.
-
-Guías incluidas: **Hunter** (BM/MM/SV), **Warrior** (Arms/Fury/Prot) y
-**Shaman** (Elemental/Enhancement/Restoration — armas solo 1H, totems, ambos
-bandos; Alliance shaman = draenei, ruta principal Azuremyst/Bloodmyst→EK).
+En Desktop las guías viven en `desktop/src/vistas/` (React) sobre los datos
+generados de `data/` más las guías curadas de `standalone/guide-*.js`
+(`guide-hunter.js`, `guide-legacy.js`; ver `docs/ARQUITECTURA.md`). Las guías
+curadas de Chamán y Guerrero (`guide-shaman.js`, `guide-warrior.js`) fueron
+retiradas del Desktop en la 2.0.0 por nombrar datos inexistentes; quedan como
+fixture de `tests/ruta-logica.test.mjs` pendientes de reescritura auditada.
 
 ## Roadmap de analítica de precios
 
@@ -509,7 +472,8 @@ Los datos de vendor también alimentan la Fase 4.
 
 Recomendaciones tipo "conviene comprar X azul por Y oro — te dura ~N niveles".
 Inputs disponibles: guía por clase (ruta/dungeons/quests), `drop-data.js`,
-`market-catalog.js`, stats del personaje (import `/simc`), precios+historial.
+el catálogo construido desde `data/`, stats del personaje (import `/simc`),
+precios+historial.
 
 Fuentes candidatas a investigar:
 

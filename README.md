@@ -141,10 +141,6 @@ tools/fuentes.json ── tools/descargar-fuentes.py ──▶ ~/.cache/wow-fore
                          tools/build-drop-data.py ◀──────┤──▶ tools/build-datos-juego.py
                                    │                                 │
                          standalone/drop-data.js                    data/*.json ──▶ skills/wow-forever/scripts/consultar.py
-                                   │                                 │
-                                   │                 tools/build-catalogo-mercado.py
-                                   │                                 │
-                                   │                  standalone/market-catalog.js
                                    └───────────────┬─────────────────┘
                         desktop/src/ (React + SDK) ── desktop/build.mjs ──▶ desktop/plugin.js
 
@@ -177,8 +173,8 @@ lua5.1 addon/tests/test_bridge.lua         # bridge diary (52)
 PLAYWRIGHT_MODULE=… CHROMIUM_PATH=… node desktop/test/navegador.mjs   # + 9 suites (307 total)
 ```
 
-The canonical stack, expected counts, and the legacy `standalone/tests/` harness (excluded
-from the runner because its «real fixture» reads live SavedVariables) are in `docs/TESTING.md`.
+The canonical stack and expected counts are in `docs/TESTING.md`; one command runs all
+gates: `node scripts/run-gates.mjs`.
 
 ## How this was built
 

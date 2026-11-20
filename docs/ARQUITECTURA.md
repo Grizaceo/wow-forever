@@ -1,11 +1,13 @@
 # Arquitectura — capas y grafo de dependencias
 
 WoW Forever tiene tres capas. Este documento mapea **qué importa qué** con
-evidencia del fuente, clasifica `standalone/` (que no es un cementerio: es la capa
-motor compartida **más** la app standalone legada), y explica por qué no se renombra.
+evidencia del fuente y clasifica `standalone/` como la **capa motor compartida**
+(la app standalone legada `index.html` fue retirada en la Fase 5 del plan de
+orden).
 
 Complementa: `docs/DESKTOP.md` (plugin React), `docs/TESTING.md` (gates),
-`docs/MODELO-DATOS.md` (almacén v2), `docs/MERCADOS-PROCEDENCIA.md` (procedencia).
+`docs/MODELO-DATOS.md` (almacén v2), `docs/MERCADOS-PROCEDENCIA.md` (procedencia),
+`standalone/MARKET.md` (semántica del motor de mercado).
 
 ## Las tres capas
 
@@ -13,25 +15,24 @@ Complementa: `docs/DESKTOP.md` (plugin React), `docs/TESTING.md` (gates),
 data/*.json  +  data/MANIFEST.json          ← generado por tools/build-datos-juego.py
    │  (CMaNGOS classic-db GPL-3.0 + tablas del cliente; LICENSE-DATA.md)
    │
-   ├──► desktop/src/datos.js  (importa 7 JSON crudo: items, clases, profesiones,
-   │                           zonas, misiones, dungeons, personaje)
-   └──► tools/build-catalogo-mercado.py ──► standalone/market-catalog.js
-                                             (catálogo pre-construido de la APP STANDALONE)
+   └──► desktop/src/datos.js  (importa 7 JSON crudo: items, clases, profesiones,
+                               zonas, misiones, dungeons, personaje)
 
 standalone/   ← capa MOTOR compartida (market*.js, guías curadas, drop-data)
-   │            + app standalone legada (index.html, market-ui.js, market-catalog.js)
    │
    ├──► desktop/src/mercado-logica.js, bridge.js, tsm.js, auctionator.js,
    │    almacen.js, datos.js   (importan el motor)
-   └──► standalone/index.html  (app legada file:// + IndexedDB)
+   └──► tests/ y standalone/tests/*.cjs     (cubertura del motor)
 
 desktop/src/  ← plugin React (vistas/, almacén v2, sondeo 30 s, puente, TSM)
-   └──► desktop/build.mjs ──► desktop/plugin.js  (bundle ESM legible, ~6,7 MB)
+   └──► desktop/build.mjs ──▶ desktop/plugin.js  (bundle ESM legible, ~6,7 MB)
 ```
 
-**Dato clave:** el bundle Desktop inlinea `data/*.json` **crudo** (vía `datos.js`),
-**no** `standalone/market-catalog.js`. El catálogo pre-construido es solo de la app
-standalone. Ambos derivan de `data/`, pero por caminos distintos.
+**Dato clave:** el bundle Desktop inlinea `data/*.json` **crudo** (vía `datos.js`)
+y el motor de `standalone/`. El antiguo catálogo pre-construido
+(`standalone/market-catalog.js` + `tools/build-catalogo-mercado.py`) era exclusivo
+de la app `file://` y se retiró con ella: Desktop construye el catálogo en runtime
+con `catalogoMercado()` (`desktop/src/mercado-logica.js`) sobre `data/` cruda.
 
 ## Grafo verificado: `desktop/src/` → `standalone/`
 
@@ -43,31 +44,38 @@ standalone. Ambos derivan de `data/`, pero por caminos distintos.
 | `auctionator.js`, `almacen.js` | `market-identity.js`, `market-history.js` |
 
 `market-history.js` es el **núcleo del motor** (lo importan `almacen.js`,
-`mercado-logica.js`, 7 suites de `tests/` y 3 `.cjs` de standalone). `market-identity.js`
+`mercado-logica.js`, 7 suites de `tests/` y los `.cjs` de standalone). `market-identity.js`
 es el segundo más compartido (3 módulos desktop + 9 tests). `market.js` es el parser
 Auctionator/TSM/puente.
 
-## Clasificación de `standalone/` (15 módulos `.js`)
+## Clasificación de `standalone/`
 
-### MOTOR COMPARTIDO — 11 módulos (el bundle Desktop los inlinea)
+### MOTOR COMPARTIDO — los módulos que el bundle Desktop inlinea
 
 `market.js` · `market-history.js` · `market-identity.js` · `market-source.js` ·
 `market-compare.js` · `market-deals.js` · `market-farm.js` · `market-chart.js` ·
 `drop-data.js` · `guide-hunter.js` · `guide-legacy.js`
 
 Son la lógica de mercado reutilizable + datos generados/curados. `desktop/src/` los
-importa; `tests/` los cubre; la app standalone también los usa. **No son código muerto.**
+importa; `tests/` los cubre. **No son código muerto.**
 
-### APP LEGADA — 4 módulos (solo `index.html` / tests, NO `desktop/src/`)
+### DATOS CURADOS EN REVISIÓN — 2 módulos (solo `tests/ruta-logica.test.mjs`)
 
 | Módulo | Rol | Estado |
 |---|---|---|
-| `market-ui.js` | UI de la app standalone (1159 líneas, DOM directo) | Reemplazada en Desktop por las vistas React (`desktop/src/vistas/`). Viva solo para `index.html`. |
-| `market-catalog.js` | Catálogo pre-construido (generado por `tools/build-catalogo-mercado.py`) | Lo usa `index.html`. Desktop usa `data/items.json` crudo. `tests/test_datos.py` verifica su regeneración byte-idéntica. |
-| `guide-shaman.js`, `guide-warrior.js` | Guías curadas de Chamán/Guerrero | **Retiradas del Desktop en 2.0.0** (`datos.js:17-22`): nombraban ítems/misiones/jefes/razas inexistentes (`tools/auditar-curado.mjs` lo detectó). Esas clases usan solo datos generados en Desktop. Siguen en standalone para la app legada y `tests/ruta-logica.test.mjs`. Pendientes de reescritura auditada. |
+| `guide-shaman.js`, `guide-warrior.js` | Guías curadas de Chamán/Guerrero | **Retiradas del Desktop en 2.0.0** (`datos.js:17-22`): nombraban ítems/misiones/jefes/razas inexistentes (`tools/auditar-curado.mjs` lo detectó). Esas clases usan solo datos generados en Desktop. Siguen como fixture de `tests/ruta-logica.test.mjs`. Pendientes de reescritura auditada o retiro. |
 
 `GUIAS = { 3: GUIDE_HUNTER }` en `datos.js`: solo Cazador (id de clase 3) tiene capa
 curada activa en Desktop. Toda guía nueva debe pasar `tests/curado-datos.test.mjs`.
+
+### RETIRADO (Fase 5 del plan de orden)
+
+- `index.html` + `market-ui.js`: la app standalone `file://` + IndexedDB, reemplazada
+  por las vistas React del plugin Desktop.
+- `market-catalog.js` + `tools/build-catalogo-mercado.py` + `tests/test_datos.py::
+  test_catalogo_reproducible`: catálogo pre-construido exclusivo de esa app.
+- `standalone/tests/*.mjs` (6 suites Playwright de la app) + `tests/README.md`.
+  Se conservan los `.cjs` del motor (cobertura única, ahora en el runner canónico).
 
 ## Build del bundle (`desktop/build.mjs`)
 
@@ -84,31 +92,14 @@ curada activa en Desktop. Toda guía nueva debe pasar `tests/curado-datos.test.m
 - **Sin `import()` dinámico**: el host no lo admite → no hay code-splitting posible.
 - Tamaño actual: **6.745.191 bytes** (`scripts/check_desktop_bundle.py`). Composición
   dominada por datos (`data/*.json` + `drop-data.js`); el análisis fino con metafile de
-  esbuild y la medición de carga son la Fase 4 del plan de orden (requiere OK aparte).
+  esbuild y la medición de carga son la Fase 4 del plan de orden.
 
 ## Por qué `standalone/` NO se renombra a `engine/`
 
-El nombre `standalone/` es histórico pero **honesto sobre su doble rol**: contiene el
-motor compartido (11 módulos que Desktop importa) **y** la app standalone legada
-(`index.html` + `market-ui.js` + `market-catalog.js`). Renombrarlo a `engine/`:
-
-1. Sería **deshonesto**: no es solo motor; también es la app legada completa.
-2. Tocaría **~30+ rutas de import** en `desktop/src/`, `tests/`, `standalone/tests/` y
-   `index.html`, más los generadores (`build-catalogo-mercado.py`, `build-datos-juego.py`)
-   y la doc. Alto riesgo de rotura para beneficio cosmético.
-3. El plan de orden (deuda 1) pedía "documentarlo como capa motor **o** moverlo con
-   aliases". Se elige **documentar** (este archivo + los banners de alcance en
-   `standalone/MARKET.md` y `standalone/tests/README.md`), que resuelve la confusión sin
-   movimiento estructural.
-
-**Decisión: mantener `standalone/`, documentar el doble rol.** Si en el futuro se separa
-la app legada del motor, recién ahí tendría sentido un `engine/` con aliases — como
-cambio estructural propio, con gates y OK del usuario, no mezclado con comportamiento.
-
-## App standalone legada (`index.html`)
-
-Superficie vieja: un solo HTML abierto por `file://`, estado en IndexedDB, UI DOM
-(`market-ui.js`), catálogo pre-construido (`market-catalog.js`). **No es el plugin
-Desktop** (React, almacén v2 en archivos JSON del host, puente, TSM, sondeo 30 s). Se
-conserva como referencia histórica y banco de pruebas del motor; su retiro/consolidación
-es la Fase 5 del plan (condicional, requiere OK). Ver `standalone/MARKET.md`.
+El nombre `standalone/` es histórico: nació como app independiente y hoy es la capa
+motor compartida. Renombrarlo a `engine/` tocaría **~30+ rutas de import** en
+`desktop/src/`, `tests/` y los generadores, más la doc — alto riesgo de rotura para
+beneficio cosmético. **Decisión: mantener `standalone/`** (documentado aquí y en
+`docs/DESKTOP.md`). Si algún día se separan los datos curados en revisión
+(`guide-shaman/warrior`) del motor, recién ahí tendría sentido una reorganización —
+como cambio estructural propio, con gates y OK del usuario.

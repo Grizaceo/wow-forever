@@ -522,21 +522,5 @@ class TestDatos(unittest.TestCase):
         self.assertIn('naranja_forever', temas)
 
 
-class TestCatalogoMercado(unittest.TestCase):
-    """standalone/market-catalog.js se regenera desde data/ byte a byte (sin entradas externas)."""
-
-    def test_catalogo_reproducible(self):
-        import subprocess, tempfile
-        raiz = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        with tempfile.TemporaryDirectory() as tmp:
-            out = os.path.join(tmp, 'cat.js')
-            subprocess.run([sys.executable, os.path.join(raiz, 'tools', 'build-catalogo-mercado.py'), '--out', out],
-                           check=True, capture_output=True)
-            with open(out, 'rb') as a, open(os.path.join(raiz, 'standalone', 'market-catalog.js'), 'rb') as b:
-                self.assertEqual(a.read(), b.read(), 'standalone/market-catalog.js no coincide con data/')
-            with open(out, encoding='utf-8') as f:
-                texto = f.read()
-            self.assertNotIn('ForeverDungeonJournal', texto)
-
 if __name__ == '__main__':
     unittest.main()

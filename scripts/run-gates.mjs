@@ -26,7 +26,7 @@ const KEEP_GOING = process.argv.includes('--keep-going');
 
 // Conteos esperados del stack canónico (actualizar a mano si se añaden tests).
 const EXPECT_NODE = 261;
-const EXPECT_PY = 87;
+const EXPECT_PY = 86;
 const EXPECT_LUA = 52;
 // Tests unitarios del motor en standalone/tests/*.cjs (node:test). Los «real
 // fixture» son stat-only por defecto; WOW_FOREVER_REAL_FIXTURE=1 los hace leer
