@@ -430,11 +430,11 @@ usuario importa sus propias fuentes (Auctionator, TSM, diario del puente).
 En Desktop las guías viven en `desktop/src/vistas/` (React) sobre los datos
 generados de `data/` más las guías curadas de `standalone/guide-*.js`
 (`guide-hunter.js`, `guide-legacy.js`; ver `docs/ARQUITECTURA.md`). Las guías
-curadas de Chamán y Guerrero (`guide-shaman.js`, `guide-warrior.js`) fueron
-retiradas del Desktop en la 2.0.0 por nombrar datos inexistentes. De ellas solo
+curadas de Chamán y Guerrero fueron retiradas del Desktop en la 2.0.0 por nombrar
+datos inexistentes, y sus archivos se borraron del repo el 2026-11-20. De ellas solo
 se conserva la parte validada —la lista curada de dungeons— como fixture en
-`tests/fixtures/guias-curadas.json`, que consume `tests/ruta-logica.test.mjs`; el
-resto sigue pendiente de reescritura auditada.
+`tests/fixtures/guias-curadas.json`, que consume `tests/ruta-logica.test.mjs`;
+publicarlas de nuevo exigiría una reescritura auditada desde cero.
 
 ## Roadmap de analítica de precios
 

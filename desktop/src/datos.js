@@ -15,11 +15,12 @@ import { GUIDE_LEGACY } from '../../standalone/guide-legacy.js'
 export const D = { personaje, clases, profesiones, items, zonas, misiones, dungeons, dropData }
 
 // Guías curadas por ID de clase del cliente (3 Cazador) y por facción que cubren. El
-// resto de clases no tiene capa curada. Las de Guerrero y Chamán
-// (standalone/guide-warrior.js, guide-shaman.js) se retiraron en la 2.0.0: nombraban
-// ítems, misiones, jefes y razas que no existen (tools/auditar-curado.mjs lo mostró), y
-// esas clases usan solo los datos generados hasta que se reescriban. Toda guía que se
-// agregue acá tiene que pasar ese auditor (tests/curado-datos.test.mjs).
+// resto de clases no tiene capa curada. Las de Guerrero y Chamán se retiraron en la
+// 2.0.0: nombraban ítems, misiones, jefes y razas que no existen
+// (tools/auditar-curado.mjs lo mostró), y esas clases usan solo los datos generados
+// hasta que se reescriban. Sus archivos se borraron del repo (2026-11-20); lo único
+// validado, la lista curada de dungeons, vive en tests/fixtures/guias-curadas.json.
+// Toda guía que se agregue acá tiene que pasar ese auditor (tests/curado-datos.test.mjs).
 export const GUIAS = { 3: GUIDE_HUNTER }
 export const LEGACY = GUIDE_LEGACY
 

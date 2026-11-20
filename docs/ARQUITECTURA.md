@@ -60,11 +60,16 @@ Auctionator/TSM/puente.
 Son la lógica de mercado reutilizable + datos generados/curados. `desktop/src/` los
 importa; `tests/` los cubre. **No son código muerto.**
 
-### DATOS CURADOS EN REVISIÓN — 2 módulos (solo `tests/ruta-logica.test.mjs`)
+### DATOS CURADOS EN REVISIÓN — ninguno en el repo
 
-| Módulo | Rol | Estado |
-|---|---|---|
-| `guide-shaman.js`, `guide-warrior.js` | Guías curadas de Chamán/Guerrero | **Retiradas del Desktop en 2.0.0** (`datos.js:17-22`): nombraban ítems/misiones/jefes/razas inexistentes (`tools/auditar-curado.mjs` lo detectó). Esas clases usan solo datos generados en Desktop. Ya **no son fixture** del test: su lista curada de dungeons (lo único validado) vive en `tests/fixtures/guias-curadas.json`, que consume `tests/ruta-logica.test.mjs`. Pendientes de reescritura auditada o de retiro definitivo. |
+Las guías curadas de Chamán y Guerrero (`guide-shaman.js`, `guide-warrior.js`) se
+retiraron del Desktop en la 2.0.0 (`datos.js:17-22`): nombraban ítems, misiones,
+jefes y razas inexistentes (`tools/auditar-curado.mjs` lo detectó). Esas clases usan
+solo datos generados en Desktop. Sus archivos se borraron del repo el 2026-11-20;
+lo único que los datos validaban —la lista curada de dungeons— se conserva como
+fixture en `tests/fixtures/guias-curadas.json`, que consume
+`tests/ruta-logica.test.mjs`. Publicar de nuevo una guía de esas clases exige una
+reescritura auditada desde cero.
 
 `GUIAS = { 3: GUIDE_HUNTER }` en `datos.js`: solo Cazador (id de clase 3) tiene capa
 curada activa en Desktop. Toda guía nueva debe pasar `tests/curado-datos.test.mjs`.
@@ -77,6 +82,9 @@ curada activa en Desktop. Toda guía nueva debe pasar `tests/curado-datos.test.m
   test_catalogo_reproducible`: catálogo pre-construido exclusivo de esa app.
 - `standalone/tests/*.mjs` (6 suites Playwright de la app) + `tests/README.md`.
   Se conservan los `.cjs` del motor (cobertura única, ahora en el runner canónico).
+- `guide-shaman.js` + `guide-warrior.js` (2026-11-20): guías curadas retiradas del
+  Desktop en la 2.0.0 y borradas del repo. No las importaba nada; el bundle Desktop
+  no cambia al borrarlas (verificado: mismo sha256 del bundle).
 
 ## Build del bundle (`desktop/build.mjs`)
 
@@ -101,6 +109,8 @@ El nombre `standalone/` es histórico: nació como app independiente y hoy es la
 motor compartida. Renombrarlo a `engine/` tocaría **~30+ rutas de import** en
 `desktop/src/`, `tests/` y los generadores, más la doc — alto riesgo de rotura para
 beneficio cosmético. **Decisión: mantener `standalone/`** (documentado aquí y en
-`docs/DESKTOP.md`). Si algún día se separan los datos curados en revisión
-(`guide-shaman/warrior`) del motor, recién ahí tendría sentido una reorganización —
-como cambio estructural propio, con gates y OK del usuario.
+`docs/DESKTOP.md`). Si algún día se separan los datos curados en revisión del
+motor, recién ahí tendría sentido una reorganización — como cambio estructural
+propio, con gates y OK del usuario. (Las guías de Chamán y Guerrero, que eran los
+datos curados en revisión, se borraron del repo el 2026-11-20: su lista curada
+quedó como fixture en `tests/fixtures/guias-curadas.json`.)
