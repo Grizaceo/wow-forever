@@ -205,6 +205,28 @@ inactivo → read-back byte a byte → mover puntero.
   de historial; respaldo troceado (manifiesto 148 B + part-000 3 MiB +
   part-001 2,37 MB).
 
+## Claves heredadas del localStorage (`src/legado.js`)
+
+La 1.0.0 guardaba en el localStorage del navegador, con el prefijo crudo
+`wow-hunter-guide.` y **sin** el namespace que usa hoy el SDK
+(`hermes.plugin.<id>.`), la ruta del Auctionator.lua que el usuario elegía a
+mano. Desde la 2.0.0 el acceso es por carpeta concedida (`ctx.files` +
+`ctx.storage`), así que esa clave quedó huérfana: 0 referencias en el código y
+en todo el historial del repo.
+
+`limpiarClavesHeredadas()` la borra en cada carga del plugin con la **API
+estándar del navegador** (`window.localStorage`), que es la misma que usa el
+propio host de Hermes para su almacenamiento. Por eso **no** hace falta cerrar
+Hermes ni editar el LevelDB a mano: el plugin corre en el realm del renderer y
+la clave desaparece por la vía que el propio host usa. Es idempotente (si la
+clave no está, no escribe) y tolera contextos sin almacenamiento.
+
+- `ctx.storage.remove()` **no** sirve para esto: el SDK prefija sus claves con
+  `hermes.plugin.<id>.` y la clave fósil vive fuera de ese namespace.
+- No se toca el namespace `wow-hunter-guide` (id del plugin, carpeta de datos) ni
+  los contratos de storage v2 / respaldo troceado.
+- Test: `node --test tests/legado.test.mjs`.
+
 ## Agregar o cambiar una sección
 
 1. Escribe la vista en `src/vistas/<seccion>.jsx` (y sus piezas en `src/vistas/<seccion>/`).

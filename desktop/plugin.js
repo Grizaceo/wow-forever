@@ -14036,8 +14036,8 @@ var require_market_compare = __commonJS({
 import { host as host2, PALETTE_AREA, ROUTES_AREA, SIDEBAR_NAV_AREA } from "@hermes/plugin-sdk";
 
 // src/almacen.js
-var import_market_history = __toESM(require_market_history());
-var import_market_identity = __toESM(require_market_identity());
+var import_market_history = __toESM(require_market_history(), 1);
+var import_market_identity = __toESM(require_market_identity(), 1);
 var MAX_MARKET = 4 * 1024 * 1024;
 var MAX_BUILD = 128 * 1024;
 var MAX_HISTORY = 4 * 1024 * 1024;
@@ -34561,9 +34561,9 @@ atos-juego.py", origen: "generado" }
 };
 
 // src/datos.js
-var import_drop_data = __toESM(require_drop_data());
-var import_guide_hunter = __toESM(require_guide_hunter());
-var import_guide_legacy = __toESM(require_guide_legacy());
+var import_drop_data = __toESM(require_drop_data(), 1);
+var import_guide_hunter = __toESM(require_guide_hunter(), 1);
+var import_guide_legacy = __toESM(require_guide_legacy(), 1);
 var D = { personaje: personaje_default, clases: clases_default, profesiones: profesiones_default, items: items_default, zonas: zonas_default, misiones: misiones_default, dungeons: dungeons_default, dropData: import_drop_data.default };
 var GUIAS = { 3: import_guide_hunter.GUIDE_HUNTER };
 var LEGACY = import_guide_legacy.GUIDE_LEGACY;
@@ -34982,14 +34982,14 @@ function TextoRico({ html }) {
 }
 
 // src/mercado-logica.js
-var import_market = __toESM(require_market());
-var import_market_history2 = __toESM(require_market_history());
-var import_market_deals = __toESM(require_market_deals());
-var import_market_chart = __toESM(require_market_chart());
-var import_market_farm = __toESM(require_market_farm());
-var import_market_identity2 = __toESM(require_market_identity());
-var import_market_source = __toESM(require_market_source());
-var import_market_compare = __toESM(require_market_compare());
+var import_market = __toESM(require_market(), 1);
+var import_market_history2 = __toESM(require_market_history(), 1);
+var import_market_deals = __toESM(require_market_deals(), 1);
+var import_market_chart = __toESM(require_market_chart(), 1);
+var import_market_farm = __toESM(require_market_farm(), 1);
+var import_market_identity2 = __toESM(require_market_identity(), 1);
+var import_market_source = __toESM(require_market_source(), 1);
+var import_market_compare = __toESM(require_market_compare(), 1);
 var Farm = import_market_farm.default;
 var PAGE_SIZE = 50;
 var SNAPSHOT_KEEP_DAYS = 5;
@@ -37984,7 +37984,7 @@ import { useCallback, useEffect as useEffect3, useMemo as useMemo14, useRef as u
 import { Button as Button8, Checkbox as Checkbox8, SearchField as SearchField2, Select as Select4, SelectContent as SelectContent4, SelectItem as SelectItem4, SelectTrigger as SelectTrigger4, SelectValue as SelectValue4 } from "@hermes/plugin-sdk";
 
 // src/auctionator.js
-var import_market_identity3 = __toESM(require_market_identity());
+var import_market_identity3 = __toESM(require_market_identity(), 1);
 var AUCTION_FILE = "Auctionator.lua";
 var AUCTION_MARK = "AUCTIONATOR_PRICE_DATABASE";
 var WALK_DIRS = 80;
@@ -38868,7 +38868,7 @@ import { useEffect as useEffect2, useMemo as useMemo13, useState as useState9 } 
 import { Button as Button7, Checkbox as Checkbox7 } from "@hermes/plugin-sdk";
 
 // src/tsm.js
-var import_market2 = __toESM(require_market());
+var import_market2 = __toESM(require_market(), 1);
 var MAX_TSM_BYTES = 8 * 1024 * 1024;
 var TX = "itemString,stackSize,quantity,price,otherPlayer,player,time,source";
 var EX = "itemString,stackSize,quantity,player,time";
@@ -43926,7 +43926,7 @@ function startTsmSync(ctx, sync) {
 }
 
 // src/bridge.js
-var import_market3 = __toESM(require_market());
+var import_market3 = __toESM(require_market(), 1);
 var BRIDGE_FILE = "WoWForeverBridge.lua";
 var BRIDGE_MAX_BYTES = 8 * 1024 * 1024;
 var MAX_ENTRIES = 62;
@@ -44245,6 +44245,30 @@ function startBridgeSync(ctx, sync) {
   }, 3e4);
 }
 
+// src/legado.js
+var CLAVES_HEREDADAS = ["wow-hunter-guide.auction-path"];
+function almacenamientoLocal() {
+  try {
+    return globalThis.localStorage ?? null;
+  } catch {
+    return null;
+  }
+}
+function limpiarClavesHeredadas(storage = almacenamientoLocal()) {
+  if (!storage) return { borradas: [], error: "sin almacenamiento local" };
+  const borradas = [];
+  for (const clave of CLAVES_HEREDADAS) {
+    try {
+      if (storage.getItem(clave) === null) continue;
+      storage.removeItem(clave);
+      borradas.push(clave);
+    } catch (e) {
+      return { borradas, error: "no se pudo limpiar el almacenamiento heredado: " + (e?.message ?? String(e)) };
+    }
+  }
+  return { borradas, error: null };
+}
+
 // src/plugin.src.jsx
 import { jsx as jsx26 } from "react/jsx-runtime";
 var RUTA = "/wow-forever";
@@ -44256,6 +44280,7 @@ var plugin_src_default = {
 s autorizadas.",
   defaultEnabled: true,
   register(ctx) {
+    limpiarClavesHeredadas();
     const almacen = createStore(ctx);
     const sincronizador = createMarketSync(ctx, almacen);
     startMarketSync(ctx, sincronizador);

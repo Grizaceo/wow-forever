@@ -11,6 +11,7 @@ import { App } from './app.jsx'
 import { createMarketSync, startMarketSync } from './mercado-auto.js'
 import { createTsmSync, startTsmSync } from './tsm-sync.js'
 import { createBridgeSync, startBridgeSync } from './bridge-sync.js'
+import { limpiarClavesHeredadas } from './legado.js'
 
 const RUTA = '/wow-forever'
 
@@ -21,6 +22,10 @@ export default {
   description: 'Guía offline de WoW Forever para cualquier raza, clase y profesión, y mercado con tus precios de Auctionator. Lee Auctionator.lua y contabilidad TradeSkillMaster.lua solo desde carpetas autorizadas.',
   defaultEnabled: true,
   register(ctx) {
+    // Borra las claves que dejaron versiones anteriores y ya no usa nadie.
+    // Es idempotente y va por la API del navegador: no toca el LevelDB de
+    // Hermes a mano ni exige cerrar la app.
+    limpiarClavesHeredadas()
     const almacen = createStore(ctx)
     const sincronizador = createMarketSync(ctx, almacen)
     startMarketSync(ctx, sincronizador)

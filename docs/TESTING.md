@@ -21,8 +21,8 @@ byte-idéntico si no hay cambios en `desktop/src/`).
 
 | Harness | Comando | Esperado | Qué cubre |
 |---|---|---|---|
-| `tests/` (node) | `node --test tests/` | **261** pass, 0 fail | lógica de `desktop/src/` + motor: mercado v2/atómico/sync/migración, puente (`bridge*.test.mjs`), TSM, ROI, ruta/maxeo, guía, perfil, preguntar-davi, referencias-skill |
-| `tests/` (python) | `python3 -m unittest discover -s tests` | **87** OK | datos (`test_datos`, catálogo reproducible), desktop (`test_desktop`), maxeo, ROI, skill (`consultar.py`), reproducibilidad de `data/`+drops+bundle |
+| `tests/` (node) | `node --test tests/` | **267** pass, 0 fail | lógica de `desktop/src/` + motor: mercado v2/atómico/sync/migración, puente (`bridge*.test.mjs`), TSM, ROI, ruta/maxeo, guía, perfil, preguntar-davi, referencias-skill, claves heredadas |
+| `tests/` (python) | `python3 -m unittest discover -s tests` | **86** OK | datos (`test_datos`, catálogo reproducible), desktop (`test_desktop`), maxeo, ROI, skill (`consultar.py`), reproducibilidad de `data/`+drops+bundle |
 | `addon/tests/` (lua) | `lua5.1 addon/tests/test_bridge.lua` | **52** checks, 0 fallos | diario del puente WoWForeverBridge (captura, poda, retención, epoch) |
 | `desktop/test/` (navegador) | 10 suites, ver abajo | **307** checks, red 0, errores 0 | bundle real en Chromium headless con dobles del SDK |
 | build | `cd desktop && node build.mjs` | OK | bundle esbuild reproducible |

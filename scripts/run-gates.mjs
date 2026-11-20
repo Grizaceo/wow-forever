@@ -7,10 +7,11 @@
  *   node scripts/run-gates.mjs --keep-going  # no corta al primer fallo
  *
  * Corre los cuatro harnesses canónicos + build/check y compara los conteos con
- * los esperados (ver docs/TESTING.md). NO incluye standalone/tests/*.cjs: su
- * sección "real fixture" lee CONTENIDO de SavedVariables vivos si existe
- * ~/Games/battlenet/.../WTF, lo que choca con el contrato de privacidad (solo
- * stat). El stack canónico usa fixtures sintéticos + dobles de carpeta concedida.
+ * los esperados (ver docs/TESTING.md). Incluye standalone/tests/*.cjs: su
+ * sección "real fixture" es stat-only por defecto y solo lee CONTENIDO de
+ * SavedVariables vivos con WOW_FOREVER_REAL_FIXTURE=1 (diagnóstico manual, nunca
+ * en gates), así que el stack canónico respeta el contrato de privacidad (solo
+ * stat).
  *
  * Entorno navegador (opcional; se autodescubre si falta):
  *   PLAYWRIGHT_MODULE  ruta a playwright/index.mjs
@@ -25,7 +26,7 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const KEEP_GOING = process.argv.includes('--keep-going');
 
 // Conteos esperados del stack canónico (actualizar a mano si se añaden tests).
-const EXPECT_NODE = 261;
+const EXPECT_NODE = 267;
 const EXPECT_PY = 86;
 const EXPECT_LUA = 52;
 // Tests unitarios del motor en standalone/tests/*.cjs (node:test). Los «real

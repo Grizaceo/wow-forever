@@ -74,7 +74,7 @@ vista-mercado 55 · vista-davi 50 · vista-guia 28 · vista-profesiones 27 · vi
   `desktop/src/almacen.js` y testeado en node.
 - Procedencia **UNKNOWN por diseño** (puente = transporte, no exportador verificado). **No es bug.**
 - Grant fósil Windows **`auction-path` PRESENTE** en storage vivo; **0 referencias en código**
-  (rg repo + addon). Inerte.
+  (rg repo + addon). Inerte. → **cerrado en §8** (borrado por `localStorage`, sin tocar el LevelDB).
 - Namespace `wow-hunter-guide` es **intencional** (`desktop/src/plugin.src.jsx:7–8`: el host
   guarda datos/grants por id interno; renombrar los perdería). El README también lo documenta.
 
@@ -126,6 +126,8 @@ vista-mercado 55 · vista-davi 50 · vista-guia 28 · vista-profesiones 27 · vi
   v2 estable + backup verificado + OK usuario).
 - `auction-path`: inerte (0 refs). Limpieza **OPCIONAL** de la clave en storage vivo — requiere
   OK (toca datos del usuario, aunque sea un grant muerto). No es código.
+  → **OK concedido y ejecutado en §8** (resultado: no era un grant del SDK, sino una clave
+  legacy de `localStorage`; se borra por la API del navegador).
 
 ### Deuda 5 — Cuatro harnesses → runner único + doc stack
 - Harnesses: (1) `tests/` node 28 `.mjs` (261) + python 6 `.py` (87); (2) `desktop/test/`
@@ -341,4 +343,34 @@ standalone doble rol, ⚠️ privacidad .cjs, leak fix). Sin duplicar la secció
 
 **Gates tras los cambios:** 17/17 verdes (`run-gates.mjs`), EXPECT_PY 87→86.
 **Deuda abierta restante:** grant `auction-path` (inerte), reescritura auditada o retiro de
+`guide-shaman/warrior.js`, rename `standalone/`→`engine/` (solo con plan de migración).
+
+---
+
+## 8. Deuda 1 · Grant fósil `auction-path` (2026-11-20) — EJECUTADO
+
+**Hallazgo que cambia la vía:** la clave no es un *grant* del SDK, sino una clave
+**legacy de `localStorage`**. En el LevelDB de Hermes se lee literalmente
+`wow-hunter-guide.auction-path` (valor: la ruta absoluta del `Auctionator.lua`
+elegida a mano), **sin** el prefijo `hermes.plugin.` que el SDK aplica a todo
+`ctx.storage` (`apps/desktop/src/contrib/plugin.ts`: `scoped = hermes.plugin.<id>.<key>`).
+Por eso `ctx.storage.remove('auction-path')` no la tocaría: escribiría una clave
+nueva bajo el namespace equivocado.
+
+**Vía segura elegida (sin tocar el LevelDB a mano, sin cerrar Hermes):** el
+plugin corre en el realm del renderer (`apps/desktop/src/contrib/runtime-loader.ts`:
+«evaluated as ESM in the renderer realm with FULL app authority») y el host
+persiste su almacenamiento con la API estándar del navegador
+(`apps/desktop/src/lib/storage.ts` → `window.localStorage`). Así que la clave
+fósil se borra **por la misma vía que usa el propio host**: `localStorage.removeItem`.
+
+| Ítem | Resultado |
+|---|---|
+| Implementación | `desktop/src/legado.js` (`CLAVES_HEREDADAS`, `limpiarClavesHeredadas`), llamado en `register()` de `desktop/src/plugin.src.jsx`. Idempotente; tolera contextos sin almacenamiento o que lanzan. |
+| Test | `tests/legado.test.mjs` — 6 casos: borra la fósil y deja intacto lo vivo (`hermes.plugin.*`), idempotencia (no escribe dos veces), ausencia de la clave, `storage` ausente, `storage` que lanza. |
+| Safety | No se toca el namespace `wow-hunter-guide` (id del plugin, carpeta de datos) ni los contratos de storage v2 / respaldo troceado. No se abre ni se escribe el LevelDB. |
+| Gates | 17/17 verdes, EXPECT_NODE 261→267. Bundle reconstruido: 6 733 766 → 6 734 551 chars (+785). |
+| Hermes | `plugin.js` es fs-watched por el host: el despliegue en `~/.hermes/plugins/wow-forever/desktop/` recarga el plugin en caliente, sin reiniciar la app. |
+
+**Deuda abierta restante:** reescritura auditada o retiro de
 `guide-shaman/warrior.js`, rename `standalone/`→`engine/` (solo con plan de migración).

@@ -24,7 +24,8 @@ standalone/   ← capa MOTOR compartida (market*.js, guías curadas, drop-data)
    │    almacen.js, datos.js   (importan el motor)
    └──► tests/ y standalone/tests/*.cjs     (cubertura del motor)
 
-desktop/src/  ← plugin React (vistas/, almacén v2, sondeo 30 s, puente, TSM)
+desktop/src/  ← plugin React (vistas/, almacén v2, sondeo 30 s, puente, TSM,
+               `legado.js` = limpieza de claves de storage heredadas)
    └──► desktop/build.mjs ──▶ desktop/plugin.js  (bundle ESM legible, ~6,7 MB)
 ```
 
