@@ -64,7 +64,7 @@ importa; `tests/` los cubre. **No son código muerto.**
 
 | Módulo | Rol | Estado |
 |---|---|---|
-| `guide-shaman.js`, `guide-warrior.js` | Guías curadas de Chamán/Guerrero | **Retiradas del Desktop en 2.0.0** (`datos.js:17-22`): nombraban ítems/misiones/jefes/razas inexistentes (`tools/auditar-curado.mjs` lo detectó). Esas clases usan solo datos generados en Desktop. Siguen como fixture de `tests/ruta-logica.test.mjs`. Pendientes de reescritura auditada o retiro. |
+| `guide-shaman.js`, `guide-warrior.js` | Guías curadas de Chamán/Guerrero | **Retiradas del Desktop en 2.0.0** (`datos.js:17-22`): nombraban ítems/misiones/jefes/razas inexistentes (`tools/auditar-curado.mjs` lo detectó). Esas clases usan solo datos generados en Desktop. Ya **no son fixture** del test: su lista curada de dungeons (lo único validado) vive en `tests/fixtures/guias-curadas.json`, que consume `tests/ruta-logica.test.mjs`. Pendientes de reescritura auditada o de retiro definitivo. |
 
 `GUIAS = { 3: GUIDE_HUNTER }` en `datos.js`: solo Cazador (id de clase 3) tiene capa
 curada activa en Desktop. Toda guía nueva debe pasar `tests/curado-datos.test.mjs`.

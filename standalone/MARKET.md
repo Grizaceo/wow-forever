@@ -431,8 +431,10 @@ En Desktop las guías viven en `desktop/src/vistas/` (React) sobre los datos
 generados de `data/` más las guías curadas de `standalone/guide-*.js`
 (`guide-hunter.js`, `guide-legacy.js`; ver `docs/ARQUITECTURA.md`). Las guías
 curadas de Chamán y Guerrero (`guide-shaman.js`, `guide-warrior.js`) fueron
-retiradas del Desktop en la 2.0.0 por nombrar datos inexistentes; quedan como
-fixture de `tests/ruta-logica.test.mjs` pendientes de reescritura auditada.
+retiradas del Desktop en la 2.0.0 por nombrar datos inexistentes. De ellas solo
+se conserva la parte validada —la lista curada de dungeons— como fixture en
+`tests/fixtures/guias-curadas.json`, que consume `tests/ruta-logica.test.mjs`; el
+resto sigue pendiente de reescritura auditada.
 
 ## Roadmap de analítica de precios
 

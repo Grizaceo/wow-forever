@@ -375,3 +375,35 @@ fósil se borra **por la misma vía que usa el propio host**: `localStorage.remo
 
 **Deuda abierta restante:** reescritura auditada o retiro de
 `guide-shaman/warrior.js`, rename `standalone/`→`engine/` (solo con plan de migración).
+
+---
+
+## 9. Deuda 2 · Guías retiradas: el fixture se separa del contenido en revisión (2026-11-20)
+
+**Problema:** `guide-shaman.js` y `guide-warrior.js` (57 KB) no se publican desde la
+2.0.0 (nombran ítems, botín, hechizos y razas que no existen) pero seguían siendo el
+fixture de `tests/ruta-logica.test.mjs`. Eso ataba el test a archivos cuyo contenido
+está en revisión: si alguien «arreglaba» una de esas guías, el test cambiaría de
+significado sin avisar, y el repo cargaba 57 KB de contenido sabidamente falso.
+
+**Qué consume el test de verdad:** `curadosPorDungeon(guiaDungeons, …)` solo usa el
+nombre curado (`d.n`) y la posición en la lista. Las tres guías tienen las mismas 17
+entradas curadas; warrior/shaman solo cambian el orden de Blackfathom Deeps (índice 3
+en vez de 2), que es justo lo que el test comprueba (`idxDe(/Blackfathom/)`).
+
+**Solución (aditiva, sin borrar nada todavía):**
+- `tests/fixtures/guias-curadas.json`: las listas curadas de warrior y shaman tal
+  cual estaban, con su nota de procedencia. Solo el nombre y la posición: el resto
+  del contenido sigue «en revisión» y no se reproduce.
+- La lista de la guía **publicada** (`guide-hunter.js`) NO se copia al fixture: el
+  test la sigue leyendo del archivo vivo, para que un cambio curado real se vea sin
+  tocar el fixture.
+- `tests/ruta-logica.test.mjs` pasa a leer el fixture para esas dos guías. **La
+  cobertura es la misma**: 17 entradas que cruzan, las variantes difíciles (SM
+  Armory/Cathedral, LBRS, Sunken Temple, Dire Maul) y el índice por guía.
+
+**Pendiente de OK (decisión del usuario):** borrar los dos archivos de guía (retiro
+definitivo, ~57 KB menos) o conservarlos como borrador de la reescritura auditada.
+Con el fixture puesto, ambas opciones son válidas y el test no depende de ellas.
+
+**Gates:** 17/17 verdes.

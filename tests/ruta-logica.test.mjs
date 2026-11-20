@@ -264,7 +264,8 @@ test('nombreDungeonCoincide casa variantes curadas con el nombre generado', () =
 })
 
 test('curadosPorDungeon cruza las 17 entradas curadas con los mapas generados', async () => {
-  // las guías curadas son ESM en standalone/; se importan aquí igual que datos.js
+  // La guía PUBLICADA se lee del archivo vivo (guide-hunter.js), para que un
+  // cambio curado real se vea en el test sin tocar nada más.
   // los archivos de guía son UMD/CJS: en Node el export nombrado puede no
   // resolverse; se toma de module.exports (default) con respaldo al nombrado.
   const guiaDe = async (f, clave) => {
@@ -272,14 +273,21 @@ test('curadosPorDungeon cruza las 17 entradas curadas con los mapas generados', 
     return mod[clave] || (mod.default && mod.default[clave]) || mod.default
   }
   const GUIDE_HUNTER = await guiaDe('../standalone/guide-hunter.js', 'GUIDE_HUNTER')
-  const GUIDE_WARRIOR = await guiaDe('../standalone/guide-warrior.js', 'GUIDE_WARRIOR')
-  const GUIDE_SHAMAN = await guiaDe('../standalone/guide-shaman.js', 'GUIDE_SHAMAN')
-  for (const [nombreG, guia] of [['hunter', GUIDE_HUNTER], ['warrior', GUIDE_WARRIOR], ['shaman', GUIDE_SHAMAN]]) {
-    const mapa = curadosPorDungeon(guia.dungeons, dungeons.clasicos, dungeons.forever)
+  // Las dos guías RETIRADAS en la 2.0.0 (chamán/guerrero) ya no son fixture:
+  // su lista curada de dungeons vive en tests/fixtures/guias-curadas.json,
+  // que es la parte que los datos sí validan (la entrada y su posición).
+  const curadas = JSON.parse(readFileSync(new URL('./fixtures/guias-curadas.json', import.meta.url), 'utf8'))
+  const guias = [
+    ['hunter', GUIDE_HUNTER.dungeons],
+    ['warrior', curadas.guias.warrior],
+    ['shaman', curadas.guias.shaman],
+  ]
+  for (const [nombreG, entradas] of guias) {
+    const mapa = curadosPorDungeon(entradas, dungeons.clasicos, dungeons.forever)
     // cada una de las 17 entradas curadas debe encontrar su dungeon generado
     const asignados = new Set()
     for (const lista of mapa.values()) for (const x of lista) asignados.add(x.indice)
-    assert.equal(asignados.size, guia.dungeons.length, `${nombreG}: las ${guia.dungeons.length} entradas curadas cruzan con un dungeon generado`)
+    assert.equal(asignados.size, entradas.length, `${nombreG}: las ${entradas.length} entradas curadas cruzan con un dungeon generado`)
     // comprobaciones puntuales de las variantes difíciles
     const sm = mapa.get(189) || []
     assert.ok(sm.length >= 2, 'Scarlet Monastery junta Armory y Cathedral')
@@ -289,7 +297,7 @@ test('curadosPorDungeon cruza las 17 entradas curadas con los mapas generados', 
     assert.ok((mapa.get(429) || []).length === 1, 'Dire Maul East / North -> 429')
     // el índice es la posición en la lista `dungeons` de ESA guía (guía a guía
     // el orden difiere: en hunter BFD=2, en warrior/shaman BFD=3)
-    const idxDe = (re) => guia.dungeons.findIndex((d) => re.test(d.n))
+    const idxDe = (re) => entradas.findIndex((d) => re.test(d.n))
     assert.equal(mapa.get(43)?.[0]?.indice, idxDe(/Wailing Caverns/), 'WC -> su índice en la guía')
     assert.equal(mapa.get(48)?.[0]?.indice, idxDe(/Blackfathom/), 'BFD -> su índice en la guía')
     assert.equal(mapa.get(189)?.[0]?.indice, idxDe(/Armory/), 'SM Armory -> su índice')

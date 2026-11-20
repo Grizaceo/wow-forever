@@ -1,0 +1,111 @@
+{
+  "nota": "Listas curadas de dungeons preservadas de las guías retiradas en la 2.0.0\n(standalone/guide-warrior.js y standalone/guide-shaman.js). Esas guías se\nretiraron porque nombraban ítems, botín, hechizos y razas que no existen\n(tools/auditar-curado.mjs); lo único validado por los datos es la lista de\ndungeons y su nombre curado, que es justo lo que consume el cruce\ncuradosPorDungeon(). De ahí que el fixture guarde solo el nombre (n) y su\nposición: el resto del contenido de esas guías sigue en revisión y no se\nreproduce aquí.\n\nLa lista de la guía publicada (guide-hunter.js) NO está en este fixture: el\ntest la sigue leyendo del archivo vivo, para que un cambio curado real se\nvea en el test sin tocar el fixture.",
+  "guias": {
+    "warrior": [
+      {
+        "n": "Ragefire Chasm"
+      },
+      {
+        "n": "Wailing Caverns"
+      },
+      {
+        "n": "Shadowfang Keep"
+      },
+      {
+        "n": "Blackfathom Deeps"
+      },
+      {
+        "n": "Razorfen Kraul"
+      },
+      {
+        "n": "Gnomeregan"
+      },
+      {
+        "n": "Scarlet Monastery — Armory"
+      },
+      {
+        "n": "Scarlet Monastery — Cathedral"
+      },
+      {
+        "n": "Razorfen Downs"
+      },
+      {
+        "n": "Zul'Farrak"
+      },
+      {
+        "n": "Maraudon"
+      },
+      {
+        "n": "Sunken Temple (Atal'Hakkar)"
+      },
+      {
+        "n": "Blackrock Depths"
+      },
+      {
+        "n": "Dire Maul East / North"
+      },
+      {
+        "n": "Scholomance"
+      },
+      {
+        "n": "Stratholme"
+      },
+      {
+        "n": "Lower/Upper Blackrock Spire"
+      }
+    ],
+    "shaman": [
+      {
+        "n": "Ragefire Chasm"
+      },
+      {
+        "n": "Wailing Caverns"
+      },
+      {
+        "n": "Shadowfang Keep"
+      },
+      {
+        "n": "Blackfathom Deeps"
+      },
+      {
+        "n": "Razorfen Kraul"
+      },
+      {
+        "n": "Gnomeregan"
+      },
+      {
+        "n": "Scarlet Monastery — Armory"
+      },
+      {
+        "n": "Scarlet Monastery — Cathedral"
+      },
+      {
+        "n": "Razorfen Downs"
+      },
+      {
+        "n": "Zul'Farrak"
+      },
+      {
+        "n": "Maraudon"
+      },
+      {
+        "n": "Sunken Temple (Atal'Hakkar)"
+      },
+      {
+        "n": "Blackrock Depths"
+      },
+      {
+        "n": "Dire Maul East / North"
+      },
+      {
+        "n": "Scholomance"
+      },
+      {
+        "n": "Stratholme"
+      },
+      {
+        "n": "Lower/Upper Blackrock Spire"
+      }
+    ]
+  }
+}
