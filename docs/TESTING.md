@@ -1,0 +1,107 @@
+# Stack de tests canónico — WoW Forever
+
+Cuatro harnesses conviven en el repo. Este documento define cuál es el **stack
+canónico** (el que corre el runner único y el que hay que mantener verde), qué
+cubre cada uno, y el estado del harness legado de `standalone/`.
+
+## Runner único
+
+```sh
+node scripts/run-gates.mjs               # todo, reporta conteos, exit 0/1
+node scripts/run-gates.mjs --keep-going  # no corta al primer fallo
+```
+
+Corre los gates canónicos en orden, parsea los conteos y los compara con los
+esperados. Si un conteo difiere (p. ej. se añadieron tests), lo marca como fallo
+aunque los tests pasen: hay que actualizar `EXPECT_*` en el runner a propósito.
+No escribe artefactos persistentes salvo el build (`desktop/plugin.js`, que sale
+byte-idéntico si no hay cambios en `desktop/src/`).
+
+## Gates canónicos y conteos esperados
+
+| Harness | Comando | Esperado | Qué cubre |
+|---|---|---|---|
+| `tests/` (node) | `node --test tests/` | **261** pass, 0 fail | lógica de `desktop/src/` + motor: mercado v2/atómico/sync/migración, puente (`bridge*.test.mjs`), TSM, ROI, ruta/maxeo, guía, perfil, preguntar-davi, referencias-skill |
+| `tests/` (python) | `python3 -m unittest discover -s tests` | **87** OK | datos (`test_datos`, catálogo reproducible), desktop (`test_desktop`), maxeo, ROI, skill (`consultar.py`), reproducibilidad de `data/`+drops+bundle |
+| `addon/tests/` (lua) | `lua5.1 addon/tests/test_bridge.lua` | **52** checks, 0 fallos | diario del puente WoWForeverBridge (captura, poda, retención, epoch) |
+| `desktop/test/` (navegador) | 10 suites, ver abajo | **307** checks, red 0, errores 0 | bundle real en Chromium headless con dobles del SDK |
+| build | `cd desktop && node build.mjs` | OK | bundle esbuild reproducible |
+| bundle-check | `python3 scripts/check_desktop_bundle.py desktop/plugin.js` | OK | tamaño/líneas/contratos del bundle |
+
+### Suites navegador (307)
+
+`navegador 34 · mercado-auto 11 · mercado-procedencia 24 · tsm 28 · vista-mercado 55 ·
+vista-davi 50 · vista-guia 28 · vista-profesiones 27 · vista-ruta-dungeons 31 · bridge 19`
+
+Cada suite imprime al final una línea JSON `{"suite":…,"pasadas":N,"red":0,"errores":0}`.
+El arnés (`desktop/test/arnes.mjs`) carga `desktop/plugin.js` en un Chromium headless
+con dobles de `ctx.files`/`ctx.storage`/`ctx.ui` que **replican el tope real del host**
+(`writeText` ≤ 4 MiB, `electron/plugin-files-ops.ts`). `red` cuenta requests de red
+(debe ser 0: el plugin no tiene red) y `errores` errores de página/consola.
+
+Entorno (el runner lo autodescubre; también se puede fijar a mano):
+
+```sh
+export PLAYWRIGHT_MODULE=/home/gris96/.hermes/hermes-agent/node_modules/.pnpm/playwright@1.64.0/node_modules/playwright/index.mjs
+export CHROMIUM_PATH=/home/gris96/.cache/ms-playwright/chromium-1248/chrome-linux64/chrome
+node desktop/test/<suite>.mjs
+```
+
+React/ReactDOM/esbuild se **prestan** del checkout de Hermes (`~/.hermes/hermes-agent`)
+vía symlinks en `desktop/node_modules`; no están en el `package.json` del repo y el
+store pnpm no es transitivo. Si el arnés no arranca, recrear esos symlinks (ver
+`docs/DESKTOP.md`). Los gates de navegador no requieren instalar nada en el repo.
+
+## Harness legado de `standalone/tests/` (NO canónico)
+
+`standalone/` es la **capa motor** compartida (`market.js`, `market-history.js`, …) que
+`desktop/src/` importa, más la app standalone vieja (`index.html`, `file://`,
+IndexedDB). Sus tests son un harness aparte, **fuera del runner canónico**:
+
+- `market.cjs`, `market-history.cjs`, `market-deals.cjs`, `market-chart.cjs`: tests
+  unitarios directos del motor (`node:test`). Cobertura **única** de parser/deals/chart
+  que no duplica `tests/`. Fixtures sintéticos.
+- `browser.mjs`, `market-browser.mjs`, `history-browser.mjs`, `deals-browser.mjs`,
+  `farm-browser.mjs`, `local-scan-browser.mjs`: suites Playwright de la **app standalone
+  legada** (`index.html`), no del bundle Desktop.
+- **Retirado** (Fase 2 del plan de orden): `desktop-state.mjs` importaba
+  `../desktop/state.mjs`, módulo inexistente → `ERR_MODULE_NOT_FOUND`; su cobertura la
+  reemplazaron `tests/market-atomic.test.mjs` y `tests/market-storage-v2.test.mjs`.
+- `public-build.mjs`: archivo **vacío**, placeholder del split público/privado `--public`
+  ya retirado (build único `desktop/build.mjs`). Pendiente de retiro/reimplementación.
+
+### ⚠️ Privacidad: por qué los `.cjs` NO entran al runner canónico
+
+`market.cjs` y `market-history.cjs` tienen una sección opcional «real fixture» que
+**busca y lee el contenido** de `Auctionator.lua` bajo
+`~/Games/battlenet/drive_c/Program Files (x86)/World of Warcraft/_forever_/WTF` si ese
+árbol existe (en este host **existe**), y reporta métricas agregadas. Leer contenido de
+SavedVariables vivos choca con el contrato de privacidad del proyecto (**solo stat**:
+existencia/mtime/bytes; nunca contenido ni nombres/rutas de cuenta). Por eso el runner
+canónico **no ejecuta** esos `.cjs`. El stack canónico (`tests/`, `desktop/test/`) usa
+fixtures sintéticos y dobles de la carpeta concedida, sin tocar SavedVariables reales.
+
+Para conservar la cobertura única del motor sin el riesgo, la sección «real fixture»
+debería neutralizarse (stat-only o fixture sintético commiteado) o migrarse a `tests/`
+ESM con fixture sintético. Queda como **deuda abierta** (decisión del usuario); no se
+cambia en esta fase.
+
+## Reproducibilidad
+
+- `tests/test_datos.py::test_catalogo_reproducible`: regenera `market-catalog.js` con
+  `tools/build-catalogo-mercado.py --out TMP` y exige byte-idéntico al commiteado.
+- `tests/test_reproducible.py`: regenera `data/` + `drop-data.js` desde las entradas
+  fijadas en `~/.cache/wow-forever-drops` y compara hashes/MANIFEST. Se salta si faltan
+  esas entradas. Usa un temp bajo `.workshop/tmp/` y **lo limpia al terminar**
+  (`tearDownClass`), para no acumular artefactos corrida tras corrida.
+- `tests/test_desktop.py::test_build_reproducible`: `node build.mjs --out TMP` y compara
+  byte a byte con `desktop/plugin.js`. **Falla si `desktop/src/` tiene WIP sin commitear**
+  (el bundle commiteado no coincide con el fuente): commitear o terminar el WIP antes.
+
+## Contratos que los tests protegen (no romper)
+
+- Respaldo pre-v2 **troceado ≤ 3 MiB + manifiesto**; `readBackupDoc`/`commitV2`/
+  `rollbackToBackup`. Los dobles de `desktop/test/` y `tests/` **replican el tope de
+  4 MiB** de `writeText` del host; un doble sin ese tope enmascara el bug de truncado.
+- Diario del puente (una entrada por día, sobrevive la poda de Auctionator).
+- Procedencia **UNKNOWN** del puente = diseño (transporte, no exportador verificado).
