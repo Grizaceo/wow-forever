@@ -325,3 +325,20 @@ skill global; artefactos (`cjs-*.log`, `leveldb.txt`) borrados de scratch. No se
 standalone doble rol, ⚠️ privacidad .cjs, leak fix). Sin duplicar la sección de puente existente.
 
 **Posición:** PARADO en espera del visto bueno de Cristóbal para Fases 4–5 y el fix de privacidad.
+
+---
+
+## 7. Cierre de Fases 4–5 y fix de privacidad (2026-11-20) — EJECUTADO
+
+**Commits:** `3e7aed8` (privacidad .cjs + gate motor) · `9c08d87` (Fase 5 retiro app legada).
+
+| Ítem | Resultado |
+|---|---|
+| Fix privacidad `.cjs` | **Hecho.** `market.cjs`/`market-history.cjs`/`market-chart.cjs`: real-fixture ahora stat-only; contenido solo con `WOW_FOREVER_REAL_FIXTURE=1`. Los 4 `.cjs` entraron al runner canónico (gate `node motor .cjs`, 78 pass / 2 skipped): la cobertura única del motor ya no está fuera de los gates. |
+| Grant fósil `auction-path` | **NO ejecutado.** Vive en el LevelDB de Hermes en ejecución (`~/.config/Hermes/Local Storage/leveldb`); editarlo en vivo arriesga corromper el almacenamiento. Es 100% inerte (0 refs en código). Queda como deuda: retirarlo con Hermes cerrado o desde la UI si algún día se expone revoke. |
+| Retiro app standalone legada | **Hecho.** Borrados `index.html`, `market-ui.js`, `market-catalog.js` (664 KB), `tools/build-catalogo-mercado.py`, 6 suites Playwright `.mjs` y `test_catalogo_reproducible`. Conservados `guide-shaman/warrior.js` (fixture de `ruta-logica.test.mjs`, pendientes de reescritura auditada) y los `.cjs` del motor. Desktop ya construía el catálogo en runtime (`catalogoMercado()`). ~878 KB menos en el repo. |
+| Fase 4 · Bundle | **Cerrada as by-design.** ~92 % del bundle son datos inline (`data/*.json` ~60 % + `drop-data.js` ~29 %); el código es ~7,7 %. `items.json` (defs de ítems) y `drop-data.js` (fuentes de drop/mobs/zonas) no son redundantes entre sí. Restricciones duras: `minify:false` deliberado (gate `test_legible` ≤400 chars/línea) y el host prohíbe `import()` → sin code-splitting. No hay reducción segura sin cambio de comportamiento ni datos. |
+
+**Gates tras los cambios:** 17/17 verdes (`run-gates.mjs`), EXPECT_PY 87→86.
+**Deuda abierta restante:** grant `auction-path` (inerte), reescritura auditada o retiro de
+`guide-shaman/warrior.js`, rename `standalone/`→`engine/` (solo con plan de migración).
