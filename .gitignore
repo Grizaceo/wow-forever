@@ -9,6 +9,8 @@ __pycache__/
 .claude/
 .devin/
 .codex/
+# Notas de sesión del agente (planes, ejecuciones): nunca se versionan
+.hermes/
 # Datos privados: nunca se publican
 *.private.js
 standalone/drop-data-private.js

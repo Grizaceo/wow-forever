@@ -216,16 +216,18 @@ en todo el historial del repo.
 
 `limpiarClavesHeredadas()` la borra en cada carga del plugin con la **API
 estándar del navegador** (`window.localStorage`), que es la misma que usa el
-propio host de Hermes para su almacenamiento. Por eso **no** hace falta cerrar
-Hermes ni editar el LevelDB a mano: el plugin corre en el realm del renderer y
-la clave desaparece por la vía que el propio host usa. Es idempotente (si la
-clave no está, no escribe) y tolera contextos sin almacenamiento.
+propio host de Hermes para su almacenamiento. Por eso **no** hace falta tocar
+el LevelDB ni usar herramientas de leveldb: basta con que el plugin se cargue
+(al iniciar Hermes). Es idempotente (si la clave no está, no escribe) y tolera
+contextos sin almacenamiento.
 
 - `ctx.storage.remove()` **no** sirve para esto: el SDK prefija sus claves con
   `hermes.plugin.<id>.` y la clave fósil vive fuera de ese namespace.
 - No se toca el namespace `wow-hunter-guide` (id del plugin, carpeta de datos) ni
   los contratos de storage v2 / respaldo troceado.
-- Test: `node --test tests/legado.test.mjs`.
+- Test: `node --test tests/legado.test.mjs` (6 casos) y la suite de navegador
+  `desktop/test/navegador.mjs` (siembra la fósil en Chromium y comprueba que
+  desaparece al cargar el bundle real).
 
 ## Agregar o cambiar una sección
 

@@ -368,9 +368,10 @@ fósil se borra **por la misma vía que usa el propio host**: `localStorage.remo
 |---|---|
 | Implementación | `desktop/src/legado.js` (`CLAVES_HEREDADAS`, `limpiarClavesHeredadas`), llamado en `register()` de `desktop/src/plugin.src.jsx`. Idempotente; tolera contextos sin almacenamiento o que lanzan. |
 | Test | `tests/legado.test.mjs` — 6 casos: borra la fósil y deja intacto lo vivo (`hermes.plugin.*`), idempotencia (no escribe dos veces), ausencia de la clave, `storage` ausente, `storage` que lanza. |
+| Test e2e | `desktop/test/navegador.mjs` (suite `desktop`): siembra `wow-hunter-guide.auction-path` en el `localStorage` real de Chromium, carga el bundle real y comprueba que la clave desaparece y que las claves vivas del SDK (`hermes.plugin.*`) sobreviven. El arnés (`arnes.mjs`) admite `previo.raw` para sembrar claves crudas, sin el prefijo del SDK. |
 | Safety | No se toca el namespace `wow-hunter-guide` (id del plugin, carpeta de datos) ni los contratos de storage v2 / respaldo troceado. No se abre ni se escribe el LevelDB. |
-| Gates | 17/17 verdes, EXPECT_NODE 261→267. Bundle reconstruido: 6 733 766 → 6 734 551 chars (+785). |
-| Hermes | `plugin.js` es fs-watched por el host: el despliegue en `~/.hermes/plugins/wow-forever/desktop/` recarga el plugin en caliente, sin reiniciar la app. |
+| Gates | 17/17 verdes, EXPECT_NODE 261→267, navegador 307→309 (`navegador` 34→36). Bundle reconstruido: 6 733 766 → 6 734 551 chars (+785). |
+| Hermes | El borrado corre en la **siguiente carga del plugin**. Ojo: el host empaquetado que corre ahora (`apps/desktop/release/linux-unpacked`, compilado 2026-11-20 11:45) **no recarga el plugin en caliente** — verificado: tras `touch` de `plugin.js` y 30 s de espera no aparece tombstone de borrado en el log vivo del LevelDB. La fuente del host sí trae el fs-watcher (`runtime-loader.ts`), así que el hot-reload depende de que el build empaquetado lo incluya. Hasta entonces, la fósil desaparece al reiniciar Hermes (o al recargar el plugin a mano). |
 
 **Deuda abierta restante:** reescritura auditada o retiro de
 `guide-shaman/warrior.js`, rename `standalone/`→`engine/` (solo con plan de migración).

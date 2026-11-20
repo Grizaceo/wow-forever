@@ -121,7 +121,7 @@ const reactDomDir = path.dirname(reqDesk.resolve('react-dom/package.json'))
   const navegador = await chromium.launch({ headless: true, executablePath: process.env.CHROMIUM_PATH, args: ['--disable-gpu'] })
   const estado = { pasadas: 0, red: 0, errores: [] }
 
-  // previo: { perfil?, build?, storage?: {clave: valor}, archivos?: {rel: texto} }
+  // previo: { perfil?, build?, storage?: {clave: valor}, raw?: {clave: valorCrudo}, archivos?: {rel: texto} }
   async function abrir(tema = 'claro', previo = {}) {
     const contexto = await navegador.newContext({ viewport: { width: 1400, height: 900 } })
     const css = Object.entries(TEMAS[tema]).map(([k, v]) => k === 'background' ? `body{background:${v}}` : `:root{${k}:${v}}`).join('')
@@ -136,6 +136,9 @@ const reactDomDir = path.dirname(reqDesk.resolve('react-dom/package.json'))
     if (previo.perfil) kv[PREF + 'perfil'] = JSON.stringify(previo.perfil)
     if (previo.build) kv[PREF + 'build'] = JSON.stringify(previo.build)
     for (const [k, v] of Object.entries(previo.storage || {})) kv[PREF + k] = JSON.stringify(v)
+    // Claves CRUDAS (sin el prefijo del SDK): para sembrar las claves heredadas
+    // que la 1.0.0 dejó en el localStorage (p.ej. `auction-path`).
+    for (const [k, v] of Object.entries(previo.raw || {})) kv[k] = v
     for (const [k, v] of Object.entries(previo.archivos || {})) kv['archivo.' + k] = v
     await p.evaluate((x) => { for (const [k, v] of Object.entries(x)) localStorage.setItem(k, v) }, kv)
     await p.addScriptTag({ content: codigo })

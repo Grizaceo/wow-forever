@@ -60,4 +60,15 @@ check('en inglés: la interfaz y los nombres cambian', await p.evaluate(() => /H
 check('Cielonato sin guía curada: no aparece la pestaña', await p.locator('[data-tab="guia"]').count() === 0)
 await cerrar()
 
+// 5) La clave heredada de la 1.0.0 (`auction-path`) se borra sola al cargar el
+//    plugin, sin tocar el LevelDB de Hermes ni las claves vivas del SDK.
+;({ p, cerrar } = await a.abrir('claro', {
+  raw: { 'wow-hunter-guide.auction-path': '/home/x/WTF/SavedVariables/Auctionator.lua' },
+  storage: { pestana: 'personaje' },
+}))
+check('borra la clave heredada `auction-path` al cargar el plugin', await p.evaluate(() =>
+  localStorage.getItem('wow-hunter-guide.auction-path') === null))
+check('la limpieza no toca las claves vivas del plugin', await p.evaluate((k) => localStorage.getItem(k) !== null, PREF + 'pestana'))
+await cerrar()
+
 await a.terminar('desktop')
