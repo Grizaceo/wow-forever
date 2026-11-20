@@ -10,7 +10,8 @@ minificar) desde `desktop/src/`. Hermes Desktop lo carga en la barra lateral com
   bundle. Nada de `eval`, `new Function`, `import()`, `innerHTML`/`dangerouslySetInnerHTML`,
   `<script>`, `window.hermesDesktop` ni tocar el DOM de la app.
 - Archivos: solo `ctx.files` (la carpeta `'data'` del plugin y la carpeta que el usuario
-  concede para `Auctionator.lua`, en `src/auctionator.js`). Sin red.
+  concede para `Auctionator.lua`, `TradeSkillMaster.lua` y `WoWForeverBridge.lua`, en
+  `src/auctionator.js`, `src/tsm.js` y `src/bridge-sync.js`). Sin red.
 - Sin globales: ningún módulo escribe en `window`. Los módulos de `standalone/` se importan como
   CommonJS (`module.exports`); el motor de farmeo recibe sus datos con `configure({...})`.
 - Colores solo con las variables del tema (`src/estilos.js`: `C`, `S`, `CALIDAD`,
@@ -28,8 +29,11 @@ minificar) desde `desktop/src/`. Hermes Desktop lo carga en la barra lateral com
 |---|---|
 | `src/plugin.src.jsx` | registro en el SDK (barra lateral, ruta, paleta). Id interno `wow-hunter-guide`: con el mismo id, Hermes conserva el almacenamiento y los permisos de la versión anterior |
 | `src/app.jsx` | carga lo guardado, perfil del jugador, pestañas |
-| `src/almacen.js` | almacén durable: progreso de la guía (`build`), mercado e historial (mismo formato que antes) |
+| `src/almacen.js` | almacén durable v2: progreso (`build`), mercado e historial en bundle `market-v2-*`/`price-history-v2-*`; respaldo pre-v2 troceado y rollback |
 | `src/auctionator.js` | lee `Auctionator.lua` de la carpeta concedida |
+| `src/mercado-auto.js` | sondeo automático de Auctionator cada 30 s (cola, revisión, puntero) |
+| `src/tsm.js` / `src/tsm-sync.js` | contabilidad personal TSM (CSV como datos) y su sondeo cada 30 s |
+| `src/bridge-sync.js` | sondeo del diario WoWForeverBridge cada 30 s (una entrada por día) |
 | `src/datos.js` | `data/*.json`, `drop-data`, guías curadas y ayudas |
 | `src/ui.jsx`, `src/estilos.js`, `src/i18n.js` | piezas, estilos y textos comunes |
 | `src/davi.js`, `src/davi-transporte.js` | «Preguntar a DAVI»: contexto puro (allowlist, acotes) y transporte insert → portapapeles → manual |
@@ -146,6 +150,61 @@ node --test tests/tsm.test.mjs
 node desktop/test/tsm.mjs
 ```
 
+## Puente WoWForeverBridge (diario por día)
+
+`WoWForeverBridge` (addon propio, v1.0.1, en `addon/WoWForeverBridge/`) captura
+cada escaneo de Auctionator en un **diario por día** (`WoWForeverBridge.lua`,
+SavedVariables `WoWForeverBridgeDB`). A diferencia del `Auctionator.lua` —que el
+addon sobrescribe y poda a ~21 días—, el diario conserva una entrada por día con
+retención configurable en el juego (`/wfb days N`). El histórico sobrevive aunque
+Auctionator descarte sus propios días.
+
+- `src/bridge-sync.js` lo sondea **cada 30 s** con el mismo contrato acotado que
+  Auctionator/TSM: solo el archivo del diario, dentro de la carpeta concedida
+  (`auctionator-folder`), búsqueda limitada, sin selector en segundo plano.
+- Varias cuentas → pide elegir el SavedVariables; no adivina. Grant revocado o
+  archivo ausente → estado visible («instalá el addon y `/reload`»), nunca un
+  selector silencioso.
+- El puente es **transporte, no exportador verificado**: los precios que trae se
+  etiquetan con procedencia **UNKNOWN** por diseño (ver
+  `docs/MERCADOS-PROCEDENCIA.md`). No es un bug a corregir.
+- El diario se fusiona en el mismo histórico v2 que Auctionator; no crea un canal
+  aparte. La UI muestra «Puente» como fuente junto a Auctionator y TSM.
+
+Pruebas específicas:
+
+```sh
+lua addon/tests/test_bridge.lua
+node --test tests/bridge-sync.test.mjs
+node desktop/test/bridge.mjs
+```
+
+## Almacenamiento v2 y respaldo pre-v2
+
+Mercado e historial viven en un **bundle v2** (`market-v2-a/b.json`,
+`price-history-v2-a/b.json`) con `schemaVersion: 2` / `history.v: 2` y un único
+puntero `market-v2-pointer` `{slot, revision}`. Escritura de siempre: slot
+inactivo → read-back byte a byte → mover puntero.
+
+- **v1 legacy** (`market-a/b.json`, `price-history-a/b.json`, punteros
+  `market-pointer` / `price-history-pointer`) se **retiene** tras la migración:
+  `rollbackToBackup` lo restaura. No se borra automáticamente.
+- **Respaldo pre-v2**: antes de migrar se guarda el estado v1 completo en
+  `pre-v2-backup.json`. El host limita `writeText` a **4 MiB**
+  (`electron/plugin-files-ops.ts`) y un respaldo A/B puede superar ese tope (caso
+  real ~5,27 MiB): se parte en **trozos ≤3 MiB** (`pre-v2-backup.part-NNN.json`)
+  + un **manifiesto**; `readBackupDoc` reensambla el documento lógico al leer.
+  Los dobles de test DEBEN replicar el tope real o una suite verde miente.
+- **Rollback en dos pasos**: la UI pide confirmación, restaura los slots v1 y
+  deja el puntero v2 intacto hasta confirmar; si algo falla, el respaldo nunca se
+  sobrescribe (es la única copia).
+- **Condición de retiro de v1**: solo cuando el rollback deje de ser necesario
+  (v2 estable + respaldo verificado tras un periodo de gracia) y con OK
+  explícito. Hoy v1 + respaldo se conservan.
+- Estado en disco verificado (2026-11-19): v2 activo, 7300 ítems / 57 863 filas
+  de historial; respaldo troceado (manifiesto 148 B + part-000 3 MiB +
+  part-001 2,37 MB).
+
 ## Agregar o cambiar una sección
 
 1. Escribe la vista en `src/vistas/<seccion>.jsx` (y sus piezas en `src/vistas/<seccion>/`).
@@ -157,6 +216,7 @@ node desktop/test/tsm.mjs
 ```sh
 python3 -m unittest discover -s tests          # incluye el lint de Hermes y el build reproducible
 node --test tests/
+lua addon/tests/test_bridge.lua
 PLAYWRIGHT_MODULE=… CHROMIUM_PATH=… node desktop/test/navegador.mjs
 PLAYWRIGHT_MODULE=… CHROMIUM_PATH=… node desktop/test/vista-<seccion>.mjs
 ```
