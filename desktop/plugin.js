@@ -11704,9 +11704,9 @@ var require_market = __commonJS({
             while (isDigit(b[this.p])) this.p++;
           }
           if (this.p === ds && b[start] !== 46) failAt("malformed data", start);
-          var num6 = Number(utf8(b.subarray(start, this.p)));
-          if (!isFinite(num6)) failAt("malformed data", start);
-          return num6;
+          var num7 = Number(utf8(b.subarray(start, this.p)));
+          if (!isFinite(num7)) failAt("malformed data", start);
+          return num7;
         };
         LuaReader.prototype.readString = function() {
           var b = this.b;
@@ -14468,8 +14468,8 @@ rket", "history"].every((k) => b.slots[s][k] === null || typeof b.slots[s][k] ==
 }
 
 // src/app.jsx
-import { Component, useCallback as useCallback3, useEffect as useEffect7, useMemo as useMemo17, useState as useState14 } from "react";
-import { Button as Button11, SegmentedControl as SegmentedControl6, Tabs, TabsList, TabsTrigger } from "@hermes/plugin-sdk";
+import { Component, useCallback as useCallback3, useEffect as useEffect8, useMemo as useMemo18, useState as useState15 } from "react";
+import { Button as Button12, SegmentedControl as SegmentedControl6, Tabs, TabsList, TabsTrigger } from "@hermes/plugin-sdk";
 
 // ../src/perfil.js
 var VERSION = 1;
@@ -34777,6 +34777,7 @@ var ES = {
   "davi.preguntaAyuda": "Escribe qué quieres saber; el contexto de abajo se adjunta tal cual.",
   "davi.partes.perfil": "Incluir el perfil",
   "davi.partes.precios": "Incluir precios y ofertas",
+  "davi.partes.simc": "Incluir estado SimC",
   "davi.confirmar": "Insertar en el chat",
   "davi.enviando": "Insertando…",
   "davi.cerrar": "Cerrar",
@@ -34846,6 +34847,7 @@ var EN = {
   "davi.preguntaAyuda": "Write what you want to know; the context below is attached as is.",
   "davi.partes.perfil": "Include the profile",
   "davi.partes.precios": "Include prices and offers",
+  "davi.partes.simc": "Include SimC state",
   "davi.confirmar": "Insert into chat",
   "davi.enviando": "Inserting…",
   "davi.cerrar": "Close",
@@ -34871,8 +34873,8 @@ function agregarTextos(es, en) {
 }
 
 // src/vistas/personaje.jsx
-import { useMemo as useMemo2, useState as useState2 } from "react";
-import { Button as Button2, Checkbox as Checkbox2, Input as Input2, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@hermes/plugin-sdk";
+import { useMemo as useMemo3, useState as useState3 } from "react";
+import { Button as Button3, Checkbox as Checkbox2, Input as Input2, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@hermes/plugin-sdk";
 
 // src/ui.jsx
 import { Fragment } from "react";
@@ -35783,6 +35785,7 @@ var ETIQUETAS = {
     mercado: "Mercado",
     perfil: "Perfil",
     precios: "Precios y ofertas",
+    simc: "Estado SimC",
     sinNombre: "sin nombre",
     sinId: "sin ID",
     sinClave: "sin clave",
@@ -35792,6 +35795,7 @@ var ETIQUETAS = {
     desconocido: "desconocido",
     perfilIncompleto: "Perfil incompleto: faltan facción, raza o clase.",
     limitePerfil: "Perfil cargado a mano; no es el estado del juego en vivo.",
+    limiteSimc: "Resumen del export de SimulationCraft (addon); equipo y talentos sin decodificar; no es una simulación.",
     limiteSinHistorial: "No se incluye el historial completo de Auctionator.lua.",
     limiteSinHistorialNiArchivo: "No se incluye el historial completo ni el contenido de Auctionator.lua.",
     limiteOfertas: "Precios = ofertas anunciadas, no ventas.",
@@ -35837,6 +35841,7 @@ var ETIQUETAS = {
     mercado: "Market",
     perfil: "Profile",
     precios: "Prices and offers",
+    simc: "SimC state",
     sinNombre: "no name",
     sinId: "no ID",
     sinClave: "no key",
@@ -35846,6 +35851,7 @@ var ETIQUETAS = {
     desconocido: "unknown",
     perfilIncompleto: "Incomplete profile: faction, race or class missing.",
     limitePerfil: "Hand-entered profile; it is not the live game state.",
+    limiteSimc: "Summary of the SimulationCraft export (addon); gear and talents not decoded; it is not a simulation.",
     limiteSinHistorial: "The full Auctionator.lua history is not included.",
     limiteSinHistorialNiArchivo: "Neither the full history nor the Auctionator.lua contents are included.",
     limiteOfertas: "Prices = posted offers, not sales.",
@@ -35909,17 +35915,23 @@ function partesDisponibles(snapshot) {
   if (!snapshot || !snapshot.partes) return out;
   if (snapshot.partes.perfil) out.push("perfil");
   if (snapshot.partes.precios) out.push("precios");
+  if (snapshot.partes.simc) out.push("simc");
   return out;
 }
-function construirContextoPersonaje({ resumen, procedencia = [], lang = "es" }) {
+function construirContextoPersonaje({ resumen, procedencia = [], lang = "es", resumenSimc: resumenSimc2 = null }) {
   const e = et(lang);
   const ok = linea(resumen) !== "";
+  const simc = linea(resumenSimc2);
   return {
     seccion: "personaje",
     titulo: e.personaje,
     seleccion: ok ? [] : [e.perfilIncompleto],
-    partes: { perfil: ok ? { titulo: e.perfil, lineas: [linea(resumen)] } : null, precios: null },
-    limites: [e.limitePerfil, e.limiteSinHistorial],
+    partes: {
+      perfil: ok ? { titulo: e.perfil, lineas: [linea(resumen)] } : null,
+      precios: null,
+      simc: simc ? { titulo: e.simc, lineas: [simc] } : null
+    },
+    limites: [e.limitePerfil, e.limiteSinHistorial].concat(simc ? [e.limiteSimc] : []),
     procedencia: [...procedencia]
   };
 }
@@ -36103,6 +36115,10 @@ function previsualizarDavi({ pregunta, snapshot, activas, lang = "es" }) {
     out.push(snapshot.partes.precios.titulo + ":");
     for (const l of snapshot.partes.precios.lineas) out.push("- " + l);
   }
+  if (snapshot.partes && snapshot.partes.simc && set.has("simc")) {
+    out.push(snapshot.partes.simc.titulo + ":");
+    for (const l of snapshot.partes.simc.lineas) out.push("- " + l);
+  }
   out.push(e.limites + ":");
   for (const l of snapshot.limites || []) out.push("- " + l);
   out.push(e.procedencia + ":");
@@ -36231,6 +36247,10 @@ function PreguntarDavi({ ctx, lang, seccion, snapshot, preguntaInicial = "" }) {
             partes.includes("precios") ? /* @__PURE__ */ jsxs2("label", { style: { display: "inline-flex", gap: 6, alignItems: "center" }, children: [
               /* @__PURE__ */ jsx2(Checkbox, { disabled: deshabilitado, checked: activas.has("precios"), onCheckedChange: () => alternar2("precios") }),
               t(lang, "davi.partes.precios")
+            ] }) : null,
+            partes.includes("simc") ? /* @__PURE__ */ jsxs2("label", { style: { display: "inline-flex", gap: 6, alignItems: "center" }, children: [
+              /* @__PURE__ */ jsx2(Checkbox, { disabled: deshabilitado, checked: activas.has("simc"), onCheckedChange: () => alternar2("simc") }),
+              t(lang, "davi.partes.simc")
             ] }) : null
           ] }),
           /* @__PURE__ */ jsx2("div", { style: S.etiqueta, children: t(lang, "davi.vistaPreviaAyuda") }),
@@ -36269,8 +36289,891 @@ rmar") }),
   ] });
 }
 
-// src/vistas/personaje.jsx
+// src/vistas/personaje-simc.jsx
+import { useEffect, useMemo as useMemo2, useState as useState2 } from "react";
+import { Button as Button2 } from "@hermes/plugin-sdk";
+
+// src/simc.js
+var CLAVE = "personaje-simc";
+var VERSION2 = 1;
+var MAX_TEXTO = 512 * 1024;
+var MAX_DESCONHECIDAS = 200;
+var MAX_CAMPO = 200;
+var MAX_ERRO = 500;
+var CLASE_POR_TOKEN = { warrior: 1, paladin: 2, hunter: 3, rogue: 4, priest: 5, shaman: 7, mage: 8, warlock: 9, druid: 11 };
+var RAZA_POR_TOKEN = { human: 1, orc: 2, dwarf: 3, night_elf: 4, undead: 5, tauren: 6, gnome: 7, troll: 8, skyborne_alliance: 95, skyborne_horde: 96 };
+var PROFISSAO_POR_TOKEN = {
+  first_aid: 129,
+  blacksmithing: 164,
+  leatherworking: 165,
+  alchemy: 171,
+  herbalism: 182,
+  cooking: 185,
+  mining: 186,
+  tailoring: 197,
+  engineering: 202,
+  enchanting: 333,
+  fishing: 356,
+  skinning: 393,
+  jewelcrafting: 755,
+  inscription: 773,
+  archaeology: 794
+};
+var SLOTS_EQUIPADOS = /* @__PURE__ */ new Set([
+  "head",
+  "neck",
+  "shoulder",
+  "back",
+  "chest",
+  "shirt",
+  "tabard",
+  "wrist",
+  "hands",
+  "waist",
+  "legs",
+  "feet",
+  "finger1",
+  "finger2",
+  "trinket1",
+  "trinket2",
+  "main_hand",
+  "off_hand",
+  "ammo",
+  "ranged"
+]);
+var STATS_PLANOS = {
+  character_stats: "stats",
+  character_stats_base: "statsBase",
+  character_stats_bonus: "statsBonus",
+  character_stats_gear: "statsGear",
+  pet_stats: "petStats",
+  pet_stats_base: "petStatsBase",
+  pet_stats_bonus: "petStatsBonus",
+  pet_stats_gear: "petStatsGear"
+};
+var STATS_COMBATE = /* @__PURE__ */ new Set([
+  "attack_power",
+  "spell_power",
+  "spell_stats",
+  "regen",
+  "crit",
+  "hit",
+  "haste",
+  "combat_modifiers",
+  "combat_ratings",
+  "defense",
+  "resistances",
+  "weapon_damage",
+  "pet_attack_power",
+  "pet_spell_power",
+  "pet_crit",
+  "pet_hit",
+  "pet_haste",
+  "pet_combat_modifiers",
+  "pet_combat_ratings",
+  "pet_defense",
+  "pet_resistances",
+  "pet_weapon_damage",
+  "pet_modifiers"
+]);
+var OUTROS_KEYS = /* @__PURE__ */ new Set([
+  "skills",
+  "buffs",
+  "ammo_count",
+  "pet_training_points",
+  "bonus_roll_currencies",
+  "bonus_roll_items",
+  "loot_spec"
+]);
+var MASCOTE_KEYS = /* @__PURE__ */ new Set(["family", "creature_id", "level", "happiness", "abilities"]);
+var num2 = (v) => {
+  if (typeof v === "number") return Number.isFinite(v) ? v : null;
+  const s = String(v ?? "").trim();
+  if (s === "") return null;
+  const n = Number(s);
+  return Number.isFinite(n) ? n : null;
+};
+var numOuTexto = (v) => {
+  const s = String(v ?? "").trim();
+  if (s === "") return null;
+  const n = Number(s);
+  return Number.isFinite(n) ? n : s.slice(0, MAX_CAMPO);
+};
+var intOuNull = (v) => {
+  const n = num2(v);
+  return n !== null && Number.isInteger(n) ? n : null;
+};
+var cortar = (v) => String(v ?? "").slice(0, MAX_CAMPO);
+function personagemVazio() {
+  return {
+    version: null,
+    checksum: null,
+    nome: null,
+    classeToken: null,
+    clase: null,
+    spec: null,
+    nivel: null,
+    razaToken: null,
+    raza: null,
+    reino: null,
+    regiao: null,
+    rol: null,
+    stats: {},
+    statsBase: {},
+    statsBonus: {},
+    statsGear: {},
+    combate: {},
+    mascote: {
+      family: null,
+      creature_id: null,
+      level: null,
+      happiness: null,
+      abilities: [],
+      stats: {},
+      statsBase: {},
+      statsBonus: {},
+      statsGear: {},
+      info: {},
+      combate: {}
+    },
+    equipo: {},
+    equipable: [],
+    recompensas: [],
+    bolsas: {},
+    talentos: { ativo: null, grupos: [], legacy: null, sistemas: {} },
+    profissoes: [],
+    outros: {},
+    desconhecidas: []
+  };
+}
+function parseItemOptions(valor) {
+  const out = { id: null, ilvl: null, nome: null, enchant: null, gems: [], bonus: [], extras: {} };
+  for (const parte of String(valor ?? "").split(",")) {
+    if (!parte) continue;
+    const eq = parte.indexOf("=");
+    if (eq < 0) continue;
+    const k = parte.slice(0, eq);
+    const v = parte.slice(eq + 1);
+    if (k === "id") out.id = intOuNull(v);
+    else if (k === "enchant_id") out.enchant = intOuNull(v);
+    else if (k === "gem_id") out.gems = v.split("/").map(intOuNull).filter((x) => x !== null);
+    else if (k === "bonus_id") out.bonus = v.split("/").map(intOuNull).filter((x) => x !== null);
+    else out.extras[k] = cortar(v);
+  }
+  return out;
+}
+function parseCombate(valor) {
+  const out = {};
+  for (const entrada of String(valor ?? "").split("/")) {
+    if (!entrada) continue;
+    const partes = entrada.split(":");
+    const nome = partes[0];
+    if (!nome) continue;
+    const resto = partes.slice(1).map(numOuTexto);
+    out[nome] = resto.length <= 1 ? resto[0] ?? null : resto;
+  }
+  return out;
+}
+function parsePares(valor) {
+  const out = {};
+  for (const entrada of String(valor ?? "").split("/")) {
+    if (!entrada) continue;
+    const eq = entrada.indexOf(":");
+    if (eq < 0) continue;
+    const k = entrada.slice(0, eq);
+    const v = entrada.slice(eq + 1);
+    if (!k) continue;
+    out[k] = v.includes(":") ? v.split(":").map(numOuTexto) : numOuTexto(v);
+  }
+  return out;
+}
+function parseProfissoes(valor) {
+  const out = [];
+  for (const entrada of String(valor ?? "").split("/")) {
+    const eq = entrada.indexOf("=");
+    if (eq < 0) continue;
+    const nome = entrada.slice(0, eq);
+    if (!nome) continue;
+    out.push({ id: PROFISSAO_POR_TOKEN[nome] ?? null, nome, skill: intOuNull(entrada.slice(eq + 1)) });
+  }
+  return out;
+}
+function lineaClaveValor(linha) {
+  const m = /^([A-Za-z_][A-Za-z0-9_]*)=(.*)$/.exec(linha);
+  return m ? { chave: m[1], valor: m[2] } : null;
+}
+function parsearSimc(texto2) {
+  const erros = [];
+  const p = personagemVazio();
+  if (typeof texto2 !== "string" || !texto2.trim()) {
+    return { ok: false, erros: ["vazio"], personagem: p };
+  }
+  if (texto2.length > MAX_TEXTO) {
+    return { ok: false, erros: ["grande"], personagem: p };
+  }
+  const linhas = texto2.replace(/\r\n?/g, "\n").split("\n");
+  let pendente = null;
+  let secao = null;
+  const desconhecida = (kv) => {
+    if (p.desconhecidas.length < MAX_DESCONHECIDAS) p.desconhecidas.push(cortar(kv));
+  };
+  const equipable = (chave, valor, comentado) => {
+    const item3 = parseItemOptions(valor);
+    if (pendente) {
+      item3.nome = pendente.nome;
+      item3.ilvl = pendente.ilvl;
+    }
+    item3.slot = chave;
+    if (comentado && secao === "bolsas") p.equipable.push(item3);
+    else if (comentado && secao === "recompensas") p.recompensas.push(item3);
+    else if (!comentado) p.equipo[chave] = item3;
+    else desconhecida(`${chave}=${cortar(valor)}`);
+  };
+  for (const bruta of linhas) {
+    const linha = bruta.trim();
+    if (!linha) continue;
+    if (linha.startsWith("#")) {
+      const conteudo = linha.replace(/^#+\s?/, "").trim();
+      if (!conteudo) continue;
+      if (linha.startsWith("###")) {
+        if (conteudo === "Gear from Bags") secao = "bolsas";
+        else if (conteudo === "Weekly Reward Choices") secao = "recompensas";
+        else secao = null;
+        continue;
+      }
+      const mc = /^Checksum:\s*(\S+)/.exec(conteudo);
+      if (mc) {
+        p.checksum = mc[1];
+        continue;
+      }
+      const mv = /^SimC Addon\s+(.+)$/.exec(conteudo);
+      if (mv) {
+        p.version = mv[1].trim();
+        continue;
+      }
+      const mi = /^(.+?)\s+\((\d+)\)\s*$/.exec(conteudo);
+      if (mi && !conteudo.includes("=")) {
+        pendente = { nome: cortar(mi[1]), ilvl: intOuNull(mi[2]) };
+        continue;
+      }
+      const kv2 = lineaClaveValor(conteudo);
+      if (!kv2) continue;
+      if (SLOTS_EQUIPADOS.has(kv2.chave)) {
+        equipable(kv2.chave, kv2.valor, true);
+        pendente = null;
+        continue;
+      }
+      if (kv2.chave === "talents") {
+        p.talentos.grupos.push(cortar(kv2.valor));
+        continue;
+      }
+      const statPlano = STATS_PLANOS[kv2.chave];
+      if (statPlano) {
+        const alvo = statPlano === "petStats" ? p.mascote.stats : statPlano === "petStatsBase" ? p.mascote.statsBase : statPlano === "petStatsBonus" ? p.mascote.statsBonus : statPlano === "petStatsGea\
+r" ? p.mascote.statsGear : p[statPlano];
+        Object.assign(alvo, parsePares(kv2.valor));
+        continue;
+      }
+      if (kv2.chave === "pet_info") {
+        Object.assign(p.mascote.info, parsePares(kv2.valor));
+        continue;
+      }
+      if (STATS_COMBATE.has(kv2.chave)) {
+        if (kv2.chave.startsWith("pet_")) p.mascote.combate[kv2.chave.slice(4)] = parseCombate(kv2.valor);
+        else p.combate[kv2.chave] = parseCombate(kv2.valor);
+        continue;
+      }
+      if (OUTROS_KEYS.has(kv2.chave)) {
+        p.outros[kv2.chave] = cortar(kv2.valor);
+        continue;
+      }
+      desconhecida(`${kv2.chave}=${cortar(kv2.valor)}`);
+      continue;
+    }
+    const kv = lineaClaveValor(linha);
+    if (!kv) {
+      desconhecida(linha);
+      pendente = null;
+      continue;
+    }
+    const { chave, valor } = kv;
+    if (SLOTS_EQUIPADOS.has(chave)) {
+      equipable(chave, valor, false);
+      pendente = null;
+      continue;
+    }
+    pendente = null;
+    if (/^bag\d+$/.test(chave)) {
+      p.bolsas[chave] = parseItemOptions(valor).id;
+      continue;
+    }
+    if (chave === "level") {
+      p.nivel = intOuNull(valor);
+      if (p.nivel === null) erros.push("nivel:invalido");
+      continue;
+    }
+    if (chave === "race") {
+      p.razaToken = cortar(valor);
+      p.raza = RAZA_POR_TOKEN[p.razaToken] ?? null;
+      if (p.raza === null) erros.push(`raza:${cortar(valor)}`);
+      continue;
+    }
+    if (chave === "region") {
+      p.regiao = cortar(valor);
+      continue;
+    }
+    if (chave === "server") {
+      p.reino = cortar(valor);
+      continue;
+    }
+    if (chave === "role") {
+      p.rol = cortar(valor);
+      continue;
+    }
+    if (chave === "spec") {
+      p.spec = cortar(valor);
+      continue;
+    }
+    if (chave === "professions") {
+      p.profissoes = parseProfissoes(valor);
+      continue;
+    }
+    if (chave === "talents") {
+      p.talentos.ativo = cortar(valor);
+      continue;
+    }
+    if (chave === "legacy_talents") {
+      p.talentos.legacy = cortar(valor);
+      continue;
+    }
+    if (chave.endsWith("_talents")) {
+      p.talentos.sistemas[chave] = cortar(valor);
+      continue;
+    }
+    if (/^pet_/.test(chave)) {
+      const resto = chave.slice(4);
+      const plano = { stats: "stats", stats_base: "statsBase", stats_bonus: "statsBonus", stats_gear: "statsGear" }[resto];
+      if (plano) Object.assign(p.mascote[plano], parsePares(valor));
+      else if (resto === "info") Object.assign(p.mascote.info, parsePares(valor));
+      else if (MASCOTE_KEYS.has(resto)) {
+        if (resto === "abilities") p.mascote.abilities = valor.split("/").map(intOuNull).filter((x) => x !== null);
+        else if (resto === "creature_id" || resto === "level" || resto === "happiness") p.mascote[resto] = intOuNull(valor);
+        else p.mascote[resto] = cortar(valor);
+      } else {
+        p.mascote.combate[resto] = parseCombate(valor);
+      }
+      continue;
+    }
+    if (valor.startsWith('"') && valor.endsWith('"') && valor.length >= 2) {
+      p.nome = cortar(valor.slice(1, -1));
+      p.claseToken = chave;
+      p.clase = CLASE_POR_TOKEN[chave] ?? null;
+      if (p.clase === null) erros.push(`clase:${cortar(chave)}`);
+      continue;
+    }
+    desconhecida(`${chave}=${cortar(valor)}`);
+  }
+  const temDados = p.version !== null || p.nome !== null || p.clase !== null || p.nivel !== null || p.raza !== null || p.reino !== null || Object.keys(p.stats).length > 0 || Object.keys(p.equipo).length >
+  0 || p.talentos.ativo !== null || p.profissoes.length > 0 || Object.keys(p.combate).length > 0 || p.mascote.family !== null;
+  if (!temDados) erros.push("sin-datos");
+  return { ok: temDados, erros, personagem: p };
+}
+function normalizarEstadoPersonagem(e) {
+  if (!e || typeof e !== "object" || e.v !== VERSION2) return null;
+  if (e.origem !== "addon" && e.origem !== "pegado") return null;
+  if (typeof e.texto !== "string" || e.texto.length > MAX_TEXTO) return null;
+  const capturado = Number.isInteger(e.capturado) && e.capturado > 0 ? e.capturado : null;
+  let erro = null;
+  if (e.erro && typeof e.erro === "object") {
+    const msg = typeof e.erro.msg === "string" && e.erro.msg ? e.erro.msg.slice(0, MAX_ERRO) : null;
+    const cap = Number.isInteger(e.erro.capturado) && e.erro.capturado > 0 ? e.erro.capturado : null;
+    if (msg && cap) erro = { msg, capturado: cap };
+  }
+  return { v: VERSION2, origem: e.origem, texto: e.texto, capturado, erro };
+}
+async function lerPersonagem(ctx) {
+  try {
+    return normalizarEstadoPersonagem(await ctx.storage.get(CLAVE, null));
+  } catch {
+    return null;
+  }
+}
+async function guardarPersonagem(ctx, registro) {
+  const n = normalizarEstadoPersonagem(registro);
+  if (!n) return null;
+  await ctx.storage.set(CLAVE, n);
+  return lerPersonagem(ctx);
+}
+var mesmoConjunto = (a, b) => a.length === b.length && a.every((x) => b.includes(x));
+async function sincronizarPersonagem(ctx, journal) {
+  const bom = journal?.personagem;
+  const mau = journal?.personagemErro;
+  const capBom = bom && typeof bom.simc === "string" && bom.simc.length > 0 && bom.simc.length <= MAX_TEXTO && Number.isInteger(bom.capturado) && bom.capturado > 0 ? bom : null;
+  const capMau = mau && typeof mau.erro === "string" && mau.erro && Number.isInteger(mau.capturado) && mau.capturado > 0 ? { msg: mau.erro.slice(0, MAX_ERRO), capturado: mau.capturado } : null;
+  if (!capBom && !capMau) return { status: "sin-cambios" };
+  const atual = await lerPersonagem(ctx);
+  let prox = null;
+  if (capBom && (!atual || atual.origem !== "addon" || (atual.capturado ?? -1) < capBom.capturado)) {
+    prox = {
+      v: VERSION2,
+      origem: "addon",
+      texto: capBom.simc,
+      capturado: capBom.capturado,
+      erro: capMau && capMau.capturado > capBom.capturado ? capMau : null
+    };
+  } else if (capMau && atual?.origem === "addon" && capMau.capturado > (atual.erro?.capturado ?? -1)) {
+    prox = { ...atual, erro: capMau };
+  }
+  if (!prox) return { status: "sin-cambios" };
+  const estado = await guardarPersonagem(ctx, prox);
+  return estado ? { status: "ok", estado } : { status: "sin-cambios" };
+}
+function propostaPerfil(p, perfil, dados) {
+  if (!p || typeof p !== "object" || !perfil || typeof perfil !== "object") return null;
+  const campos = {};
+  if (Number.isInteger(p.nivel) && p.nivel >= 1 && p.nivel <= 60 && p.nivel !== perfil.nivel) {
+    campos.nivel = p.nivel;
+  }
+  let classeFinal = perfil.clase ?? null;
+  if (Number.isInteger(p.clase) && dados?.clases?.[String(p.clase)] && p.clase !== perfil.clase) {
+    campos.clase = p.clase;
+    classeFinal = p.clase;
+  }
+  if (typeof p.reino === "string" && p.reino && p.reino.toLowerCase() !== String(perfil.reino ?? "").toLowerCase()) {
+    campos.reino = p.reino.replace(/_/g, " ");
+  }
+  if (Number.isInteger(p.raza)) {
+    const facRaza = faccionDeRaza(dados, p.raza);
+    const facBase = facRaza ?? perfil.faccion ?? null;
+    if (facBase && razasPara(dados, facBase, classeFinal).includes(p.raza)) {
+      if (p.raza !== perfil.raza) campos.raza = p.raza;
+      const facFinal = facRaza ?? perfil.faccion ?? null;
+      if (facFinal && facFinal !== perfil.faccion) campos.faccion = facFinal;
+    }
+  }
+  if (Array.isArray(p.profissoes) && p.profissoes.length) {
+    const ids = p.profissoes.map((x) => x?.id).filter((id) => Number.isInteger(id));
+    const principais = [...new Set(ids.filter((id) => PROFESIONES_PRINCIPALES.includes(id)))].slice(0, MAX_PRINCIPALES);
+    const secundarias = [...new Set(ids.filter((id) => PROFESIONES_SECUNDARIAS.includes(id)))].sort((a, b) => a - b);
+    if (principais.length && !mesmoConjunto(principais, perfil.profesiones ?? [])) campos.profissoes = principais;
+    if (secundarias.length && !mesmoConjunto(secundarias, perfil.secundarias ?? [])) campos.secundarias = secundarias;
+  }
+  if (!Object.keys(campos).length) return null;
+  const { ok } = validarPerfil({ ...perfil, ...campos }, dados);
+  return ok ? { campos } : null;
+}
+
+// src/vistas/personaje-simc.jsx
 import { Fragment as Fragment4, jsx as jsx3, jsxs as jsxs3 } from "react/jsx-runtime";
+agregarTextos({
+  "simc.titulo": "Estado del personaje (SimulationCraft)",
+  "simc.origem.addon": "Leído del juego",
+  "simc.origem.addon.ayuda": "WoWForeverBridge + SimulationCraft lo capturaron dentro del juego; el plugin lo lee del diario del puente.",
+  "simc.origem.pegado": "Pegado a mano",
+  "simc.origem.pegado.ayuda": "Texto del export pegado por ti; no viene del juego.",
+  "simc.vazio": "Todavía no hay estado del personaje.",
+  "simc.vazio.ayuda": "Con SimulationCraft y WoWForeverBridge 1.1+ en el juego, el addon guarda el export solo (/wfbp personagem lo fuerza). También puedes pegarlo aquí.",
+  "simc.actual": "Actual",
+  "simc.viejo": "Desactualizado",
+  "simc.capturado": "Capturado",
+  "simc.releer": "Actualizar",
+  "simc.leyendo": "Leyendo…",
+  "simc.erro": "La última captura del juego falló",
+  "simc.clase": "Clase",
+  "simc.spec": "Spec",
+  "simc.nivel": "Nv",
+  "simc.raza": "Raza",
+  "simc.reino": "Reino",
+  "simc.rol": "Rol",
+  "simc.faccion": "Facción",
+  "simc.stats": "Stats",
+  "simc.vida": "Vida",
+  "simc.armadura": "Armadura",
+  "simc.equipo": "Equipo puesto",
+  "simc.equipo.vacio": "Sin equipo en el export",
+  "simc.ilvl": "ilvl {n}",
+  "simc.talentos": "Talentos",
+  "simc.talentos.si": "Exportados por el addon",
+  "simc.talentos.no": "No declarados en el export",
+  "simc.talentos.grupos": "{n} grupo(s) adicionales",
+  "simc.profissoes": "Profesiones (del juego)",
+  "simc.desconhecidas": "{n} líneas no reconocidas",
+  "simc.pegar": "Pegar export de SimulationCraft",
+  "simc.pegar.ayuda": "En el juego: /simc copia el export al portapapeles; pégalo aquí.",
+  "simc.guardar": "Guardar export",
+  "simc.guardado": "Export guardado.",
+  "simc.muyLargo": "El texto supera el máximo permitido.",
+  "simc.copiar": "Copiar export",
+  "simc.copiado": "Copiado. Pégalo donde lo necesites.",
+  "simc.noCopiado": "No se pudo copiar. Selecciona el texto y cópialo a mano:",
+  "simc.proposta": "El export propone actualizar tu perfil",
+  "simc.aplicar": "Aplicar al perfil",
+  "simc.aplicado": "Perfil actualizado con los datos del export.",
+  "simc.sinParsear": "El texto guardado no se reconoce como un export de SimulationCraft.",
+  "simc.slot.head": "Cabeza",
+  "simc.slot.neck": "Cuello",
+  "simc.slot.shoulder": "Hombros",
+  "simc.slot.back": "Espalda",
+  "simc.slot.chest": "Pecho",
+  "simc.slot.shirt": "Camisa",
+  "simc.slot.tabard": "Tabardo",
+  "simc.slot.wrist": "Muñecas",
+  "simc.slot.hands": "Manos",
+  "simc.slot.waist": "Cintura",
+  "simc.slot.legs": "Piernas",
+  "simc.slot.feet": "Pies",
+  "simc.slot.finger1": "Dedo 1",
+  "simc.slot.finger2": "Dedo 2",
+  "simc.slot.trinket1": "Accesorio 1",
+  "simc.slot.trinket2": "Accesorio 2",
+  "simc.slot.main_hand": "Mano princ.",
+  "simc.slot.off_hand": "Mano sec.",
+  "simc.slot.ranged": "A distancia",
+  "simc.slot.ammo": "Proyectiles"
+}, {
+  "simc.titulo": "Character state (SimulationCraft)",
+  "simc.origem.addon": "Read from the game",
+  "simc.origem.addon.ayuda": "WoWForeverBridge + SimulationCraft captured it in game; the plugin reads it from the bridge journal.",
+  "simc.origem.pegado": "Pasted by hand",
+  "simc.origem.pegado.ayuda": "Export text you pasted; it did not come from the game.",
+  "simc.vazio": "No character state yet.",
+  "simc.vazio.ayuda": "With SimulationCraft and WoWForeverBridge 1.1+ in game, the addon saves the export by itself (/wfbp personagem forces it). You can also paste it here.",
+  "simc.actual": "Current",
+  "simc.viejo": "Stale",
+  "simc.capturado": "Captured",
+  "simc.releer": "Refresh",
+  "simc.leyendo": "Reading…",
+  "simc.erro": "The last in-game capture failed",
+  "simc.clase": "Class",
+  "simc.spec": "Spec",
+  "simc.nivel": "Lv",
+  "simc.raza": "Race",
+  "simc.reino": "Realm",
+  "simc.rol": "Role",
+  "simc.faccion": "Faction",
+  "simc.stats": "Stats",
+  "simc.vida": "Health",
+  "simc.armadura": "Armor",
+  "simc.equipo": "Equipped gear",
+  "simc.equipo.vacio": "No gear in the export",
+  "simc.ilvl": "ilvl {n}",
+  "simc.talentos": "Talents",
+  "simc.talentos.si": "Exported by the addon",
+  "simc.talentos.no": "Not declared in the export",
+  "simc.talentos.grupos": "{n} additional group(s)",
+  "simc.profissoes": "Professions (from game)",
+  "simc.desconhecidas": "{n} unrecognized lines",
+  "simc.pegar": "Paste SimulationCraft export",
+  "simc.pegar.ayuda": "In game: /simc copies the export to the clipboard; paste it here.",
+  "simc.guardar": "Save export",
+  "simc.guardado": "Export saved.",
+  "simc.muyLargo": "The text exceeds the allowed size.",
+  "simc.copiar": "Copy export",
+  "simc.copiado": "Copied. Paste it wherever you need it.",
+  "simc.noCopiado": "Could not copy. Select the text and copy it by hand:",
+  "simc.proposta": "The export proposes updating your profile",
+  "simc.aplicar": "Apply to profile",
+  "simc.aplicado": "Profile updated with the export data.",
+  "simc.sinParsear": "The saved text is not recognized as a SimulationCraft export.",
+  "simc.slot.head": "Head",
+  "simc.slot.neck": "Neck",
+  "simc.slot.shoulder": "Shoulders",
+  "simc.slot.back": "Back",
+  "simc.slot.chest": "Chest",
+  "simc.slot.shirt": "Shirt",
+  "simc.slot.tabard": "Tabard",
+  "simc.slot.wrist": "Wrists",
+  "simc.slot.hands": "Hands",
+  "simc.slot.waist": "Waist",
+  "simc.slot.legs": "Legs",
+  "simc.slot.feet": "Feet",
+  "simc.slot.finger1": "Finger 1",
+  "simc.slot.finger2": "Finger 2",
+  "simc.slot.trinket1": "Trinket 1",
+  "simc.slot.trinket2": "Trinket 2",
+  "simc.slot.main_hand": "Main hand",
+  "simc.slot.off_hand": "Off hand",
+  "simc.slot.ranged": "Ranged",
+  "simc.slot.ammo": "Ammo"
+});
+var SLOTS = [
+  "head",
+  "neck",
+  "shoulder",
+  "back",
+  "chest",
+  "shirt",
+  "tabard",
+  "wrist",
+  "hands",
+  "waist",
+  "legs",
+  "feet",
+  "finger1",
+  "finger2",
+  "trinket1",
+  "trinket2",
+  "main_hand",
+  "off_hand",
+  "ranged",
+  "ammo"
+];
+var STATS = ["strength", "agility", "stamina", "intellect", "spirit", "health"];
+var STAT_LABEL = { strength: "FUE", agility: "AGI", stamina: "RES", intellect: "INT", spirit: "ESP", health: "VID" };
+var VIEJO_S = 7 * 86400;
+var fecha = (unix) => {
+  if (!Number.isInteger(unix) || unix <= 0) return "—";
+  try {
+    return new Date(unix * 1e3).toLocaleString();
+  } catch {
+    return "—";
+  }
+};
+function resumenSimc(registro, p, lang) {
+  if (!registro || !p) return null;
+  const partes = [];
+  if (p.version) partes.push("SimC " + p.version);
+  partes.push(p.clase != null && D.personaje.clases[String(p.clase)] ? nombre(D.personaje.clases[String(p.clase)].n, lang) : p.claseToken || t(lang, "simc.sinParsear"));
+  if (Number.isInteger(p.nivel)) partes.push(t(lang, "simc.nivel") + " " + p.nivel);
+  if (p.raza != null && D.personaje.razas[String(p.raza)]) partes.push(nombre(D.personaje.razas[String(p.raza)].n, lang));
+  if (p.reino) partes.push(String(p.reino).replace(/_/g, " "));
+  const stats = STATS.filter((k) => Number.isFinite(p.stats?.[k])).map((k) => STAT_LABEL[k] + p.stats[k]);
+  if (stats.length) partes.push(stats.join(" "));
+  const nEquipo = Object.keys(p.equipo || {}).length;
+  if (nEquipo) partes.push(t(lang, "simc.equipo") + ": " + nEquipo);
+  if (p.talentos?.ativo) partes.push(t(lang, "simc.talentos.si"));
+  const capt = registro.capturado ? " · " + t(lang, "simc.capturado") + " " + fecha(registro.capturado) : "";
+  return partes.join(" · ") + capt;
+}
+function Campo({ etiqueta, children }) {
+  return /* @__PURE__ */ jsxs3("div", { style: { minWidth: 90 }, children: [
+    /* @__PURE__ */ jsx3("div", { style: S.etiqueta, children: etiqueta }),
+    /* @__PURE__ */ jsx3("div", { style: { fontSize: 13 }, children: children ?? "—" })
+  ] });
+}
+function TarjetaSimc({ ctx, lang, perfil, onAplicar, puente, onResumen }) {
+  const [registro, setRegistro] = useState2(null);
+  const [cargado, setCargado] = useState2(false);
+  const [pegado, setPegado] = useState2("");
+  const [estado, setEstado] = useState2("");
+  const [copia, setCopia] = useState2(null);
+  const [frescura2, setFrescura] = useState2(0);
+  const leer = async () => {
+    setEstado(t(lang, "simc.leyendo"));
+    if (puente && typeof puente.poll === "function") {
+      try {
+        await puente.poll();
+      } catch {
+      }
+    }
+    const reg = await lerPersonagem(ctx);
+    setRegistro(reg);
+    setCargado(true);
+    setFrescura(Date.now() / 1e3);
+    setEstado("");
+  };
+  useEffect(() => {
+    void leer();
+  }, []);
+  const parseado = useMemo2(
+    () => registro?.texto ? parsearSimc(registro.texto) : null,
+    [registro]
+  );
+  const p = parseado?.ok ? parseado.personagem : null;
+  useEffect(() => {
+    onResumen?.(resumenSimc(registro, p, lang));
+  }, [registro, p, lang]);
+  const guardarPegado = async () => {
+    if (!pegado.trim()) return;
+    if (pegado.length > MAX_TEXTO) {
+      setEstado(t(lang, "simc.muyLargo"));
+      return;
+    }
+    const reg = await guardarPersonagem(ctx, {
+      v: 1,
+      origem: "pegado",
+      texto: pegado,
+      capturado: Math.floor(Date.now() / 1e3),
+      erro: null
+    });
+    if (!reg) {
+      setEstado(t(lang, "simc.muyLargo"));
+      return;
+    }
+    setRegistro(reg);
+    setPegado("");
+    setEstado(t(lang, "simc.guardado"));
+  };
+  const copiar = async () => {
+    if (!registro?.texto) return;
+    let ok = false;
+    try {
+      ok = await ctx.os.writeClipboard(registro.texto) === true;
+    } catch {
+      ok = false;
+    }
+    setCopia({ ok, texto: registro.texto });
+  };
+  const proposta = p ? propostaPerfil(p, perfil, D.personaje) : null;
+  const aplicar = async () => {
+    if (!proposta || typeof onAplicar !== "function") return;
+    setEstado(t(lang, "simc.leyendo"));
+    try {
+      await onAplicar(proposta.campos);
+      setEstado(t(lang, "simc.aplicado"));
+    } catch (e) {
+      setEstado(e?.message || String(e));
+    }
+  };
+  const cambios = proposta ? Object.keys(proposta.campos).map((k) => {
+    if (k === "nivel") return t(lang, "simc.nivel") + " → " + proposta.campos.nivel;
+    if (k === "clase") return t(lang, "simc.clase") + " → " + nombre(D.personaje.clases[String(proposta.campos.clase)]?.n, lang);
+    if (k === "raza") return t(lang, "simc.raza") + " → " + nombre(D.personaje.razas[String(proposta.campos.raza)]?.n, lang);
+    if (k === "faccion") return t(lang, "simc.faccion") + " → " + proposta.campos.faccion;
+    if (k === "reino") return t(lang, "simc.reino") + " → " + proposta.campos.reino;
+    if (k === "profissoes") return t(lang, "perfil.profesiones") + " → " + proposta.campos.profissoes.map((id) => nombre(D.profesiones.profesiones[id]?.n, lang)).join(", ");
+    if (k === "secundarias") return t(lang, "perfil.secundarias") + " → " + proposta.campos.secundarias.map((id) => nombre(D.profesiones.profesiones[id]?.n, lang)).join(", ");
+    return k;
+  }) : [];
+  const viejo = registro?.capturado ? frescura2 - registro.capturado > VIEJO_S : false;
+  const armor = Number.isFinite(p?.combate?.defense?.armor_effective) ? p.combate.defense.armor_effective : Number.isFinite(p?.combate?.defense?.armor) ? p.combate.defense.armor : null;
+  return /* @__PURE__ */ jsxs3(Tarjeta, { titulo: t(lang, "simc.titulo"), children: [
+    !cargado ? /* @__PURE__ */ jsx3("div", { style: S.sub, children: t(lang, "simc.leyendo") }) : null,
+    cargado && !registro ? /* @__PURE__ */ jsxs3("div", { style: S.sub, children: [
+      t(lang, "simc.vazio"),
+      " ",
+      t(lang, "simc.vazio.ayuda")
+    ] }) : null,
+    registro ? /* @__PURE__ */ jsxs3(Fragment4, { children: [
+      /* @__PURE__ */ jsxs3("div", { style: { display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }, children: [
+        /* @__PURE__ */ jsx3(
+          "span",
+          {
+            title: t(lang, registro.origem === "addon" ? "simc.origem.addon.ayuda" : "simc.origem.pegado.ayuda"),
+            style: { ...S.chip, borderColor: registro.origem === "addon" ? C.verde : C.azul, color: registro.origem === "addon" ? C.verde : C.azul },
+            children: t(lang, registro.origem === "addon" ? "simc.origem.addon" : "simc.origem.pegado")
+          }
+        ),
+        registro.capturado ? /* @__PURE__ */ jsxs3("span", { style: { ...S.chip, borderColor: viejo ? C.amarillo : C.borde2, color: viejo ? C.amarillo : C.texto3 }, children: [
+          viejo ? t(lang, "simc.viejo") : t(lang, "simc.actual"),
+          " · ",
+          t(lang, "simc.capturado"),
+          " ",
+          fecha(registro.capturado)
+        ] }) : null,
+        registro.erro ? /* @__PURE__ */ jsx3("span", { title: registro.erro.msg, style: { ...S.chip, borderColor: C.rojo, color: C.rojo }, children: t(lang, "simc.erro") }) : null,
+        /* @__PURE__ */ jsx3(Button2, { size: "xs", variant: "outline", onClick: () => {
+          void leer();
+        }, children: t(lang, "simc.releer") })
+      ] }),
+      parseado && !parseado.ok ? /* @__PURE__ */ jsx3(Aviso, { children: t(lang, "simc.sinParsear") }) : null,
+      p ? /* @__PURE__ */ jsxs3(Fragment4, { children: [
+        /* @__PURE__ */ jsxs3("div", { style: { display: "flex", flexWrap: "wrap", gap: 12 }, children: [
+          /* @__PURE__ */ jsxs3(Campo, { etiqueta: t(lang, "simc.clase"), children: [
+            p.clase != null ? nombre(D.personaje.clases[String(p.clase)]?.n, lang) : p.claseToken || "—",
+            p.spec && p.spec !== "unknown" ? /* @__PURE__ */ jsxs3("span", { style: S.etiqueta, children: [
+              " · ",
+              p.spec
+            ] }) : null
+          ] }),
+          /* @__PURE__ */ jsx3(Campo, { etiqueta: t(lang, "simc.nivel"), children: Number.isInteger(p.nivel) ? p.nivel : "—" }),
+          /* @__PURE__ */ jsx3(Campo, { etiqueta: t(lang, "simc.raza"), children: p.raza != null ? nombre(D.personaje.razas[String(p.raza)]?.n, lang) : p.razaToken || "—" }),
+          /* @__PURE__ */ jsx3(Campo, { etiqueta: t(lang, "simc.reino"), children: p.reino ? String(p.reino).replace(/_/g, " ") : "—" }),
+          /* @__PURE__ */ jsx3(Campo, { etiqueta: t(lang, "simc.rol"), children: p.rol || "—" })
+        ] }),
+        /* @__PURE__ */ jsxs3("div", { children: [
+          /* @__PURE__ */ jsx3("div", { style: S.etiqueta, children: t(lang, "simc.stats") }),
+          /* @__PURE__ */ jsxs3("div", { style: { display: "flex", flexWrap: "wrap", gap: 8 }, children: [
+            STATS.map((k) => /* @__PURE__ */ jsxs3("span", { style: S.chip, title: k, children: [
+              STAT_LABEL[k],
+              " ",
+              Number.isFinite(p.stats?.[k]) ? p.stats[k] : "—"
+            ] }, k)),
+            /* @__PURE__ */ jsxs3("span", { style: S.chip, title: "armor", children: [
+              t(lang, "simc.armadura"),
+              " ",
+              armor ?? "—"
+            ] })
+          ] })
+        ] }),
+        /* @__PURE__ */ jsxs3("div", { children: [
+          /* @__PURE__ */ jsx3("div", { style: S.etiqueta, children: t(lang, "simc.equipo") }),
+          Object.keys(p.equipo).length === 0 ? /* @__PURE__ */ jsx3("div", { style: S.sub, children: t(lang, "simc.equipo.vacio") }) : /* @__PURE__ */ jsx3("div", { style: { display: "flex", flexWrap: "\
+wrap", gap: 6 }, children: SLOTS.filter((s) => p.equipo[s]).map((s) => {
+            const eq = p.equipo[s];
+            return /* @__PURE__ */ jsxs3("span", { style: S.chip, title: eq.nome || void 0, children: [
+              t(lang, "simc.slot." + s),
+              " · ",
+              eq.id != null ? /* @__PURE__ */ jsx3(NombreItem, { id: eq.id, lang }) : `#?`,
+              Number.isInteger(eq.ilvl) ? " · " + t(lang, "simc.ilvl", { n: eq.ilvl }) : ""
+            ] }, s);
+          }) })
+        ] }),
+        /* @__PURE__ */ jsxs3("div", { style: { display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }, children: [
+          /* @__PURE__ */ jsxs3("span", { style: S.chip, title: p.talentos?.grupos?.length ? t(lang, "simc.talentos.grupos", { n: p.talentos.grupos.length }) : void 0, children: [
+            t(lang, "simc.talentos"),
+            ": ",
+            p.talentos?.ativo || p.talentos?.legacy ? t(lang, "simc.talentos.si") : t(lang, "simc.talentos.no")
+          ] }),
+          p.profissoes?.length ? /* @__PURE__ */ jsx3("span", { style: S.chip, title: t(lang, "simc.profissoes"), children: p.profissoes.map((x) => (D.profesiones.profesiones[x.id]?.n ? nombre(D.profesiones.
+          profesiones[x.id].n, lang) : x.nome) + (x.skill != null ? " " + x.skill : "")).join(", ") }) : null,
+          p.desconhecidas?.length ? /* @__PURE__ */ jsx3("span", { style: S.etiqueta, children: t(lang, "simc.desconhecidas", { n: p.desconhecidas.length }) }) : null
+        ] }),
+        proposta ? /* @__PURE__ */ jsxs3(Aviso, { children: [
+          /* @__PURE__ */ jsxs3("div", { children: [
+            t(lang, "simc.proposta"),
+            ": ",
+            cambios.join(" · ")
+          ] }),
+          /* @__PURE__ */ jsx3("div", { style: { marginTop: 6 }, children: /* @__PURE__ */ jsx3(Button2, { size: "xs", onClick: () => {
+            void aplicar();
+          }, children: t(lang, "simc.aplicar") }) })
+        ] }) : null
+      ] }) : null
+    ] }) : null,
+    /* @__PURE__ */ jsxs3("div", { children: [
+      /* @__PURE__ */ jsx3("div", { style: S.etiqueta, children: t(lang, "simc.pegar") }),
+      /* @__PURE__ */ jsx3("div", { style: S.sub, children: t(lang, "simc.pegar.ayuda") }),
+      /* @__PURE__ */ jsx3(
+        "textarea",
+        {
+          value: pegado,
+          onChange: (e) => setPegado(e.target.value),
+          rows: 4,
+          placeholder: "# SimC Addon …",
+          style: {
+            width: "100%",
+            fontFamily: "var(--font-mono, monospace)",
+            fontSize: 11,
+            color: C.texto,
+            background: C.fondo2,
+            border: `1px solid ${C.borde}`,
+            borderRadius: 4,
+            padding: 8
+          }
+        }
+      ),
+      /* @__PURE__ */ jsxs3("div", { style: { display: "flex", gap: 8, marginTop: 6, alignItems: "center" }, children: [
+        /* @__PURE__ */ jsx3(Button2, { size: "xs", variant: "outline", disabled: !pegado.trim(), onClick: () => {
+          void guardarPegado();
+        }, children: t(lang, "simc.guardar") }),
+        registro?.texto ? /* @__PURE__ */ jsx3(Button2, { size: "xs", variant: "outline", onClick: () => {
+          void copiar();
+        }, children: t(lang, "simc.copiar") }) : null
+      ] }),
+      estado ? /* @__PURE__ */ jsx3("div", { style: S.sub, role: "status", children: estado }) : null,
+      copia ? /* @__PURE__ */ jsx3("div", { style: S.sub, role: "status", children: t(lang, copia.ok ? "simc.copiado" : "simc.noCopiado") }) : null,
+      copia && !copia.ok ? /* @__PURE__ */ jsx3("pre", { style: { ...S.sub, whiteSpace: "pre-wrap", userSelect: "text" }, children: copia.texto }) : null
+    ] }),
+    /* @__PURE__ */ jsxs3("div", { style: S.sub, children: [
+      CLAVE,
+      " · storage del plugin"
+    ] })
+  ] });
+}
+
+// src/vistas/personaje.jsx
+import { Fragment as Fragment5, jsx as jsx4, jsxs as jsxs4 } from "react/jsx-runtime";
 agregarTextos({
   "perfil.copiar": "Copiar perfil para el agente",
   "perfil.copiar.ayuda": "Pégalo en el chat de Hermes: la skill wow-forever lo usa para responder sobre tu personaje.",
@@ -36291,18 +37194,19 @@ var PROCEDENCIA_PERSONAJE = [
   "builds: cliente-forever " + (D.profesiones.meta?.builds?.["cliente-forever"] || "?") + " / cmangos-1.12 " + (D.profesiones.meta?.builds?.["cmangos-1.12"] || "?")
 ];
 function Selector({ etiqueta, valor, opciones, onChange, id }) {
-  return /* @__PURE__ */ jsxs3("label", { style: S.campo, htmlFor: id, children: [
-    /* @__PURE__ */ jsx3("span", { style: S.etiqueta, children: etiqueta }),
-    /* @__PURE__ */ jsxs3(Select, { value: valor == null ? "" : String(valor), onValueChange: (v) => onChange(v), children: [
-      /* @__PURE__ */ jsx3(SelectTrigger, { id, "aria-label": etiqueta, children: /* @__PURE__ */ jsx3(SelectValue, { placeholder: "—" }) }),
-      /* @__PURE__ */ jsx3(SelectContent, { children: opciones.map(([v, texto2]) => /* @__PURE__ */ jsx3(SelectItem, { value: String(v), children: texto2 }, v)) })
+  return /* @__PURE__ */ jsxs4("label", { style: S.campo, htmlFor: id, children: [
+    /* @__PURE__ */ jsx4("span", { style: S.etiqueta, children: etiqueta }),
+    /* @__PURE__ */ jsxs4(Select, { value: valor == null ? "" : String(valor), onValueChange: (v) => onChange(v), children: [
+      /* @__PURE__ */ jsx4(SelectTrigger, { id, "aria-label": etiqueta, children: /* @__PURE__ */ jsx4(SelectValue, { placeholder: "—" }) }),
+      /* @__PURE__ */ jsx4(SelectContent, { children: opciones.map(([v, texto2]) => /* @__PURE__ */ jsx4(SelectItem, { value: String(v), children: texto2 }, v)) })
     ] })
   ] });
 }
-function VistaPersonaje({ ctx, perfil, guardarPerfil, razaSupuesta, lang, irA }) {
-  const [borrador, setBorrador] = useState2(perfil);
-  const [estado, setEstado] = useState2("");
-  const [copia, setCopia] = useState2(null);
+function VistaPersonaje({ ctx, perfil, guardarPerfil, razaSupuesta, lang, irA, puente }) {
+  const [borrador, setBorrador] = useState3(perfil);
+  const [estado, setEstado] = useState3("");
+  const [copia, setCopia] = useState3(null);
+  const [resumenSimc2, setResumenSimc] = useState3(null);
   const p = borrador;
   const cambiar = async (parcial) => {
     const nuevo = { ...p, ...parcial };
@@ -36320,9 +37224,9 @@ function VistaPersonaje({ ctx, perfil, guardarPerfil, razaSupuesta, lang, irA })
     }
   };
   const resumen = perfilParaAgente(p, D.personaje, NOMBRES_PROF, lang);
-  const snapshotDavi = useMemo2(
-    () => construirContextoPersonaje({ resumen, procedencia: PROCEDENCIA_PERSONAJE, lang }),
-    [resumen, lang]
+  const snapshotDavi = useMemo3(
+    () => construirContextoPersonaje({ resumen, procedencia: PROCEDENCIA_PERSONAJE, lang, resumenSimc: resumenSimc2 }),
+    [resumen, lang, resumenSimc2]
   );
   const copiar = async () => {
     let ok = false;
@@ -36336,11 +37240,11 @@ function VistaPersonaje({ ctx, perfil, guardarPerfil, razaSupuesta, lang, irA })
   const razas = p.faccion && p.clase ? razasPara(D.personaje, p.faccion, p.clase) : [];
   const clasesFac = p.faccion ? CLASES.filter((c) => razasPara(D.personaje, p.faccion, c).length) : CLASES;
   const toggle = (lista, id, max) => lista.includes(id) ? lista.filter((x) => x !== id) : lista.length < max ? [...lista, id] : lista;
-  return /* @__PURE__ */ jsxs3(Fragment4, { children: [
-    /* @__PURE__ */ jsxs3(Tarjeta, { titulo: t(lang, "tab.personaje"), extra: /* @__PURE__ */ jsx3(Origen, { f: "cliente-forever", lang }), children: [
-      razaSupuesta ? /* @__PURE__ */ jsx3(Aviso, { children: t(lang, "perfil.supuesta") }) : null,
-      /* @__PURE__ */ jsxs3("div", { style: { display: "flex", flexWrap: "wrap", gap: 12 }, children: [
-        /* @__PURE__ */ jsx3(
+  return /* @__PURE__ */ jsxs4(Fragment5, { children: [
+    /* @__PURE__ */ jsxs4(Tarjeta, { titulo: t(lang, "tab.personaje"), extra: /* @__PURE__ */ jsx4(Origen, { f: "cliente-forever", lang }), children: [
+      razaSupuesta ? /* @__PURE__ */ jsx4(Aviso, { children: t(lang, "perfil.supuesta") }) : null,
+      /* @__PURE__ */ jsxs4("div", { style: { display: "flex", flexWrap: "wrap", gap: 12 }, children: [
+        /* @__PURE__ */ jsx4(
           Selector,
           {
             id: "wf-faccion",
@@ -36350,7 +37254,7 @@ function VistaPersonaje({ ctx, perfil, guardarPerfil, razaSupuesta, lang, irA })
             onChange: (v) => cambiar({ faccion: v })
           }
         ),
-        /* @__PURE__ */ jsx3(
+        /* @__PURE__ */ jsx4(
           Selector,
           {
             id: "wf-clase",
@@ -36360,7 +37264,7 @@ function VistaPersonaje({ ctx, perfil, guardarPerfil, razaSupuesta, lang, irA })
             onChange: (v) => cambiar({ clase: Number(v) })
           }
         ),
-        /* @__PURE__ */ jsx3(
+        /* @__PURE__ */ jsx4(
           Selector,
           {
             id: "wf-raza",
@@ -36370,9 +37274,9 @@ function VistaPersonaje({ ctx, perfil, guardarPerfil, razaSupuesta, lang, irA })
             onChange: (v) => cambiar({ raza: Number(v) })
           }
         ),
-        /* @__PURE__ */ jsxs3("label", { style: S.campo, htmlFor: "wf-nivel", children: [
-          /* @__PURE__ */ jsx3("span", { style: S.etiqueta, children: t(lang, "perfil.nivel") }),
-          /* @__PURE__ */ jsx3(
+        /* @__PURE__ */ jsxs4("label", { style: S.campo, htmlFor: "wf-nivel", children: [
+          /* @__PURE__ */ jsx4("span", { style: S.etiqueta, children: t(lang, "perfil.nivel") }),
+          /* @__PURE__ */ jsx4(
             Input2,
             {
               id: "wf-nivel",
@@ -36384,21 +37288,22 @@ function VistaPersonaje({ ctx, perfil, guardarPerfil, razaSupuesta, lang, irA })
             }
           )
         ] }),
-        /* @__PURE__ */ jsxs3("label", { style: S.campo, htmlFor: "wf-reino", children: [
-          /* @__PURE__ */ jsx3("span", { style: S.etiqueta, children: t(lang, "perfil.reino") }),
-          /* @__PURE__ */ jsx3(Input2, { id: "wf-reino", value: p.reino, maxLength: 64, onChange: (e) => cambiar({ reino: e.target.value }) })
+        /* @__PURE__ */ jsxs4("label", { style: S.campo, htmlFor: "wf-reino", children: [
+          /* @__PURE__ */ jsx4("span", { style: S.etiqueta, children: t(lang, "perfil.reino") }),
+          /* @__PURE__ */ jsx4(Input2, { id: "wf-reino", value: p.reino, maxLength: 64, onChange: (e) => cambiar({ reino: e.target.value }) })
         ] })
       ] }),
-      p.raza && p.clase && esNueva(p.raza, p.clase) ? /* @__PURE__ */ jsxs3("div", { style: { ...S.sub, color: C.verde }, children: [
+      p.raza && p.clase && esNueva(p.raza, p.clase) ? /* @__PURE__ */ jsxs4("div", { style: { ...S.sub, color: C.verde }, children: [
         "★ ",
         t(lang, "perfil.nueva")
       ] }) : null,
-      /* @__PURE__ */ jsx3("div", { style: S.sub, role: "status", children: estado })
+      /* @__PURE__ */ jsx4("div", { style: S.sub, role: "status", children: estado })
     ] }),
-    /* @__PURE__ */ jsxs3(Tarjeta, { titulo: t(lang, "perfil.profesiones"), children: [
-      /* @__PURE__ */ jsx3("div", { style: { display: "flex", flexWrap: "wrap", gap: 12 }, children: PRINCIPALES.map((id) => /* @__PURE__ */ jsxs3("label", { style: { display: "flex", gap: 6, alignItems: "\
+    /* @__PURE__ */ jsx4(TarjetaSimc, { ctx, lang, perfil: p, onAplicar: cambiar, puente, onResumen: setResumenSimc }),
+    /* @__PURE__ */ jsxs4(Tarjeta, { titulo: t(lang, "perfil.profesiones"), children: [
+      /* @__PURE__ */ jsx4("div", { style: { display: "flex", flexWrap: "wrap", gap: 12 }, children: PRINCIPALES.map((id) => /* @__PURE__ */ jsxs4("label", { style: { display: "flex", gap: 6, alignItems: "\
 center" }, children: [
-        /* @__PURE__ */ jsx3(
+        /* @__PURE__ */ jsx4(
           Checkbox2,
           {
             checked: p.profesiones.includes(id),
@@ -36407,10 +37312,10 @@ center" }, children: [
         ),
         nombre(D.profesiones.profesiones[id].n, lang)
       ] }, id)) }),
-      /* @__PURE__ */ jsx3("span", { style: S.etiqueta, children: t(lang, "perfil.secundarias") }),
-      /* @__PURE__ */ jsx3("div", { style: { display: "flex", flexWrap: "wrap", gap: 12 }, children: SECUNDARIAS.map((id) => /* @__PURE__ */ jsxs3("label", { style: { display: "flex", gap: 6, alignItems: "\
+      /* @__PURE__ */ jsx4("span", { style: S.etiqueta, children: t(lang, "perfil.secundarias") }),
+      /* @__PURE__ */ jsx4("div", { style: { display: "flex", flexWrap: "wrap", gap: 12 }, children: SECUNDARIAS.map((id) => /* @__PURE__ */ jsxs4("label", { style: { display: "flex", gap: 6, alignItems: "\
 center" }, children: [
-        /* @__PURE__ */ jsx3(
+        /* @__PURE__ */ jsx4(
           Checkbox2,
           {
             checked: p.secundarias.includes(id),
@@ -36419,18 +37324,18 @@ center" }, children: [
         ),
         nombre(D.profesiones.profesiones[id].n, lang)
       ] }, id)) }),
-      p.faccion && p.raza && p.clase ? /* @__PURE__ */ jsx3("div", { children: /* @__PURE__ */ jsxs3(Button2, { size: "xs", onClick: () => irA("clase"), children: [
+      p.faccion && p.raza && p.clase ? /* @__PURE__ */ jsx4("div", { children: /* @__PURE__ */ jsxs4(Button3, { size: "xs", onClick: () => irA("clase"), children: [
         t(lang, "tab.clase"),
         " →"
       ] }) }) : null
     ] }),
-    /* @__PURE__ */ jsxs3(Tarjeta, { titulo: t(lang, "perfil.copiar"), children: [
-      /* @__PURE__ */ jsx3("div", { style: S.sub, children: t(lang, "perfil.copiar.ayuda") }),
-      /* @__PURE__ */ jsx3("div", { children: /* @__PURE__ */ jsx3(Button2, { size: "xs", variant: "outline", disabled: !resumen, onClick: copiar, children: t(lang, "perfil.copiar") }) }),
-      copia ? /* @__PURE__ */ jsx3("div", { style: S.sub, role: "status", children: t(lang, copia.ok ? "perfil.copiado" : "perfil.noCopiado") }) : null,
-      copia && !copia.ok ? /* @__PURE__ */ jsx3("pre", { style: { ...S.sub, whiteSpace: "pre-wrap", userSelect: "text" }, children: copia.texto }) : null
+    /* @__PURE__ */ jsxs4(Tarjeta, { titulo: t(lang, "perfil.copiar"), children: [
+      /* @__PURE__ */ jsx4("div", { style: S.sub, children: t(lang, "perfil.copiar.ayuda") }),
+      /* @__PURE__ */ jsx4("div", { children: /* @__PURE__ */ jsx4(Button3, { size: "xs", variant: "outline", disabled: !resumen, onClick: copiar, children: t(lang, "perfil.copiar") }) }),
+      copia ? /* @__PURE__ */ jsx4("div", { style: S.sub, role: "status", children: t(lang, copia.ok ? "perfil.copiado" : "perfil.noCopiado") }) : null,
+      copia && !copia.ok ? /* @__PURE__ */ jsx4("pre", { style: { ...S.sub, whiteSpace: "pre-wrap", userSelect: "text" }, children: copia.texto }) : null
     ] }),
-    /* @__PURE__ */ jsx3(Tarjeta, { titulo: t(lang, "davi.boton"), children: /* @__PURE__ */ jsx3(
+    /* @__PURE__ */ jsx4(Tarjeta, { titulo: t(lang, "davi.boton"), children: /* @__PURE__ */ jsx4(
       PreguntarDavi,
       {
         ctx,
@@ -36444,12 +37349,12 @@ center" }, children: [
 }
 
 // src/vistas/clase.jsx
-import { useState as useState3 } from "react";
-import { Button as Button3 } from "@hermes/plugin-sdk";
-import { Fragment as Fragment5, jsx as jsx4, jsxs as jsxs4 } from "react/jsx-runtime";
+import { useState as useState4 } from "react";
+import { Button as Button4 } from "@hermes/plugin-sdk";
+import { Fragment as Fragment6, jsx as jsx5, jsxs as jsxs5 } from "react/jsx-runtime";
 var VENTANA = 10;
 function VistaClase({ perfil, lang }) {
-  const [todos, setTodos] = useState3(false);
+  const [todos, setTodos] = useState4(false);
   const cl = D.clases.clases[String(perfil.clase)];
   const entrenadores = cl.entrenadores[perfil.faccion] || [];
   const sinEntrenador = huecos("clases", { tema: "entrenadores", clase: perfil.clase, faccion: perfil.faccion });
@@ -36461,58 +37366,58 @@ function VistaClase({ perfil, lang }) {
     const k = e.zona == null ? "—" : nombre(zona(e.zona)?.n, lang) || String(e.zona);
     porZona.set(k, [...porZona.get(k) || [], e]);
   }
-  return /* @__PURE__ */ jsxs4(Fragment5, { children: [
-    /* @__PURE__ */ jsxs4(
+  return /* @__PURE__ */ jsxs5(Fragment6, { children: [
+    /* @__PURE__ */ jsxs5(
       Tarjeta,
       {
         titulo: t(lang, "clase.entrenadores") + " · " + nombre(D.personaje.facciones[perfil.faccion].n, lang),
-        extra: /* @__PURE__ */ jsx4(Origen, { f: "cmangos-1.12", lang }),
+        extra: /* @__PURE__ */ jsx5(Origen, { f: "cmangos-1.12", lang }),
         children: [
-          sinEntrenador.length ? /* @__PURE__ */ jsx4(Hueco, { lang, children: t(lang, "clase.sinEntrenador") }) : null,
-          [...porZona.entries()].sort().map(([z, lista]) => /* @__PURE__ */ jsxs4("div", { style: S.fila, children: [
-            /* @__PURE__ */ jsx4("span", { style: { minWidth: 160, color: C.texto2 }, children: z }),
-            /* @__PURE__ */ jsx4("span", { children: lista.map((e) => nombre(e.n, lang)).join(", ") })
+          sinEntrenador.length ? /* @__PURE__ */ jsx5(Hueco, { lang, children: t(lang, "clase.sinEntrenador") }) : null,
+          [...porZona.entries()].sort().map(([z, lista]) => /* @__PURE__ */ jsxs5("div", { style: S.fila, children: [
+            /* @__PURE__ */ jsx5("span", { style: { minWidth: 160, color: C.texto2 }, children: z }),
+            /* @__PURE__ */ jsx5("span", { children: lista.map((e) => nombre(e.n, lang)).join(", ") })
           ] }, z))
         ]
       }
     ),
-    /* @__PURE__ */ jsxs4(Tarjeta, { titulo: t(lang, "clase.hechizos"), extra: /* @__PURE__ */ jsxs4(Fragment5, { children: [
-      /* @__PURE__ */ jsx4(Origen, { f: "cmangos-1.12", lang }),
-      /* @__PURE__ */ jsx4(Button3, { variant: "ghost", size: "xs", onClick: () => setTodos(!todos), children: todos ? t(lang, "clase.menos") : t(lang, "clase.todos") })
+    /* @__PURE__ */ jsxs5(Tarjeta, { titulo: t(lang, "clase.hechizos"), extra: /* @__PURE__ */ jsxs5(Fragment6, { children: [
+      /* @__PURE__ */ jsx5(Origen, { f: "cmangos-1.12", lang }),
+      /* @__PURE__ */ jsx5(Button4, { variant: "ghost", size: "xs", onClick: () => setTodos(!todos), children: todos ? t(lang, "clase.menos") : t(lang, "clase.todos") })
     ] }), children: [
-      !todos ? /* @__PURE__ */ jsxs4("div", { style: S.sub, children: [
+      !todos ? /* @__PURE__ */ jsxs5("div", { style: S.sub, children: [
         t(lang, "clase.proximos"),
         " · ",
         t(lang, "clase.hastaNivel"),
         " ",
         perfil.nivel + VENTANA
       ] }) : null,
-      visibles.length ? /* @__PURE__ */ jsxs4("table", { style: S.tabla, children: [
-        /* @__PURE__ */ jsx4("thead", { children: /* @__PURE__ */ jsxs4("tr", { children: [
-          /* @__PURE__ */ jsx4("th", { style: S.th, children: t(lang, "clase.nivel") }),
-          /* @__PURE__ */ jsx4("th", { style: S.th, children: t(lang, "clase.hechizo") }),
-          /* @__PURE__ */ jsx4("th", { style: S.th, children: t(lang, "clase.costo") })
+      visibles.length ? /* @__PURE__ */ jsxs5("table", { style: S.tabla, children: [
+        /* @__PURE__ */ jsx5("thead", { children: /* @__PURE__ */ jsxs5("tr", { children: [
+          /* @__PURE__ */ jsx5("th", { style: S.th, children: t(lang, "clase.nivel") }),
+          /* @__PURE__ */ jsx5("th", { style: S.th, children: t(lang, "clase.hechizo") }),
+          /* @__PURE__ */ jsx5("th", { style: S.th, children: t(lang, "clase.costo") })
         ] }) }),
-        /* @__PURE__ */ jsx4("tbody", { children: visibles.map((h) => /* @__PURE__ */ jsxs4("tr", { style: { opacity: h.nivel <= perfil.nivel ? 1 : 0.75 }, children: [
-          /* @__PURE__ */ jsx4("td", { style: S.td, children: h.nivel }),
-          /* @__PURE__ */ jsx4("td", { style: S.td, children: nombre(h.n, lang) }),
-          /* @__PURE__ */ jsx4("td", { style: S.td, children: dinero(h.costo) })
+        /* @__PURE__ */ jsx5("tbody", { children: visibles.map((h) => /* @__PURE__ */ jsxs5("tr", { style: { opacity: h.nivel <= perfil.nivel ? 1 : 0.75 }, children: [
+          /* @__PURE__ */ jsx5("td", { style: S.td, children: h.nivel }),
+          /* @__PURE__ */ jsx5("td", { style: S.td, children: nombre(h.n, lang) }),
+          /* @__PURE__ */ jsx5("td", { style: S.td, children: dinero(h.costo) })
         ] }, h.spell + ":" + h.nivel)) })
-      ] }) : /* @__PURE__ */ jsx4("div", { style: S.sub, children: t(lang, "clase.ninguno") })
+      ] }) : /* @__PURE__ */ jsx5("div", { style: S.sub, children: t(lang, "clase.ninguno") })
     ] }),
-    /* @__PURE__ */ jsx4(Tarjeta, { titulo: t(lang, "clase.misiones"), extra: /* @__PURE__ */ jsx4(Origen, { f: "cmangos-1.12", lang }), children: misiones.length ? misiones.map(([id, m]) => /* @__PURE__ */ jsxs4(
+    /* @__PURE__ */ jsx5(Tarjeta, { titulo: t(lang, "clase.misiones"), extra: /* @__PURE__ */ jsx5(Origen, { f: "cmangos-1.12", lang }), children: misiones.length ? misiones.map(([id, m]) => /* @__PURE__ */ jsxs5(
     "div", { style: { ...S.fila, opacity: m.min > perfil.nivel ? 0.6 : 1 }, children: [
-      /* @__PURE__ */ jsx4("span", { style: { minWidth: 40, color: C.texto3 }, children: m.nivel }),
-      /* @__PURE__ */ jsx4("span", { style: { flex: 1 }, children: nombre(m.t, lang) }),
-      /* @__PURE__ */ jsx4("span", { style: S.sub, children: m.zona != null ? nombre(zona(m.zona)?.n, lang) : m.dungeon != null ? nombre(D.dungeons.clasicos[String(m.dungeon)]?.n, lang) : "" })
-    ] }, id)) : /* @__PURE__ */ jsx4(Hueco, { lang, children: t(lang, "clase.misiones") }) }),
-    /* @__PURE__ */ jsx4(Tarjeta, { titulo: t(lang, "clase.competencias"), extra: /* @__PURE__ */ jsx4(Origen, { f: "cliente-forever", lang }), children: /* @__PURE__ */ jsx4("div", { style: { display: "\
-flex", flexWrap: "wrap", gap: 6 }, children: cl.competencias.map((c) => /* @__PURE__ */ jsx4("span", { style: S.chip, children: nombre(c.n, lang) }, c.id)) }) })
+      /* @__PURE__ */ jsx5("span", { style: { minWidth: 40, color: C.texto3 }, children: m.nivel }),
+      /* @__PURE__ */ jsx5("span", { style: { flex: 1 }, children: nombre(m.t, lang) }),
+      /* @__PURE__ */ jsx5("span", { style: S.sub, children: m.zona != null ? nombre(zona(m.zona)?.n, lang) : m.dungeon != null ? nombre(D.dungeons.clasicos[String(m.dungeon)]?.n, lang) : "" })
+    ] }, id)) : /* @__PURE__ */ jsx5(Hueco, { lang, children: t(lang, "clase.misiones") }) }),
+    /* @__PURE__ */ jsx5(Tarjeta, { titulo: t(lang, "clase.competencias"), extra: /* @__PURE__ */ jsx5(Origen, { f: "cliente-forever", lang }), children: /* @__PURE__ */ jsx5("div", { style: { display: "\
+flex", flexWrap: "wrap", gap: 6 }, children: cl.competencias.map((c) => /* @__PURE__ */ jsx5("span", { style: S.chip, children: nombre(c.n, lang) }, c.id)) }) })
   ] });
 }
 
 // src/vistas/ruta.jsx
-import { useMemo as useMemo3, useState as useState4 } from "react";
+import { useMemo as useMemo4, useState as useState5 } from "react";
 
 // src/ruta-logica.js
 function faccionCodigo(faccion) {
@@ -36763,7 +37668,7 @@ function alternarEnLista(lista, id, puesto) {
 
 // src/vistas/ruta/curada.jsx
 import { Checkbox as Checkbox3, SegmentedControl } from "@hermes/plugin-sdk";
-import { Fragment as Fragment6, jsx as jsx5, jsxs as jsxs5 } from "react/jsx-runtime";
+import { Fragment as Fragment7, jsx as jsx6, jsxs as jsxs6 } from "react/jsx-runtime";
 agregarTextos({
   "ruta.curada": "Ruta curada",
   "ruta.curadaSub": "Bandas escritas a mano en la guía de tu clase. Tilda los pasos que ya hiciste: se guardan solos.",
@@ -36816,12 +37721,12 @@ function CuradaRuta({ datos, build, pasos, onPaso, onGuardar, perfil, lang }) {
   const hechos = hitos.filter((m, i) => pasos.has(m.lvl + "|" + i)).length;
   const pct2 = total ? Math.round(hechos / total * 1e3) / 10 : 0;
   const locLabel = (c) => c === "K" ? t(lang, "ruta.locK") : c === "E" ? t(lang, "ruta.locE") : c;
-  return /* @__PURE__ */ jsxs5(
+  return /* @__PURE__ */ jsxs6(
     Tarjeta,
     {
       titulo: t(lang, "ruta.curada"),
-      extra: /* @__PURE__ */ jsxs5(Fragment6, { children: [
-        /* @__PURE__ */ jsx5(
+      extra: /* @__PURE__ */ jsxs6(Fragment7, { children: [
+        /* @__PURE__ */ jsx6(
           SegmentedControl,
           {
             value: realm,
@@ -36829,14 +37734,14 @@ function CuradaRuta({ datos, build, pasos, onPaso, onGuardar, perfil, lang }) {
             options: claves.map((k) => ({ id: k, label: k === "ek" ? t(lang, "ruta.ek") : k === "kalimdor" ? t(lang, "ruta.kalimdor") : k }))
           }
         ),
-        /* @__PURE__ */ jsx5(Origen, { f: "curado", lang })
+        /* @__PURE__ */ jsx6(Origen, { f: "curado", lang })
       ] }),
       children: [
-        /* @__PURE__ */ jsx5("div", { style: S.sub, children: t(lang, "ruta.curadaSub") }),
-        /* @__PURE__ */ jsxs5("div", { style: { display: "flex", alignItems: "center", gap: 8 }, children: [
-          /* @__PURE__ */ jsx5("div", { style: { flex: 1, height: 6, borderRadius: 3, background: C.fondo3, overflow: "hidden" }, children: /* @__PURE__ */ jsx5("div", { style: { width: pct2 + "%", height: "\
+        /* @__PURE__ */ jsx6("div", { style: S.sub, children: t(lang, "ruta.curadaSub") }),
+        /* @__PURE__ */ jsxs6("div", { style: { display: "flex", alignItems: "center", gap: 8 }, children: [
+          /* @__PURE__ */ jsx6("div", { style: { flex: 1, height: 6, borderRadius: 3, background: C.fondo3, overflow: "hidden" }, children: /* @__PURE__ */ jsx6("div", { style: { width: pct2 + "%", height: "\
 100%", background: C.acento } }) }),
-          /* @__PURE__ */ jsxs5("span", { style: S.sub, children: [
+          /* @__PURE__ */ jsxs6("span", { style: S.sub, children: [
             hechos,
             "/",
             total,
@@ -36849,21 +37754,21 @@ function CuradaRuta({ datos, build, pasos, onPaso, onGuardar, perfil, lang }) {
           if (!ms.length) return null;
           const actual = nivel >= b.min && nivel <= b.max;
           const dn = ms.filter((x) => pasos.has(x.m.lvl + "|" + x.i)).length;
-          return /* @__PURE__ */ jsxs5("details", { open: bi === idxActual, style: estiloDetails, "data-banda": bi, children: [
-            /* @__PURE__ */ jsxs5("summary", { style: estiloSummary, children: [
-              /* @__PURE__ */ jsx5("span", { style: { fontWeight: 600 }, children: t(lang, "ruta.nivel", { min: b.min, max: b.max }) }),
-              actual ? /* @__PURE__ */ jsx5("span", { style: { ...S.chip, borderColor: C.verde, color: C.verde }, children: t(lang, "ruta.aqui") }) : null,
-              /* @__PURE__ */ jsx5("span", { style: { ...S.sub, flex: 1, minWidth: 0 }, children: b.zones }),
-              /* @__PURE__ */ jsxs5("span", { style: { ...S.sub, whiteSpace: "nowrap" }, children: [
+          return /* @__PURE__ */ jsxs6("details", { open: bi === idxActual, style: estiloDetails, "data-banda": bi, children: [
+            /* @__PURE__ */ jsxs6("summary", { style: estiloSummary, children: [
+              /* @__PURE__ */ jsx6("span", { style: { fontWeight: 600 }, children: t(lang, "ruta.nivel", { min: b.min, max: b.max }) }),
+              actual ? /* @__PURE__ */ jsx6("span", { style: { ...S.chip, borderColor: C.verde, color: C.verde }, children: t(lang, "ruta.aqui") }) : null,
+              /* @__PURE__ */ jsx6("span", { style: { ...S.sub, flex: 1, minWidth: 0 }, children: b.zones }),
+              /* @__PURE__ */ jsxs6("span", { style: { ...S.sub, whiteSpace: "nowrap" }, children: [
                 dn,
                 "/",
                 ms.length
               ] })
             ] }),
-            /* @__PURE__ */ jsxs5("div", { style: { padding: "0 8px 8px", display: "flex", flexDirection: "column", gap: 4 }, children: [
-              b.notes ? /* @__PURE__ */ jsx5("div", { style: S.sub, children: b.notes }) : null,
-              b.dung ? /* @__PURE__ */ jsxs5("div", { style: S.sub, children: [
-                /* @__PURE__ */ jsxs5("b", { style: { color: C.naranja }, children: [
+            /* @__PURE__ */ jsxs6("div", { style: { padding: "0 8px 8px", display: "flex", flexDirection: "column", gap: 4 }, children: [
+              b.notes ? /* @__PURE__ */ jsx6("div", { style: S.sub, children: b.notes }) : null,
+              b.dung ? /* @__PURE__ */ jsxs6("div", { style: S.sub, children: [
+                /* @__PURE__ */ jsxs6("b", { style: { color: C.naranja }, children: [
                   t(lang, "ruta.dungeons"),
                   ":"
                 ] }),
@@ -36873,12 +37778,12 @@ function CuradaRuta({ datos, build, pasos, onPaso, onGuardar, perfil, lang }) {
               ms.map(({ m, i }) => {
                 const id = m.lvl + "|" + i;
                 const hecho = pasos.has(id);
-                return /* @__PURE__ */ jsxs5("label", { "data-paso": id, style: { display: "flex", gap: 8, alignItems: "baseline", fontSize: 12, opacity: hecho ? 0.65 : 1 }, children: [
-                  /* @__PURE__ */ jsx5(Checkbox3, { checked: hecho, onCheckedChange: (v) => onPaso(id, v) }),
-                  /* @__PURE__ */ jsx5("span", { style: { minWidth: 28, color: C.texto3 }, children: m.lvl }),
-                  /* @__PURE__ */ jsx5("span", { style: S.chip, children: m.cat }),
-                  m.loc ? /* @__PURE__ */ jsx5("span", { style: S.chip, children: locLabel(m.loc) }) : null,
-                  /* @__PURE__ */ jsx5("span", { style: { flex: 1 }, children: m.txt })
+                return /* @__PURE__ */ jsxs6("label", { "data-paso": id, style: { display: "flex", gap: 8, alignItems: "baseline", fontSize: 12, opacity: hecho ? 0.65 : 1 }, children: [
+                  /* @__PURE__ */ jsx6(Checkbox3, { checked: hecho, onCheckedChange: (v) => onPaso(id, v) }),
+                  /* @__PURE__ */ jsx6("span", { style: { minWidth: 28, color: C.texto3 }, children: m.lvl }),
+                  /* @__PURE__ */ jsx6("span", { style: S.chip, children: m.cat }),
+                  m.loc ? /* @__PURE__ */ jsx6("span", { style: S.chip, children: locLabel(m.loc) }) : null,
+                  /* @__PURE__ */ jsx6("span", { style: { flex: 1 }, children: m.txt })
                 ] }, id);
               })
             ] })
@@ -36890,7 +37795,7 @@ function CuradaRuta({ datos, build, pasos, onPaso, onGuardar, perfil, lang }) {
 }
 
 // src/vistas/ruta.jsx
-import { Fragment as Fragment7, jsx as jsx6, jsxs as jsxs6 } from "react/jsx-runtime";
+import { Fragment as Fragment8, jsx as jsx7, jsxs as jsxs7 } from "react/jsx-runtime";
 agregarTextos({
   "ruta.zonas": "Zonas a tu nivel",
   "ruta.zonasSub": "Zonas de tu facción (o disputadas) cuyo rango de niveles te incluye, ordenadas por nivel. El número es cuántas misiones de tu facción hay en cada una.",
@@ -36945,16 +37850,16 @@ function porTitulo(items, lang) {
   return [...grupos.values()].map((g) => ({ ...g, niveles: g.min === g.max ? String(g.min) : g.min + "–" + g.max }));
 }
 function VistaRuta({ almacen, estado, recargar, perfil, lang }) {
-  const [aviso, setAviso] = useState4("");
-  const build = useMemo3(() => leerBuild(estado && estado.build), [estado && estado.build]);
+  const [aviso, setAviso] = useState5("");
+  const build = useMemo4(() => leerBuild(estado && estado.build), [estado && estado.build]);
   const nivel = perfil.nivel;
   const banda = bandaActual(nivel);
-  const listaZonas = useMemo3(() => zonasDeNivel(D.zonas, perfil.faccion, nivel), [perfil.faccion, nivel]);
-  const sinNiveles = useMemo3(() => zonasSinNiveles(D.zonas), []);
-  const grupos = useMemo3(() => misionesDeBanda(D.misiones.misiones, perfil, D.dungeons), [perfil]);
+  const listaZonas = useMemo4(() => zonasDeNivel(D.zonas, perfil.faccion, nivel), [perfil.faccion, nivel]);
+  const sinNiveles = useMemo4(() => zonasSinNiveles(D.zonas), []);
+  const grupos = useMemo4(() => misionesDeBanda(D.misiones.misiones, perfil, D.dungeons), [perfil]);
   const inicio = inicioDeRaza(D.personaje, perfil.raza);
   const { datos } = guiaCurada(perfil) || {};
-  const pasos = useMemo3(() => new Set(listaBuild(build, "steps")), [build]);
+  const pasos = useMemo4(() => new Set(listaBuild(build, "steps")), [build]);
   const guardar = async (cambios) => {
     try {
       await buildCambios(almacen, cambios);
@@ -36966,31 +37871,31 @@ function VistaRuta({ almacen, estado, recargar, perfil, lang }) {
   };
   const alternarPaso = (id, puesto) => guardar({ steps: alternarEnLista(listaBuild(build, "steps"), id, puesto) });
   const tituloGrupo = (g) => g.tipo === "zona" ? nombreDeZona(g.id, lang) : g.tipo === "dungeon" ? nombreDeDungeon(g.id, lang) : t(lang, "ruta.otras");
-  return /* @__PURE__ */ jsxs6(Fragment7, { children: [
-    aviso ? /* @__PURE__ */ jsx6(Aviso, { children: aviso }) : null,
-    /* @__PURE__ */ jsxs6(
+  return /* @__PURE__ */ jsxs7(Fragment8, { children: [
+    aviso ? /* @__PURE__ */ jsx7(Aviso, { children: aviso }) : null,
+    /* @__PURE__ */ jsxs7(
       Tarjeta,
       {
         titulo: t(lang, "ruta.zonas"),
         estilo: { gap: 4 },
-        extra: /* @__PURE__ */ jsx6(Origen, { f: ["cliente-forever", "curado", "cmangos-1.12"], lang }),
+        extra: /* @__PURE__ */ jsx7(Origen, { f: ["cliente-forever", "curado", "cmangos-1.12"], lang }),
         children: [
-          /* @__PURE__ */ jsx6("div", { style: S.sub, children: t(lang, "ruta.zonasSub") }),
-          inicio ? nivel <= 10 ? /* @__PURE__ */ jsxs6("div", { style: S.fila, "data-inicio": inicio.zona, children: [
-            /* @__PURE__ */ jsx6("span", { style: { flex: 1 }, children: t(lang, "ruta.inicio") }),
-            /* @__PURE__ */ jsx6("span", { children: nombreDeZona(inicio.zona, lang) })
-          ] }) : null : /* @__PURE__ */ jsx6(Hueco, { lang, children: t(lang, "ruta.sinInicio") }),
+          /* @__PURE__ */ jsx7("div", { style: S.sub, children: t(lang, "ruta.zonasSub") }),
+          inicio ? nivel <= 10 ? /* @__PURE__ */ jsxs7("div", { style: S.fila, "data-inicio": inicio.zona, children: [
+            /* @__PURE__ */ jsx7("span", { style: { flex: 1 }, children: t(lang, "ruta.inicio") }),
+            /* @__PURE__ */ jsx7("span", { children: nombreDeZona(inicio.zona, lang) })
+          ] }) : null : /* @__PURE__ */ jsx7(Hueco, { lang, children: t(lang, "ruta.sinInicio") }),
           listaZonas.length ? listaZonas.map((z) => {
             const cont = continenteDe(z.continente, lang);
-            return /* @__PURE__ */ jsxs6("div", { "data-zona": z.id, style: S.fila, children: [
-              /* @__PURE__ */ jsx6("span", { style: { flex: 1, minWidth: 0 }, children: nombre(z.n, lang) }),
-              /* @__PURE__ */ jsx6("span", { style: { ...S.sub, whiteSpace: "nowrap" }, children: t(lang, "ruta.niveles", { min: z.niveles.min, max: z.niveles.max }) }),
-              /* @__PURE__ */ jsx6("span", { style: { ...S.sub, whiteSpace: "nowrap" }, children: z.misiones != null ? t(lang, "ruta.misionesDe", { n: z.misiones }) : "—" }),
-              cont ? /* @__PURE__ */ jsx6("span", { style: S.chip, children: cont }) : null,
-              z.faccion === "disputada" ? /* @__PURE__ */ jsx6("span", { style: S.chip, children: t(lang, "ruta.ambos") }) : null
+            return /* @__PURE__ */ jsxs7("div", { "data-zona": z.id, style: S.fila, children: [
+              /* @__PURE__ */ jsx7("span", { style: { flex: 1, minWidth: 0 }, children: nombre(z.n, lang) }),
+              /* @__PURE__ */ jsx7("span", { style: { ...S.sub, whiteSpace: "nowrap" }, children: t(lang, "ruta.niveles", { min: z.niveles.min, max: z.niveles.max }) }),
+              /* @__PURE__ */ jsx7("span", { style: { ...S.sub, whiteSpace: "nowrap" }, children: z.misiones != null ? t(lang, "ruta.misionesDe", { n: z.misiones }) : "—" }),
+              cont ? /* @__PURE__ */ jsx7("span", { style: S.chip, children: cont }) : null,
+              z.faccion === "disputada" ? /* @__PURE__ */ jsx7("span", { style: S.chip, children: t(lang, "ruta.ambos") }) : null
             ] }, z.id);
-          }) : /* @__PURE__ */ jsx6("div", { style: S.sub, children: t(lang, "ruta.sinZonas") }),
-          sinNiveles.length ? /* @__PURE__ */ jsxs6(Hueco, { lang, children: [
+          }) : /* @__PURE__ */ jsx7("div", { style: S.sub, children: t(lang, "ruta.sinZonas") }),
+          sinNiveles.length ? /* @__PURE__ */ jsxs7(Hueco, { lang, children: [
             t(lang, "ruta.sinNiveles"),
             " ",
             sinNiveles.map((z) => nombre(z.n, lang)).filter(Boolean).join(", ")
@@ -36998,42 +37903,42 @@ function VistaRuta({ almacen, estado, recargar, perfil, lang }) {
         ]
       }
     ),
-    /* @__PURE__ */ jsx6(
+    /* @__PURE__ */ jsx7(
       Tarjeta,
       {
         titulo: t(lang, "ruta.misiones") + " · " + t(lang, "ruta.niveles", { min: banda.min, max: banda.max }),
-        extra: /* @__PURE__ */ jsx6(Origen, { f: "cmangos-1.12", lang }),
-        children: grupos.length ? grupos.map((g) => /* @__PURE__ */ jsxs6("div", { "data-grupo": g.tipo + ":" + (g.id ?? ""), children: [
-          /* @__PURE__ */ jsxs6("div", { style: { ...S.etiqueta, marginTop: 6 }, children: [
+        extra: /* @__PURE__ */ jsx7(Origen, { f: "cmangos-1.12", lang }),
+        children: grupos.length ? grupos.map((g) => /* @__PURE__ */ jsxs7("div", { "data-grupo": g.tipo + ":" + (g.id ?? ""), children: [
+          /* @__PURE__ */ jsxs7("div", { style: { ...S.etiqueta, marginTop: 6 }, children: [
             tituloGrupo(g),
             " · ",
             g.items.length
           ] }),
-          porTitulo(g.items, lang).map(({ id, m, ids, niveles }) => /* @__PURE__ */ jsxs6("div", { "data-mision": id, "data-misiones": ids.join(","), style: { ...S.fila, borderBottom: "none", padding: "\
+          porTitulo(g.items, lang).map(({ id, m, ids, niveles }) => /* @__PURE__ */ jsxs7("div", { "data-mision": id, "data-misiones": ids.join(","), style: { ...S.fila, borderBottom: "none", padding: "\
 2px 0" }, children: [
-            /* @__PURE__ */ jsx6("span", { style: { minWidth: 34, color: C.texto3 }, children: niveles }),
-            /* @__PURE__ */ jsxs6("span", { style: { flex: 1 }, children: [
+            /* @__PURE__ */ jsx7("span", { style: { minWidth: 34, color: C.texto3 }, children: niveles }),
+            /* @__PURE__ */ jsxs7("span", { style: { flex: 1 }, children: [
               nombre(m.t, lang),
-              ids.length > 1 ? /* @__PURE__ */ jsxs6("span", { style: { color: C.texto3 }, children: [
+              ids.length > 1 ? /* @__PURE__ */ jsxs7("span", { style: { color: C.texto3 }, children: [
                 " ×",
                 ids.length
               ] }) : null
             ] })
           ] }, id))
-        ] }, g.tipo + ":" + (g.id ?? ""))) : /* @__PURE__ */ jsx6("div", { style: S.sub, children: t(lang, "ruta.sinMisiones") })
+        ] }, g.tipo + ":" + (g.id ?? ""))) : /* @__PURE__ */ jsx7("div", { style: S.sub, children: t(lang, "ruta.sinMisiones") })
       }
     ),
-    datos && datos.routes ? /* @__PURE__ */ jsx6(CuradaRuta, { datos, build, pasos, onPaso: alternarPaso, onGuardar: guardar, perfil, lang }) : null
+    datos && datos.routes ? /* @__PURE__ */ jsx7(CuradaRuta, { datos, build, pasos, onPaso: alternarPaso, onGuardar: guardar, perfil, lang }) : null
   ] });
 }
 
 // src/vistas/profesiones.jsx
-import { useEffect as useEffect2, useMemo as useMemo8, useState as useState7 } from "react";
-import { Button as Button5, Input as Input3, Select as Select2, SelectContent as SelectContent2, SelectItem as SelectItem2, SelectTrigger as SelectTrigger2, SelectValue as SelectValue2 } from "@hermes/plugin-sdk";
+import { useEffect as useEffect3, useMemo as useMemo9, useState as useState8 } from "react";
+import { Button as Button6, Input as Input3, Select as Select2, SelectContent as SelectContent2, SelectItem as SelectItem2, SelectTrigger as SelectTrigger2, SelectValue as SelectValue2 } from "@hermes/plugin-sdk";
 
 // src/recetas-propias.js
-var CLAVE = "recetas-propias";
-var VERSION2 = 1;
+var CLAVE2 = "recetas-propias";
+var VERSION3 = 1;
 var SEMILLA = [
   20626,
   // Everyday Meals · Undermine Clam Chowder
@@ -37095,22 +38000,22 @@ function normalizarLista(spells) {
 }
 function normalizarEstado(v) {
   if (!v || typeof v !== "object" || Array.isArray(v)) return null;
-  if (v.v !== VERSION2 || !Array.isArray(v.spells)) return null;
+  if (v.v !== VERSION3 || !Array.isArray(v.spells)) return null;
   if (!v.spells.every((s) => Number.isSafeInteger(s) && s > 0)) return null;
   return normalizarLista(v.spells);
 }
 async function leerPropias(ctx) {
   try {
-    const guardado = normalizarEstado(await ctx.storage.get(CLAVE));
+    const guardado = normalizarEstado(await ctx.storage.get(CLAVE2));
     if (guardado) return { spells: guardado, origen: "guardadas" };
   } catch {
   }
   return { spells: normalizarLista(SEMILLA), origen: "semilla" };
 }
 async function guardarPropias(ctx, spells) {
-  const valor = { v: VERSION2, spells: normalizarLista(spells) };
-  await ctx.storage.set(CLAVE, valor);
-  const leido = normalizarEstado(await ctx.storage.get(CLAVE));
+  const valor = { v: VERSION3, spells: normalizarLista(spells) };
+  await ctx.storage.set(CLAVE2, valor);
+  const leido = normalizarEstado(await ctx.storage.get(CLAVE2));
   if (!leido || leido.join(",") !== valor.spells.join(",")) {
     throw new Error("No se confirmó el guardado de recetas propias.");
   }
@@ -37133,8 +38038,8 @@ function resumenRecetario(recetas, propias) {
 }
 
 // src/oficios.js
-var CLAVE2 = "niveles-oficio";
-var VERSION3 = 1;
+var CLAVE3 = "niveles-oficio";
+var VERSION4 = 1;
 var PESCA = 356;
 var NIVEL_MAX2 = 300;
 var SEMILLA2 = Object.freeze({ [PESCA]: 93 });
@@ -37158,7 +38063,7 @@ function normalizarNiveles(x) {
 }
 function normalizarEstado2(estado) {
   if (!estado || typeof estado !== "object" || Array.isArray(estado)) return null;
-  if (estado.v !== VERSION3) return null;
+  if (estado.v !== VERSION4) return null;
   const crudo = estado.niveles;
   if (!crudo || typeof crudo !== "object" || Array.isArray(crudo)) return null;
   for (const clave of Object.keys(crudo)) {
@@ -37175,7 +38080,7 @@ function nivelDe(niveles, id, def = 0) {
 async function leerNiveles(ctx) {
   let guardado = null;
   try {
-    guardado = ctx && ctx.storage ? await ctx.storage.get(CLAVE2) : null;
+    guardado = ctx && ctx.storage ? await ctx.storage.get(CLAVE3) : null;
   } catch {
     guardado = null;
   }
@@ -37185,9 +38090,9 @@ async function leerNiveles(ctx) {
 }
 
 // src/vistas/profesiones/tabla.jsx
-import { useEffect, useMemo as useMemo4, useState as useState5 } from "react";
+import { useEffect as useEffect2, useMemo as useMemo5, useState as useState6 } from "react";
 import { Checkbox as Checkbox4, SearchField, SegmentedControl as SegmentedControl2 } from "@hermes/plugin-sdk";
-import { Fragment as Fragment8, jsx as jsx7, jsxs as jsxs7 } from "react/jsx-runtime";
+import { Fragment as Fragment9, jsx as jsx8, jsxs as jsxs8 } from "react/jsx-runtime";
 agregarTextos({
   "prof.recetas": "Recetas",
   "prof.filtro.ahora": "Aprendibles ahora",
@@ -37251,11 +38156,11 @@ agregarTextos({
 });
 var APRENDIBLES = /* @__PURE__ */ new Set(["naranja", "amarillo", "verde", "gris"]);
 function DineroSigno({ cobre }) {
-  if (cobre == null || !Number.isFinite(cobre)) return /* @__PURE__ */ jsx7(Dinero, { cobre: null });
-  return /* @__PURE__ */ jsx7("span", { style: { fontVariantNumeric: "tabular-nums" }, children: cobre < 0 ? "-" + dinero(-cobre) : dinero(cobre) });
+  if (cobre == null || !Number.isFinite(cobre)) return /* @__PURE__ */ jsx8(Dinero, { cobre: null });
+  return /* @__PURE__ */ jsx8("span", { style: { fontVariantNumeric: "tabular-nums" }, children: cobre < 0 ? "-" + dinero(-cobre) : dinero(cobre) });
 }
-var num2 = (v) => Number.isFinite(v) ? v : null;
-var nivelDe2 = (r) => num2(r.rango?.aprende) ?? num2(r.rango?.amarillo) ?? num2(r.rango?.verde) ?? num2(r.rango?.gris) ?? 9999;
+var num3 = (v) => Number.isFinite(v) ? v : null;
+var nivelDe2 = (r) => num3(r.rango?.aprende) ?? num3(r.rango?.amarillo) ?? num3(r.rango?.verde) ?? num3(r.rango?.gris) ?? 9999;
 function textoDe(r, items) {
   const partes = [r.n?.es, r.n?.en];
   if (r.crea) {
@@ -37269,34 +38174,34 @@ function textoDe(r, items) {
   return partes.filter(Boolean).join(" ").toLowerCase();
 }
 function ComoAprende({ r, faccion, lang }) {
-  if (r.como === "entrenador") return /* @__PURE__ */ jsx7("span", { children: t(lang, "prof.como.entrenador") });
-  if (r.como === "automatica") return /* @__PURE__ */ jsx7("span", { children: t(lang, "prof.como.automatica") });
-  if (r.como === "desconocido") return /* @__PURE__ */ jsx7("span", { style: { color: C.texto3 }, children: t(lang, "prof.como.desconocido") });
+  if (r.como === "entrenador") return /* @__PURE__ */ jsx8("span", { children: t(lang, "prof.como.entrenador") });
+  if (r.como === "automatica") return /* @__PURE__ */ jsx8("span", { children: t(lang, "prof.como.automatica") });
+  if (r.como === "desconocido") return /* @__PURE__ */ jsx8("span", { style: { color: C.texto3 }, children: t(lang, "prof.como.desconocido") });
   const vendedores = r.vendedores?.[faccion] || [];
-  return /* @__PURE__ */ jsxs7("span", { children: [
+  return /* @__PURE__ */ jsxs8("span", { children: [
     t(lang, "prof.como.receta"),
-    r.receta_item != null ? /* @__PURE__ */ jsxs7(Fragment8, { children: [
+    r.receta_item != null ? /* @__PURE__ */ jsxs8(Fragment9, { children: [
       " · ",
-      /* @__PURE__ */ jsx7(NombreItem, { id: r.receta_item, lang })
+      /* @__PURE__ */ jsx8(NombreItem, { id: r.receta_item, lang })
     ] }) : null,
-    vendedores.length ? /* @__PURE__ */ jsxs7("span", { style: { color: C.texto3 }, children: [
+    vendedores.length ? /* @__PURE__ */ jsxs8("span", { style: { color: C.texto3 }, children: [
       " · ",
       vendedores.map((v) => nombre(v.n, lang)).join(", ")
     ] }) : null
   ] });
 }
 function TablaRecetas({ prof, skill, precios, items, faccion, lang, sel, onSel, propias, onPropia }) {
-  const [filtro, setFiltro] = useState5("ahora");
-  const [q, setQ] = useState5("");
-  const [ocultarMias, setOcultarMias] = useState5(false);
-  const mias = useMemo4(() => propias instanceof Set ? propias : new Set(normalizarLista(propias)), [propias]);
+  const [filtro, setFiltro] = useState6("ahora");
+  const [q, setQ] = useState6("");
+  const [ocultarMias, setOcultarMias] = useState6(false);
+  const mias = useMemo5(() => propias instanceof Set ? propias : new Set(normalizarLista(propias)), [propias]);
   const tiene = (r) => mias.has(r.spell);
-  const conteos = useMemo4(() => ({
+  const conteos = useMemo5(() => ({
     ahora: prof.recetas.filter((r) => APRENDIBLES.has(dificultadReceta(r, skill))).length,
     todas: prof.recetas.length,
     forever: prof.recetas.filter((r) => r.f === "cliente-forever").length
   }), [prof, skill]);
-  const filas = useMemo4(() => {
+  const filas = useMemo5(() => {
     const buscado = q.trim().toLowerCase();
     let rs = prof.recetas.filter((r) => {
       if (filtro === "ahora" && !APRENDIBLES.has(dificultadReceta(r, skill))) return false;
@@ -37306,10 +38211,10 @@ function TablaRecetas({ prof, skill, precios, items, faccion, lang, sel, onSel, 
     });
     return [...rs].sort((a, b) => nivelDe2(a) - nivelDe2(b) || a.spell - b.spell);
   }, [prof, skill, filtro, q, items, ocultarMias, mias]);
-  useEffect(() => {
+  useEffect2(() => {
     if (sel == null && filas.length) onSel(filas[0].spell);
   }, [filas, sel, onSel]);
-  const info = useMemo4(() => {
+  const info = useMemo5(() => {
     const m = /* @__PURE__ */ new Map();
     for (const r of filas) {
       const d = dificultadReceta(r, skill);
@@ -37323,46 +38228,46 @@ function TablaRecetas({ prof, skill, precios, items, faccion, lang, sel, onSel, 
     return m;
   }, [filas, skill, precios, items]);
   const propiasAqui = conteos.todas ? [...mias].filter((s) => prof.recetas.some((r) => r.spell === s)).length : 0;
-  return /* @__PURE__ */ jsxs7(
+  return /* @__PURE__ */ jsxs8(
     Tarjeta,
     {
       titulo: t(lang, "prof.recetas") + " · " + prof.recetas.length + (propiasAqui ? " · " + t(lang, "prof.tienes", { n: propiasAqui }) : ""),
-      extra: /* @__PURE__ */ jsx7(Origen, { f: prof.f || "cmangos-1.12", lang }),
+      extra: /* @__PURE__ */ jsx8(Origen, { f: prof.f || "cmangos-1.12", lang }),
       children: [
-        /* @__PURE__ */ jsxs7("div", { style: { display: "flex", flexWrap: "wrap", gap: 12, alignItems: "center" }, children: [
-          /* @__PURE__ */ jsx7(SegmentedControl2, { value: filtro, onChange: setFiltro, options: [
+        /* @__PURE__ */ jsxs8("div", { style: { display: "flex", flexWrap: "wrap", gap: 12, alignItems: "center" }, children: [
+          /* @__PURE__ */ jsx8(SegmentedControl2, { value: filtro, onChange: setFiltro, options: [
             { id: "ahora", label: `${t(lang, "prof.filtro.ahora")} (${conteos.ahora})` },
             { id: "todas", label: `${t(lang, "prof.filtro.todas")} (${conteos.todas})` },
             { id: "forever", label: `${t(lang, "prof.filtro.forever")} (${conteos.forever})` }
           ] }),
-          /* @__PURE__ */ jsx7(SearchField, { placeholder: t(lang, "prof.buscar"), value: q, onChange: setQ }),
-          propiasAqui ? /* @__PURE__ */ jsxs7("label", { style: { ...S.chip, display: "inline-flex", alignItems: "center", gap: 6, cursor: "pointer" }, children: [
-            /* @__PURE__ */ jsx7(Checkbox4, { checked: ocultarMias, onCheckedChange: (v) => setOcultarMias(!!v) }),
-            /* @__PURE__ */ jsx7("span", { children: t(lang, "prof.ocultar.tengo") })
+          /* @__PURE__ */ jsx8(SearchField, { placeholder: t(lang, "prof.buscar"), value: q, onChange: setQ }),
+          propiasAqui ? /* @__PURE__ */ jsxs8("label", { style: { ...S.chip, display: "inline-flex", alignItems: "center", gap: 6, cursor: "pointer" }, children: [
+            /* @__PURE__ */ jsx8(Checkbox4, { checked: ocultarMias, onCheckedChange: (v) => setOcultarMias(!!v) }),
+            /* @__PURE__ */ jsx8("span", { children: t(lang, "prof.ocultar.tengo") })
           ] }) : null
         ] }),
-        filas.length ? /* @__PURE__ */ jsx7("div", { style: { overflowX: "auto" }, children: /* @__PURE__ */ jsxs7("table", { style: S.tabla, children: [
-          /* @__PURE__ */ jsx7("thead", { children: /* @__PURE__ */ jsxs7("tr", { children: [
-            /* @__PURE__ */ jsx7("th", { style: { ...S.th, width: 1 }, title: t(lang, "prof.col.tengo.ayuda") }),
-            /* @__PURE__ */ jsx7("th", { style: S.th, children: t(lang, "prof.col.dificultad") }),
-            /* @__PURE__ */ jsx7("th", { style: S.th, children: t(lang, "prof.col.crea") }),
-            /* @__PURE__ */ jsx7("th", { style: S.th, children: t(lang, "prof.col.reactivos") }),
-            /* @__PURE__ */ jsx7("th", { style: S.th, children: t(lang, "prof.col.como") }),
-            /* @__PURE__ */ jsx7("th", { style: S.th, children: t(lang, "prof.col.costo") }),
-            /* @__PURE__ */ jsx7("th", { style: S.th, children: t(lang, "prof.col.valor") }),
-            /* @__PURE__ */ jsx7("th", { style: S.th, children: t(lang, "prof.col.margen") }),
-            /* @__PURE__ */ jsx7("th", { style: S.th })
+        filas.length ? /* @__PURE__ */ jsx8("div", { style: { overflowX: "auto" }, children: /* @__PURE__ */ jsxs8("table", { style: S.tabla, children: [
+          /* @__PURE__ */ jsx8("thead", { children: /* @__PURE__ */ jsxs8("tr", { children: [
+            /* @__PURE__ */ jsx8("th", { style: { ...S.th, width: 1 }, title: t(lang, "prof.col.tengo.ayuda") }),
+            /* @__PURE__ */ jsx8("th", { style: S.th, children: t(lang, "prof.col.dificultad") }),
+            /* @__PURE__ */ jsx8("th", { style: S.th, children: t(lang, "prof.col.crea") }),
+            /* @__PURE__ */ jsx8("th", { style: S.th, children: t(lang, "prof.col.reactivos") }),
+            /* @__PURE__ */ jsx8("th", { style: S.th, children: t(lang, "prof.col.como") }),
+            /* @__PURE__ */ jsx8("th", { style: S.th, children: t(lang, "prof.col.costo") }),
+            /* @__PURE__ */ jsx8("th", { style: S.th, children: t(lang, "prof.col.valor") }),
+            /* @__PURE__ */ jsx8("th", { style: S.th, children: t(lang, "prof.col.margen") }),
+            /* @__PURE__ */ jsx8("th", { style: S.th })
           ] }) }),
-          /* @__PURE__ */ jsx7("tbody", { children: filas.map((r) => {
+          /* @__PURE__ */ jsx8("tbody", { children: filas.map((r) => {
             const i = info.get(r.spell);
             const activa = sel === r.spell;
-            return /* @__PURE__ */ jsxs7(
+            return /* @__PURE__ */ jsxs8(
               "tr",
               {
                 onClick: () => onSel(r.spell),
                 style: { cursor: "pointer", background: activa ? C.fondo3 : void 0 },
                 children: [
-                  /* @__PURE__ */ jsx7("td", { style: { ...S.td, width: 1 }, onClick: (e) => e.stopPropagation(), children: onPropia ? /* @__PURE__ */ jsx7(
+                  /* @__PURE__ */ jsx8("td", { style: { ...S.td, width: 1 }, onClick: (e) => e.stopPropagation(), children: onPropia ? /* @__PURE__ */ jsx8(
                     Checkbox4,
                     {
                       checked: tiene(r),
@@ -37370,38 +38275,38 @@ function TablaRecetas({ prof, skill, precios, items, faccion, lang, sel, onSel, 
                       "aria-label": nombre(r.n, lang) + " · " + t(lang, "prof.col.tengo")
                     }
                   ) : null }),
-                  /* @__PURE__ */ jsx7("td", { style: { ...S.td, color: DIFICULTAD[i.d] || C.texto3, whiteSpace: "nowrap" }, children: t(lang, "prof.diff." + i.d) }),
-                  /* @__PURE__ */ jsx7("td", { style: S.td, children: r.crea ? /* @__PURE__ */ jsx7(Fragment8, { children: /* @__PURE__ */ jsx7(NombreItem, { id: r.crea[0], lang, cantidad: r.crea[1] }) }) :
-                  /* @__PURE__ */ jsxs7(Fragment8, { children: [
+                  /* @__PURE__ */ jsx8("td", { style: { ...S.td, color: DIFICULTAD[i.d] || C.texto3, whiteSpace: "nowrap" }, children: t(lang, "prof.diff." + i.d) }),
+                  /* @__PURE__ */ jsx8("td", { style: S.td, children: r.crea ? /* @__PURE__ */ jsx8(Fragment9, { children: /* @__PURE__ */ jsx8(NombreItem, { id: r.crea[0], lang, cantidad: r.crea[1] }) }) :
+                  /* @__PURE__ */ jsxs8(Fragment9, { children: [
                     nombre(r.n, lang),
                     " ",
-                    /* @__PURE__ */ jsxs7("span", { style: { color: C.texto3 }, children: [
+                    /* @__PURE__ */ jsxs8("span", { style: { color: C.texto3 }, children: [
                       "· ",
                       t(lang, "prof.encantamiento")
                     ] })
                   ] }) }),
-                  /* @__PURE__ */ jsx7("td", { style: { ...S.td, fontSize: 11, color: C.texto2 }, children: (r.reactivos || []).map(([it, cant]) => /* @__PURE__ */ jsx7("div", { children: /* @__PURE__ */ jsx7(
+                  /* @__PURE__ */ jsx8("td", { style: { ...S.td, fontSize: 11, color: C.texto2 }, children: (r.reactivos || []).map(([it, cant]) => /* @__PURE__ */ jsx8("div", { children: /* @__PURE__ */ jsx8(
                   NombreItem, { id: it, lang, cantidad: cant }) }, it)) }),
-                  /* @__PURE__ */ jsx7("td", { style: { ...S.td, fontSize: 11 }, children: /* @__PURE__ */ jsx7(ComoAprende, { r, faccion, lang }) }),
-                  /* @__PURE__ */ jsx7("td", { style: { ...S.td, whiteSpace: "nowrap" }, children: /* @__PURE__ */ jsx7(Dinero, { cobre: i.costo }) }),
-                  /* @__PURE__ */ jsx7("td", { style: { ...S.td, whiteSpace: "nowrap" }, children: /* @__PURE__ */ jsx7(Dinero, { cobre: i.valor }) }),
-                  /* @__PURE__ */ jsx7("td", { style: { ...S.td, whiteSpace: "nowrap", color: i.margen == null ? C.texto3 : i.margen >= 0 ? C.verde : C.rojo }, children: /* @__PURE__ */ jsx7(DineroSigno,
+                  /* @__PURE__ */ jsx8("td", { style: { ...S.td, fontSize: 11 }, children: /* @__PURE__ */ jsx8(ComoAprende, { r, faccion, lang }) }),
+                  /* @__PURE__ */ jsx8("td", { style: { ...S.td, whiteSpace: "nowrap" }, children: /* @__PURE__ */ jsx8(Dinero, { cobre: i.costo }) }),
+                  /* @__PURE__ */ jsx8("td", { style: { ...S.td, whiteSpace: "nowrap" }, children: /* @__PURE__ */ jsx8(Dinero, { cobre: i.valor }) }),
+                  /* @__PURE__ */ jsx8("td", { style: { ...S.td, whiteSpace: "nowrap", color: i.margen == null ? C.texto3 : i.margen >= 0 ? C.verde : C.rojo }, children: /* @__PURE__ */ jsx8(DineroSigno,
                   { cobre: i.margen }) }),
-                  /* @__PURE__ */ jsx7("td", { style: { ...S.td, whiteSpace: "nowrap" }, children: /* @__PURE__ */ jsx7(Origen, { f: r.f, lang }) })
+                  /* @__PURE__ */ jsx8("td", { style: { ...S.td, whiteSpace: "nowrap" }, children: /* @__PURE__ */ jsx8(Origen, { f: r.f, lang }) })
                 ]
               },
               r.spell
             );
           }) })
-        ] }) }) : /* @__PURE__ */ jsx7("div", { style: S.sub, children: t(lang, "prof.recetas.vacio") })
+        ] }) }) : /* @__PURE__ */ jsx8("div", { style: S.sub, children: t(lang, "prof.recetas.vacio") })
       ]
     }
   );
 }
 
 // src/vistas/profesiones/venta.jsx
-import { useMemo as useMemo5 } from "react";
-import { jsx as jsx8, jsxs as jsxs8 } from "react/jsx-runtime";
+import { useMemo as useMemo6 } from "react";
+import { jsx as jsx9, jsxs as jsxs9 } from "react/jsx-runtime";
 var COMISION = 0.05;
 var TOPE = 5;
 var NOTA = { fontSize: 11, color: C.texto3, lineHeight: 1.45, margin: "6px 0 0" };
@@ -37434,7 +38339,7 @@ function listadas(market, itemId) {
 function PanelVenta({ recetas, propias, precios, items, market, lang }) {
   const tienePrecios = Boolean(precios && (precios instanceof Map ? precios.size : Object.keys(precios).length));
   const mias = propias instanceof Set ? propias : new Set(propias || []);
-  const filas = useMemo5(() => {
+  const filas = useMemo6(() => {
     if (!tienePrecios) return [];
     const base = mias.size ? recetas.filter((r) => mias.has(r.spell)) : recetas;
     const out = [];
@@ -37450,37 +38355,37 @@ function PanelVenta({ recetas, propias, precios, items, market, lang }) {
     return out.sort((a, b) => b.neto - a.neto || a.nombre.localeCompare(b.nombre)).slice(0, TOPE);
   }, [recetas, mias, precios, items, market, lang, tienePrecios]);
   if (!tienePrecios) return null;
-  return /* @__PURE__ */ jsxs8(Tarjeta, { titulo: t(lang, "prof.venta") + (filas.length ? " · " + filas.length : ""), children: [
-    filas.length ? /* @__PURE__ */ jsxs8("div", { style: { display: "flex", flexDirection: "column" }, children: [
-      /* @__PURE__ */ jsxs8("div", { style: { display: "flex", gap: 8, fontSize: 11, color: C.texto3, padding: "0 6px 4px", borderBottom: `1px solid ${C.borde}` }, children: [
-        /* @__PURE__ */ jsx8("span", { style: { flex: 1 }, children: t(lang, "prof.venta.col.receta") }),
-        /* @__PURE__ */ jsx8("span", { style: { width: 110, textAlign: "right" }, children: t(lang, "prof.venta.col.neto") }),
-        /* @__PURE__ */ jsx8("span", { style: { width: 64, textAlign: "right" }, children: t(lang, "prof.venta.col.listadas") })
+  return /* @__PURE__ */ jsxs9(Tarjeta, { titulo: t(lang, "prof.venta") + (filas.length ? " · " + filas.length : ""), children: [
+    filas.length ? /* @__PURE__ */ jsxs9("div", { style: { display: "flex", flexDirection: "column" }, children: [
+      /* @__PURE__ */ jsxs9("div", { style: { display: "flex", gap: 8, fontSize: 11, color: C.texto3, padding: "0 6px 4px", borderBottom: `1px solid ${C.borde}` }, children: [
+        /* @__PURE__ */ jsx9("span", { style: { flex: 1 }, children: t(lang, "prof.venta.col.receta") }),
+        /* @__PURE__ */ jsx9("span", { style: { width: 110, textAlign: "right" }, children: t(lang, "prof.venta.col.neto") }),
+        /* @__PURE__ */ jsx9("span", { style: { width: 64, textAlign: "right" }, children: t(lang, "prof.venta.col.listadas") })
       ] }),
-      filas.map((f) => /* @__PURE__ */ jsxs8(
+      filas.map((f) => /* @__PURE__ */ jsxs9(
         "div",
         {
           "data-venta-fila": "",
           style: { display: "flex", gap: 8, fontSize: 12, padding: "4px 6px", borderBottom: `1px solid ${C.borde2}` },
           children: [
-            /* @__PURE__ */ jsx8("span", { style: { flex: 1 }, children: f.nombre }),
-            /* @__PURE__ */ jsx8("span", { style: { width: 110, textAlign: "right", color: C.verde, fontWeight: 600, fontVariantNumeric: "tabular-nums" }, children: /* @__PURE__ */ jsx8(Dinero, { cobre: f.
+            /* @__PURE__ */ jsx9("span", { style: { flex: 1 }, children: f.nombre }),
+            /* @__PURE__ */ jsx9("span", { style: { width: 110, textAlign: "right", color: C.verde, fontWeight: 600, fontVariantNumeric: "tabular-nums" }, children: /* @__PURE__ */ jsx9(Dinero, { cobre: f.
             neto }) }),
-            /* @__PURE__ */ jsx8("span", { style: { width: 64, textAlign: "right", color: C.texto3, fontVariantNumeric: "tabular-nums" }, children: f.listadas || "—" })
+            /* @__PURE__ */ jsx9("span", { style: { width: 64, textAlign: "right", color: C.texto3, fontVariantNumeric: "tabular-nums" }, children: f.listadas || "—" })
           ]
         },
         f.spell
       ))
-    ] }) : /* @__PURE__ */ jsx8("p", { style: NOTA, children: t(lang, "prof.venta.vacio") }),
-    mias.size ? null : /* @__PURE__ */ jsx8("p", { style: NOTA, children: t(lang, "prof.venta.sinPropias") }),
-    /* @__PURE__ */ jsx8("p", { style: NOTA, children: t(lang, "prof.venta.nota") })
+    ] }) : /* @__PURE__ */ jsx9("p", { style: NOTA, children: t(lang, "prof.venta.vacio") }),
+    mias.size ? null : /* @__PURE__ */ jsx9("p", { style: NOTA, children: t(lang, "prof.venta.sinPropias") }),
+    /* @__PURE__ */ jsx9("p", { style: NOTA, children: t(lang, "prof.venta.nota") })
   ] });
 }
 
 // src/vistas/profesiones/plan.jsx
-import { useMemo as useMemo6, useState as useState6 } from "react";
-import { Button as Button4 } from "@hermes/plugin-sdk";
-import { Fragment as Fragment9, jsx as jsx9, jsxs as jsxs9 } from "react/jsx-runtime";
+import { useMemo as useMemo7, useState as useState7 } from "react";
+import { Button as Button5 } from "@hermes/plugin-sdk";
+import { Fragment as Fragment10, jsx as jsx10, jsxs as jsxs10 } from "react/jsx-runtime";
 agregarTextos({
   "prof.plan": "Plan de subida",
   "prof.plan.estimacion": "Estimación: probabilidad de subida con la fórmula aproximada de Classic; el costo usa precios de vendedor y subasta. No garantiza nada en Forever.",
@@ -37542,158 +38447,158 @@ Classic formula; not guaranteed on Forever.",
   "prof.max.subasta": "auction",
   "prof.max.desde": "from {n}"
 });
-var num3 = (v) => Number.isFinite(v) ? v : 0;
+var num4 = (v) => Number.isFinite(v) ? v : 0;
 var pct1 = (v) => Number.isFinite(v) ? String(Math.round(v * 1e3) / 10) : "—";
 function PlanSubida({ prof, skill, trainers, precios, items, lang, irA, faccion }) {
-  const [maxear, setMaxear] = useState6(false);
-  const hasta = useMemo6(() => {
-    const deTrainers = trainers.length ? Math.max(...trainers.map((e) => num3(e.max))) : 0;
+  const [maxear, setMaxear] = useState7(false);
+  const hasta = useMemo7(() => {
+    const deTrainers = trainers.length ? Math.max(...trainers.map((e) => num4(e.max))) : 0;
     if (deTrainers > 0) return Math.min(300, deTrainers);
-    const gris = Math.max(0, ...prof.recetas.map((r) => num3(r.rango?.gris)));
+    const gris = Math.max(0, ...prof.recetas.map((r) => num4(r.rango?.gris)));
     return Math.min(300, gris);
   }, [trainers, prof]);
-  const obtenibles = useMemo6(() => prof.recetas.filter((r) => r.como === "entrenador" || r.como === "automatica" || r.como === "receta" && (r.vendedores && r.vendedores[faccion] || []).length > 0), [
+  const obtenibles = useMemo7(() => prof.recetas.filter((r) => r.como === "entrenador" || r.como === "automatica" || r.como === "receta" && (r.vendedores && r.vendedores[faccion] || []).length > 0), [
   prof, faccion]);
-  const plan = useMemo6(
+  const plan = useMemo7(
     () => skill < hasta ? planDeSubida(obtenibles, skill, hasta, precios, items) : [],
     [obtenibles, skill, hasta, precios, items]
   );
-  const porSpell = useMemo6(() => new Map(prof.recetas.map((r) => [r.spell, r])), [prof]);
+  const porSpell = useMemo7(() => new Map(prof.recetas.map((r) => [r.spell, r])), [prof]);
   const hayPrecios = precios instanceof Map ? precios.size > 0 : false;
-  const ruta = useMemo6(
+  const ruta = useMemo7(
     () => maxear && hayPrecios ? rutaMaxeo(prof.recetas, skill, 300, precios, items, { faccion }) : null,
     [maxear, hayPrecios, prof, skill, precios, items, faccion]
   );
   const totalCrafts = plan.reduce((a, p) => a + p.crafteos, 0);
   const costos = plan.map((p) => p.costo);
   const totalCosto = costos.every((c) => c !== null) && costos.length ? costos.reduce((a, c) => a + c, 0) : null;
-  const fuentes = useMemo6(() => [...new Set(prof.recetas.flatMap((r) => [].concat(r.f || [])))], [prof]);
-  const toggle = /* @__PURE__ */ jsxs9("div", { style: { display: "flex", gap: 6, marginBottom: 8 }, children: [
-    /* @__PURE__ */ jsx9(Button4, { size: "xs", variant: maxear ? "outline" : "secondary", onClick: () => setMaxear(false), children: t(lang, "prof.plan.modo.rapido") }),
-    /* @__PURE__ */ jsx9(Button4, { size: "xs", variant: maxear ? "secondary" : "outline", onClick: () => setMaxear(true), children: t(lang, "prof.plan.modo.maxear") })
+  const fuentes = useMemo7(() => [...new Set(prof.recetas.flatMap((r) => [].concat(r.f || [])))], [prof]);
+  const toggle = /* @__PURE__ */ jsxs10("div", { style: { display: "flex", gap: 6, marginBottom: 8 }, children: [
+    /* @__PURE__ */ jsx10(Button5, { size: "xs", variant: maxear ? "outline" : "secondary", onClick: () => setMaxear(false), children: t(lang, "prof.plan.modo.rapido") }),
+    /* @__PURE__ */ jsx10(Button5, { size: "xs", variant: maxear ? "secondary" : "outline", onClick: () => setMaxear(true), children: t(lang, "prof.plan.modo.maxear") })
   ] });
-  const importar = /* @__PURE__ */ jsxs9(Aviso, { children: [
+  const importar = /* @__PURE__ */ jsxs10(Aviso, { children: [
     t(lang, "prof.plan.sinPrecios"),
     " ",
-    /* @__PURE__ */ jsx9(Button4, { variant: "outline", size: "xs", onClick: () => irA("mercado"), children: t(lang, "prof.plan.importar") })
+    /* @__PURE__ */ jsx10(Button5, { variant: "outline", size: "xs", onClick: () => irA("mercado"), children: t(lang, "prof.plan.importar") })
   ] });
-  const origen = /* @__PURE__ */ jsx9(Origen, { f: fuentes.length ? fuentes : "cmangos-1.12", lang });
+  const origen = /* @__PURE__ */ jsx10(Origen, { f: fuentes.length ? fuentes : "cmangos-1.12", lang });
   if (maxear) {
     const pasos = ruta ? ruta.pasos : [];
     const acqs = ruta ? ruta.adquisiciones : [];
-    return /* @__PURE__ */ jsxs9(Tarjeta, { titulo: `${t(lang, "prof.max.titulo")} · ${skill} → 300`, extra: origen, children: [
+    return /* @__PURE__ */ jsxs10(Tarjeta, { titulo: `${t(lang, "prof.max.titulo")} · ${skill} → 300`, extra: origen, children: [
       toggle,
-      /* @__PURE__ */ jsx9("div", { style: S.sub, children: t(lang, "prof.max.estimacion") }),
-      /* @__PURE__ */ jsx9("div", { style: S.sub, children: t(lang, "prof.max.avisoEntrenamiento") }),
-      !hayPrecios ? importar : !ruta || !pasos.length ? /* @__PURE__ */ jsxs9(Fragment9, { children: [
-        /* @__PURE__ */ jsx9("div", { style: S.sub, children: t(lang, "prof.max.sinRuta") }),
-        ruta && ruta.huecos.length ? /* @__PURE__ */ jsxs9("div", { style: { marginTop: 6 }, children: [
-          /* @__PURE__ */ jsx9("div", { style: { ...S.sub, fontWeight: 600 }, children: t(lang, "prof.max.huecos") }),
-          ruta.huecos.map((h, i) => /* @__PURE__ */ jsxs9("div", { style: S.fila, children: [
-            /* @__PURE__ */ jsxs9("span", { style: { minWidth: 110, color: C.texto3, fontVariantNumeric: "tabular-nums" }, children: [
+      /* @__PURE__ */ jsx10("div", { style: S.sub, children: t(lang, "prof.max.estimacion") }),
+      /* @__PURE__ */ jsx10("div", { style: S.sub, children: t(lang, "prof.max.avisoEntrenamiento") }),
+      !hayPrecios ? importar : !ruta || !pasos.length ? /* @__PURE__ */ jsxs10(Fragment10, { children: [
+        /* @__PURE__ */ jsx10("div", { style: S.sub, children: t(lang, "prof.max.sinRuta") }),
+        ruta && ruta.huecos.length ? /* @__PURE__ */ jsxs10("div", { style: { marginTop: 6 }, children: [
+          /* @__PURE__ */ jsx10("div", { style: { ...S.sub, fontWeight: 600 }, children: t(lang, "prof.max.huecos") }),
+          ruta.huecos.map((h, i) => /* @__PURE__ */ jsxs10("div", { style: S.fila, children: [
+            /* @__PURE__ */ jsxs10("span", { style: { minWidth: 110, color: C.texto3, fontVariantNumeric: "tabular-nums" }, children: [
               h.desde,
               "–",
               h.hasta - 1
             ] }),
-            /* @__PURE__ */ jsx9("span", { style: { flex: 1, ...S.sub }, children: h.motivo })
+            /* @__PURE__ */ jsx10("span", { style: { flex: 1, ...S.sub }, children: h.motivo })
           ] }, i))
         ] }) : null
-      ] }) : /* @__PURE__ */ jsxs9(Fragment9, { children: [
-        /* @__PURE__ */ jsx9("div", { style: { ...S.sub, marginTop: 6 }, children: t(lang, "prof.max.cobertura", { pct: pct1(ruta.cobertura) }) }),
-        /* @__PURE__ */ jsx9("div", { style: { maxHeight: 320, overflowY: "auto", marginTop: 6 }, children: pasos.map((p, i) => {
+      ] }) : /* @__PURE__ */ jsxs10(Fragment10, { children: [
+        /* @__PURE__ */ jsx10("div", { style: { ...S.sub, marginTop: 6 }, children: t(lang, "prof.max.cobertura", { pct: pct1(ruta.cobertura) }) }),
+        /* @__PURE__ */ jsx10("div", { style: { maxHeight: 320, overflowY: "auto", marginTop: 6 }, children: pasos.map((p, i) => {
           const r = porSpell.get(p.spell);
-          return /* @__PURE__ */ jsxs9("div", { style: S.fila, children: [
-            /* @__PURE__ */ jsxs9("span", { style: { minWidth: 110, color: C.texto3, fontVariantNumeric: "tabular-nums" }, children: [
+          return /* @__PURE__ */ jsxs10("div", { style: S.fila, children: [
+            /* @__PURE__ */ jsxs10("span", { style: { minWidth: 110, color: C.texto3, fontVariantNumeric: "tabular-nums" }, children: [
               p.desde,
               "–",
               p.hasta - 1
             ] }),
-            /* @__PURE__ */ jsx9("span", { style: { flex: 1 }, children: r ? nombre(r.n, lang) : /* @__PURE__ */ jsx9("span", { style: { color: C.texto3 }, children: t(lang, "prof.plan.sinReceta") }) }),
-            /* @__PURE__ */ jsx9("span", { style: S.sub, children: t(lang, "prof.plan.crafts", { n: p.crafteos }) }),
-            /* @__PURE__ */ jsx9("span", { style: { ...S.sub, fontVariantNumeric: "tabular-nums", minWidth: 80, textAlign: "right" }, children: p.costo === null ? "—" : /* @__PURE__ */ jsx9(Dinero, {
-            cobre: p.costo }) })
+            /* @__PURE__ */ jsx10("span", { style: { flex: 1 }, children: r ? nombre(r.n, lang) : /* @__PURE__ */ jsx10("span", { style: { color: C.texto3 }, children: t(lang, "prof.plan.sinReceta") }) }),
+            /* @__PURE__ */ jsx10("span", { style: S.sub, children: t(lang, "prof.plan.crafts", { n: p.crafteos }) }),
+            /* @__PURE__ */ jsx10("span", { style: { ...S.sub, fontVariantNumeric: "tabular-nums", minWidth: 80, textAlign: "right" }, children: p.costo === null ? "—" : /* @__PURE__ */ jsx10(Dinero,
+            { cobre: p.costo }) })
           ] }, i);
         }) }),
-        acqs.length ? /* @__PURE__ */ jsxs9("div", { style: { marginTop: 8 }, children: [
-          /* @__PURE__ */ jsx9("div", { style: { ...S.sub, fontWeight: 600 }, children: t(lang, "prof.max.adquisicion") }),
-          /* @__PURE__ */ jsx9("div", { style: S.sub, children: t(lang, "prof.max.adquisicion.nota") }),
+        acqs.length ? /* @__PURE__ */ jsxs10("div", { style: { marginTop: 8 }, children: [
+          /* @__PURE__ */ jsx10("div", { style: { ...S.sub, fontWeight: 600 }, children: t(lang, "prof.max.adquisicion") }),
+          /* @__PURE__ */ jsx10("div", { style: S.sub, children: t(lang, "prof.max.adquisicion.nota") }),
           acqs.map((a, i) => {
             const r = porSpell.get(a.spell);
-            return /* @__PURE__ */ jsxs9("div", { style: S.fila, children: [
-              /* @__PURE__ */ jsx9("span", { style: { flex: 1 }, children: r ? nombre(r.n, lang) : a.item != null ? nombre(items[String(a.item)]?.[0], lang) : "—" }),
-              /* @__PURE__ */ jsx9("span", { style: S.sub, children: t(lang, "prof.max." + a.fuente) }),
-              /* @__PURE__ */ jsx9("span", { style: S.sub, children: t(lang, "prof.max.desde", { n: a.desde }) }),
-              /* @__PURE__ */ jsx9("span", { style: { ...S.sub, fontVariantNumeric: "tabular-nums", minWidth: 80, textAlign: "right" }, children: a.cobre === 0 ? t(lang, "prof.max.gratis") : /* @__PURE__ */ jsx9(
+            return /* @__PURE__ */ jsxs10("div", { style: S.fila, children: [
+              /* @__PURE__ */ jsx10("span", { style: { flex: 1 }, children: r ? nombre(r.n, lang) : a.item != null ? nombre(items[String(a.item)]?.[0], lang) : "—" }),
+              /* @__PURE__ */ jsx10("span", { style: S.sub, children: t(lang, "prof.max." + a.fuente) }),
+              /* @__PURE__ */ jsx10("span", { style: S.sub, children: t(lang, "prof.max.desde", { n: a.desde }) }),
+              /* @__PURE__ */ jsx10("span", { style: { ...S.sub, fontVariantNumeric: "tabular-nums", minWidth: 80, textAlign: "right" }, children: a.cobre === 0 ? t(lang, "prof.max.gratis") : /* @__PURE__ */ jsx10(
               Dinero, { cobre: a.cobre }) })
             ] }, i);
           })
         ] }) : null,
-        /* @__PURE__ */ jsxs9("div", { style: { ...S.fila, borderBottom: "none", fontWeight: 600, marginTop: 6 }, children: [
-          /* @__PURE__ */ jsx9("span", { style: { flex: 1 }, children: t(lang, "prof.max.materiales") }),
-          /* @__PURE__ */ jsx9("span", { style: { fontVariantNumeric: "tabular-nums", minWidth: 80, textAlign: "right" }, children: ruta.totalMateriales === null ? "—" : /* @__PURE__ */ jsx9(Dinero,
+        /* @__PURE__ */ jsxs10("div", { style: { ...S.fila, borderBottom: "none", fontWeight: 600, marginTop: 6 }, children: [
+          /* @__PURE__ */ jsx10("span", { style: { flex: 1 }, children: t(lang, "prof.max.materiales") }),
+          /* @__PURE__ */ jsx10("span", { style: { fontVariantNumeric: "tabular-nums", minWidth: 80, textAlign: "right" }, children: ruta.totalMateriales === null ? "—" : /* @__PURE__ */ jsx10(Dinero,
           { cobre: ruta.totalMateriales }) })
         ] }),
-        /* @__PURE__ */ jsxs9("div", { style: { ...S.fila, borderBottom: "none" }, children: [
-          /* @__PURE__ */ jsx9("span", { style: { flex: 1 }, children: t(lang, "prof.max.adquisicion") }),
-          /* @__PURE__ */ jsx9("span", { style: { fontVariantNumeric: "tabular-nums", minWidth: 80, textAlign: "right" }, children: /* @__PURE__ */ jsx9(Dinero, { cobre: ruta.totalAdquisicion }) })
+        /* @__PURE__ */ jsxs10("div", { style: { ...S.fila, borderBottom: "none" }, children: [
+          /* @__PURE__ */ jsx10("span", { style: { flex: 1 }, children: t(lang, "prof.max.adquisicion") }),
+          /* @__PURE__ */ jsx10("span", { style: { fontVariantNumeric: "tabular-nums", minWidth: 80, textAlign: "right" }, children: /* @__PURE__ */ jsx10(Dinero, { cobre: ruta.totalAdquisicion }) })
         ] }),
-        /* @__PURE__ */ jsxs9("div", { style: { ...S.fila, borderBottom: "none", fontWeight: 600 }, children: [
-          /* @__PURE__ */ jsx9("span", { style: { flex: 1 }, children: t(lang, "prof.max.total") }),
-          /* @__PURE__ */ jsx9("span", { style: { fontVariantNumeric: "tabular-nums", minWidth: 80, textAlign: "right" }, children: ruta.total === null ? "—" : /* @__PURE__ */ jsx9(Dinero, { cobre: ruta.
+        /* @__PURE__ */ jsxs10("div", { style: { ...S.fila, borderBottom: "none", fontWeight: 600 }, children: [
+          /* @__PURE__ */ jsx10("span", { style: { flex: 1 }, children: t(lang, "prof.max.total") }),
+          /* @__PURE__ */ jsx10("span", { style: { fontVariantNumeric: "tabular-nums", minWidth: 80, textAlign: "right" }, children: ruta.total === null ? "—" : /* @__PURE__ */ jsx10(Dinero, { cobre: ruta.
           total }) })
         ] }),
-        ruta.huecos.length ? /* @__PURE__ */ jsxs9("div", { style: { marginTop: 8 }, children: [
-          /* @__PURE__ */ jsx9("div", { style: { ...S.sub, fontWeight: 600 }, children: t(lang, "prof.max.huecos") }),
-          ruta.huecos.map((h, i) => /* @__PURE__ */ jsxs9("div", { style: S.fila, children: [
-            /* @__PURE__ */ jsxs9("span", { style: { minWidth: 110, color: C.texto3, fontVariantNumeric: "tabular-nums" }, children: [
+        ruta.huecos.length ? /* @__PURE__ */ jsxs10("div", { style: { marginTop: 8 }, children: [
+          /* @__PURE__ */ jsx10("div", { style: { ...S.sub, fontWeight: 600 }, children: t(lang, "prof.max.huecos") }),
+          ruta.huecos.map((h, i) => /* @__PURE__ */ jsxs10("div", { style: S.fila, children: [
+            /* @__PURE__ */ jsxs10("span", { style: { minWidth: 110, color: C.texto3, fontVariantNumeric: "tabular-nums" }, children: [
               h.desde,
               "–",
               h.hasta - 1
             ] }),
-            /* @__PURE__ */ jsx9("span", { style: { flex: 1, ...S.sub }, children: h.motivo })
+            /* @__PURE__ */ jsx10("span", { style: { flex: 1, ...S.sub }, children: h.motivo })
           ] }, i))
         ] }) : null,
-        ruta.adquisicionesSinDato.length ? /* @__PURE__ */ jsx9("div", { style: S.sub, children: t(lang, "prof.max.sinDato", { n: ruta.adquisicionesSinDato.length }) }) : null,
-        ruta.sinPrecio.length ? /* @__PURE__ */ jsx9("div", { style: S.sub, children: t(lang, "prof.max.sinPrecio", { n: ruta.sinPrecio.length }) }) : null
+        ruta.adquisicionesSinDato.length ? /* @__PURE__ */ jsx10("div", { style: S.sub, children: t(lang, "prof.max.sinDato", { n: ruta.adquisicionesSinDato.length }) }) : null,
+        ruta.sinPrecio.length ? /* @__PURE__ */ jsx10("div", { style: S.sub, children: t(lang, "prof.max.sinPrecio", { n: ruta.sinPrecio.length }) }) : null
       ] })
     ] });
   }
-  return /* @__PURE__ */ jsxs9(Tarjeta, { titulo: `${t(lang, "prof.plan")} · ${skill} → ${hasta}`, extra: origen, children: [
+  return /* @__PURE__ */ jsxs10(Tarjeta, { titulo: `${t(lang, "prof.plan")} · ${skill} → ${hasta}`, extra: origen, children: [
     toggle,
-    /* @__PURE__ */ jsxs9("div", { style: S.sub, children: [
+    /* @__PURE__ */ jsxs10("div", { style: S.sub, children: [
       t(lang, "prof.plan.estimacion"),
       " ",
       t(lang, "prof.plan.obtenibles")
     ] }),
     !hayPrecios ? importar : null,
-    skill >= hasta ? /* @__PURE__ */ jsx9("div", { style: S.sub, children: t(lang, "prof.plan.tope", { hasta }) }) : !plan.length ? /* @__PURE__ */ jsx9("div", { style: S.sub, children: t(lang, "prof.\
-plan.vacio") }) : /* @__PURE__ */ jsxs9(Fragment9, { children: [
-      /* @__PURE__ */ jsx9("div", { style: { maxHeight: 320, overflowY: "auto" }, children: plan.map((p, i) => {
+    skill >= hasta ? /* @__PURE__ */ jsx10("div", { style: S.sub, children: t(lang, "prof.plan.tope", { hasta }) }) : !plan.length ? /* @__PURE__ */ jsx10("div", { style: S.sub, children: t(lang, "pro\
+f.plan.vacio") }) : /* @__PURE__ */ jsxs10(Fragment10, { children: [
+      /* @__PURE__ */ jsx10("div", { style: { maxHeight: 320, overflowY: "auto" }, children: plan.map((p, i) => {
         const r = p.spell != null ? porSpell.get(p.spell) : null;
-        return /* @__PURE__ */ jsxs9("div", { style: S.fila, children: [
-          /* @__PURE__ */ jsxs9("span", { style: { minWidth: 110, color: C.texto3, fontVariantNumeric: "tabular-nums" }, children: [
+        return /* @__PURE__ */ jsxs10("div", { style: S.fila, children: [
+          /* @__PURE__ */ jsxs10("span", { style: { minWidth: 110, color: C.texto3, fontVariantNumeric: "tabular-nums" }, children: [
             p.desde,
             "–",
             p.hasta - 1
           ] }),
-          /* @__PURE__ */ jsx9("span", { style: { flex: 1 }, children: r ? nombre(r.n, lang) : /* @__PURE__ */ jsx9("span", { style: { color: C.texto3 }, children: t(lang, "prof.plan.sinReceta") }) }),
-          /* @__PURE__ */ jsx9("span", { style: S.sub, children: t(lang, "prof.plan.crafts", { n: p.crafteos }) }),
-          /* @__PURE__ */ jsx9("span", { style: { ...S.sub, fontVariantNumeric: "tabular-nums", minWidth: 80, textAlign: "right" }, children: p.costo === null ? "—" : /* @__PURE__ */ jsx9(Dinero, { cobre: p.
-          costo }) })
+          /* @__PURE__ */ jsx10("span", { style: { flex: 1 }, children: r ? nombre(r.n, lang) : /* @__PURE__ */ jsx10("span", { style: { color: C.texto3 }, children: t(lang, "prof.plan.sinReceta") }) }),
+          /* @__PURE__ */ jsx10("span", { style: S.sub, children: t(lang, "prof.plan.crafts", { n: p.crafteos }) }),
+          /* @__PURE__ */ jsx10("span", { style: { ...S.sub, fontVariantNumeric: "tabular-nums", minWidth: 80, textAlign: "right" }, children: p.costo === null ? "—" : /* @__PURE__ */ jsx10(Dinero, {
+          cobre: p.costo }) })
         ] }, i);
       }) }),
-      /* @__PURE__ */ jsxs9("div", { style: { ...S.fila, borderBottom: "none", fontWeight: 600 }, children: [
-        /* @__PURE__ */ jsx9("span", { style: { flex: 1 }, children: t(lang, "prof.plan.total") }),
-        /* @__PURE__ */ jsx9("span", { style: S.sub, children: t(lang, "prof.plan.crafts", { n: totalCrafts }) }),
-        /* @__PURE__ */ jsx9("span", { style: { fontVariantNumeric: "tabular-nums", minWidth: 80, textAlign: "right" }, children: totalCosto === null ? "—" : /* @__PURE__ */ jsx9(Dinero, { cobre: totalCosto }) })
+      /* @__PURE__ */ jsxs10("div", { style: { ...S.fila, borderBottom: "none", fontWeight: 600 }, children: [
+        /* @__PURE__ */ jsx10("span", { style: { flex: 1 }, children: t(lang, "prof.plan.total") }),
+        /* @__PURE__ */ jsx10("span", { style: S.sub, children: t(lang, "prof.plan.crafts", { n: totalCrafts }) }),
+        /* @__PURE__ */ jsx10("span", { style: { fontVariantNumeric: "tabular-nums", minWidth: 80, textAlign: "right" }, children: totalCosto === null ? "—" : /* @__PURE__ */ jsx10(Dinero, { cobre: totalCosto }) })
       ] })
     ] })
   ] });
 }
 
 // src/vistas/profesiones/fuentes.jsx
-import { useMemo as useMemo7 } from "react";
-import { jsx as jsx10, jsxs as jsxs10 } from "react/jsx-runtime";
+import { useMemo as useMemo8 } from "react";
+import { jsx as jsx11, jsxs as jsxs11 } from "react/jsx-runtime";
 agregarTextos({
   "prof.detalle": "De dónde sacar cada reactivo",
   "prof.fuente.vendedor": "vendedor · {precio}",
@@ -37721,7 +38626,7 @@ agregarTextos({
 });
 var TIPO_FUENTE = { m: "tipomob", s: "tipodesuello", p: "tipohurtar", o: "tipoobjeto" };
 var LADO = { alianza: "a", horda: "h" };
-var num4 = (v) => Number.isFinite(v) ? v : null;
+var num5 = (v) => Number.isFinite(v) ? v : null;
 function zonaDrop(drop, zk) {
   const z = drop && drop.zones ? drop.zones[zk] : null;
   return z ? z[0] : null;
@@ -37741,9 +38646,9 @@ function fuentesDe(itemId, drop, n = 3) {
         subtipo: o[1],
         nombre: o[0],
         zona: zonaDrop(drop, o[2]),
-        prob: num4(prob),
-        min: num4(min),
-        max: num4(max)
+        prob: num5(prob),
+        min: num5(min),
+        max: num5(max)
       });
     } else if (tipo === "m" || tipo === "s" || tipo === "p") {
       const m = drop.mobs && drop.mobs[String(id)];
@@ -37752,9 +38657,9 @@ function fuentesDe(itemId, drop, n = 3) {
         tipo: TIPO_FUENTE[tipo] || "tipomob",
         nombre: m[0],
         zona: zonaDrop(drop, m[4]),
-        prob: num4(prob),
-        min: num4(min),
-        max: num4(max),
+        prob: num5(prob),
+        min: num5(min),
+        max: num5(max),
         fac: m[7]
       });
     }
@@ -37764,48 +38669,48 @@ function fuentesDe(itemId, drop, n = 3) {
 var probTxt = (p) => p === null ? "—" : String(Math.round(p * 10) / 10);
 var rangoTxt = (min, max) => max !== null && max > 1 ? ` ×${min ?? 1}-${max}` : "";
 function FuentesReceta({ prof, sel, precios, items, faccion, lang }) {
-  const receta = useMemo7(
+  const receta = useMemo8(
     () => (sel != null ? prof.recetas.find((r) => r.spell === sel) : null) ?? null,
     [prof, sel]
   );
   const drop = D.dropData;
   const lado = LADO[faccion] || null;
-  return /* @__PURE__ */ jsx10(
+  return /* @__PURE__ */ jsx11(
     Tarjeta,
     {
       titulo: receta ? `${t(lang, "prof.detalle")} · ${nombre(receta.n, lang)}` : t(lang, "prof.detalle"),
-      extra: /* @__PURE__ */ jsx10(Origen, { f: ["cmangos-1.12", "cliente-forever"], lang }),
-      children: !receta ? /* @__PURE__ */ jsx10("div", { style: S.sub, children: t(lang, "prof.elegirReceta") }) : /* @__PURE__ */ jsxs10("div", { style: { display: "flex", flexDirection: "column", gap: 6 },
+      extra: /* @__PURE__ */ jsx11(Origen, { f: ["cmangos-1.12", "cliente-forever"], lang }),
+      children: !receta ? /* @__PURE__ */ jsx11("div", { style: S.sub, children: t(lang, "prof.elegirReceta") }) : /* @__PURE__ */ jsxs11("div", { style: { display: "flex", flexDirection: "column", gap: 6 },
       children: [
         (receta.reactivos || []).map(([itemId, cant]) => {
           const u = costoUnidad(itemId, precios, items);
           const fuentes = fuentesDe(itemId, drop);
-          return /* @__PURE__ */ jsxs10("div", { style: { ...S.fila, flexWrap: "wrap" }, children: [
-            /* @__PURE__ */ jsx10("span", { style: { minWidth: 170 }, children: /* @__PURE__ */ jsx10(NombreItem, { id: itemId, lang, cantidad: cant }) }),
-            /* @__PURE__ */ jsxs10("span", { style: { flex: 1, display: "flex", flexWrap: "wrap", gap: 10, fontSize: 11 }, children: [
-              u.fuente === "vendedor" ? /* @__PURE__ */ jsx10("span", { style: { color: C.texto2 }, children: t(lang, "prof.fuente.vendedor", { precio: dinero(u.cobre) }) }) : null,
-              precios instanceof Map && precios.has(itemId) ? /* @__PURE__ */ jsx10("span", { style: { color: C.texto2 }, children: t(lang, "prof.fuente.subasta", { precio: dinero(precios.get(itemId)) }) }) :
+          return /* @__PURE__ */ jsxs11("div", { style: { ...S.fila, flexWrap: "wrap" }, children: [
+            /* @__PURE__ */ jsx11("span", { style: { minWidth: 170 }, children: /* @__PURE__ */ jsx11(NombreItem, { id: itemId, lang, cantidad: cant }) }),
+            /* @__PURE__ */ jsxs11("span", { style: { flex: 1, display: "flex", flexWrap: "wrap", gap: 10, fontSize: 11 }, children: [
+              u.fuente === "vendedor" ? /* @__PURE__ */ jsx11("span", { style: { color: C.texto2 }, children: t(lang, "prof.fuente.vendedor", { precio: dinero(u.cobre) }) }) : null,
+              precios instanceof Map && precios.has(itemId) ? /* @__PURE__ */ jsx11("span", { style: { color: C.texto2 }, children: t(lang, "prof.fuente.subasta", { precio: dinero(precios.get(itemId)) }) }) :
               null,
-              fuentes.length ? fuentes.map((f, i) => /* @__PURE__ */ jsxs10("span", { style: { color: C.texto2 }, children: [
+              fuentes.length ? fuentes.map((f, i) => /* @__PURE__ */ jsxs11("span", { style: { color: C.texto2 }, children: [
                 f.tipo === "objeto" ? t(lang, "prof.fuente.objeto", { nombre: f.nombre, tipo: f.subtipo, zona: f.zona || "—", prob: probTxt(f.prob) }) : `${t(lang, "prof.fuente." + f.tipo)}: ` + t(lang,
                 "prof.fuente.mob", { nombre: f.nombre, zona: f.zona || "—", prob: probTxt(f.prob) }),
                 rangoTxt(f.min, f.max),
-                f.fac && lado && !f.fac.includes(lado) ? /* @__PURE__ */ jsxs10("span", { style: { color: C.texto3 }, children: [
+                f.fac && lado && !f.fac.includes(lado) ? /* @__PURE__ */ jsxs11("span", { style: { color: C.texto3 }, children: [
                   " · ",
                   t(lang, "prof.fuente.otraFac")
                 ] }) : null
-              ] }, i)) : /* @__PURE__ */ jsx10("span", { style: { color: C.texto3 }, children: t(lang, "prof.fuente.nada") })
+              ] }, i)) : /* @__PURE__ */ jsx11("span", { style: { color: C.texto3 }, children: t(lang, "prof.fuente.nada") })
             ] })
           ] }, itemId);
         }),
-        !(receta.reactivos || []).length ? /* @__PURE__ */ jsx10(Hueco, { lang, children: nombre(receta.n, lang) }) : null
+        !(receta.reactivos || []).length ? /* @__PURE__ */ jsx11(Hueco, { lang, children: nombre(receta.n, lang) }) : null
       ] })
     }
   );
 }
 
 // src/vistas/profesiones.jsx
-import { Fragment as Fragment10, jsx as jsx11, jsxs as jsxs11 } from "react/jsx-runtime";
+import { Fragment as Fragment11, jsx as jsx12, jsxs as jsxs12 } from "react/jsx-runtime";
 agregarTextos({
   "prof.skill": "Skill",
   "prof.skill.declarado": "Declarado a mano (no lo leyó el juego)",
@@ -37836,7 +38741,7 @@ agregarTextos({
   "prof.elegirReceta": "Pick a recipe from the table to see where to get its reagents."
 });
 var ORDEN_BASE = [...PRINCIPALES, ...SECUNDARIAS];
-var num5 = (v) => Number.isFinite(v) ? v : 0;
+var num6 = (v) => Number.isFinite(v) ? v : 0;
 var pct = (v) => Number.isFinite(v) ? String(Math.round(v * 10) / 10) : "—";
 var NOMBRES_PROF2 = Object.fromEntries(
   Object.entries(D.profesiones.profesiones).map(([id, p]) => [id, p.n])
@@ -37848,15 +38753,15 @@ var PROCEDENCIA_PROF = [
 ];
 function VistaProfesiones({ ctx, estado, perfil, lang, irA }) {
   const datos = D.profesiones.profesiones;
-  const orden = useMemo8(() => {
+  const orden = useMemo9(() => {
     const elegidas = [...perfil.profesiones || [], ...perfil.secundarias || []].filter((id) => datos[String(id)]);
     const set = new Set(elegidas);
     return [...elegidas, ...ORDEN_BASE.filter((id) => !set.has(id))];
   }, [perfil, datos]);
-  const [pid, setPid] = useState7(() => orden[0]);
-  const [skills, setSkills] = useState7({});
-  const [niveles, setNiveles] = useState7(() => ({ ...SEMILLA2 }));
-  useEffect2(() => {
+  const [pid, setPid] = useState8(() => orden[0]);
+  const [skills, setSkills] = useState8({});
+  const [niveles, setNiveles] = useState8(() => ({ ...SEMILLA2 }));
+  useEffect3(() => {
     let vivo = true;
     leerNiveles(ctx).then((r) => {
       if (vivo) setNiveles(r.niveles);
@@ -37866,7 +38771,7 @@ function VistaProfesiones({ ctx, estado, perfil, lang, irA }) {
       vivo = false;
     };
   }, [ctx]);
-  const [sel, setSel] = useState7(null);
+  const [sel, setSel] = useState8(null);
   const pidReal = datos[String(pid)] ? pid : orden[0];
   const prof = datos[String(pidReal)];
   const skillDe = (id) => {
@@ -37889,9 +38794,9 @@ function VistaProfesiones({ ctx, estado, perfil, lang, irA }) {
     } catch {
     }
   };
-  const [todosEntr, setTodosEntr] = useState7(false);
-  const [propias, setPropias] = useState7(() => normalizarLista(SEMILLA));
-  useEffect2(() => {
+  const [todosEntr, setTodosEntr] = useState8(false);
+  const [propias, setPropias] = useState8(() => normalizarLista(SEMILLA));
+  useEffect3(() => {
     let vivo = true;
     leerPropias(ctx).then((r) => {
       if (vivo) setPropias(r.spells);
@@ -37901,7 +38806,7 @@ function VistaProfesiones({ ctx, estado, perfil, lang, irA }) {
       vivo = false;
     };
   }, [ctx]);
-  const conjuntoPropias = useMemo8(() => new Set(propias), [propias]);
+  const conjuntoPropias = useMemo9(() => new Set(propias), [propias]);
   const alternarPropia = async (spell) => {
     const nueva = alternar(propias, spell);
     setPropias(nueva);
@@ -37910,10 +38815,10 @@ function VistaProfesiones({ ctx, estado, perfil, lang, irA }) {
     } catch {
     }
   };
-  const precios = useMemo8(() => preciosDelMercado(estado.market, perfil.reino), [estado.market, perfil.reino]);
+  const precios = useMemo9(() => preciosDelMercado(estado.market, perfil.reino), [estado.market, perfil.reino]);
   const trainers = prof && prof.entrenadores ? prof.entrenadores[perfil.faccion] || [] : [];
-  const siguiente = Math.min(Infinity, ...trainers.map((e) => num5(e.max)).filter((m) => m > skill));
-  const delTramo = Number.isFinite(siguiente) ? trainers.filter((e) => num5(e.max) === siguiente) : [];
+  const siguiente = Math.min(Infinity, ...trainers.map((e) => num6(e.max)).filter((m) => m > skill));
+  const delTramo = Number.isFinite(siguiente) ? trainers.filter((e) => num6(e.max) === siguiente) : [];
   const plegada = !todosEntr && delTramo.length > 0 && delTramo.length < trainers.length;
   const visibles = plegada ? delTramo : trainers;
   const porZona = /* @__PURE__ */ new Map();
@@ -37923,14 +38828,14 @@ function VistaProfesiones({ ctx, estado, perfil, lang, irA }) {
     porZona.get(z).push(e);
   }
   const enPerfil = /* @__PURE__ */ new Set([...perfil.profesiones || [], ...perfil.secundarias || []]);
-  const catalogo = useMemo8(() => catalogoMercado(D.items, D.dungeons), []);
-  const resumenPerfil = useMemo8(() => perfilParaAgente(perfil, D.personaje, NOMBRES_PROF2, lang), [perfil, lang]);
-  const recetaSel = useMemo8(
+  const catalogo = useMemo9(() => catalogoMercado(D.items, D.dungeons), []);
+  const resumenPerfil = useMemo9(() => perfilParaAgente(perfil, D.personaje, NOMBRES_PROF2, lang), [perfil, lang]);
+  const recetaSel = useMemo9(
     () => prof && sel == null ? null : prof ? prof.recetas.find((r) => r.spell === sel) || null : null,
     [prof, sel]
   );
-  const recetario = useMemo8(() => resumenRecetario(prof?.recetas, propias), [prof, propias]);
-  const snapshotDavi = useMemo8(() => !prof ? null : construirContextoProfesion({
+  const recetario = useMemo9(() => resumenRecetario(prof?.recetas, propias), [prof, propias]);
+  const snapshotDavi = useMemo9(() => !prof ? null : construirContextoProfesion({
     id: pidReal,
     nombre: prof.n,
     skill,
@@ -37946,26 +38851,26 @@ function VistaProfesiones({ ctx, estado, perfil, lang, irA }) {
     recetario,
     skillDeclarado
   }), [prof, pidReal, skill, recetaSel, catalogo, precios, lang, resumenPerfil, estado.market, perfil.reino, recetario, skillDeclarado]);
-  if (!prof) return /* @__PURE__ */ jsx11(Tarjeta, { titulo: t(lang, "tab.profesiones"), children: /* @__PURE__ */ jsx11(Hueco, { lang, children: t(lang, "prof.huecoEntrenadores") }) });
-  return /* @__PURE__ */ jsxs11(Fragment10, { children: [
-    /* @__PURE__ */ jsx11(Tarjeta, { titulo: t(lang, "tab.profesiones"), extra: /* @__PURE__ */ jsx11(Origen, { f: prof.f || "cmangos-1.12", lang }), children: /* @__PURE__ */ jsxs11("div", { style: {
+  if (!prof) return /* @__PURE__ */ jsx12(Tarjeta, { titulo: t(lang, "tab.profesiones"), children: /* @__PURE__ */ jsx12(Hueco, { lang, children: t(lang, "prof.huecoEntrenadores") }) });
+  return /* @__PURE__ */ jsxs12(Fragment11, { children: [
+    /* @__PURE__ */ jsx12(Tarjeta, { titulo: t(lang, "tab.profesiones"), extra: /* @__PURE__ */ jsx12(Origen, { f: prof.f || "cmangos-1.12", lang }), children: /* @__PURE__ */ jsxs12("div", { style: {
     display: "flex", flexWrap: "wrap", gap: 12, alignItems: "flex-end" }, children: [
-      /* @__PURE__ */ jsxs11("label", { style: S.campo, htmlFor: "wf-profesion", children: [
-        /* @__PURE__ */ jsx11("span", { style: S.etiqueta, children: t(lang, "tab.profesiones") }),
-        /* @__PURE__ */ jsxs11(Select2, { value: String(pidReal), onValueChange: (v) => {
+      /* @__PURE__ */ jsxs12("label", { style: S.campo, htmlFor: "wf-profesion", children: [
+        /* @__PURE__ */ jsx12("span", { style: S.etiqueta, children: t(lang, "tab.profesiones") }),
+        /* @__PURE__ */ jsxs12(Select2, { value: String(pidReal), onValueChange: (v) => {
           setPid(Number(v));
           setSel(null);
         }, children: [
-          /* @__PURE__ */ jsx11(SelectTrigger2, { id: "wf-profesion", "aria-label": t(lang, "tab.profesiones"), children: /* @__PURE__ */ jsx11(SelectValue2, {}) }),
-          /* @__PURE__ */ jsx11(SelectContent2, { children: orden.map((id) => /* @__PURE__ */ jsxs11(SelectItem2, { value: String(id), children: [
+          /* @__PURE__ */ jsx12(SelectTrigger2, { id: "wf-profesion", "aria-label": t(lang, "tab.profesiones"), children: /* @__PURE__ */ jsx12(SelectValue2, {}) }),
+          /* @__PURE__ */ jsx12(SelectContent2, { children: orden.map((id) => /* @__PURE__ */ jsxs12(SelectItem2, { value: String(id), children: [
             nombre(datos[String(id)].n, lang),
             enPerfil.has(id) ? " ★" : ""
           ] }, id)) })
         ] })
       ] }),
-      /* @__PURE__ */ jsxs11("label", { style: S.campo, htmlFor: "wf-skill-" + pidReal, children: [
-        /* @__PURE__ */ jsx11("span", { style: S.etiqueta, children: t(lang, "prof.skill") }),
-        /* @__PURE__ */ jsx11(
+      /* @__PURE__ */ jsxs12("label", { style: S.campo, htmlFor: "wf-skill-" + pidReal, children: [
+        /* @__PURE__ */ jsx12("span", { style: S.etiqueta, children: t(lang, "prof.skill") }),
+        /* @__PURE__ */ jsx12(
           Input3,
           {
             id: "wf-skill-" + pidReal,
@@ -37978,37 +38883,37 @@ function VistaProfesiones({ ctx, estado, perfil, lang, irA }) {
           }
         )
       ] }),
-      /* @__PURE__ */ jsx11("span", { style: S.chip, children: t(lang, prof.tipo === "secundaria" ? "prof.tipo.secundaria" : "prof.tipo.principal") }),
-      prof.recoleccion ? /* @__PURE__ */ jsx11("span", { style: S.chip, children: t(lang, "prof.recoleccion") }) : null,
-      skillDeclarado ? /* @__PURE__ */ jsx11("span", { style: S.chip, children: t(lang, "prof.skill.declarado") }) : null,
-      enPerfil.has(pidReal) ? /* @__PURE__ */ jsx11("span", { style: S.chip, children: t(lang, "prof.enPerfil") }) : null
+      /* @__PURE__ */ jsx12("span", { style: S.chip, children: t(lang, prof.tipo === "secundaria" ? "prof.tipo.secundaria" : "prof.tipo.principal") }),
+      prof.recoleccion ? /* @__PURE__ */ jsx12("span", { style: S.chip, children: t(lang, "prof.recoleccion") }) : null,
+      skillDeclarado ? /* @__PURE__ */ jsx12("span", { style: S.chip, children: t(lang, "prof.skill.declarado") }) : null,
+      enPerfil.has(pidReal) ? /* @__PURE__ */ jsx12("span", { style: S.chip, children: t(lang, "prof.enPerfil") }) : null
     ] }) }),
-    /* @__PURE__ */ jsxs11(
+    /* @__PURE__ */ jsxs12(
       Tarjeta,
       {
         titulo: t(lang, "prof.entrenadores") + " · " + nombre(D.personaje.facciones[perfil.faccion].n, lang),
-        extra: /* @__PURE__ */ jsx11(Origen, { f: "cmangos-1.12", lang }),
+        extra: /* @__PURE__ */ jsx12(Origen, { f: "cmangos-1.12", lang }),
         children: [
-          plegada ? /* @__PURE__ */ jsx11("div", { style: S.sub, children: t(lang, "prof.entr.siguiente", { max: siguiente }) }) : null,
-          porZona.size ? [...porZona.entries()].sort().map(([z, lista]) => /* @__PURE__ */ jsxs11("div", { style: { display: "flex", flexDirection: "column" }, children: [
-            /* @__PURE__ */ jsx11("div", { style: { ...S.fila, borderBottom: "none", paddingBottom: 0 }, children: /* @__PURE__ */ jsx11("span", { style: { color: C.texto2 }, children: z }) }),
-            lista.map((e) => /* @__PURE__ */ jsxs11("div", { style: S.fila, children: [
-              /* @__PURE__ */ jsx11("span", { style: { flex: 1 }, children: nombre(e.n, lang) }),
-              /* @__PURE__ */ jsxs11("span", { style: S.sub, children: [
+          plegada ? /* @__PURE__ */ jsx12("div", { style: S.sub, children: t(lang, "prof.entr.siguiente", { max: siguiente }) }) : null,
+          porZona.size ? [...porZona.entries()].sort().map(([z, lista]) => /* @__PURE__ */ jsxs12("div", { style: { display: "flex", flexDirection: "column" }, children: [
+            /* @__PURE__ */ jsx12("div", { style: { ...S.fila, borderBottom: "none", paddingBottom: 0 }, children: /* @__PURE__ */ jsx12("span", { style: { color: C.texto2 }, children: z }) }),
+            lista.map((e) => /* @__PURE__ */ jsxs12("div", { style: S.fila, children: [
+              /* @__PURE__ */ jsx12("span", { style: { flex: 1 }, children: nombre(e.n, lang) }),
+              /* @__PURE__ */ jsxs12("span", { style: S.sub, children: [
                 pct(e.x),
                 "%, ",
                 pct(e.y),
                 "%"
               ] }),
-              /* @__PURE__ */ jsx11("span", { style: S.sub, children: t(lang, "prof.hasta", { max: num5(e.max) }) })
+              /* @__PURE__ */ jsx12("span", { style: S.sub, children: t(lang, "prof.hasta", { max: num6(e.max) }) })
             ] }, e.npc))
-          ] }, z)) : /* @__PURE__ */ jsx11(Hueco, { lang, children: t(lang, "prof.huecoEntrenadores") }),
-          delTramo.length > 0 && delTramo.length < trainers.length ? /* @__PURE__ */ jsx11("div", { children: /* @__PURE__ */ jsx11(Button5, { size: "xs", variant: "outline", onClick: () => setTodosEntr(
+          ] }, z)) : /* @__PURE__ */ jsx12(Hueco, { lang, children: t(lang, "prof.huecoEntrenadores") }),
+          delTramo.length > 0 && delTramo.length < trainers.length ? /* @__PURE__ */ jsx12("div", { children: /* @__PURE__ */ jsx12(Button6, { size: "xs", variant: "outline", onClick: () => setTodosEntr(
           !todosEntr), children: todosEntr ? t(lang, "prof.entr.menos") : t(lang, "prof.entr.todos", { n: trainers.length }) }) }) : null
         ]
       }
     ),
-    /* @__PURE__ */ jsx11(
+    /* @__PURE__ */ jsx12(
       PlanSubida,
       {
         prof,
@@ -38021,7 +38926,7 @@ function VistaProfesiones({ ctx, estado, perfil, lang, irA }) {
         faccion: perfil.faccion
       }
     ),
-    /* @__PURE__ */ jsx11(
+    /* @__PURE__ */ jsx12(
       TablaRecetas,
       {
         prof,
@@ -38036,7 +38941,7 @@ function VistaProfesiones({ ctx, estado, perfil, lang, irA }) {
         onPropia: alternarPropia
       }
     ),
-    /* @__PURE__ */ jsx11(
+    /* @__PURE__ */ jsx12(
       PanelVenta,
       {
         recetas: prof.recetas,
@@ -38047,7 +38952,7 @@ function VistaProfesiones({ ctx, estado, perfil, lang, irA }) {
         lang
       }
     ),
-    /* @__PURE__ */ jsx11(
+    /* @__PURE__ */ jsx12(
       FuentesReceta,
       {
         prof,
@@ -38058,7 +38963,7 @@ function VistaProfesiones({ ctx, estado, perfil, lang, irA }) {
         lang
       }
     ),
-    /* @__PURE__ */ jsx11(Tarjeta, { titulo: t(lang, "davi.boton"), children: /* @__PURE__ */ jsx11(
+    /* @__PURE__ */ jsx12(Tarjeta, { titulo: t(lang, "davi.boton"), children: /* @__PURE__ */ jsx12(
       PreguntarDavi,
       {
         ctx,
@@ -38072,13 +38977,13 @@ function VistaProfesiones({ ctx, estado, perfil, lang, irA }) {
 }
 
 // src/vistas/dungeons.jsx
-import { useMemo as useMemo10, useState as useState8 } from "react";
+import { useMemo as useMemo11, useState as useState9 } from "react";
 import { Checkbox as Checkbox6, SegmentedControl as SegmentedControl3 } from "@hermes/plugin-sdk";
 
 // src/vistas/dungeons/tarjeta.jsx
-import { useMemo as useMemo9 } from "react";
+import { useMemo as useMemo10 } from "react";
 import { Checkbox as Checkbox5 } from "@hermes/plugin-sdk";
-import { jsx as jsx12, jsxs as jsxs12 } from "react/jsx-runtime";
+import { jsx as jsx13, jsxs as jsxs13 } from "react/jsx-runtime";
 agregarTextos({
   "dungeon.niveles": "Nv {min}–{max}",
   "dungeon.jugadores": "hasta {n} jugadores",
@@ -38128,9 +39033,9 @@ var estiloCuerpo = { padding: "0 12px 10px", display: "flex", flexDirection: "co
 var contLabel = (c, lang) => c === "K" ? t(lang, "dungeon.contK") : c === "E" ? t(lang, "dungeon.contE") : c;
 function TarjetaDungeon({ d, lang, perfil, soloUtil, items, competencias, gear, curados, onGear }) {
   const enRango = dungeonEnRango(d, perfil.nivel);
-  const misiones = useMemo9(() => misionesDeDungeon(D.misiones.misiones, perfil, d.mapa), [perfil, d.mapa]);
+  const misiones = useMemo10(() => misionesDeDungeon(D.misiones.misiones, perfil, d.mapa), [perfil, d.mapa]);
   const hs = huecos("dungeons", { tema: "botin", mapa: d.mapa });
-  const utilesTotal = useMemo9(() => {
+  const utilesTotal = useMemo10(() => {
     if (!soloUtil) return 0;
     return d.jefes.reduce((n, j) => n + (j.botin ? botinUtil(items, j.botin, competencias).length : 0), 0);
   }, [soloUtil, d, items, competencias]);
@@ -38138,22 +39043,22 @@ function TarjetaDungeon({ d, lang, perfil, soloUtil, items, competencias, gear, 
     t(lang, "dungeon.niveles", { min: d.niveles.min, max: d.niveles.max }),
     d.jugadores ? t(lang, "dungeon.jugadores", { n: d.jugadores }) : null
   ].filter(Boolean).join(" · ") : t(lang, "dungeon.forever");
-  return /* @__PURE__ */ jsxs12("details", { open: enRango, "data-dungeon": d.mapa, style: estiloDetails2, children: [
-    /* @__PURE__ */ jsxs12("summary", { style: estiloSummary2, children: [
-      /* @__PURE__ */ jsx12("span", { style: { fontWeight: 600 }, children: nombre(d.n, lang) }),
-      /* @__PURE__ */ jsx12("span", { style: S.sub, children: meta }),
-      d.raid ? /* @__PURE__ */ jsx12("span", { style: { ...S.chip, borderColor: C.rojo, color: C.rojo }, children: t(lang, "dungeon.raid") }) : null,
-      enRango ? /* @__PURE__ */ jsx12("span", { style: { ...S.chip, borderColor: C.verde, color: C.verde }, children: t(lang, "dungeon.enRango") }) : null,
-      soloUtil && d.tipo === "clasico" ? /* @__PURE__ */ jsx12("span", { style: S.chip, children: t(lang, "dungeon.utiles", { n: utilesTotal }) }) : null,
-      /* @__PURE__ */ jsx12(Origen, { f: d.f, lang })
+  return /* @__PURE__ */ jsxs13("details", { open: enRango, "data-dungeon": d.mapa, style: estiloDetails2, children: [
+    /* @__PURE__ */ jsxs13("summary", { style: estiloSummary2, children: [
+      /* @__PURE__ */ jsx13("span", { style: { fontWeight: 600 }, children: nombre(d.n, lang) }),
+      /* @__PURE__ */ jsx13("span", { style: S.sub, children: meta }),
+      d.raid ? /* @__PURE__ */ jsx13("span", { style: { ...S.chip, borderColor: C.rojo, color: C.rojo }, children: t(lang, "dungeon.raid") }) : null,
+      enRango ? /* @__PURE__ */ jsx13("span", { style: { ...S.chip, borderColor: C.verde, color: C.verde }, children: t(lang, "dungeon.enRango") }) : null,
+      soloUtil && d.tipo === "clasico" ? /* @__PURE__ */ jsx13("span", { style: S.chip, children: t(lang, "dungeon.utiles", { n: utilesTotal }) }) : null,
+      /* @__PURE__ */ jsx13(Origen, { f: d.f, lang })
     ] }),
-    /* @__PURE__ */ jsxs12("div", { style: estiloCuerpo, children: [
-      d.tipo === "forever" ? /* @__PURE__ */ jsx12(Hueco, { lang, children: t(lang, "dungeon.sinDatosForever") }) : null,
-      hs.filter((h) => d.tipo !== "forever").map((h, i) => /* @__PURE__ */ jsxs12(Hueco, { lang, children: [
+    /* @__PURE__ */ jsxs13("div", { style: estiloCuerpo, children: [
+      d.tipo === "forever" ? /* @__PURE__ */ jsx13(Hueco, { lang, children: t(lang, "dungeon.sinDatosForever") }) : null,
+      hs.filter((h) => d.tipo !== "forever").map((h, i) => /* @__PURE__ */ jsxs13(Hueco, { lang, children: [
         h.motivo,
         h.jefes && h.jefes.length ? " — " + h.jefes.join(", ") : ""
       ] }, i)),
-      /* @__PURE__ */ jsxs12("div", { style: S.etiqueta, children: [
+      /* @__PURE__ */ jsxs13("div", { style: S.etiqueta, children: [
         t(lang, "dungeon.jefes"),
         " · ",
         d.jefes.length
@@ -38161,58 +39066,58 @@ function TarjetaDungeon({ d, lang, perfil, soloUtil, items, competencias, gear, 
       d.jefes.map((j, ji) => {
         const botin = j.botin || [];
         const muestra = soloUtil ? botinUtil(items, botin, competencias) : botin;
-        return /* @__PURE__ */ jsxs12("div", { "data-jefe": ji, style: { paddingLeft: 6 }, children: [
-          /* @__PURE__ */ jsx12("div", { style: { fontSize: 12, fontWeight: 600 }, children: nombre(j.n, lang) }),
-          d.tipo === "forever" ? null : /* @__PURE__ */ jsx12("div", { style: { paddingLeft: 12, display: "flex", flexDirection: "column", gap: 2 }, children: muestra.length ? muestra.map(([iid, prob], bi) => /* @__PURE__ */ jsxs12(
+        return /* @__PURE__ */ jsxs13("div", { "data-jefe": ji, style: { paddingLeft: 6 }, children: [
+          /* @__PURE__ */ jsx13("div", { style: { fontSize: 12, fontWeight: 600 }, children: nombre(j.n, lang) }),
+          d.tipo === "forever" ? null : /* @__PURE__ */ jsx13("div", { style: { paddingLeft: 12, display: "flex", flexDirection: "column", gap: 2 }, children: muestra.length ? muestra.map(([iid, prob], bi) => /* @__PURE__ */ jsxs13(
           "div", { style: { display: "flex", gap: 6, alignItems: "baseline" }, children: [
-            /* @__PURE__ */ jsx12(NombreItem, { id: iid, lang }),
-            /* @__PURE__ */ jsxs12("span", { style: S.sub, children: [
+            /* @__PURE__ */ jsx13(NombreItem, { id: iid, lang }),
+            /* @__PURE__ */ jsxs13("span", { style: S.sub, children: [
               prob,
               "%"
             ] })
-          ] }, bi)) : /* @__PURE__ */ jsx12("div", { style: S.sub, children: botin.length ? t(lang, "dungeon.sinUtil") : t(lang, "dungeon.sinBotin") }) })
+          ] }, bi)) : /* @__PURE__ */ jsx13("div", { style: S.sub, children: botin.length ? t(lang, "dungeon.sinUtil") : t(lang, "dungeon.sinBotin") }) })
         ] }, ji);
       }),
-      misiones.length ? /* @__PURE__ */ jsxs12("div", { style: { marginTop: 4 }, children: [
-        /* @__PURE__ */ jsxs12("div", { style: S.etiqueta, children: [
+      misiones.length ? /* @__PURE__ */ jsxs13("div", { style: { marginTop: 4 }, children: [
+        /* @__PURE__ */ jsxs13("div", { style: S.etiqueta, children: [
           t(lang, "dungeon.misiones"),
           " · ",
           misiones.length
         ] }),
-        misiones.map(([id, m]) => /* @__PURE__ */ jsxs12("div", { "data-mision": id, style: { ...S.fila, borderBottom: "none", padding: "2px 0", opacity: m.min > perfil.nivel ? 0.6 : 1 }, children: [
-          /* @__PURE__ */ jsx12("span", { style: { minWidth: 34, color: C.texto3 }, children: m.nivel }),
-          /* @__PURE__ */ jsx12("span", { style: { flex: 1 }, children: nombre(m.t, lang) })
+        misiones.map(([id, m]) => /* @__PURE__ */ jsxs13("div", { "data-mision": id, style: { ...S.fila, borderBottom: "none", padding: "2px 0", opacity: m.min > perfil.nivel ? 0.6 : 1 }, children: [
+          /* @__PURE__ */ jsx13("span", { style: { minWidth: 34, color: C.texto3 }, children: m.nivel }),
+          /* @__PURE__ */ jsx13("span", { style: { flex: 1 }, children: nombre(m.t, lang) })
         ] }, id))
       ] }) : null,
       curados.map(({ d: cd, indice }) => {
         const loot = Array.isArray(cd.loot) ? cd.loot : [];
         const conseguidos = loot.filter((l) => gear.has("d" + indice + "|" + l[0])).length;
-        return /* @__PURE__ */ jsxs12("div", { "data-curado": indice, style: { borderTop: `1px dashed ${C.borde}`, paddingTop: 6, marginTop: 4 }, children: [
-          /* @__PURE__ */ jsxs12("div", { style: { display: "flex", gap: 6, alignItems: "baseline", flexWrap: "wrap" }, children: [
-            /* @__PURE__ */ jsx12("span", { style: { fontSize: 12, fontWeight: 600 }, children: cd.n }),
-            /* @__PURE__ */ jsxs12("span", { style: S.sub, children: [
+        return /* @__PURE__ */ jsxs13("div", { "data-curado": indice, style: { borderTop: `1px dashed ${C.borde}`, paddingTop: 6, marginTop: 4 }, children: [
+          /* @__PURE__ */ jsxs13("div", { style: { display: "flex", gap: 6, alignItems: "baseline", flexWrap: "wrap" }, children: [
+            /* @__PURE__ */ jsx13("span", { style: { fontSize: 12, fontWeight: 600 }, children: cd.n }),
+            /* @__PURE__ */ jsxs13("span", { style: S.sub, children: [
               cd.loc,
               " · ",
               cd.r[0],
               "–",
               cd.r[1]
             ] }),
-            /* @__PURE__ */ jsx12("span", { style: S.chip, children: contLabel(cd.cont, lang) }),
-            cd.key ? /* @__PURE__ */ jsx12("span", { style: { ...S.chip, borderColor: C.amarillo, color: C.amarillo }, children: t(lang, "dungeon.clave") }) : null,
-            /* @__PURE__ */ jsxs12("span", { style: { ...S.sub, marginLeft: "auto" }, children: [
+            /* @__PURE__ */ jsx13("span", { style: S.chip, children: contLabel(cd.cont, lang) }),
+            cd.key ? /* @__PURE__ */ jsx13("span", { style: { ...S.chip, borderColor: C.amarillo, color: C.amarillo }, children: t(lang, "dungeon.clave") }) : null,
+            /* @__PURE__ */ jsxs13("span", { style: { ...S.sub, marginLeft: "auto" }, children: [
               conseguidos,
               "/",
               loot.length
             ] })
           ] }),
-          cd.note ? /* @__PURE__ */ jsx12("div", { style: S.sub, children: cd.note }) : null,
-          /* @__PURE__ */ jsx12(Origen, { f: "curado", lang }),
+          cd.note ? /* @__PURE__ */ jsx13("div", { style: S.sub, children: cd.note }) : null,
+          /* @__PURE__ */ jsx13(Origen, { f: "curado", lang }),
           loot.map((l, li) => {
             const gid = "d" + indice + "|" + l[0];
-            return /* @__PURE__ */ jsxs12("label", { "data-loot": gid, style: { display: "flex", gap: 6, alignItems: "baseline", fontSize: 12 }, children: [
-              /* @__PURE__ */ jsx12(Checkbox5, { checked: gear.has(gid), onCheckedChange: (v) => onGear(gid, v) }),
-              /* @__PURE__ */ jsx12("span", { style: { fontWeight: 600 }, children: l[0] }),
-              /* @__PURE__ */ jsxs12("span", { style: S.sub, children: [
+            return /* @__PURE__ */ jsxs13("label", { "data-loot": gid, style: { display: "flex", gap: 6, alignItems: "baseline", fontSize: 12 }, children: [
+              /* @__PURE__ */ jsx13(Checkbox5, { checked: gear.has(gid), onCheckedChange: (v) => onGear(gid, v) }),
+              /* @__PURE__ */ jsx13("span", { style: { fontWeight: 600 }, children: l[0] }),
+              /* @__PURE__ */ jsxs13("span", { style: S.sub, children: [
                 "— ",
                 l[1]
               ] })
@@ -38225,7 +39130,7 @@ function TarjetaDungeon({ d, lang, perfil, soloUtil, items, competencias, gear, 
 }
 
 // src/vistas/dungeons.jsx
-import { Fragment as Fragment11, jsx as jsx13, jsxs as jsxs13 } from "react/jsx-runtime";
+import { Fragment as Fragment12, jsx as jsx14, jsxs as jsxs14 } from "react/jsx-runtime";
 agregarTextos({
   "dungeon.util": "Solo útil para mi clase",
   "dungeon.utilSub": "Deja solo el botín de calidad poco común o mejor que tu clase puede equipar.",
@@ -38244,19 +39149,19 @@ agregarTextos({
   "dungeon.intro": "Those in your range (±5 levels) come open. The curated loot tick saves itself."
 });
 function VistaDungeons({ almacen, estado, recargar, perfil, lang }) {
-  const [filtro, setFiltro] = useState8("rango");
-  const [soloUtil, setSoloUtil] = useState8(false);
-  const [aviso, setAviso] = useState8("");
-  const build = useMemo10(() => leerBuild(estado && estado.build), [estado && estado.build]);
-  const lista = useMemo10(() => listaDungeons(D.dungeons), []);
-  const visibles = useMemo10(() => dungeonsVisibles(lista, filtro, perfil.nivel), [lista, filtro, perfil.nivel]);
-  const competencias = useMemo10(() => {
+  const [filtro, setFiltro] = useState9("rango");
+  const [soloUtil, setSoloUtil] = useState9(false);
+  const [aviso, setAviso] = useState9("");
+  const build = useMemo11(() => leerBuild(estado && estado.build), [estado && estado.build]);
+  const lista = useMemo11(() => listaDungeons(D.dungeons), []);
+  const visibles = useMemo11(() => dungeonsVisibles(lista, filtro, perfil.nivel), [lista, filtro, perfil.nivel]);
+  const competencias = useMemo11(() => {
     const cl = D.clases.clases[String(perfil.clase)];
     return new Set((cl && cl.competencias ? cl.competencias : []).map((c) => c.id));
   }, [perfil.clase]);
-  const gear = useMemo10(() => new Set(listaBuild(build, "gear")), [build]);
+  const gear = useMemo11(() => new Set(listaBuild(build, "gear")), [build]);
   const { guia } = guiaCurada(perfil) || {};
-  const curados = useMemo10(
+  const curados = useMemo11(
     () => guia && guia.dungeons ? curadosPorDungeon(guia.dungeons, D.dungeons.clasicos, D.dungeons.forever) : /* @__PURE__ */ new Map(),
     [guia]
   );
@@ -38270,11 +39175,11 @@ function VistaDungeons({ almacen, estado, recargar, perfil, lang }) {
     }
   };
   const alternarGear = (id, puesto) => guardar({ gear: alternarEnLista(listaBuild(build, "gear"), id, puesto) });
-  return /* @__PURE__ */ jsxs13(Fragment11, { children: [
-    aviso ? /* @__PURE__ */ jsx13(Aviso, { children: aviso }) : null,
-    /* @__PURE__ */ jsxs13(Tarjeta, { titulo: t(lang, "tab.dungeons"), extra: /* @__PURE__ */ jsx13(Origen, { f: ["cliente-forever", "cmangos-1.12"], lang }), children: [
-      /* @__PURE__ */ jsxs13("div", { style: { display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }, children: [
-        /* @__PURE__ */ jsx13(
+  return /* @__PURE__ */ jsxs14(Fragment12, { children: [
+    aviso ? /* @__PURE__ */ jsx14(Aviso, { children: aviso }) : null,
+    /* @__PURE__ */ jsxs14(Tarjeta, { titulo: t(lang, "tab.dungeons"), extra: /* @__PURE__ */ jsx14(Origen, { f: ["cliente-forever", "cmangos-1.12"], lang }), children: [
+      /* @__PURE__ */ jsxs14("div", { style: { display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }, children: [
+        /* @__PURE__ */ jsx14(
           SegmentedControl3,
           {
             value: filtro,
@@ -38286,16 +39191,16 @@ function VistaDungeons({ almacen, estado, recargar, perfil, lang }) {
             ]
           }
         ),
-        /* @__PURE__ */ jsxs13("label", { title: t(lang, "dungeon.utilSub"), style: { display: "flex", gap: 6, alignItems: "center", fontSize: 12, color: C.texto2, cursor: "pointer" }, children: [
-          /* @__PURE__ */ jsx13(Checkbox6, { checked: soloUtil, onCheckedChange: setSoloUtil }),
+        /* @__PURE__ */ jsxs14("label", { title: t(lang, "dungeon.utilSub"), style: { display: "flex", gap: 6, alignItems: "center", fontSize: 12, color: C.texto2, cursor: "pointer" }, children: [
+          /* @__PURE__ */ jsx14(Checkbox6, { checked: soloUtil, onCheckedChange: setSoloUtil }),
           t(lang, "dungeon.util")
         ] }),
-        /* @__PURE__ */ jsx13("span", { style: { ...S.sub, marginLeft: "auto" }, children: visibles.length })
+        /* @__PURE__ */ jsx14("span", { style: { ...S.sub, marginLeft: "auto" }, children: visibles.length })
       ] }),
-      /* @__PURE__ */ jsx13("div", { style: S.sub, children: t(lang, "dungeon.intro") }),
-      !visibles.length ? /* @__PURE__ */ jsx13("div", { style: S.sub, children: t(lang, "dungeon.vacio") }) : null
+      /* @__PURE__ */ jsx14("div", { style: S.sub, children: t(lang, "dungeon.intro") }),
+      !visibles.length ? /* @__PURE__ */ jsx14("div", { style: S.sub, children: t(lang, "dungeon.vacio") }) : null
     ] }),
-    visibles.map((d) => /* @__PURE__ */ jsx13(
+    visibles.map((d) => /* @__PURE__ */ jsx14(
       TarjetaDungeon,
       {
         d,
@@ -38314,8 +39219,8 @@ function VistaDungeons({ almacen, estado, recargar, perfil, lang }) {
 }
 
 // src/vistas/mercado.jsx
-import { useCallback, useEffect as useEffect4, useMemo as useMemo15, useRef as useRef2, useState as useState10 } from "react";
-import { Button as Button8, Checkbox as Checkbox9, SearchField as SearchField2, Select as Select4, SelectContent as SelectContent4, SelectItem as SelectItem4, SelectTrigger as SelectTrigger4, SelectValue as SelectValue4 } from "@hermes/plugin-sdk";
+import { useCallback, useEffect as useEffect5, useMemo as useMemo16, useRef as useRef2, useState as useState11 } from "react";
+import { Button as Button9, Checkbox as Checkbox9, SearchField as SearchField2, Select as Select4, SelectContent as SelectContent4, SelectItem as SelectItem4, SelectTrigger as SelectTrigger4, SelectValue as SelectValue4 } from "@hermes/plugin-sdk";
 
 // src/auctionator.js
 var import_market_identity3 = __toESM(require_market_identity(), 1);
@@ -38646,11 +39551,11 @@ function startMarketSync(ctx, sync) {
 }
 
 // src/vistas/mercado/detalle.jsx
-import { useMemo as useMemo12 } from "react";
+import { useMemo as useMemo13 } from "react";
 
 // src/vistas/mercado/grafico.jsx
-import { useMemo as useMemo11 } from "react";
-import { jsx as jsx14, jsxs as jsxs14 } from "react/jsx-runtime";
+import { useMemo as useMemo12 } from "react";
+import { jsx as jsx15, jsxs as jsxs15 } from "react/jsx-runtime";
 var ROLES = {
   area: { fill: C.amarillo, fillOpacity: 0.1 },
   linea: { stroke: C.amarillo, strokeWidth: 1.6, fill: "none", strokeLinejoin: "round", strokeLinecap: "round" },
@@ -38661,28 +39566,28 @@ var ROLES = {
   texto: { fill: C.texto3, fontSize: 9.5 }
 };
 function GraficoPrecios({ history, actual, lang, titulo }) {
-  const g = useMemo11(() => geometriaGrafico(history, { current: actual }), [history, actual]);
-  if (!g) return /* @__PURE__ */ jsx14("p", { style: S.sub, children: t(lang, "mercado.sinHistorial") });
-  return /* @__PURE__ */ jsxs14("svg", { viewBox: `0 0 ${g.W} ${g.H}`, role: "img", "aria-label": titulo || t(lang, "mercado.grafico"), style: { width: "100%", height: "auto", display: "block" }, children: [
-    g.mediana != null && /* @__PURE__ */ jsx14("line", { x1: g.x0, y1: g.mediana, x2: g.x1, y2: g.mediana, style: ROLES.mediana }),
-    /* @__PURE__ */ jsx14("path", { d: g.area, style: ROLES.area }),
-    /* @__PURE__ */ jsx14("path", { d: g.linea, style: ROLES.linea }),
-    g.actual && /* @__PURE__ */ jsx14("circle", { cx: g.actual.x, cy: g.actual.y, r: 3, style: ROLES.punto }),
-    /* @__PURE__ */ jsx14("circle", { cx: g.fin.x, cy: g.fin.y, r: 3, style: ROLES.punto }),
-    g.ticksY?.map((tk) => /* @__PURE__ */ jsxs14("g", { children: [
-      /* @__PURE__ */ jsx14("line", { x1: g.x0 - 4, y1: tk.y, x2: g.x0, y2: tk.y, style: ROLES.tick }),
-      /* @__PURE__ */ jsx14("text", { x: g.x0 - 7, y: tk.y + 3, textAnchor: "end", style: ROLES.texto, children: tk.label })
+  const g = useMemo12(() => geometriaGrafico(history, { current: actual }), [history, actual]);
+  if (!g) return /* @__PURE__ */ jsx15("p", { style: S.sub, children: t(lang, "mercado.sinHistorial") });
+  return /* @__PURE__ */ jsxs15("svg", { viewBox: `0 0 ${g.W} ${g.H}`, role: "img", "aria-label": titulo || t(lang, "mercado.grafico"), style: { width: "100%", height: "auto", display: "block" }, children: [
+    g.mediana != null && /* @__PURE__ */ jsx15("line", { x1: g.x0, y1: g.mediana, x2: g.x1, y2: g.mediana, style: ROLES.mediana }),
+    /* @__PURE__ */ jsx15("path", { d: g.area, style: ROLES.area }),
+    /* @__PURE__ */ jsx15("path", { d: g.linea, style: ROLES.linea }),
+    g.actual && /* @__PURE__ */ jsx15("circle", { cx: g.actual.x, cy: g.actual.y, r: 3, style: ROLES.punto }),
+    /* @__PURE__ */ jsx15("circle", { cx: g.fin.x, cy: g.fin.y, r: 3, style: ROLES.punto }),
+    g.ticksY?.map((tk) => /* @__PURE__ */ jsxs15("g", { children: [
+      /* @__PURE__ */ jsx15("line", { x1: g.x0 - 4, y1: tk.y, x2: g.x0, y2: tk.y, style: ROLES.tick }),
+      /* @__PURE__ */ jsx15("text", { x: g.x0 - 7, y: tk.y + 3, textAnchor: "end", style: ROLES.texto, children: tk.label })
     ] }, "y" + tk.v)),
-    g.ticksX?.map((tk) => /* @__PURE__ */ jsxs14("g", { children: [
-      /* @__PURE__ */ jsx14("line", { x1: tk.x, y1: g.y1, x2: tk.x, y2: g.y1 + 4, style: ROLES.eje }),
-      /* @__PURE__ */ jsx14("text", { x: tk.x, y: g.y1 + 15, textAnchor: "middle", style: ROLES.texto, children: tk.label })
+    g.ticksX?.map((tk) => /* @__PURE__ */ jsxs15("g", { children: [
+      /* @__PURE__ */ jsx15("line", { x1: tk.x, y1: g.y1, x2: tk.x, y2: g.y1 + 4, style: ROLES.eje }),
+      /* @__PURE__ */ jsx15("text", { x: tk.x, y: g.y1 + 15, textAnchor: "middle", style: ROLES.texto, children: tk.label })
     ] }, "x" + tk.x + tk.label)),
-    /* @__PURE__ */ jsx14("line", { x1: g.x0, y1: g.y0, x2: g.x0, y2: g.y1, style: ROLES.eje }),
-    /* @__PURE__ */ jsx14("line", { x1: g.x0, y1: g.y1, x2: g.x1, y2: g.y1, style: ROLES.eje })
+    /* @__PURE__ */ jsx15("line", { x1: g.x0, y1: g.y0, x2: g.x0, y2: g.y1, style: ROLES.eje }),
+    /* @__PURE__ */ jsx15("line", { x1: g.x0, y1: g.y1, x2: g.x1, y2: g.y1, style: ROLES.eje })
   ] });
 }
 function Sparkline({ history }) {
-  const g = useMemo11(() => geometriaGrafico(history, {
+  const g = useMemo12(() => geometriaGrafico(history, {
     w: 150,
     h: 34,
     pad: { l: 4, r: 4, t: 5, b: 5 },
@@ -38690,27 +39595,27 @@ function Sparkline({ history }) {
     current: null
   }), [history]);
   if (!g) return null;
-  return /* @__PURE__ */ jsxs14("svg", { viewBox: `0 0 ${g.W} ${g.H}`, role: "img", "aria-label": "sparkline", style: { width: 150, height: 34, display: "block", flexShrink: 0 }, children: [
-    /* @__PURE__ */ jsx14("path", { d: g.area, style: ROLES.area }),
-    /* @__PURE__ */ jsx14("path", { d: g.linea, style: ROLES.linea }),
-    /* @__PURE__ */ jsx14("circle", { cx: g.fin.x, cy: g.fin.y, r: 2.5, style: ROLES.punto })
+  return /* @__PURE__ */ jsxs15("svg", { viewBox: `0 0 ${g.W} ${g.H}`, role: "img", "aria-label": "sparkline", style: { width: 150, height: 34, display: "block", flexShrink: 0 }, children: [
+    /* @__PURE__ */ jsx15("path", { d: g.area, style: ROLES.area }),
+    /* @__PURE__ */ jsx15("path", { d: g.linea, style: ROLES.linea }),
+    /* @__PURE__ */ jsx15("circle", { cx: g.fin.x, cy: g.fin.y, r: 2.5, style: ROLES.punto })
   ] });
 }
 
 // src/vistas/mercado/detalle.jsx
-import { jsx as jsx15, jsxs as jsxs15 } from "react/jsx-runtime";
+import { jsx as jsx16, jsxs as jsxs16 } from "react/jsx-runtime";
 var TENDENCIA = { sube: "mercado.tend.sube", baja: "mercado.tend.baja", estable: "mercado.tend.estable", "sin-datos": "mercado.tend.pocos" };
 var KIND_DROP = { mob: "", skin: "Piel: ", pick: "Pillosidad: ", object: "Objeto: " };
 function fmtPct(v) {
   return v == null ? "—" : `${Math.round(v * 100)}%`;
 }
 function DetalleItem({ item: item3, lang, catalogo, metrica, deal, onCerrar }) {
-  const stats = useMemo12(() => import_market_history2.default.priceStats(item3), [item3]);
-  const catEntry = useMemo12(() => item3?.itemId != null ? catalogo?.items?.[String(item3.itemId)] : null, [item3, catalogo]);
-  const fuentes = useMemo12(() => catEntry ? fuentesItem(catEntry, D.dungeons) : [], [catEntry]);
-  const drops = useMemo12(() => fuentesDropData(item3?.itemId, D.dropData), [item3]);
-  const fss = useMemo12(() => metrica?.sources?.length ? [...metrica.sources].sort((a, b) => Number(b.eligible) - Number(a.eligible) || (b.gph || 0) - (a.gph || 0)).slice(0, 10) : [], [metrica]);
-  const historial = useMemo12(() => (item3?.history || []).slice().sort((a, b) => b.day - a.day), [item3]);
+  const stats = useMemo13(() => import_market_history2.default.priceStats(item3), [item3]);
+  const catEntry = useMemo13(() => item3?.itemId != null ? catalogo?.items?.[String(item3.itemId)] : null, [item3, catalogo]);
+  const fuentes = useMemo13(() => catEntry ? fuentesItem(catEntry, D.dungeons) : [], [catEntry]);
+  const drops = useMemo13(() => fuentesDropData(item3?.itemId, D.dropData), [item3]);
+  const fss = useMemo13(() => metrica?.sources?.length ? [...metrica.sources].sort((a, b) => Number(b.eligible) - Number(a.eligible) || (b.gph || 0) - (a.gph || 0)).slice(0, 10) : [], [metrica]);
+  const historial = useMemo13(() => (item3?.history || []).slice().sort((a, b) => b.day - a.day), [item3]);
   if (!item3) return null;
   const nombreVisible = nombreItem(item3, D.items, catalogo, lang) || item3.sourceKey;
   const esVariante = item3.itemId == null;
@@ -38718,22 +39623,22 @@ function DetalleItem({ item: item3, lang, catalogo, metrica, deal, onCerrar }) {
   const dealKind = deal?.kind;
   const verdict = dealKind === "oferta" ? t(lang, "mercado.deal.oferta") : dealKind === "sobreprecio" ? t(lang, "mercado.deal.sobreprecio") : dealKind === "estable" ? t(lang, "mercado.deal.estable") :
   null;
-  return /* @__PURE__ */ jsxs15(
+  return /* @__PURE__ */ jsxs16(
     Tarjeta,
     {
       titulo: `${nombreVisible} · ${item3.sourceKey}`,
-      extra: onCerrar ? /* @__PURE__ */ jsx15("button", { type: "button", onClick: onCerrar, style: { ...S.etiqueta, cursor: "pointer" }, children: t(lang, "mercado.cerrar") }) : null,
+      extra: onCerrar ? /* @__PURE__ */ jsx16("button", { type: "button", onClick: onCerrar, style: { ...S.etiqueta, cursor: "pointer" }, children: t(lang, "mercado.cerrar") }) : null,
       children: [
-        /* @__PURE__ */ jsxs15("p", { style: S.sub, children: [
+        /* @__PURE__ */ jsxs16("p", { style: S.sub, children: [
           t(lang, "mercado.det.ultimo"),
           ": ",
-          /* @__PURE__ */ jsx15(Dinero, { cobre: item3.unitPriceCopper }),
+          /* @__PURE__ */ jsx16(Dinero, { cobre: item3.unitPriceCopper }),
           ". ",
           t(lang, "mercado.det.aviso"),
           metrica?.doubtful ? ` ${t(lang, "mercado.det.dudoso")}` : "",
           esVariante ? ` ${t(lang, "mercado.det.variante")}` : ""
         ] }),
-        stats?.diasMuestra > 0 && /* @__PURE__ */ jsxs15("p", { style: S.sub, children: [
+        stats?.diasMuestra > 0 && /* @__PURE__ */ jsxs16("p", { style: S.sub, children: [
           t(lang, "mercado.det.historial"),
           ": ",
           stats.diasMuestra,
@@ -38741,25 +39646,25 @@ function DetalleItem({ item: item3, lang, catalogo, metrica, deal, onCerrar }) {
           " ",
           t(lang, "mercado.det.minimo"),
           " ",
-          /* @__PURE__ */ jsx15(Dinero, { cobre: stats.minLow }),
+          /* @__PURE__ */ jsx16(Dinero, { cobre: stats.minLow }),
           " ·",
           " ",
           t(lang, "mercado.det.mediana"),
           " ",
-          /* @__PURE__ */ jsx15(Dinero, { cobre: stats.medianaLow }),
+          /* @__PURE__ */ jsx16(Dinero, { cobre: stats.medianaLow }),
           " ·",
           " ",
           t(lang, "mercado.det.promedio"),
           " ",
-          /* @__PURE__ */ jsx15(Dinero, { cobre: stats.avgLow }),
+          /* @__PURE__ */ jsx16(Dinero, { cobre: stats.avgLow }),
           " ·",
           " ",
           t(lang, TENDENCIA[stats.tendencia] || "mercado.tend.pocos")
         ] }),
-        verdict && /* @__PURE__ */ jsxs15("p", { style: S.sub, children: [
+        verdict && /* @__PURE__ */ jsxs16("p", { style: S.sub, children: [
           t(lang, "mercado.det.analisis"),
           ": ",
-          /* @__PURE__ */ jsx15("b", { children: verdict }),
+          /* @__PURE__ */ jsx16("b", { children: verdict }),
           deal?.medianaLow != null ? ` — ${t(lang, "mercado.det.mediana")} <Dinero cobre={deal.medianaLow} />` : "",
           deal?.minLow != null ? ` · ${t(lang, "mercado.det.minimo")} <Dinero cobre={deal.minLow} />` : "",
           deal?.days ? ` · ${deal.days}d` : "",
@@ -38767,80 +39672,80 @@ function DetalleItem({ item: item3, lang, catalogo, metrica, deal, onCerrar }) {
           ".",
           (deal?.reasons || []).length ? ` ${deal.reasons.join(" ")}` : ""
         ] }),
-        /* @__PURE__ */ jsxs15("div", { children: [
-          /* @__PURE__ */ jsx15("h4", { style: { ...S.titulo, fontSize: 12, margin: "4px 0" }, children: t(lang, "mercado.det.grafico") }),
-          /* @__PURE__ */ jsx15(GraficoPrecios, { history: item3.history, actual: item3.unitPriceCopper, lang }),
-          /* @__PURE__ */ jsx15("p", { style: S.sub, children: t(lang, "mercado.det.graficoNota") })
+        /* @__PURE__ */ jsxs16("div", { children: [
+          /* @__PURE__ */ jsx16("h4", { style: { ...S.titulo, fontSize: 12, margin: "4px 0" }, children: t(lang, "mercado.det.grafico") }),
+          /* @__PURE__ */ jsx16(GraficoPrecios, { history: item3.history, actual: item3.unitPriceCopper, lang }),
+          /* @__PURE__ */ jsx16("p", { style: S.sub, children: t(lang, "mercado.det.graficoNota") })
         ] }),
-        /* @__PURE__ */ jsxs15("div", { children: [
-          /* @__PURE__ */ jsx15("h4", { style: { ...S.titulo, fontSize: 12, margin: "4px 0" }, children: t(lang, "mercado.det.diario") }),
-          /* @__PURE__ */ jsx15("div", { style: { overflowX: "auto" }, children: /* @__PURE__ */ jsxs15("table", { style: S.tabla, children: [
-            /* @__PURE__ */ jsx15("thead", { children: /* @__PURE__ */ jsxs15("tr", { children: [
-              /* @__PURE__ */ jsx15("th", { style: S.th, children: t(lang, "mercado.det.dia") }),
-              /* @__PURE__ */ jsx15("th", { style: S.th, children: t(lang, "mercado.det.minDiario") }),
-              /* @__PURE__ */ jsx15("th", { style: S.th, children: t(lang, "mercado.det.maxMin") }),
-              /* @__PURE__ */ jsx15("th", { style: S.th, children: t(lang, "mercado.det.maxOferta") })
+        /* @__PURE__ */ jsxs16("div", { children: [
+          /* @__PURE__ */ jsx16("h4", { style: { ...S.titulo, fontSize: 12, margin: "4px 0" }, children: t(lang, "mercado.det.diario") }),
+          /* @__PURE__ */ jsx16("div", { style: { overflowX: "auto" }, children: /* @__PURE__ */ jsxs16("table", { style: S.tabla, children: [
+            /* @__PURE__ */ jsx16("thead", { children: /* @__PURE__ */ jsxs16("tr", { children: [
+              /* @__PURE__ */ jsx16("th", { style: S.th, children: t(lang, "mercado.det.dia") }),
+              /* @__PURE__ */ jsx16("th", { style: S.th, children: t(lang, "mercado.det.minDiario") }),
+              /* @__PURE__ */ jsx16("th", { style: S.th, children: t(lang, "mercado.det.maxMin") }),
+              /* @__PURE__ */ jsx16("th", { style: S.th, children: t(lang, "mercado.det.maxOferta") })
             ] }) }),
-            /* @__PURE__ */ jsx15("tbody", { children: historial.length ? historial.map((h) => /* @__PURE__ */ jsxs15("tr", { children: [
-              /* @__PURE__ */ jsx15("td", { style: S.td, children: fmtDia(h.day) }),
-              /* @__PURE__ */ jsx15("td", { style: S.td, children: /* @__PURE__ */ jsx15(Dinero, { cobre: h.low }) }),
-              /* @__PURE__ */ jsx15("td", { style: S.td, children: /* @__PURE__ */ jsx15(Dinero, { cobre: h.high }) }),
-              /* @__PURE__ */ jsx15("td", { style: S.td, children: h.available == null ? t(lang, "mercado.det.sinDato") : h.available })
-            ] }, h.day)) : /* @__PURE__ */ jsx15("tr", { children: /* @__PURE__ */ jsx15("td", { style: S.td, colSpan: 4, children: t(lang, "mercado.det.sinHistorialFila") }) }) })
+            /* @__PURE__ */ jsx16("tbody", { children: historial.length ? historial.map((h) => /* @__PURE__ */ jsxs16("tr", { children: [
+              /* @__PURE__ */ jsx16("td", { style: S.td, children: fmtDia(h.day) }),
+              /* @__PURE__ */ jsx16("td", { style: S.td, children: /* @__PURE__ */ jsx16(Dinero, { cobre: h.low }) }),
+              /* @__PURE__ */ jsx16("td", { style: S.td, children: /* @__PURE__ */ jsx16(Dinero, { cobre: h.high }) }),
+              /* @__PURE__ */ jsx16("td", { style: S.td, children: h.available == null ? t(lang, "mercado.det.sinDato") : h.available })
+            ] }, h.day)) : /* @__PURE__ */ jsx16("tr", { children: /* @__PURE__ */ jsx16("td", { style: S.td, colSpan: 4, children: t(lang, "mercado.det.sinHistorialFila") }) }) })
           ] }) })
         ] }),
-        /* @__PURE__ */ jsxs15("div", { children: [
-          /* @__PURE__ */ jsxs15("h4", { style: { ...S.titulo, fontSize: 12, margin: "4px 0", display: "flex", gap: 8, alignItems: "center" }, children: [
+        /* @__PURE__ */ jsxs16("div", { children: [
+          /* @__PURE__ */ jsxs16("h4", { style: { ...S.titulo, fontSize: 12, margin: "4px 0", display: "flex", gap: 8, alignItems: "center" }, children: [
             t(lang, "mercado.det.fuentes"),
-            /* @__PURE__ */ jsx15(Origen, { f: ["cmangos-1.12", "cliente-forever"], lang })
+            /* @__PURE__ */ jsx16(Origen, { f: ["cmangos-1.12", "cliente-forever"], lang })
           ] }),
-          fuentes.length ? /* @__PURE__ */ jsx15("ul", { style: { margin: 0, paddingLeft: 18, fontSize: 12 }, children: fuentes.map((s, i) => /* @__PURE__ */ jsxs15("li", { children: [
+          fuentes.length ? /* @__PURE__ */ jsx16("ul", { style: { margin: 0, paddingLeft: 18, fontSize: 12 }, children: fuentes.map((s, i) => /* @__PURE__ */ jsxs16("li", { children: [
             nombre(s.bossN || { es: s.boss, en: s.boss }, lang) || s.boss,
             " · ",
             nombre(s.dungeonN || { es: s.dungeon, en: s.dungeon }, lang) || s.dungeon,
             s.location ? ` · ${nombre({ es: s.dungeonN?.es || s.location, en: s.dungeonN?.en || s.location }, lang)}` : "",
             s.levelMin != null && s.levelMax != null ? ` · ${t(lang, "mercado.det.rangoGrupo", { min: s.levelMin, max: s.levelMax })}` : "",
-            /* @__PURE__ */ jsx15("div", { style: S.etiqueta, children: s.reference })
-          ] }, i)) }) : /* @__PURE__ */ jsx15(Hueco, { lang, children: t(lang, "mercado.det.sinFuente") }),
-          /* @__PURE__ */ jsx15("p", { style: S.sub, children: t(lang, "mercado.det.fuentesNota") })
+            /* @__PURE__ */ jsx16("div", { style: S.etiqueta, children: s.reference })
+          ] }, i)) }) : /* @__PURE__ */ jsx16(Hueco, { lang, children: t(lang, "mercado.det.sinFuente") }),
+          /* @__PURE__ */ jsx16("p", { style: S.sub, children: t(lang, "mercado.det.fuentesNota") })
         ] }),
-        /* @__PURE__ */ jsxs15("div", { children: [
-          /* @__PURE__ */ jsxs15("h4", { style: { ...S.titulo, fontSize: 12, margin: "4px 0", display: "flex", gap: 8, alignItems: "center" }, children: [
+        /* @__PURE__ */ jsxs16("div", { children: [
+          /* @__PURE__ */ jsxs16("h4", { style: { ...S.titulo, fontSize: 12, margin: "4px 0", display: "flex", gap: 8, alignItems: "center" }, children: [
             t(lang, "mercado.det.drops"),
-            /* @__PURE__ */ jsx15(Origen, { f: "cmangos-1.12", lang })
+            /* @__PURE__ */ jsx16(Origen, { f: "cmangos-1.12", lang })
           ] }),
-          drops.length ? /* @__PURE__ */ jsxs15("ul", { style: { margin: 0, paddingLeft: 18, fontSize: 12 }, children: [
-            drops.slice(0, 20).map((s, i) => /* @__PURE__ */ jsxs15("li", { children: [
+          drops.length ? /* @__PURE__ */ jsxs16("ul", { style: { margin: 0, paddingLeft: 18, fontSize: 12 }, children: [
+            drops.slice(0, 20).map((s, i) => /* @__PURE__ */ jsxs16("li", { children: [
               KIND_DROP[s.kind || (s.tipo === "o" ? "object" : "mob")] || "",
               s.nombre || `#${s.id}`,
               s.objKind ? ` (${s.objKind})` : "",
               s.nivelMin != null ? ` · nv ${s.nivelMin}${s.nivelMax != null && s.nivelMax !== s.nivelMin ? `–${s.nivelMax}` : ""}` : "",
               s.chance != null ? ` · ${fmtPct(s.chance / 100)} ${t(lang, "mercado.det.cadaMuerte")}` : "",
               s.minC != null && s.maxC != null && s.maxC !== s.minC ? ` · ${s.minC}–${s.maxC}` : "",
-              s.zonas.length ? /* @__PURE__ */ jsxs15("div", { style: S.etiqueta, children: [
+              s.zonas.length ? /* @__PURE__ */ jsxs16("div", { style: S.etiqueta, children: [
                 s.zonas.slice(0, 4).map((z) => z.nombre).join(" · "),
                 s.zonas.length > 4 ? ` +${s.zonas.length - 4}` : ""
               ] }) : null
             ] }, i)),
-            drops.length > 20 ? /* @__PURE__ */ jsxs15("li", { style: S.etiqueta, children: [
+            drops.length > 20 ? /* @__PURE__ */ jsxs16("li", { style: S.etiqueta, children: [
               "+",
               drops.length - 20
             ] }) : null
-          ] }) : /* @__PURE__ */ jsx15(Hueco, { lang, children: t(lang, "mercado.det.sinDrops") })
+          ] }) : /* @__PURE__ */ jsx16(Hueco, { lang, children: t(lang, "mercado.det.sinDrops") })
         ] }),
-        fss.length > 0 && /* @__PURE__ */ jsxs15("div", { children: [
-          /* @__PURE__ */ jsxs15("h4", { style: { ...S.titulo, fontSize: 12, margin: "4px 0", display: "flex", gap: 8, alignItems: "center" }, children: [
+        fss.length > 0 && /* @__PURE__ */ jsxs16("div", { children: [
+          /* @__PURE__ */ jsxs16("h4", { style: { ...S.titulo, fontSize: 12, margin: "4px 0", display: "flex", gap: 8, alignItems: "center" }, children: [
             t(lang, "mercado.det.farmeo"),
-            /* @__PURE__ */ jsx15(Origen, { f: "cmangos-1.12", lang })
+            /* @__PURE__ */ jsx16(Origen, { f: "cmangos-1.12", lang })
           ] }),
-          /* @__PURE__ */ jsx15("ul", { style: { margin: 0, paddingLeft: 18, fontSize: 12 }, children: fss.map((s, i) => /* @__PURE__ */ jsxs15("li", { children: [
+          /* @__PURE__ */ jsx16("ul", { style: { margin: 0, paddingLeft: 18, fontSize: 12 }, children: fss.map((s, i) => /* @__PURE__ */ jsxs16("li", { children: [
             fmt2.srcLabel ? fmt2.srcLabel(s) : `${s.name || "#" + s.id}`,
             s.zoneKey != null && fmt2.zoneName ? ` · ${fmt2.zoneName(s.zoneKey)}` : "",
             s.eligible ? ` · ${fmt2.pct ? fmt2.pct(s.chance) : fmtPct(s.chance)} · ~${fmt2.gph ? fmt2.gph(s.gph) : s.gph}/h${s.roi != null ? ` · ROI ${s.roi >= 0 ? "+" : ""}${Math.round(s.roi * 100)}\
 %` : ""}` : ` — ${s.reason || t(lang, "mercado.det.noElegible")}`
           ] }, i)) })
         ] }),
-        /* @__PURE__ */ jsxs15("p", { style: S.sub, children: [
+        /* @__PURE__ */ jsxs16("p", { style: S.sub, children: [
           t(lang, "mercado.det.cobertura", { addon: catalogo?.source?.addon || t(lang, "mercado.det.sinCatalogo") }),
           " ",
           catalogo?.source?.coverage || ""
@@ -38851,53 +39756,53 @@ function DetalleItem({ item: item3, lang, catalogo, metrica, deal, onCerrar }) {
 }
 
 // src/vistas/mercado/farmeo.jsx
-import { useMemo as useMemo13 } from "react";
-import { Button as Button6, Checkbox as Checkbox7, Input as Input4, Select as Select3, SelectContent as SelectContent3, SelectItem as SelectItem3, SelectTrigger as SelectTrigger3, SelectValue as SelectValue3 } from "@hermes/plugin-sdk";
-import { Fragment as Fragment12, jsx as jsx16, jsxs as jsxs16 } from "react/jsx-runtime";
+import { useMemo as useMemo14 } from "react";
+import { Button as Button7, Checkbox as Checkbox7, Input as Input4, Select as Select3, SelectContent as SelectContent3, SelectItem as SelectItem3, SelectTrigger as SelectTrigger3, SelectValue as SelectValue3 } from "@hermes/plugin-sdk";
+import { Fragment as Fragment13, jsx as jsx17, jsxs as jsxs17 } from "react/jsx-runtime";
 var COMP_LABEL = { auto: "Auto", low: "Baja", med: "Media", high: "Alta" };
 var RIESGO = { baja: "mercado.farm.riesgo.baja", media: "mercado.farm.riesgo.media", alta: "mercado.farm.riesgo.alta" };
 var PROF_NOMBRE = { skin: "mercado.farm.prof.skin", herb: "mercado.farm.prof.herb", mine: "mercado.farm.prof.mine" };
 function Chip({ children, color }) {
-  return /* @__PURE__ */ jsx16("span", { style: { ...S.chip, borderColor: color || C.borde, color: color || C.texto2 }, children });
+  return /* @__PURE__ */ jsx17("span", { style: { ...S.chip, borderColor: color || C.borde, color: color || C.texto2 }, children });
 }
 function BadgeZona({ e, lang, fmt: fmt2 }) {
   const bits = [];
-  bits.push(/* @__PURE__ */ jsxs16(Chip, { color: e.risk?.level === "alta" ? C.rojo : e.risk?.level === "media" ? C.amarillo : C.verde, children: [
+  bits.push(/* @__PURE__ */ jsxs17(Chip, { color: e.risk?.level === "alta" ? C.rojo : e.risk?.level === "media" ? C.amarillo : C.verde, children: [
     t(lang, "mercado.farm.riesgo"),
     ": ",
     t(lang, RIESGO[e.risk?.level] || RIESGO.baja)
   ] }, "r"));
-  bits.push(/* @__PURE__ */ jsxs16(Chip, { children: [
+  bits.push(/* @__PURE__ */ jsxs17(Chip, { children: [
     t(lang, "mercado.farm.comp"),
     ": ",
     COMP_LABEL[e.comp?.comp] || e.comp?.comp
   ] }, "c"));
-  if (e.travel?.min) bits.push(/* @__PURE__ */ jsxs16(Chip, { children: [
+  if (e.travel?.min) bits.push(/* @__PURE__ */ jsxs17(Chip, { children: [
     t(lang, "mercado.farm.viaje", { min: e.travel.min }),
     e.travel.fp ? "" : ` · ${t(lang, "mercado.farm.sinVuelo")}`,
     e.travel.hub ? ` · ${t(lang, "mercado.farm.tuRuta")}` : ""
   ] }, "v"));
-  if (e.vendorGph) bits.push(/* @__PURE__ */ jsxs16(Chip, { children: [
+  if (e.vendorGph) bits.push(/* @__PURE__ */ jsxs17(Chip, { children: [
     "≈",
     fmt2.gph(e.vendorGph),
     "/h ",
     t(lang, "mercado.farm.vendedor")
   ] }, "g"));
-  return /* @__PURE__ */ jsx16("div", { style: { display: "flex", gap: 4, flexWrap: "wrap" }, children: bits });
+  return /* @__PURE__ */ jsx17("div", { style: { display: "flex", gap: 4, flexWrap: "wrap" }, children: bits });
 }
 function PrecioItem({ hist, price, lang }) {
-  const st = useMemo13(() => hist?.length ? FarmHistPriceStats(hist) : null, [hist]);
+  const st = useMemo14(() => hist?.length ? FarmHistPriceStats(hist) : null, [hist]);
   if (!st) return null;
   const tend = { sube: "mercado.tend.sube", baja: "mercado.tend.baja", estable: "mercado.tend.estable", "sin-datos": "mercado.tend.pocos" }[st.tendencia] || "mercado.tend.pocos";
-  return /* @__PURE__ */ jsxs16("span", { style: { display: "inline-flex", gap: 6, alignItems: "center", marginLeft: 6 }, children: [
-    /* @__PURE__ */ jsx16(Sparkline, { history: hist }),
-    st.diasMuestra >= 2 && /* @__PURE__ */ jsxs16(Chip, { color: st.tendencia === "sube" ? C.verde : st.tendencia === "baja" ? C.rojo : void 0, children: [
+  return /* @__PURE__ */ jsxs17("span", { style: { display: "inline-flex", gap: 6, alignItems: "center", marginLeft: 6 }, children: [
+    /* @__PURE__ */ jsx17(Sparkline, { history: hist }),
+    st.diasMuestra >= 2 && /* @__PURE__ */ jsxs17(Chip, { color: st.tendencia === "sube" ? C.verde : st.tendencia === "baja" ? C.rojo : void 0, children: [
       t(lang, tend),
       " · ",
       st.diasMuestra,
       "d"
     ] }),
-    st.medianaLow != null && /* @__PURE__ */ jsxs16("span", { style: S.etiqueta, children: [
+    st.medianaLow != null && /* @__PURE__ */ jsxs17("span", { style: S.etiqueta, children: [
       t(lang, "mercado.farm.mediana"),
       " ",
       fmtMoney(st.medianaLow),
@@ -38914,21 +39819,21 @@ function fmtMoney(c) {
 function TarjetaZona({ e, rank, profile, settings, lang, onComp, onCopada }) {
   const fmt2 = Farm.fmt || {};
   const cur = settings.zoneComp?.[e.zoneKey] || "auto";
-  return /* @__PURE__ */ jsxs16("div", { style: { ...S.tarjeta, borderLeft: rank === "A" ? `3px solid ${C.acento}` : void 0 }, children: [
-    /* @__PURE__ */ jsxs16("div", { style: { display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }, children: [
-      /* @__PURE__ */ jsxs16("b", { children: [
+  return /* @__PURE__ */ jsxs17("div", { style: { ...S.tarjeta, borderLeft: rank === "A" ? `3px solid ${C.acento}` : void 0 }, children: [
+    /* @__PURE__ */ jsxs17("div", { style: { display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }, children: [
+      /* @__PURE__ */ jsxs17("b", { children: [
         rank,
         " · ",
         e.name
       ] }),
-      /* @__PURE__ */ jsx16(BadgeZona, { e, lang, fmt: fmt2 })
+      /* @__PURE__ */ jsx17(BadgeZona, { e, lang, fmt: fmt2 })
     ] }),
-    /* @__PURE__ */ jsxs16("p", { style: S.sub, children: [
+    /* @__PURE__ */ jsxs17("p", { style: S.sub, children: [
       t(lang, "mercado.farm.niveles", { min: e.levels?.[0] ?? "?", max: e.levels?.[1] ?? "?" }),
       " · ",
       t(lang, "mercado.farm.nivelVos", { nivel: profile.level || 12 })
     ] }),
-    /* @__PURE__ */ jsxs16("p", { style: S.sub, children: [
+    /* @__PURE__ */ jsxs17("p", { style: S.sub, children: [
       "~",
       fmt2.gph ? fmt2.gph(e.gph) : e.gph,
       "/h ",
@@ -38950,9 +39855,9 @@ function TarjetaZona({ e, rank, profile, settings, lang, onComp, onCopada }) {
       " ",
       t(lang, "mercado.farm.utiles")
     ] }),
-    e.topItems?.length > 0 && /* @__PURE__ */ jsxs16("div", { children: [
-      /* @__PURE__ */ jsx16("div", { style: S.etiqueta, children: t(lang, "mercado.farm.itemsScan") }),
-      /* @__PURE__ */ jsx16("ul", { style: { margin: 0, paddingLeft: 18, fontSize: 12 }, children: e.topItems.map((it, i) => /* @__PURE__ */ jsxs16("li", { children: [
+    e.topItems?.length > 0 && /* @__PURE__ */ jsxs17("div", { children: [
+      /* @__PURE__ */ jsx17("div", { style: S.etiqueta, children: t(lang, "mercado.farm.itemsScan") }),
+      /* @__PURE__ */ jsx17("ul", { style: { margin: 0, paddingLeft: 18, fontSize: 12 }, children: e.topItems.map((it, i) => /* @__PURE__ */ jsxs17("li", { children: [
         it.name,
         " · ",
         fmt2.srcLabel ? fmt2.srcLabel(it.source) : it.source?.name,
@@ -38962,36 +39867,36 @@ function TarjetaZona({ e, rank, profile, settings, lang, onComp, onCopada }) {
         fmt2.zoneName ? fmt2.zoneName(it.source?.zoneKey) : it.source?.zoneKey,
         " · ",
         fmt2.pct ? fmt2.pct(it.chance) : it.chance,
-        it.doubtful ? /* @__PURE__ */ jsxs16(Fragment12, { children: [
+        it.doubtful ? /* @__PURE__ */ jsxs17(Fragment13, { children: [
           " ",
-          /* @__PURE__ */ jsx16(Chip, { color: C.amarillo, children: t(lang, "mercado.farm.dudoso") })
+          /* @__PURE__ */ jsx17(Chip, { color: C.amarillo, children: t(lang, "mercado.farm.dudoso") })
         ] }) : null,
-        /* @__PURE__ */ jsx16(PrecioItem, { hist: it.hist, price: it.price, lang })
+        /* @__PURE__ */ jsx17(PrecioItem, { hist: it.hist, price: it.price, lang })
       ] }, i)) })
     ] }),
-    e.useful?.length > 0 && /* @__PURE__ */ jsxs16("div", { children: [
-      /* @__PURE__ */ jsx16("div", { style: S.etiqueta, children: t(lang, "mercado.farm.utilesVos") }),
-      /* @__PURE__ */ jsx16("ul", { style: { margin: 0, paddingLeft: 18, fontSize: 12 }, children: e.useful.map((u, i) => /* @__PURE__ */ jsxs16("li", { children: [
+    e.useful?.length > 0 && /* @__PURE__ */ jsxs17("div", { children: [
+      /* @__PURE__ */ jsx17("div", { style: S.etiqueta, children: t(lang, "mercado.farm.utilesVos") }),
+      /* @__PURE__ */ jsx17("ul", { style: { margin: 0, paddingLeft: 18, fontSize: 12 }, children: e.useful.map((u, i) => /* @__PURE__ */ jsxs17("li", { children: [
         u.name,
         " ",
-        /* @__PURE__ */ jsxs16("span", { style: S.etiqueta, children: [
+        /* @__PURE__ */ jsxs17("span", { style: S.etiqueta, children: [
           "· ",
           u.srcName || ""
         ] }),
-        u.preferred ? /* @__PURE__ */ jsxs16(Fragment12, { children: [
+        u.preferred ? /* @__PURE__ */ jsxs17(Fragment13, { children: [
           " ",
-          /* @__PURE__ */ jsx16(Chip, { color: C.azul, children: t(lang, "mercado.farm.preferida") })
+          /* @__PURE__ */ jsx17(Chip, { color: C.azul, children: t(lang, "mercado.farm.preferida") })
         ] }) : null,
-        u.isRare ? /* @__PURE__ */ jsxs16(Fragment12, { children: [
+        u.isRare ? /* @__PURE__ */ jsxs17(Fragment13, { children: [
           " ",
-          /* @__PURE__ */ jsx16(Chip, { color: C.amarillo, children: t(lang, "mercado.farm.rareza") })
+          /* @__PURE__ */ jsx17(Chip, { color: C.amarillo, children: t(lang, "mercado.farm.rareza") })
         ] }) : null,
-        /* @__PURE__ */ jsx16(PrecioItem, { hist: u.hist, price: u.price, lang })
+        /* @__PURE__ */ jsx17(PrecioItem, { hist: u.hist, price: u.price, lang })
       ] }, i)) })
     ] }),
-    e.camps?.length > 0 && /* @__PURE__ */ jsxs16("div", { children: [
-      /* @__PURE__ */ jsx16("div", { style: S.etiqueta, children: t(lang, "mercado.farm.camps") }),
-      /* @__PURE__ */ jsx16("ul", { style: { margin: 0, paddingLeft: 18, fontSize: 12 }, children: e.camps.map((c, i) => /* @__PURE__ */ jsxs16("li", { children: [
+    e.camps?.length > 0 && /* @__PURE__ */ jsxs17("div", { children: [
+      /* @__PURE__ */ jsx17("div", { style: S.etiqueta, children: t(lang, "mercado.farm.camps") }),
+      /* @__PURE__ */ jsx17("ul", { style: { margin: 0, paddingLeft: 18, fontSize: 12 }, children: e.camps.map((c, i) => /* @__PURE__ */ jsxs17("li", { children: [
         c.name,
         " · ",
         c.kind === "object" ? t(lang, "mercado.farm.recoleccion") : "mob",
@@ -39001,29 +39906,29 @@ function TarjetaZona({ e, rank, profile, settings, lang, onComp, onCopada }) {
         t(lang, "mercado.farm.approx")
       ] }, i)) })
     ] }),
-    e.risk?.note && /* @__PURE__ */ jsx16("div", { style: S.aviso, children: e.risk.note }),
-    /* @__PURE__ */ jsxs16("div", { style: { display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }, children: [
-      /* @__PURE__ */ jsxs16("label", { style: { ...S.campo, minWidth: 140 }, children: [
-        /* @__PURE__ */ jsx16("span", { style: S.etiqueta, children: t(lang, "mercado.farm.compZona") }),
-        /* @__PURE__ */ jsxs16(Select3, { value: cur, onValueChange: (v) => onComp(e.zoneKey, v), children: [
-          /* @__PURE__ */ jsx16(SelectTrigger3, { "aria-label": t(lang, "mercado.farm.compZona"), children: /* @__PURE__ */ jsx16(SelectValue3, {}) }),
-          /* @__PURE__ */ jsxs16(SelectContent3, { children: [
-            /* @__PURE__ */ jsx16(SelectItem3, { value: "auto", children: t(lang, "mercado.farm.compAuto") }),
-            /* @__PURE__ */ jsx16(SelectItem3, { value: "low", children: t(lang, "mercado.farm.compLow") }),
-            /* @__PURE__ */ jsx16(SelectItem3, { value: "med", children: t(lang, "mercado.farm.compMed") }),
-            /* @__PURE__ */ jsx16(SelectItem3, { value: "high", children: t(lang, "mercado.farm.compHigh") })
+    e.risk?.note && /* @__PURE__ */ jsx17("div", { style: S.aviso, children: e.risk.note }),
+    /* @__PURE__ */ jsxs17("div", { style: { display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }, children: [
+      /* @__PURE__ */ jsxs17("label", { style: { ...S.campo, minWidth: 140 }, children: [
+        /* @__PURE__ */ jsx17("span", { style: S.etiqueta, children: t(lang, "mercado.farm.compZona") }),
+        /* @__PURE__ */ jsxs17(Select3, { value: cur, onValueChange: (v) => onComp(e.zoneKey, v), children: [
+          /* @__PURE__ */ jsx17(SelectTrigger3, { "aria-label": t(lang, "mercado.farm.compZona"), children: /* @__PURE__ */ jsx17(SelectValue3, {}) }),
+          /* @__PURE__ */ jsxs17(SelectContent3, { children: [
+            /* @__PURE__ */ jsx17(SelectItem3, { value: "auto", children: t(lang, "mercado.farm.compAuto") }),
+            /* @__PURE__ */ jsx17(SelectItem3, { value: "low", children: t(lang, "mercado.farm.compLow") }),
+            /* @__PURE__ */ jsx17(SelectItem3, { value: "med", children: t(lang, "mercado.farm.compMed") }),
+            /* @__PURE__ */ jsx17(SelectItem3, { value: "high", children: t(lang, "mercado.farm.compHigh") })
           ] })
         ] })
       ] }),
-      /* @__PURE__ */ jsx16(Button6, { variant: "outline", size: "xs", onClick: () => onCopada(e.zoneKey), children: t(lang, "mercado.farm.copada") })
+      /* @__PURE__ */ jsx17(Button7, { variant: "outline", size: "xs", onClick: () => onCopada(e.zoneKey), children: t(lang, "mercado.farm.copada") })
     ] }),
-    e.reasons?.length > 0 && /* @__PURE__ */ jsx16("ul", { style: { margin: 0, paddingLeft: 18, fontSize: 12, color: C.texto2 }, children: e.reasons.map((r, i) => /* @__PURE__ */ jsx16("li", { children: r },
+    e.reasons?.length > 0 && /* @__PURE__ */ jsx17("ul", { style: { margin: 0, paddingLeft: 18, fontSize: 12, color: C.texto2 }, children: e.reasons.map((r, i) => /* @__PURE__ */ jsx17("li", { children: r },
     i)) })
   ] });
 }
 function Farmeo({ items, perfil, settings, onSettings, lang }) {
-  const guia = useMemo13(() => guiaCurada(perfil), [perfil]);
-  const profile = useMemo13(() => {
+  const guia = useMemo14(() => guiaCurada(perfil), [perfil]);
+  const profile = useMemo14(() => {
     const hub = hubZonesDe(perfil?.nivel || 12, guia?.datos?.routes, D.zonas, perfil?.faccion);
     return perfilMotor(perfil, hub);
   }, [perfil, guia]);
@@ -39036,7 +39941,7 @@ function Farmeo({ items, perfil, settings, onSettings, lang }) {
   };
   const cambiarProf = (k, v) => cambiar({ prof: { ...settings.prof, [k]: v } });
   const fmt2 = Farm.fmt || {};
-  const calculo = useMemo13(() => {
+  const calculo = useMemo14(() => {
     if (!items?.length) return null;
     try {
       return {
@@ -39050,24 +39955,24 @@ function Farmeo({ items, perfil, settings, onSettings, lang }) {
     }
   }, [items, profile, settings]);
   const sinAjusteClase = ![1, 3, 7].includes(perfil?.clase);
-  return /* @__PURE__ */ jsx16(Tarjeta, { titulo: t(lang, "mercado.farm.titulo"), extra: /* @__PURE__ */ jsx16("span", { style: S.etiqueta, children: t(lang, "mercado.farm.subtitulo") }), children: !items?.
-  length ? /* @__PURE__ */ jsx16("p", { style: S.sub, children: t(lang, "mercado.farm.sinScan") }) : /* @__PURE__ */ jsxs16(Fragment12, { children: [
-    /* @__PURE__ */ jsxs16("div", { style: { display: "flex", gap: 12, flexWrap: "wrap", alignItems: "flex-end" }, children: [
-      /* @__PURE__ */ jsxs16("label", { style: S.campo, children: [
-        /* @__PURE__ */ jsx16("span", { style: S.etiqueta, children: t(lang, "mercado.farm.compGlobal") }),
-        /* @__PURE__ */ jsxs16(Select3, { value: settings.comp, onValueChange: (v) => cambiar({ comp: v }), children: [
-          /* @__PURE__ */ jsx16(SelectTrigger3, { "aria-label": t(lang, "mercado.farm.compGlobal"), children: /* @__PURE__ */ jsx16(SelectValue3, {}) }),
-          /* @__PURE__ */ jsxs16(SelectContent3, { children: [
-            /* @__PURE__ */ jsx16(SelectItem3, { value: "auto", children: t(lang, "mercado.farm.compAuto") }),
-            /* @__PURE__ */ jsx16(SelectItem3, { value: "low", children: t(lang, "mercado.farm.compLow") }),
-            /* @__PURE__ */ jsx16(SelectItem3, { value: "med", children: t(lang, "mercado.farm.compMed") }),
-            /* @__PURE__ */ jsx16(SelectItem3, { value: "high", children: t(lang, "mercado.farm.compHigh") })
+  return /* @__PURE__ */ jsx17(Tarjeta, { titulo: t(lang, "mercado.farm.titulo"), extra: /* @__PURE__ */ jsx17("span", { style: S.etiqueta, children: t(lang, "mercado.farm.subtitulo") }), children: !items?.
+  length ? /* @__PURE__ */ jsx17("p", { style: S.sub, children: t(lang, "mercado.farm.sinScan") }) : /* @__PURE__ */ jsxs17(Fragment13, { children: [
+    /* @__PURE__ */ jsxs17("div", { style: { display: "flex", gap: 12, flexWrap: "wrap", alignItems: "flex-end" }, children: [
+      /* @__PURE__ */ jsxs17("label", { style: S.campo, children: [
+        /* @__PURE__ */ jsx17("span", { style: S.etiqueta, children: t(lang, "mercado.farm.compGlobal") }),
+        /* @__PURE__ */ jsxs17(Select3, { value: settings.comp, onValueChange: (v) => cambiar({ comp: v }), children: [
+          /* @__PURE__ */ jsx17(SelectTrigger3, { "aria-label": t(lang, "mercado.farm.compGlobal"), children: /* @__PURE__ */ jsx17(SelectValue3, {}) }),
+          /* @__PURE__ */ jsxs17(SelectContent3, { children: [
+            /* @__PURE__ */ jsx17(SelectItem3, { value: "auto", children: t(lang, "mercado.farm.compAuto") }),
+            /* @__PURE__ */ jsx17(SelectItem3, { value: "low", children: t(lang, "mercado.farm.compLow") }),
+            /* @__PURE__ */ jsx17(SelectItem3, { value: "med", children: t(lang, "mercado.farm.compMed") }),
+            /* @__PURE__ */ jsx17(SelectItem3, { value: "high", children: t(lang, "mercado.farm.compHigh") })
           ] })
         ] })
       ] }),
-      /* @__PURE__ */ jsxs16("label", { style: S.campo, children: [
-        /* @__PURE__ */ jsx16("span", { style: S.etiqueta, children: t(lang, "mercado.farm.gphRef") }),
-        /* @__PURE__ */ jsx16(
+      /* @__PURE__ */ jsxs17("label", { style: S.campo, children: [
+        /* @__PURE__ */ jsx17("span", { style: S.etiqueta, children: t(lang, "mercado.farm.gphRef") }),
+        /* @__PURE__ */ jsx17(
           Input4,
           {
             type: "number",
@@ -39082,44 +39987,44 @@ function Farmeo({ items, perfil, settings, onSettings, lang }) {
           }
         )
       ] }),
-      /* @__PURE__ */ jsxs16("label", { style: S.campo, children: [
-        /* @__PURE__ */ jsx16("span", { style: S.etiqueta, children: t(lang, "mercado.farm.ciclo") }),
-        /* @__PURE__ */ jsxs16(Select3, { value: String(settings.session), onValueChange: (v) => cambiar({ session: [1, 2, 4].includes(+v) ? +v : 2 }), children: [
-          /* @__PURE__ */ jsx16(SelectTrigger3, { "aria-label": t(lang, "mercado.farm.ciclo"), children: /* @__PURE__ */ jsx16(SelectValue3, {}) }),
-          /* @__PURE__ */ jsxs16(SelectContent3, { children: [
-            /* @__PURE__ */ jsx16(SelectItem3, { value: "1", children: "1 h" }),
-            /* @__PURE__ */ jsx16(SelectItem3, { value: "2", children: "2 h" }),
-            /* @__PURE__ */ jsx16(SelectItem3, { value: "4", children: "4 h" })
+      /* @__PURE__ */ jsxs17("label", { style: S.campo, children: [
+        /* @__PURE__ */ jsx17("span", { style: S.etiqueta, children: t(lang, "mercado.farm.ciclo") }),
+        /* @__PURE__ */ jsxs17(Select3, { value: String(settings.session), onValueChange: (v) => cambiar({ session: [1, 2, 4].includes(+v) ? +v : 2 }), children: [
+          /* @__PURE__ */ jsx17(SelectTrigger3, { "aria-label": t(lang, "mercado.farm.ciclo"), children: /* @__PURE__ */ jsx17(SelectValue3, {}) }),
+          /* @__PURE__ */ jsxs17(SelectContent3, { children: [
+            /* @__PURE__ */ jsx17(SelectItem3, { value: "1", children: "1 h" }),
+            /* @__PURE__ */ jsx17(SelectItem3, { value: "2", children: "2 h" }),
+            /* @__PURE__ */ jsx17(SelectItem3, { value: "4", children: "4 h" })
           ] })
         ] })
       ] }),
-      /* @__PURE__ */ jsxs16("label", { style: S.campo, children: [
-        /* @__PURE__ */ jsx16("span", { style: S.etiqueta, children: t(lang, "mercado.farm.zonasExtra") }),
-        /* @__PURE__ */ jsxs16(Select3, { value: String(settings.n), onValueChange: (v) => {
+      /* @__PURE__ */ jsxs17("label", { style: S.campo, children: [
+        /* @__PURE__ */ jsx17("span", { style: S.etiqueta, children: t(lang, "mercado.farm.zonasExtra") }),
+        /* @__PURE__ */ jsxs17(Select3, { value: String(settings.n), onValueChange: (v) => {
           const n = +v;
           cambiar({ n: n >= 3 && n <= 8 ? n : 5 });
         }, children: [
-          /* @__PURE__ */ jsx16(SelectTrigger3, { "aria-label": t(lang, "mercado.farm.zonasExtra"), children: /* @__PURE__ */ jsx16(SelectValue3, {}) }),
-          /* @__PURE__ */ jsx16(SelectContent3, { children: [3, 4, 5, 6, 7, 8].map((n) => /* @__PURE__ */ jsx16(SelectItem3, { value: String(n), children: n }, n)) })
+          /* @__PURE__ */ jsx17(SelectTrigger3, { "aria-label": t(lang, "mercado.farm.zonasExtra"), children: /* @__PURE__ */ jsx17(SelectValue3, {}) }),
+          /* @__PURE__ */ jsx17(SelectContent3, { children: [3, 4, 5, 6, 7, 8].map((n) => /* @__PURE__ */ jsx17(SelectItem3, { value: String(n), children: n }, n)) })
         ] })
       ] })
     ] }),
-    /* @__PURE__ */ jsxs16("div", { style: { display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center" }, children: [
-      /* @__PURE__ */ jsx16(Checkbox7, { checked: !!settings.prof.skin, onCheckedChange: (v) => cambiarProf("skin", !!v) }),
-      /* @__PURE__ */ jsx16("span", { style: { fontSize: 12 }, children: t(lang, PROF_NOMBRE.skin) }),
-      /* @__PURE__ */ jsx16(Checkbox7, { checked: !!settings.prof.herb, onCheckedChange: (v) => cambiarProf("herb", !!v) }),
-      /* @__PURE__ */ jsx16("span", { style: { fontSize: 12 }, children: t(lang, PROF_NOMBRE.herb) }),
-      /* @__PURE__ */ jsx16(Checkbox7, { checked: !!settings.prof.mine, onCheckedChange: (v) => cambiarProf("mine", !!v) }),
-      /* @__PURE__ */ jsx16("span", { style: { fontSize: 12 }, children: t(lang, PROF_NOMBRE.mine) }),
-      /* @__PURE__ */ jsx16(Checkbox7, { checked: !!settings.group, onCheckedChange: (v) => cambiar({ group: !!v }) }),
-      /* @__PURE__ */ jsx16("span", { style: { fontSize: 12 }, children: t(lang, "mercado.farm.grupo") }),
-      /* @__PURE__ */ jsx16(Checkbox7, { checked: settings.pvp !== false, onCheckedChange: (v) => cambiar({ pvp: !!v }) }),
-      /* @__PURE__ */ jsx16("span", { style: { fontSize: 12 }, children: t(lang, "mercado.farm.pvp") })
+    /* @__PURE__ */ jsxs17("div", { style: { display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center" }, children: [
+      /* @__PURE__ */ jsx17(Checkbox7, { checked: !!settings.prof.skin, onCheckedChange: (v) => cambiarProf("skin", !!v) }),
+      /* @__PURE__ */ jsx17("span", { style: { fontSize: 12 }, children: t(lang, PROF_NOMBRE.skin) }),
+      /* @__PURE__ */ jsx17(Checkbox7, { checked: !!settings.prof.herb, onCheckedChange: (v) => cambiarProf("herb", !!v) }),
+      /* @__PURE__ */ jsx17("span", { style: { fontSize: 12 }, children: t(lang, PROF_NOMBRE.herb) }),
+      /* @__PURE__ */ jsx17(Checkbox7, { checked: !!settings.prof.mine, onCheckedChange: (v) => cambiarProf("mine", !!v) }),
+      /* @__PURE__ */ jsx17("span", { style: { fontSize: 12 }, children: t(lang, PROF_NOMBRE.mine) }),
+      /* @__PURE__ */ jsx17(Checkbox7, { checked: !!settings.group, onCheckedChange: (v) => cambiar({ group: !!v }) }),
+      /* @__PURE__ */ jsx17("span", { style: { fontSize: 12 }, children: t(lang, "mercado.farm.grupo") }),
+      /* @__PURE__ */ jsx17(Checkbox7, { checked: settings.pvp !== false, onCheckedChange: (v) => cambiar({ pvp: !!v }) }),
+      /* @__PURE__ */ jsx17("span", { style: { fontSize: 12 }, children: t(lang, "mercado.farm.pvp") })
     ] }),
-    sinAjusteClase && /* @__PURE__ */ jsx16("p", { style: S.sub, children: t(lang, "mercado.farm.sinEquipoClase") }),
-    !calculo ? /* @__PURE__ */ jsx16("p", { style: S.sub, children: t(lang, "mercado.farm.sinZonas") }) : /* @__PURE__ */ jsxs16(Fragment12, { children: [
-      calculo.rank.A ? /* @__PURE__ */ jsxs16("div", { style: { display: "flex", flexDirection: "column", gap: 10 }, children: [
-        /* @__PURE__ */ jsx16(
+    sinAjusteClase && /* @__PURE__ */ jsx17("p", { style: S.sub, children: t(lang, "mercado.farm.sinEquipoClase") }),
+    !calculo ? /* @__PURE__ */ jsx17("p", { style: S.sub, children: t(lang, "mercado.farm.sinZonas") }) : /* @__PURE__ */ jsxs17(Fragment13, { children: [
+      calculo.rank.A ? /* @__PURE__ */ jsxs17("div", { style: { display: "flex", flexDirection: "column", gap: 10 }, children: [
+        /* @__PURE__ */ jsx17(
           TarjetaZona,
           {
             e: calculo.rank.A,
@@ -39131,7 +40036,7 @@ function Farmeo({ items, perfil, settings, onSettings, lang }) {
             onCopada: (zk) => cambiarCompZona(zk, "high")
           }
         ),
-        calculo.rank.B.map((b, i) => /* @__PURE__ */ jsx16(
+        calculo.rank.B.map((b, i) => /* @__PURE__ */ jsx17(
           TarjetaZona,
           {
             e: b,
@@ -39144,12 +40049,12 @@ function Farmeo({ items, perfil, settings, onSettings, lang }) {
           },
           b.zoneKey
         ))
-      ] }) : /* @__PURE__ */ jsx16("p", { style: S.sub, children: t(lang, "mercado.farm.sinZonas") }),
-      calculo.profs?.length > 0 && /* @__PURE__ */ jsxs16("div", { children: [
-        /* @__PURE__ */ jsx16("div", { style: S.etiqueta, children: t(lang, "mercado.farm.porProfesion") }),
-        calculo.profs.map((p) => /* @__PURE__ */ jsxs16("div", { style: { marginTop: 6 }, children: [
-          /* @__PURE__ */ jsx16("b", { style: { fontSize: 12 }, children: p.name }),
-          /* @__PURE__ */ jsx16("ul", { style: { margin: 0, paddingLeft: 18, fontSize: 12 }, children: p.zones.map((z) => /* @__PURE__ */ jsxs16("li", { children: [
+      ] }) : /* @__PURE__ */ jsx17("p", { style: S.sub, children: t(lang, "mercado.farm.sinZonas") }),
+      calculo.profs?.length > 0 && /* @__PURE__ */ jsxs17("div", { children: [
+        /* @__PURE__ */ jsx17("div", { style: S.etiqueta, children: t(lang, "mercado.farm.porProfesion") }),
+        calculo.profs.map((p) => /* @__PURE__ */ jsxs17("div", { style: { marginTop: 6 }, children: [
+          /* @__PURE__ */ jsx17("b", { style: { fontSize: 12 }, children: p.name }),
+          /* @__PURE__ */ jsx17("ul", { style: { margin: 0, paddingLeft: 18, fontSize: 12 }, children: p.zones.map((z) => /* @__PURE__ */ jsxs17("li", { children: [
             z.name,
             " · ~",
             fmt2.gph ? fmt2.gph(z.gph) : z.gph,
@@ -39157,9 +40062,9 @@ function Farmeo({ items, perfil, settings, onSettings, lang }) {
             t(lang, "mercado.farm.enMateriales"),
             z.items?.length ? ` · ${z.items.join(" · ")}` : ""
           ] }, z.zoneKey)) }),
-          p.along?.length > 0 && /* @__PURE__ */ jsxs16("div", { style: { marginTop: 4 }, children: [
-            /* @__PURE__ */ jsx16("div", { style: S.etiqueta, children: t(lang, "mercado.farm.skinAlong") }),
-            /* @__PURE__ */ jsx16("ul", { style: { margin: 0, paddingLeft: 18, fontSize: 12 }, children: p.along.map((z) => /* @__PURE__ */ jsxs16("li", { children: [
+          p.along?.length > 0 && /* @__PURE__ */ jsxs17("div", { style: { marginTop: 4 }, children: [
+            /* @__PURE__ */ jsx17("div", { style: S.etiqueta, children: t(lang, "mercado.farm.skinAlong") }),
+            /* @__PURE__ */ jsx17("ul", { style: { margin: 0, paddingLeft: 18, fontSize: 12 }, children: p.along.map((z) => /* @__PURE__ */ jsxs17("li", { children: [
               z.name,
               " · ~",
               fmt2.gph ? fmt2.gph(z.gph) : z.gph,
@@ -39167,17 +40072,17 @@ function Farmeo({ items, perfil, settings, onSettings, lang }) {
               t(lang, "mercado.farm.enMateriales"),
               z.bands ? ` · ${t(lang, "mercado.farm.bandas", { bands: z.bands })}` : ""
             ] }, z.zoneKey)) }),
-            /* @__PURE__ */ jsx16("p", { style: S.sub, children: t(lang, "mercado.farm.skinAlongNota") })
+            /* @__PURE__ */ jsx17("p", { style: S.sub, children: t(lang, "mercado.farm.skinAlongNota") })
           ] })
         ] }, p.kind)),
-        /* @__PURE__ */ jsx16("p", { style: S.sub, children: t(lang, "mercado.farm.porProfesionNota") })
+        /* @__PURE__ */ jsx17("p", { style: S.sub, children: t(lang, "mercado.farm.porProfesionNota") })
       ] }),
-      calculo.prog?.length > 0 && /* @__PURE__ */ jsxs16("div", { children: [
-        /* @__PURE__ */ jsx16("div", { style: S.etiqueta, children: t(lang, "mercado.farm.progresion") }),
-        /* @__PURE__ */ jsx16("ul", { style: { margin: 0, paddingLeft: 18, fontSize: 12 }, children: calculo.prog.map((p, i, arr) => {
+      calculo.prog?.length > 0 && /* @__PURE__ */ jsxs17("div", { children: [
+        /* @__PURE__ */ jsx17("div", { style: S.etiqueta, children: t(lang, "mercado.farm.progresion") }),
+        /* @__PURE__ */ jsx17("ul", { style: { margin: 0, paddingLeft: 18, fontSize: 12 }, children: calculo.prog.map((p, i, arr) => {
           const prev = i > 0 ? arr[i - 1] : null;
           const same = prev && p.zoneKey === prev.zoneKey;
-          return /* @__PURE__ */ jsxs16("li", { children: [
+          return /* @__PURE__ */ jsxs17("li", { children: [
             t(lang, "mercado.farm.progLinea", { nivel: p.level }),
             " ",
             same ? t(lang, "mercado.farm.progSeguimos", { zona: p.name }) : t(lang, "mercado.farm.progMover", { zona: p.name }),
@@ -39185,9 +40090,9 @@ function Farmeo({ items, perfil, settings, onSettings, lang }) {
           ] }, p.level);
         }) })
       ] }),
-      /* @__PURE__ */ jsxs16("div", { children: [
-        /* @__PURE__ */ jsx16("div", { style: S.etiqueta, children: t(lang, "mercado.farm.cobertura") }),
-        /* @__PURE__ */ jsxs16("p", { style: S.sub, children: [
+      /* @__PURE__ */ jsxs17("div", { children: [
+        /* @__PURE__ */ jsx17("div", { style: S.etiqueta, children: t(lang, "mercado.farm.cobertura") }),
+        /* @__PURE__ */ jsxs17("p", { style: S.sub, children: [
           calculo.stats ? t(lang, "mercado.farm.coberturaLinea", { matched: calculo.stats.matched, total: calculo.stats.total, pct: calculo.stats.pct }) : "",
           " ",
           t(lang, "mercado.farm.estimaciones")
@@ -39198,8 +40103,8 @@ function Farmeo({ items, perfil, settings, onSettings, lang }) {
 }
 
 // src/vistas/mercado/mis-ventas.jsx
-import { useEffect as useEffect3, useMemo as useMemo14, useState as useState9 } from "react";
-import { Button as Button7, Checkbox as Checkbox8 } from "@hermes/plugin-sdk";
+import { useEffect as useEffect4, useMemo as useMemo15, useState as useState10 } from "react";
+import { Button as Button8, Checkbox as Checkbox8 } from "@hermes/plugin-sdk";
 
 // src/tsm.js
 var import_market2 = __toESM(require_market(), 1);
@@ -39296,26 +40201,26 @@ function resumenTsm(snapshot, realmName) {
 }
 
 // src/vistas/mercado/mis-ventas.jsx
-import { Fragment as Fragment13, jsx as jsx17, jsxs as jsxs17 } from "react/jsx-runtime";
+import { Fragment as Fragment14, jsx as jsx18, jsxs as jsxs18 } from "react/jsx-runtime";
 function MisVentas({ ventas, auctionSnapshot, perfil, lang }) {
-  const [state, setState] = useState9(() => ventas?.getState() || { status: "unavailable", enabled: false, snapshot: null });
-  const [busy, setBusy] = useState9(false), [confirm, setConfirm] = useState9(false);
-  const [selected, setSelected] = useState9(""), [search, setSearch] = useState9(""), [page, setPage] = useState9(0);
-  useEffect3(() => ventas?.subscribe(setState), [ventas]);
+  const [state, setState] = useState10(() => ventas?.getState() || { status: "unavailable", enabled: false, snapshot: null });
+  const [busy, setBusy] = useState10(false), [confirm, setConfirm] = useState10(false);
+  const [selected, setSelected] = useState10(""), [search, setSearch] = useState10(""), [page, setPage] = useState10(0);
+  useEffect4(() => ventas?.subscribe(setState), [ventas]);
   const en = lang === "en", tr = (es, english) => en ? english : es;
   const snap = state.snapshot;
   const realms = snap?.realms || [];
   const realm = realms.some((r) => r.name === selected) ? selected : realms.some((r) => r.name === perfil?.reino) ? perfil.reino : realms[0]?.name || "";
-  const rows = useMemo14(() => resumenTsm(snap, realm), [snap, realm]);
-  const filtered = useMemo14(() => rows.filter((r) => {
+  const rows = useMemo15(() => resumenTsm(snap, realm), [snap, realm]);
+  const filtered = useMemo15(() => rows.filter((r) => {
     const n = nombre(item(r.itemId)?.n, lang) || "";
     return `${n} ${r.itemString}`.toLocaleLowerCase().includes(search.trim().toLocaleLowerCase());
   }), [rows, search, lang]);
-  useEffect3(() => setPage(0), [search, realm, snap]);
+  useEffect4(() => setPage(0), [search, realm, snap]);
   const safePage = Math.min(page, Math.max(0, Math.ceil(filtered.length / 25) - 1));
   const auctions = auctionSnapshot?.realms?.find((r) => r.name === realm);
-  const prices = useMemo14(() => new Map((auctions?.items || []).filter((i) => /^\d+$/.test(i.sourceKey)).map((i) => [i.itemId, i])), [auctions]);
-  const range = useMemo14(() => {
+  const prices = useMemo15(() => new Map((auctions?.items || []).filter((i) => /^\d+$/.test(i.sourceKey)).map((i) => [i.itemId, i])), [auctions]);
+  const range = useMemo15(() => {
     let first = Infinity, last = 0;
     for (const r of snap?.realms?.find((r2) => r2.name === realm)?.records || []) {
       first = Math.min(first, r.time);
@@ -39347,113 +40252,113 @@ ed automatically."),
     error: tr("No se pudo completar la operación TSM.", "Could not complete the TSM operation."),
     idle: tr("TSM listo", "TSM ready")
   };
-  return /* @__PURE__ */ jsx17("div", { "data-testid": "tsm-panel", children: /* @__PURE__ */ jsxs17(Tarjeta, { titulo: tr("Mis ventas · TradeSkillMaster", "My sales · TradeSkillMaster"), extra: /* @__PURE__ */ jsx17(
+  return /* @__PURE__ */ jsx18("div", { "data-testid": "tsm-panel", children: /* @__PURE__ */ jsxs18(Tarjeta, { titulo: tr("Mis ventas · TradeSkillMaster", "My sales · TradeSkillMaster"), extra: /* @__PURE__ */ jsx18(
   "span", { style: S.chip, children: tr("Operaciones registradas · local", "Recorded transactions · local") }), children: [
-    /* @__PURE__ */ jsxs17("div", { style: { display: "flex", flexWrap: "wrap", gap: 8 }, children: [
-      /* @__PURE__ */ jsx17(Button7, { disabled: busy || !ventas, onClick: () => run(() => ventas.read()), children: tr("Leer TradeSkillMaster.lua", "Read TradeSkillMaster.lua") }),
-      /* @__PURE__ */ jsx17(Button7, { variant: "outline", disabled: busy || !ventas, onClick: () => run(() => ventas.read({ pick: true })), children: tr("Elegir carpeta TSM", "Choose TSM folder") }),
-      /* @__PURE__ */ jsx17(Button7, { variant: "outline", disabled: busy || !ventas, onClick: () => run(() => ventas.restore()), children: tr("Reabrir TSM", "Reopen TSM") }),
-      /* @__PURE__ */ jsx17(Button7, { variant: "outline", disabled: busy || !ventas || !snap, onClick: () => confirm ? run(() => ventas.clear()) : setConfirm(true), children: confirm ? tr("Confirmar \
+    /* @__PURE__ */ jsxs18("div", { style: { display: "flex", flexWrap: "wrap", gap: 8 }, children: [
+      /* @__PURE__ */ jsx18(Button8, { disabled: busy || !ventas, onClick: () => run(() => ventas.read()), children: tr("Leer TradeSkillMaster.lua", "Read TradeSkillMaster.lua") }),
+      /* @__PURE__ */ jsx18(Button8, { variant: "outline", disabled: busy || !ventas, onClick: () => run(() => ventas.read({ pick: true })), children: tr("Elegir carpeta TSM", "Choose TSM folder") }),
+      /* @__PURE__ */ jsx18(Button8, { variant: "outline", disabled: busy || !ventas, onClick: () => run(() => ventas.restore()), children: tr("Reabrir TSM", "Reopen TSM") }),
+      /* @__PURE__ */ jsx18(Button8, { variant: "outline", disabled: busy || !ventas || !snap, onClick: () => confirm ? run(() => ventas.clear()) : setConfirm(true), children: confirm ? tr("Confirmar \
 borrado TSM", "Confirm clear TSM") : tr("Borrar historial TSM", "Clear TSM history") }),
-      confirm && /* @__PURE__ */ jsx17(Button7, { variant: "outline", onClick: () => setConfirm(false), children: tr("Cancelar", "Cancel") })
+      confirm && /* @__PURE__ */ jsx18(Button8, { variant: "outline", onClick: () => setConfirm(false), children: tr("Cancelar", "Cancel") })
     ] }),
-    /* @__PURE__ */ jsxs17("label", { style: S.sub, children: [
-      /* @__PURE__ */ jsx17(Checkbox8, { checked: state.enabled, disabled: busy || !ventas, onCheckedChange: () => run(async () => {
+    /* @__PURE__ */ jsxs18("label", { style: S.sub, children: [
+      /* @__PURE__ */ jsx18(Checkbox8, { checked: state.enabled, disabled: busy || !ventas, onCheckedChange: () => run(async () => {
         await ventas.setEnabled(!state.enabled);
         if (!state.enabled) await ventas.poll();
       }) }),
       tr(" Seguimiento TSM · cada 30 s", " TSM tracking · every 30 s")
     ] }),
-    /* @__PURE__ */ jsxs17("p", { style: { ...S.sub, margin: 0 }, role: "status", "aria-live": "polite", children: [
+    /* @__PURE__ */ jsxs18("p", { style: { ...S.sub, margin: 0 }, role: "status", "aria-live": "polite", children: [
       statuses[state.status] || state.status,
       state.message ? ` · ${state.message}` : ""
     ] }),
-    /* @__PURE__ */ jsx17("p", { style: S.sub, children: tr("Detectamos TSM automáticamente en las carpetas autorizadas, reutilizando el permiso de Auctionator. No necesitas elegir archivos. Si falta \
+    /* @__PURE__ */ jsx18("p", { style: S.sub, children: tr("Detectamos TSM automáticamente en las carpetas autorizadas, reutilizando el permiso de Auctionator. No necesitas elegir archivos. Si falta \
 permiso, autoriza una vez la carpeta del juego o WTF (no Interface/AddOns). Con varias cuentas se requiere escoger una. TSM guarda al usar /reload o cerrar sesión; el seguimiento continúa entre pestañ\
 as. No se guardan nombres de jugadores.", "TSM is discovered automatically within authorized folders, reusing Auctionator’s permission. No file selection is needed. If access is missing, authorize the\
  game or WTF folder once (not Interface/AddOns). Multiple accounts require choosing one. TSM saves after /reload or logout; tracking continues across tabs. Player names are not stored.") }),
-    !snap ? /* @__PURE__ */ jsx17("p", { children: tr("Sin operaciones importadas", "No imported transactions") }) : /* @__PURE__ */ jsxs17(Fragment13, { children: [
-      /* @__PURE__ */ jsxs17("div", { style: { display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center" }, children: [
-        /* @__PURE__ */ jsxs17("label", { children: [
+    !snap ? /* @__PURE__ */ jsx18("p", { children: tr("Sin operaciones importadas", "No imported transactions") }) : /* @__PURE__ */ jsxs18(Fragment14, { children: [
+      /* @__PURE__ */ jsxs18("div", { style: { display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center" }, children: [
+        /* @__PURE__ */ jsxs18("label", { children: [
           tr("Reino TSM", "TSM realm"),
           " ",
-          /* @__PURE__ */ jsx17("select", { "aria-label": tr("Reino TSM", "TSM realm"), value: realm, onChange: (e) => setSelected(e.target.value), children: realms.map((r) => /* @__PURE__ */ jsx17("o\
+          /* @__PURE__ */ jsx18("select", { "aria-label": tr("Reino TSM", "TSM realm"), value: realm, onChange: (e) => setSelected(e.target.value), children: realms.map((r) => /* @__PURE__ */ jsx18("o\
 ption", { value: r.name, children: r.name }, r.name)) })
         ] }),
-        /* @__PURE__ */ jsxs17("label", { children: [
+        /* @__PURE__ */ jsxs18("label", { children: [
           tr("Buscar operaciones", "Search transactions"),
           " ",
-          /* @__PURE__ */ jsx17("input", { type: "text", "aria-label": tr("Buscar operaciones", "Search transactions"), value: search, onChange: (e) => setSearch(e.target.value) })
+          /* @__PURE__ */ jsx18("input", { type: "text", "aria-label": tr("Buscar operaciones", "Search transactions"), value: search, onChange: (e) => setSearch(e.target.value) })
         ] })
       ] }),
-      /* @__PURE__ */ jsxs17("div", { style: S.sub, children: [
+      /* @__PURE__ */ jsxs18("div", { style: S.sub, children: [
         tr("Importado: ", "Imported: "),
         new Date(snap.importedAt).toLocaleString(en ? "en" : "es"),
         range ? ` · ${tr("Operaciones entre", "Transactions between")} ${date(range[0])} — ${date(range[1])}` : "",
         ` · ${filtered.length} ${tr("objetos", "items")}`
       ] }),
-      /* @__PURE__ */ jsx17("div", { style: { overflowX: "auto" }, children: /* @__PURE__ */ jsxs17("table", { style: S.tabla, "aria-label": tr("Resumen de operaciones TSM", "TSM transaction summary"),
+      /* @__PURE__ */ jsx18("div", { style: { overflowX: "auto" }, children: /* @__PURE__ */ jsxs18("table", { style: S.tabla, "aria-label": tr("Resumen de operaciones TSM", "TSM transaction summary"),
       children: [
-        /* @__PURE__ */ jsx17("thead", { children: /* @__PURE__ */ jsx17("tr", { children: headings.map((h) => /* @__PURE__ */ jsx17("th", { scope: "col", style: S.th, children: h }, h)) }) }),
-        /* @__PURE__ */ jsxs17("tbody", { children: [
+        /* @__PURE__ */ jsx18("thead", { children: /* @__PURE__ */ jsx18("tr", { children: headings.map((h) => /* @__PURE__ */ jsx18("th", { scope: "col", style: S.th, children: h }, h)) }) }),
+        /* @__PURE__ */ jsxs18("tbody", { children: [
           filtered.slice(safePage * 25, (safePage + 1) * 25).map((r) => {
             const price = /^i:\d+$/.test(r.itemString) ? prices.get(r.itemId) : null;
-            return /* @__PURE__ */ jsxs17("tr", { children: [
-              /* @__PURE__ */ jsxs17("td", { style: S.td, children: [
-                /* @__PURE__ */ jsx17(NombreItem, { id: r.itemId, lang }),
-                /* @__PURE__ */ jsxs17("div", { style: S.etiqueta, children: [
+            return /* @__PURE__ */ jsxs18("tr", { children: [
+              /* @__PURE__ */ jsxs18("td", { style: S.td, children: [
+                /* @__PURE__ */ jsx18(NombreItem, { id: r.itemId, lang }),
+                /* @__PURE__ */ jsxs18("div", { style: S.etiqueta, children: [
                   r.itemString,
                   " · ",
                   r.sources.join(", ")
                 ] })
               ] }),
-              /* @__PURE__ */ jsxs17("td", { style: S.td, children: [
-                /* @__PURE__ */ jsx17("b", { children: r.sold }),
+              /* @__PURE__ */ jsxs18("td", { style: S.td, children: [
+                /* @__PURE__ */ jsx18("b", { children: r.sold }),
                 " · ",
-                r.avgSale === null ? "—" : /* @__PURE__ */ jsx17(Dinero, { cobre: Math.round(r.avgSale) })
+                r.avgSale === null ? "—" : /* @__PURE__ */ jsx18(Dinero, { cobre: Math.round(r.avgSale) })
               ] }),
-              /* @__PURE__ */ jsxs17("td", { style: S.td, children: [
+              /* @__PURE__ */ jsxs18("td", { style: S.td, children: [
                 r.bought,
                 " · ",
-                r.avgBuy === null ? "—" : /* @__PURE__ */ jsx17(Dinero, { cobre: Math.round(r.avgBuy) })
+                r.avgBuy === null ? "—" : /* @__PURE__ */ jsx18(Dinero, { cobre: Math.round(r.avgBuy) })
               ] }),
-              /* @__PURE__ */ jsxs17("td", { style: S.td, children: [
+              /* @__PURE__ */ jsxs18("td", { style: S.td, children: [
                 r.expired,
                 " / ",
                 r.cancelled
               ] }),
-              /* @__PURE__ */ jsxs17("td", { style: S.td, children: [
-                /* @__PURE__ */ jsx17(Dinero, { cobre: r.saleCopper }),
-                /* @__PURE__ */ jsxs17("div", { style: S.etiqueta, children: [
+              /* @__PURE__ */ jsxs18("td", { style: S.td, children: [
+                /* @__PURE__ */ jsx18(Dinero, { cobre: r.saleCopper }),
+                /* @__PURE__ */ jsxs18("div", { style: S.etiqueta, children: [
                   tr("Compras: ", "Purchases: "),
-                  /* @__PURE__ */ jsx17(Dinero, { cobre: r.buyCopper })
+                  /* @__PURE__ */ jsx18(Dinero, { cobre: r.buyCopper })
                 ] })
               ] }),
-              /* @__PURE__ */ jsx17("td", { style: S.td, children: r.lastSale ? date(r.lastSale) : "—" }),
-              /* @__PURE__ */ jsx17("td", { style: S.td, children: price ? /* @__PURE__ */ jsxs17(Fragment13, { children: [
-                /* @__PURE__ */ jsx17(Dinero, { cobre: price.unitPriceCopper }),
-                /* @__PURE__ */ jsxs17("div", { style: S.etiqueta, children: [
+              /* @__PURE__ */ jsx18("td", { style: S.td, children: r.lastSale ? date(r.lastSale) : "—" }),
+              /* @__PURE__ */ jsx18("td", { style: S.td, children: price ? /* @__PURE__ */ jsxs18(Fragment14, { children: [
+                /* @__PURE__ */ jsx18(Dinero, { cobre: price.unitPriceCopper }),
+                /* @__PURE__ */ jsxs18("div", { style: S.etiqueta, children: [
                   tr("Observación día Auctionator: ", "Auctionator observation day: "),
                   fechaDe(price.observedDay) ?? "—"
                 ] })
-              ] }) : /* @__PURE__ */ jsx17("span", { style: S.etiqueta, children: tr("Sin referencia compatible", "No matching reference") }) })
+              ] }) : /* @__PURE__ */ jsx18("span", { style: S.etiqueta, children: tr("Sin referencia compatible", "No matching reference") }) })
             ] }, r.itemString);
           }),
-          !filtered.length && /* @__PURE__ */ jsx17("tr", { children: /* @__PURE__ */ jsx17("td", { colSpan: 7, style: S.td, children: tr("Sin operaciones para esta selección.", "No transactions for \
+          !filtered.length && /* @__PURE__ */ jsx18("tr", { children: /* @__PURE__ */ jsx18("td", { colSpan: 7, style: S.td, children: tr("Sin operaciones para esta selección.", "No transactions for \
 this selection.") }) })
         ] })
       ] }) }),
-      filtered.length > 25 && /* @__PURE__ */ jsxs17("div", { style: { display: "flex", gap: 8 }, children: [
-        /* @__PURE__ */ jsx17(Button7, { variant: "outline", disabled: safePage === 0, onClick: () => setPage(safePage - 1), children: tr("Anterior", "Previous") }),
-        /* @__PURE__ */ jsxs17("span", { children: [
+      filtered.length > 25 && /* @__PURE__ */ jsxs18("div", { style: { display: "flex", gap: 8 }, children: [
+        /* @__PURE__ */ jsx18(Button8, { variant: "outline", disabled: safePage === 0, onClick: () => setPage(safePage - 1), children: tr("Anterior", "Previous") }),
+        /* @__PURE__ */ jsxs18("span", { children: [
           safePage + 1,
           " / ",
           Math.ceil(filtered.length / 25)
         ] }),
-        /* @__PURE__ */ jsx17(Button7, { variant: "outline", disabled: (safePage + 1) * 25 >= filtered.length, onClick: () => setPage(safePage + 1), children: tr("Siguiente", "Next") })
+        /* @__PURE__ */ jsx18(Button8, { variant: "outline", disabled: (safePage + 1) * 25 >= filtered.length, onClick: () => setPage(safePage + 1), children: tr("Siguiente", "Next") })
       ] })
     ] }),
-    /* @__PURE__ */ jsx17("div", { style: { ...S.aviso, borderColor: C.azul }, children: tr("Importes registrados por TSM, no beneficio neto: en ventas desde correo, TSM ya descuenta la comisión y red\
+    /* @__PURE__ */ jsx18("div", { style: { ...S.aviso, borderColor: C.azul }, children: tr("Importes registrados por TSM, no beneficio neto: en ventas desde correo, TSM ya descuenta la comisión y red\
 ondea por unidad. No reconstruimos el bruto ni descontamos de nuevo comisiones; faltan costes de fabricación y depósitos. Expiradas y canceladas son unidades en intentos de subasta (una misma unidad p\
 uede repetirse), no ventas perdidas ni tasa de venta del servidor. La comparación usa solo el mismo reino y objetos base sin variantes. Cada lectura válida reemplaza la copia completa de TSM: refleja \
 también sus recortes o borrados; no recupera operaciones anteriores a instalarlo.", "TSM recorded amounts, not net profit: mail auction sales already deduct the AH cut and round per unit. We do not r\
@@ -39463,7 +40368,7 @@ rates. Comparison requires the same realm and plain base items. Each valid impor
 }
 
 // src/vistas/mercado.jsx
-import { Fragment as Fragment14, jsx as jsx18, jsxs as jsxs18 } from "react/jsx-runtime";
+import { Fragment as Fragment15, jsx as jsx19, jsxs as jsxs19 } from "react/jsx-runtime";
 agregarTextos({
   "mercado.scan.titulo": "Escaneo de Auctionator",
   "mercado.leer": "Leer Auctionator.lua",
@@ -39950,17 +40855,17 @@ function InsigniaOferta({ deal, lang }) {
   const esOferta = deal.kind === "oferta";
   const color = esOferta ? C.verde : C.rojo;
   const tip = `${t(lang, "mercado.det.analisis")}: ${t(lang, esOferta ? "mercado.oferta.deal" : "mercado.oferta.caro")} ${esOferta ? "−" : "+"}${pct2}%`;
-  return /* @__PURE__ */ jsx18("span", { title: tip, style: { ...S.chip, borderColor: color, color, marginLeft: 4 }, children: tip });
+  return /* @__PURE__ */ jsx19("span", { title: tip, style: { ...S.chip, borderColor: color, color, marginLeft: 4 }, children: tip });
 }
 function Chip2({ children, color }) {
-  return /* @__PURE__ */ jsx18("span", { style: { ...S.chip, borderColor: color || C.borde, color: color || C.texto2 }, children });
+  return /* @__PURE__ */ jsx19("span", { style: { ...S.chip, borderColor: color || C.borde, color: color || C.texto2 }, children });
 }
 function FilaVacia({ texto: texto2 }) {
-  return /* @__PURE__ */ jsx18("tr", { children: /* @__PURE__ */ jsx18("td", { style: S.td, colSpan: 6, children: texto2 }) });
+  return /* @__PURE__ */ jsx19("tr", { children: /* @__PURE__ */ jsx19("td", { style: S.td, colSpan: 6, children: texto2 }) });
 }
 function PuenteEstado({ puente, lang }) {
-  const [st, setSt] = useState10(puente.getState());
-  useEffect4(() => puente.subscribe(setSt), [puente]);
+  const [st, setSt] = useState11(puente.getState());
+  useEffect5(() => puente.subscribe(setSt), [puente]);
   const cambiar = async () => {
     try {
       await puente.setEnabled(!st.enabled);
@@ -39968,12 +40873,12 @@ function PuenteEstado({ puente, lang }) {
     } catch {
     }
   };
-  return /* @__PURE__ */ jsxs18("div", { "data-testid": "bridge-panel", style: { marginTop: 6 }, children: [
-    /* @__PURE__ */ jsxs18("label", { style: S.sub, children: [
-      /* @__PURE__ */ jsx18(Checkbox9, { checked: st.enabled, onCheckedChange: cambiar }),
+  return /* @__PURE__ */ jsxs19("div", { "data-testid": "bridge-panel", style: { marginTop: 6 }, children: [
+    /* @__PURE__ */ jsxs19("label", { style: S.sub, children: [
+      /* @__PURE__ */ jsx19(Checkbox9, { checked: st.enabled, onCheckedChange: cambiar }),
       lang === "en" ? " Scan bridge (WoWForeverBridge addon) · keeps every scan in a daily journal" : " Puente de escaneos (addon WoWForeverBridge) · guarda cada escaneo en un diario por día"
     ] }),
-    /* @__PURE__ */ jsxs18("p", { "data-testid": "bridge-status", style: S.sub, children: [
+    /* @__PURE__ */ jsxs19("p", { "data-testid": "bridge-status", style: S.sub, children: [
       lang === "en" ? "Bridge: " : "Puente: ",
       st.status,
       st.entries ? ` · ${st.entries} ${lang === "en" ? "day(s)" : "día(s)"} · ${st.items} ${lang === "en" ? "observations" : "observaciones"}` : "",
@@ -39984,9 +40889,9 @@ function PuenteEstado({ puente, lang }) {
   ] });
 }
 function VistaMercado({ ctx, almacen, sincronizador, ventas, puente, estado, recargar, perfil, lang }) {
-  const sync = useMemo15(() => sincronizador || createMarketSync(ctx, almacen), [sincronizador, ctx, almacen]);
-  const [auto, setAuto] = useState10(sync.getState());
-  useEffect4(() => sync.subscribe(setAuto), [sync]);
+  const sync = useMemo16(() => sincronizador || createMarketSync(ctx, almacen), [sincronizador, ctx, almacen]);
+  const [auto, setAuto] = useState11(sync.getState());
+  useEffect5(() => sync.subscribe(setAuto), [sync]);
   const cambiarAuto = async () => {
     try {
       await sync.setEnabled(!auto.enabled);
@@ -39997,45 +40902,45 @@ function VistaMercado({ ctx, almacen, sincronizador, ventas, puente, estado, rec
   };
   const mercado = estado?.market;
   const historial = estado?.history;
-  const snapshot = useMemo15(() => snapshotVisible(mercado, historial), [mercado, historial]);
-  const [mensaje, setMensaje] = useState10("");
-  const [importando, setImportando] = useState10(false);
-  const [confirmBorrar, setConfirmBorrar] = useState10(false);
-  const [realmName, setRealmName] = useState10("");
-  const [realmChoice, setRealmChoice] = useState10("");
+  const snapshot = useMemo16(() => snapshotVisible(mercado, historial), [mercado, historial]);
+  const [mensaje, setMensaje] = useState11("");
+  const [importando, setImportando] = useState11(false);
+  const [confirmBorrar, setConfirmBorrar] = useState11(false);
+  const [realmName, setRealmName] = useState11("");
+  const [realmChoice, setRealmChoice] = useState11("");
   const realmId = (r) => snapshot?.realms.filter((x) => x.name === r.name).length > 1 ? JSON.stringify([import_market_identity2.default.identityKey(r.identity), r.name]) : r.name;
-  const [busqueda, setBusqueda] = useState10("");
-  const [soloRecientes, setSoloRecientes] = useState10(false);
-  const [conFuente, setConFuente] = useState10(false);
-  const [soloFarmable, setSoloFarmable] = useState10(false);
-  const [soloOfertas, setSoloOfertas] = useState10(false);
-  const [orden, setOrden] = useState10("precio");
-  const [pagina, setPagina] = useState10(0);
-  const [detalleKey, setDetalleKey] = useState10(null);
-  const [farmGuardado, setFarmGuardado] = useState10(null);
+  const [busqueda, setBusqueda] = useState11("");
+  const [soloRecientes, setSoloRecientes] = useState11(false);
+  const [conFuente, setConFuente] = useState11(false);
+  const [soloFarmable, setSoloFarmable] = useState11(false);
+  const [soloOfertas, setSoloOfertas] = useState11(false);
+  const [orden, setOrden] = useState11("precio");
+  const [pagina, setPagina] = useState11(0);
+  const [detalleKey, setDetalleKey] = useState11(null);
+  const [farmGuardado, setFarmGuardado] = useState11(null);
   const fileRef = useRef2(null);
   const revM = useRef2(0);
   const revH = useRef2(0);
-  const [scopesMemoria, setScopesMemoria] = useState10([]);
-  const [scopeA, setScopeA] = useState10("");
-  const [scopeB, setScopeB] = useState10("");
-  const [errorFuente, setErrorFuente] = useState10("");
-  const [bloqueoV2, setBloqueoV2] = useState10("");
-  const [ultimaFuente, setUltimaFuente] = useState10("");
-  const [guardandoV2, setGuardandoV2] = useState10(false);
-  const [confirmGuardarV2, setConfirmGuardarV2] = useState10(false);
-  const [confirmRollback, setConfirmRollback] = useState10(false);
-  const [exportandoCli, setExportandoCli] = useState10(false);
-  const [exportCli, setExportCli] = useState10(null);
-  const [comision, setComision] = useState10({
+  const [scopesMemoria, setScopesMemoria] = useState11([]);
+  const [scopeA, setScopeA] = useState11("");
+  const [scopeB, setScopeB] = useState11("");
+  const [errorFuente, setErrorFuente] = useState11("");
+  const [bloqueoV2, setBloqueoV2] = useState11("");
+  const [ultimaFuente, setUltimaFuente] = useState11("");
+  const [guardandoV2, setGuardandoV2] = useState11(false);
+  const [confirmGuardarV2, setConfirmGuardarV2] = useState11(false);
+  const [confirmRollback, setConfirmRollback] = useState11(false);
+  const [exportandoCli, setExportandoCli] = useState11(false);
+  const [exportCli, setExportCli] = useState11(null);
+  const [comision, setComision] = useState11({
     capital: { bps: "", verificada: false, etiqueta: "", dia: "" },
     neutral: { bps: "", verificada: false, etiqueta: "", dia: "" }
   });
-  useEffect4(() => {
+  useEffect5(() => {
     revM.current = estado?.revision ?? 0;
     revH.current = estado?.history?.revision ?? 0;
   }, [estado]);
-  useEffect4(() => {
+  useEffect5(() => {
     let vivo = true;
     Promise.resolve(ctx?.storage?.get?.("farm-settings")).then((v) => {
       if (vivo) setFarmGuardado(v && typeof v === "object" ? v : {});
@@ -40046,7 +40951,7 @@ function VistaMercado({ ctx, almacen, sincronizador, ventas, puente, estado, rec
       vivo = false;
     };
   }, [ctx]);
-  useEffect4(() => {
+  useEffect5(() => {
     if (!snapshot) {
       if (realmName) setRealmName("");
       return;
@@ -40057,14 +40962,14 @@ function VistaMercado({ ctx, almacen, sincronizador, ventas, puente, estado, rec
     setRealmName(preferido);
   }, [snapshot, perfil?.reino, mercado?.realm, realmName]);
   const realm = (snapshot?.realms || []).find((r) => realmId(r) === realmChoice) || snapshot?.realms?.find((r) => r.name === realmName) || null;
-  const items = useMemo15(() => realm?.items || [], [realm]);
+  const items = useMemo16(() => realm?.items || [], [realm]);
   const nivel = perfil?.nivel || 12;
-  const guia = useMemo15(() => guiaCurada(perfil), [perfil]);
-  const motorProfile = useMemo15(() => {
+  const guia = useMemo16(() => guiaCurada(perfil), [perfil]);
+  const motorProfile = useMemo16(() => {
     const hub = hubZonesDe(nivel, guia?.datos?.routes, D.zonas, perfil?.faccion);
     return perfilMotor(perfil, hub);
   }, [perfil, guia, nivel]);
-  const settings = useMemo15(() => ajustesFarm(perfil, farmGuardado), [perfil, farmGuardado]);
+  const settings = useMemo16(() => ajustesFarm(perfil, farmGuardado), [perfil, farmGuardado]);
   const guardarFarm = async (nuevo) => {
     setFarmGuardado(nuevo);
     try {
@@ -40091,8 +40996,8 @@ function VistaMercado({ ctx, almacen, sincronizador, ventas, puente, estado, rec
     }
     return dcache.current.map.get(item3.sourceKey);
   }, [dkey]);
-  const textos = useMemo15(() => textosBusqueda(items, CATALOGO, D.items, D.dungeons), [items]);
-  const visibles = useMemo15(() => {
+  const textos = useMemo16(() => textosBusqueda(items, CATALOGO, D.items, D.dungeons), [items]);
+  const visibles = useMemo16(() => {
     const filtrados = filtrarMercado(items, {
       textos,
       q: busqueda,
@@ -40114,16 +41019,16 @@ function VistaMercado({ ctx, almacen, sincronizador, ventas, puente, estado, rec
   const paginas = Math.max(1, Math.ceil(visibles.length / PAGE_SIZE));
   const paginaSegura = Math.min(pagina, paginas - 1);
   const paginaItems = visibles.slice(paginaSegura * PAGE_SIZE, (paginaSegura + 1) * PAGE_SIZE);
-  const detalle = useMemo15(() => items.find((i) => i.sourceKey === detalleKey) || null, [items, detalleKey]);
-  const detalleMetrica = useMemo15(() => detalle ? metricOf(detalle) : null, [detalle, metricOf]);
-  const detalleDeal = useMemo15(() => detalle ? dealOf(detalle) : null, [detalle, dealOf]);
-  const resumenPerfilMercado = useMemo15(() => perfilParaAgente(perfil, D.personaje, {}, lang), [perfil, lang]);
-  const procedenciaMercado = useMemo15(() => [
+  const detalle = useMemo16(() => items.find((i) => i.sourceKey === detalleKey) || null, [items, detalleKey]);
+  const detalleMetrica = useMemo16(() => detalle ? metricOf(detalle) : null, [detalle, metricOf]);
+  const detalleDeal = useMemo16(() => detalle ? dealOf(detalle) : null, [detalle, dealOf]);
+  const resumenPerfilMercado = useMemo16(() => perfilParaAgente(perfil, D.personaje, {}, lang), [perfil, lang]);
+  const procedenciaMercado = useMemo16(() => [
     "Auctionator.lua (importación del cliente)",
     "importado: " + (snapshot?.importedAt ? String(snapshot.importedAt) : "fecha desconocida"),
     "DB " + (snapshot?.sourceVersion || "?")
   ], [snapshot]);
-  const snapshotDavi = useMemo15(() => !detalle ? null : construirContextoMercado({
+  const snapshotDavi = useMemo16(() => !detalle ? null : construirContextoMercado({
     item: detalle,
     realm: realmName,
     available: ofertaMaximaDe(detalle),
@@ -40134,22 +41039,22 @@ function VistaMercado({ ctx, almacen, sincronizador, ventas, puente, estado, rec
     resumenPerfil: resumenPerfilMercado,
     procedencia: procedenciaMercado
   }), [detalle, realmName, snapshot, lang, resumenPerfilMercado, procedenciaMercado]);
-  const fres = useMemo15(() => frescura(realm ? { ...snapshot, realms: [realm] } : snapshot, realmName), [snapshot, realmName, realm]);
-  const histInfo = useMemo15(() => infoHistorial(historial?.store), [historial]);
+  const fres = useMemo16(() => frescura(realm ? { ...snapshot, realms: [realm] } : snapshot, realmName), [snapshot, realmName, realm]);
+  const histInfo = useMemo16(() => infoHistorial(historial?.store), [historial]);
   const esLegacy = !!(estado?.legacyMarket || mercado?.snapshot?.schemaVersion === 1 || mercado?.snapshot?.realms?.some((r) => r.identity?.provenance?.confidence !== "verified"));
-  const scopes = useMemo15(() => {
+  const scopes = useMemo16(() => {
     const mapa = /* @__PURE__ */ new Map();
     for (const s of [...scopesDeSnapshot(mercado?.snapshot, "guardado"), ...scopesMemoria]) mapa.set(s.key, s);
     return [...mapa.values()];
   }, [mercado?.snapshot, scopesMemoria]);
-  useEffect4(() => {
+  useEffect5(() => {
     const claves = scopes.map((s) => s.key);
     setScopeA((prev) => claves.includes(prev) ? prev : claves[0] || "");
     setScopeB((prev) => claves.includes(prev) && prev !== claves[0] ? prev : claves.find((k) => k !== claves[0]) || "");
   }, [scopes]);
   const scopeAObj = scopes.find((s) => s.key === scopeA) || null;
   const scopeBObj = scopes.find((s) => s.key === scopeB) || null;
-  const comisiones = useMemo15(() => {
+  const comisiones = useMemo16(() => {
     const out = {};
     for (const [lado, scope] of [["capital", scopeAObj], ["neutral", scopeBObj]]) {
       const ch = scope?.identity?.postingChannel;
@@ -40161,7 +41066,7 @@ function VistaMercado({ ctx, almacen, sincronizador, ventas, puente, estado, rec
     }
     return out;
   }, [comision, scopeAObj, scopeBObj]);
-  const resultadoCmp = useMemo15(() => {
+  const resultadoCmp = useMemo16(() => {
     if (!scopeAObj || !scopeBObj) {
       return { status: "blocked", reasons: [esLegacy ? "unknown-provenance-legacy" : "missing-two-scopes"], rows: [], coverage: {}, liquidityClaim: null };
     }
@@ -40186,7 +41091,7 @@ function VistaMercado({ ctx, almacen, sincronizador, ventas, puente, estado, rec
       return { status: "blocked", reasons: ["invalid-comparison-input"], rows: [], coverage: {}, liquidityClaim: null };
     }
   }, [scopeAObj, scopeBObj, comisiones, esLegacy]);
-  const ctxCmp = useMemo15(() => construirContextoComparacionCapitalNeutral({ resultado: resultadoCmp, lang }), [resultadoCmp, lang]);
+  const ctxCmp = useMemo16(() => construirContextoComparacionCapitalNeutral({ resultado: resultadoCmp, lang }), [resultadoCmp, lang]);
   const esSerieUnica = resultadoCmp.status === "single-pool";
   const rollbackDisponible = !!(estado?.market?.snapshot?.schemaVersion === 2 && typeof almacen?.rollbackToBackup === "function");
   const cargarFuente = async (e) => {
@@ -40399,7 +41304,7 @@ a")}`;
   };
   const farmCell = (item3) => {
     const m = metricOf(item3);
-    if (!m || item3.itemId == null) return /* @__PURE__ */ jsx18("span", { style: S.etiqueta, children: t(lang, "mercado.farmeo.sinId") });
+    if (!m || item3.itemId == null) return /* @__PURE__ */ jsx19("span", { style: S.etiqueta, children: t(lang, "mercado.farmeo.sinId") });
     const doubt = m.doubtful ? ` · ${t(lang, "mercado.farmeo.dudosoPre")}` : "";
     if (m.farmable && m.best) {
       const s = m.best;
@@ -40408,7 +41313,7 @@ rvada: " : s.kind === "chest-obs" ? "Cofre observado: " : "";
       const lvl = s.lvlMin != null || s.lvlMax != null ? `nv ${s.lvlMin ?? "?"}–${s.lvlMax ?? "?"} ` : "";
       const rank = { normal: "normal", elite: "élite", rareelite: "élite rara", rare: "rara", boss: "jefe" }[s.rank] || "";
       const roi = m.roi == null ? "" : ` · ROI ${m.roi >= 0 ? "+" : ""}${Math.round(m.roi * 100)}%`;
-      return /* @__PURE__ */ jsxs18(Fragment14, { children: [
+      return /* @__PURE__ */ jsxs19(Fragment15, { children: [
         kind,
         s.name,
         " · ",
@@ -40423,12 +41328,12 @@ rvada: " : s.kind === "chest-obs" ? "Cofre observado: " : "";
         roi,
         doubt,
         " ",
-        /* @__PURE__ */ jsx18(Chip2, { color: C.verde, children: t(lang, "mercado.farmeo.farmeable") })
+        /* @__PURE__ */ jsx19(Chip2, { color: C.verde, children: t(lang, "mercado.farmeo.farmeable") })
       ] });
     }
     if (m.sources.length) {
       const inel = m.sources.filter((s) => !s.eligible).sort((a, b) => (b.gph || 0) - (a.gph || 0))[0] || m.sources[0];
-      return /* @__PURE__ */ jsxs18(Fragment14, { children: [
+      return /* @__PURE__ */ jsxs19(Fragment15, { children: [
         t(lang, "mercado.farmeo.noFar"),
         " (",
         inel.reason || t(lang, "mercado.farmeo.sinElegible"),
@@ -40482,17 +41387,17 @@ rvada: " : s.kind === "chest-obs" ? "Cofre observado: " : "";
       setExportandoCli(false);
     }
   };
-  return /* @__PURE__ */ jsx18("div", { style: S.pagina, children: /* @__PURE__ */ jsxs18("div", { style: S.cuerpo, children: [
-    /* @__PURE__ */ jsx18(MisVentas, { ventas, auctionSnapshot: snapshot, perfil, lang }),
-    /* @__PURE__ */ jsxs18(Tarjeta, { titulo: t(lang, "mercado.scan.titulo"), extra: /* @__PURE__ */ jsx18("span", { style: S.chip, children: t(lang, "mercado.tusDatos") }), children: [
-      /* @__PURE__ */ jsxs18("div", { style: { display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }, children: [
-        /* @__PURE__ */ jsx18(Button8, { onClick: () => leerCarpeta(false), disabled: importando, children: t(lang, "mercado.leer") }),
-        /* @__PURE__ */ jsx18(Button8, { variant: "outline", onClick: () => leerCarpeta(true), disabled: importando, children: t(lang, "mercado.otra") }),
-        /* @__PURE__ */ jsx18(Button8, { variant: "outline", onClick: () => fileRef.current?.click(), disabled: importando, children: t(lang, "mercado.archivo") }),
-        /* @__PURE__ */ jsx18("input", { ref: fileRef, type: "file", accept: ".lua", onChange: onArchivo, style: { display: "none" } }),
-        /* @__PURE__ */ jsx18(Button8, { variant: "outline", onClick: borrar, disabled: importando || !snapshot, children: confirmBorrar ? t(lang, "mercado.borrarSi") : t(lang, "mercado.borrar") }),
-        /* @__PURE__ */ jsx18(
-          Button8,
+  return /* @__PURE__ */ jsx19("div", { style: S.pagina, children: /* @__PURE__ */ jsxs19("div", { style: S.cuerpo, children: [
+    /* @__PURE__ */ jsx19(MisVentas, { ventas, auctionSnapshot: snapshot, perfil, lang }),
+    /* @__PURE__ */ jsxs19(Tarjeta, { titulo: t(lang, "mercado.scan.titulo"), extra: /* @__PURE__ */ jsx19("span", { style: S.chip, children: t(lang, "mercado.tusDatos") }), children: [
+      /* @__PURE__ */ jsxs19("div", { style: { display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }, children: [
+        /* @__PURE__ */ jsx19(Button9, { onClick: () => leerCarpeta(false), disabled: importando, children: t(lang, "mercado.leer") }),
+        /* @__PURE__ */ jsx19(Button9, { variant: "outline", onClick: () => leerCarpeta(true), disabled: importando, children: t(lang, "mercado.otra") }),
+        /* @__PURE__ */ jsx19(Button9, { variant: "outline", onClick: () => fileRef.current?.click(), disabled: importando, children: t(lang, "mercado.archivo") }),
+        /* @__PURE__ */ jsx19("input", { ref: fileRef, type: "file", accept: ".lua", onChange: onArchivo, style: { display: "none" } }),
+        /* @__PURE__ */ jsx19(Button9, { variant: "outline", onClick: borrar, disabled: importando || !snapshot, children: confirmBorrar ? t(lang, "mercado.borrarSi") : t(lang, "mercado.borrar") }),
+        /* @__PURE__ */ jsx19(
+          Button9,
           {
             variant: "outline",
             "data-testid": "export-cli",
@@ -40502,11 +41407,11 @@ rvada: " : s.kind === "chest-obs" ? "Cofre observado: " : "";
           }
         )
       ] }),
-      /* @__PURE__ */ jsxs18("label", { style: S.sub, children: [
-        /* @__PURE__ */ jsx18(Checkbox9, { checked: auto.enabled, onCheckedChange: cambiarAuto, disabled: importando }),
+      /* @__PURE__ */ jsxs19("label", { style: S.sub, children: [
+        /* @__PURE__ */ jsx19(Checkbox9, { checked: auto.enabled, onCheckedChange: cambiarAuto, disabled: importando }),
         lang === "en" ? " Automatic tracking · every 30 s while Hermes is open" : " Seguimiento automático · cada 30 s con Hermes abierto"
       ] }),
-      /* @__PURE__ */ jsxs18("p", { "data-testid": "auctionator-auto-status", style: S.sub, children: [
+      /* @__PURE__ */ jsxs19("p", { "data-testid": "auctionator-auto-status", style: S.sub, children: [
         lang === "en" ? "Automatic status: " : "Estado automático: ",
         auto.status,
         auto.checkedAt ? ` · ${fmtFecha(auto.checkedAt)}` : "",
@@ -40514,28 +41419,28 @@ rvada: " : s.kind === "chest-obs" ? "Cofre observado: " : "";
         auto.error && !auto.message ? ` · ${auto.error}` : "",
         auto.histOk === false ? lang === "en" ? " · History pending; will retry." : " · Historial pendiente; se reintentará." : ""
       ] }),
-      puente && /* @__PURE__ */ jsx18(PuenteEstado, { puente, lang }),
-      /* @__PURE__ */ jsx18("p", { style: S.sub, children: lang === "en" ? "Grant WTF/Account/<account>/SavedVariables once (a parent folder only if the bounded search can complete). Not Interface/Add\
+      puente && /* @__PURE__ */ jsx19(PuenteEstado, { puente, lang }),
+      /* @__PURE__ */ jsx19("p", { style: S.sub, children: lang === "en" ? "Grant WTF/Account/<account>/SavedVariables once (a parent folder only if the bounded search can complete). Not Interface/Add\
 Ons. After an in-game scan, use /reload or log out to write prices to disk. Changing tabs does not stop tracking." : "Autoriza una vez WTF/Account/<cuenta>/SavedVariables (una carpeta superior solo si\
  la búsqueda acotada puede completarse). No Interface/AddOns. Tras escanear en el juego, usa /reload o cierra sesión para guardar los precios en disco. Cambiar de pestaña no detiene el seguimiento." }),
-      /* @__PURE__ */ jsx18("p", { role: "status", "aria-live": "polite", style: { ...S.sub, margin: 0 }, children: mensaje || (snapshot ? t(lang, "mercado.restaurado") : t(lang, "mercado.vacio.scan")) }),
-      snapshot && fres && /* @__PURE__ */ jsxs18("div", { style: { display: "flex", gap: 10, flexWrap: "wrap", fontSize: 12, color: C.texto2 }, children: [
-        /* @__PURE__ */ jsxs18("span", { children: [
+      /* @__PURE__ */ jsx19("p", { role: "status", "aria-live": "polite", style: { ...S.sub, margin: 0 }, children: mensaje || (snapshot ? t(lang, "mercado.restaurado") : t(lang, "mercado.vacio.scan")) }),
+      snapshot && fres && /* @__PURE__ */ jsxs19("div", { style: { display: "flex", gap: 10, flexWrap: "wrap", fontSize: 12, color: C.texto2 }, children: [
+        /* @__PURE__ */ jsxs19("span", { children: [
           t(lang, "mercado.frescura.importado"),
           ": ",
           fmtFecha(fres.importedAt)
         ] }),
-        /* @__PURE__ */ jsxs18("span", { children: [
+        /* @__PURE__ */ jsxs19("span", { children: [
           t(lang, "mercado.frescura.max"),
           ": ",
           fres.fechaMax || "—",
           fres.diasDesde != null ? ` (${t(lang, "mercado.frescura.hace", { dias: fres.diasDesde })})` : ""
         ] }),
-        histInfo.days > 0 && /* @__PURE__ */ jsx18("span", { children: t(lang, "mercado.frescura.hist", { dias: histInfo.days, entradas: histInfo.entries }) })
+        histInfo.days > 0 && /* @__PURE__ */ jsx19("span", { children: t(lang, "mercado.frescura.hist", { dias: histInfo.days, entradas: histInfo.entries }) })
       ] }),
-      exportCli && /* @__PURE__ */ jsx18("div", { "data-testid": "export-cli-estado", role: "status", "aria-live": "polite", style: { ...S.sub, marginTop: 8 }, children: exportCli.ok ? /* @__PURE__ */ jsxs18(
-      Fragment14, { children: [
-        /* @__PURE__ */ jsxs18("span", { style: { color: C.verde }, children: [
+      exportCli && /* @__PURE__ */ jsx19("div", { "data-testid": "export-cli-estado", role: "status", "aria-live": "polite", style: { ...S.sub, marginTop: 8 }, children: exportCli.ok ? /* @__PURE__ */ jsxs19(
+      Fragment15, { children: [
+        /* @__PURE__ */ jsxs19("span", { style: { color: C.verde }, children: [
           "✓ ",
           cp(
             lang,
@@ -40543,10 +41448,10 @@ Ons. After an in-game scan, use /reload or log out to write prices to disk. Chan
             `Exported precios-cli.json · realm ${exportCli.reino} · ${exportCli.n} priced items.`
           )
         ] }),
-        /* @__PURE__ */ jsxs18("div", { style: { display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginTop: 4 }, children: [
-          /* @__PURE__ */ jsx18("code", { style: { fontSize: 11, color: C.texto2 }, children: exportCli.cmd }),
-          /* @__PURE__ */ jsx18(
-            Button8,
+        /* @__PURE__ */ jsxs19("div", { style: { display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginTop: 4 }, children: [
+          /* @__PURE__ */ jsx19("code", { style: { fontSize: 11, color: C.texto2 }, children: exportCli.cmd }),
+          /* @__PURE__ */ jsx19(
+            Button9,
             {
               variant: "outline",
               "data-testid": "export-cli-copiar",
@@ -40558,23 +41463,23 @@ Ons. After an in-game scan, use /reload or log out to write prices to disk. Chan
             }
           )
         ] }),
-        /* @__PURE__ */ jsx18("p", { style: { margin: "4px 0 0", fontSize: 11, color: C.texto3 }, children: cp(
+        /* @__PURE__ */ jsx19("p", { style: { margin: "4px 0 0", fontSize: 11, color: C.texto3 }, children: cp(
           lang,
           "Queda en la carpeta de datos del plugin (Ajustes → Plugins → revelar carpeta). Formato canónico {valores, reino, fecha} que lee consultar.py maxeo --precios.",
           "Lands in the plugin data folder (Settings → Plugins → reveal folder). Canonical {valores, reino, fecha} format read by consultar.py maxeo --precios."
         ) })
-      ] }) : /* @__PURE__ */ jsxs18("span", { style: { color: C.rojo }, children: [
+      ] }) : /* @__PURE__ */ jsxs19("span", { style: { color: C.rojo }, children: [
         "✗ ",
         cp(lang, "No se exportó: ", "Export failed: "),
         exportCli.error
       ] }) }),
-      fres?.aviso && /* @__PURE__ */ jsx18(Aviso, { children: t(lang, "mercado.frescura.aviso") }),
-      (snapshot?.warnings || []).map((w, i) => /* @__PURE__ */ jsxs18("p", { style: S.sub, children: [
+      fres?.aviso && /* @__PURE__ */ jsx19(Aviso, { children: t(lang, "mercado.frescura.aviso") }),
+      (snapshot?.warnings || []).map((w, i) => /* @__PURE__ */ jsxs19("p", { style: S.sub, children: [
         "⚠ ",
         w
       ] }, i)),
-      esLegacy || snapshot && !scopes.length ? /* @__PURE__ */ jsxs18("div", { role: "status", "data-testid": "procedencia-desconocida", style: { ...S.aviso, marginTop: 10 }, children: [
-        /* @__PURE__ */ jsx18("strong", { children: cp(lang, "Procedencia DESCONOCIDA (UNKNOWN)", "UNKNOWN provenance") }),
+      esLegacy || snapshot && !scopes.length ? /* @__PURE__ */ jsxs19("div", { role: "status", "data-testid": "procedencia-desconocida", style: { ...S.aviso, marginTop: 10 }, children: [
+        /* @__PURE__ */ jsx19("strong", { children: cp(lang, "Procedencia DESCONOCIDA (UNKNOWN)", "UNKNOWN provenance") }),
         " — ",
         cp(
           lang,
@@ -40583,30 +41488,30 @@ Ons. After an in-game scan, use /reload or log out to write prices to disk. Chan
           "These prices come from Auctionator with no verified exporter: region, ruleset, house and posting channel are unknown. They cannot be compared with another house or used to recommend sales."
         )
       ] }) : null,
-      /* @__PURE__ */ jsxs18("details", { style: { fontSize: 12 }, children: [
-        /* @__PURE__ */ jsx18("summary", { style: { cursor: "pointer", color: C.texto3 }, children: t(lang, "mercado.privacidad.titulo") }),
-        /* @__PURE__ */ jsx18("p", { style: S.sub, children: t(lang, "mercado.privacidad.texto") })
+      /* @__PURE__ */ jsxs19("details", { style: { fontSize: 12 }, children: [
+        /* @__PURE__ */ jsx19("summary", { style: { cursor: "pointer", color: C.texto3 }, children: t(lang, "mercado.privacidad.titulo") }),
+        /* @__PURE__ */ jsx19("p", { style: S.sub, children: t(lang, "mercado.privacidad.texto") })
       ] })
     ] }),
-    /* @__PURE__ */ jsx18(Tarjeta, { titulo: t(lang, "mercado.aviso.titulo"), children: /* @__PURE__ */ jsx18("p", { style: { ...S.sub, margin: 0 }, children: t(lang, "mercado.aviso.texto") }) }),
-    /* @__PURE__ */ jsxs18(Tarjeta, { titulo: cp(lang, "Procedencia y ámbitos aislados", "Provenance and isolated scopes"), children: [
-      /* @__PURE__ */ jsx18("p", { style: S.sub, children: cp(
+    /* @__PURE__ */ jsx19(Tarjeta, { titulo: t(lang, "mercado.aviso.titulo"), children: /* @__PURE__ */ jsx19("p", { style: { ...S.sub, margin: 0 }, children: t(lang, "mercado.aviso.texto") }) }),
+    /* @__PURE__ */ jsxs19(Tarjeta, { titulo: cp(lang, "Procedencia y ámbitos aislados", "Provenance and isolated scopes"), children: [
+      /* @__PURE__ */ jsx19("p", { style: S.sub, children: cp(
         lang,
         "Sin exportador verificado: las etiquetas son declaradas por quien entregó el archivo y validadas por esquema. No prueban la economía del juego, pueden ser sintéticas y nunca se presentan como\
  importación acreditada.",
         "No verified exporter: labels are declared by the file provider and schema-validated. They do not prove the game economy, may be synthetic and are never presented as an accredited import."
       ) }),
-      /* @__PURE__ */ jsxs18("p", { style: S.sub, children: [
+      /* @__PURE__ */ jsxs19("p", { style: S.sub, children: [
         cp(lang, "Exportador", "Exporter"),
         ": ",
         verifiedExporter() || cp(lang, "sin exportador verificado", "no verified exporter"),
         " · ",
         classifyAcquisition({ status: "ok" }).warnings.map((w) => motivo(w, lang)).join(" · ")
       ] }),
-      /* @__PURE__ */ jsxs18("div", { style: { display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginTop: 8 }, children: [
-        /* @__PURE__ */ jsxs18("label", { style: { ...S.campo, minWidth: 240 }, children: [
-          /* @__PURE__ */ jsx18("span", { style: S.etiqueta, children: cp(lang, "Observación aislada (archivo .json)", "Isolated observation (.json file)") }),
-          /* @__PURE__ */ jsx18(
+      /* @__PURE__ */ jsxs19("div", { style: { display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginTop: 8 }, children: [
+        /* @__PURE__ */ jsxs19("label", { style: { ...S.campo, minWidth: 240 }, children: [
+          /* @__PURE__ */ jsx19("span", { style: S.etiqueta, children: cp(lang, "Observación aislada (archivo .json)", "Isolated observation (.json file)") }),
+          /* @__PURE__ */ jsx19(
             "input",
             {
               "data-testid": "fuente-aislada",
@@ -40617,58 +41522,58 @@ Ons. After an in-game scan, use /reload or log out to write prices to disk. Chan
             }
           )
         ] }),
-        ultimaFuente ? /* @__PURE__ */ jsx18(Button8, { variant: "outline", onClick: guardarV2, disabled: guardandoV2, children: confirmGuardarV2 ? cp(lang, "Confirmar guardado v2", "Confirm v2 save") :
+        ultimaFuente ? /* @__PURE__ */ jsx19(Button9, { variant: "outline", onClick: guardarV2, disabled: guardandoV2, children: confirmGuardarV2 ? cp(lang, "Confirmar guardado v2", "Confirm v2 save") :
         cp(lang, "Guardar como v2 (con respaldo)", "Save as v2 (with backup)") }) : null,
-        rollbackDisponible ? /* @__PURE__ */ jsx18(Button8, { variant: "outline", onClick: rollback, children: confirmRollback ? cp(lang, "Confirmar restauración del respaldo", "Confirm backup restor\
+        rollbackDisponible ? /* @__PURE__ */ jsx19(Button9, { variant: "outline", onClick: rollback, children: confirmRollback ? cp(lang, "Confirmar restauración del respaldo", "Confirm backup restor\
 e") : cp(lang, "Restaurar respaldo previo a v2", "Restore pre-v2 backup") }) : null
       ] }),
-      errorFuente ? /* @__PURE__ */ jsx18("p", { role: "status", "data-testid": "error-fuente", style: { ...S.aviso, marginTop: 8 }, children: errorFuente }) : null,
-      bloqueoV2 ? /* @__PURE__ */ jsx18("p", { role: "status", "data-testid": "fuente-bloqueada", style: { ...S.aviso, marginTop: 8 }, children: bloqueoV2 }) : null,
-      scopes.length ? /* @__PURE__ */ jsx18("ul", { "data-testid": "identidades-fuente", style: { ...S.sub, marginTop: 8, paddingLeft: 18 }, children: scopes.map((s) => /* @__PURE__ */ jsxs18("li", { style: {
+      errorFuente ? /* @__PURE__ */ jsx19("p", { role: "status", "data-testid": "error-fuente", style: { ...S.aviso, marginTop: 8 }, children: errorFuente }) : null,
+      bloqueoV2 ? /* @__PURE__ */ jsx19("p", { role: "status", "data-testid": "fuente-bloqueada", style: { ...S.aviso, marginTop: 8 }, children: bloqueoV2 }) : null,
+      scopes.length ? /* @__PURE__ */ jsx19("ul", { "data-testid": "identidades-fuente", style: { ...S.sub, marginTop: 8, paddingLeft: 18 }, children: scopes.map((s) => /* @__PURE__ */ jsxs19("li", { style: {
       marginBottom: 4 }, children: [
-        /* @__PURE__ */ jsx18(Chip2, { color: C.azul, children: etiquetaCorta(s, lang) }),
+        /* @__PURE__ */ jsx19(Chip2, { color: C.azul, children: etiquetaCorta(s, lang) }),
         " — ",
         identidadTexto(s.identity, lang),
         " — ",
         cp(lang, "clave de reino opaca", "opaque realm key"),
         ": ",
         s.realm
-      ] }, s.key)) }) : /* @__PURE__ */ jsx18("p", { "data-testid": "identidades-fuente", style: S.sub, children: cp(lang, "Sin ámbitos verificados: la comparación permanece bloqueada.", "No verifie\
+      ] }, s.key)) }) : /* @__PURE__ */ jsx19("p", { "data-testid": "identidades-fuente", style: S.sub, children: cp(lang, "Sin ámbitos verificados: la comparación permanece bloqueada.", "No verifie\
 d scopes: comparison stays blocked.") })
     ] }),
-    /* @__PURE__ */ jsx18("div", { "data-testid": "comparacion-card", children: /* @__PURE__ */ jsxs18(Tarjeta, { titulo: cp(lang, "Comparación capital / neutral (escenario)", "Capital / neutral comp\
+    /* @__PURE__ */ jsx19("div", { "data-testid": "comparacion-card", children: /* @__PURE__ */ jsxs19(Tarjeta, { titulo: cp(lang, "Comparación capital / neutral (escenario)", "Capital / neutral comp\
 arison (scenario)"), children: [
-      /* @__PURE__ */ jsx18("p", { style: S.sub, children: cp(
+      /* @__PURE__ */ jsx19("p", { style: S.sub, children: cp(
         lang,
         "Solo entre fuentes aisladas verificadas. El resultado no promete venta ni ganancia: es un escenario de precios observados.",
         "Only between verified isolated sources. The result promises no sale or profit: it is a scenario of observed prices."
       ) }),
-      /* @__PURE__ */ jsx18("div", { style: { display: "flex", gap: 12, flexWrap: "wrap" }, children: [["A", scopeA, setScopeA], ["B", scopeB, setScopeB]].map(([lado, valor, setValor]) => /* @__PURE__ */ jsxs18(
+      /* @__PURE__ */ jsx19("div", { style: { display: "flex", gap: 12, flexWrap: "wrap" }, children: [["A", scopeA, setScopeA], ["B", scopeB, setScopeB]].map(([lado, valor, setValor]) => /* @__PURE__ */ jsxs19(
       "label", { style: { ...S.campo, flex: 1, minWidth: 220 }, children: [
-        /* @__PURE__ */ jsx18("span", { style: S.etiqueta, children: cp(lang, `Ámbito ${lado} (origen aislado)`, `Scope ${lado} (isolated source)`) }),
-        /* @__PURE__ */ jsxs18(Select4, { value: valor, onValueChange: setValor, disabled: scopes.length < 2, children: [
-          /* @__PURE__ */ jsx18(
+        /* @__PURE__ */ jsx19("span", { style: S.etiqueta, children: cp(lang, `Ámbito ${lado} (origen aislado)`, `Scope ${lado} (isolated source)`) }),
+        /* @__PURE__ */ jsxs19(Select4, { value: valor, onValueChange: setValor, disabled: scopes.length < 2, children: [
+          /* @__PURE__ */ jsx19(
             SelectTrigger4,
             {
               id: `ambito-${lado.toLowerCase()}`,
               "aria-label": cp(lang, `Ámbito ${lado} (origen aislado)`, `Scope ${lado} (isolated source)`),
-              children: /* @__PURE__ */ jsx18(SelectValue4, {})
+              children: /* @__PURE__ */ jsx19(SelectValue4, {})
             }
           ),
-          /* @__PURE__ */ jsxs18(SelectContent4, { children: [
-            /* @__PURE__ */ jsx18(SelectItem4, { value: "__none__", children: "—" }),
-            scopes.map((s) => /* @__PURE__ */ jsx18(SelectItem4, { value: s.key, children: etiquetaCorta(s, lang) }, s.key))
+          /* @__PURE__ */ jsxs19(SelectContent4, { children: [
+            /* @__PURE__ */ jsx19(SelectItem4, { value: "__none__", children: "—" }),
+            scopes.map((s) => /* @__PURE__ */ jsx19(SelectItem4, { value: s.key, children: etiquetaCorta(s, lang) }, s.key))
           ] })
         ] })
       ] }, lado)) }),
-      /* @__PURE__ */ jsx18("p", { style: { ...S.sub, marginTop: 10 }, children: cp(
+      /* @__PURE__ */ jsx19("p", { style: { ...S.sub, marginTop: 10 }, children: cp(
         lang,
         "Comisión: solo si la tasa está verificada y fechada. En blanco, el neto se muestra como escenario; no se asume ningún porcentaje.",
         "Commission: only when the rate is verified and dated. If blank, net is shown as a scenario; no percentage is assumed."
       ) }),
-      ["capital", "neutral"].map((lado) => /* @__PURE__ */ jsxs18("div", { style: { display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center", marginTop: 4 }, children: [
-        /* @__PURE__ */ jsx18("span", { style: { ...S.etiqueta, minWidth: 64 }, children: lado }),
-        /* @__PURE__ */ jsx18(
+      ["capital", "neutral"].map((lado) => /* @__PURE__ */ jsxs19("div", { style: { display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center", marginTop: 4 }, children: [
+        /* @__PURE__ */ jsx19("span", { style: { ...S.etiqueta, minWidth: 64 }, children: lado }),
+        /* @__PURE__ */ jsx19(
           "input",
           {
             "data-testid": `comision-${lado}-bps`,
@@ -40682,7 +41587,7 @@ arison (scenario)"), children: [
             onChange: (e) => setComision((c) => ({ ...c, [lado]: { ...c[lado], bps: e.target.value } }))
           }
         ),
-        /* @__PURE__ */ jsx18(
+        /* @__PURE__ */ jsx19(
           Checkbox9,
           {
             "data-testid": `comision-${lado}-verificada`,
@@ -40691,8 +41596,8 @@ arison (scenario)"), children: [
             onCheckedChange: (v) => setComision((c) => ({ ...c, [lado]: { ...c[lado], verificada: v === true } }))
           }
         ),
-        /* @__PURE__ */ jsx18("span", { style: S.etiqueta, children: cp(lang, "tasa verificada", "verified rate") }),
-        /* @__PURE__ */ jsx18(
+        /* @__PURE__ */ jsx19("span", { style: S.etiqueta, children: cp(lang, "tasa verificada", "verified rate") }),
+        /* @__PURE__ */ jsx19(
           "input",
           {
             "data-testid": `comision-${lado}-fuente`,
@@ -40703,7 +41608,7 @@ arison (scenario)"), children: [
             onChange: (e) => setComision((c) => ({ ...c, [lado]: { ...c[lado], etiqueta: e.target.value } }))
           }
         ),
-        /* @__PURE__ */ jsx18(
+        /* @__PURE__ */ jsx19(
           "input",
           {
             "data-testid": `comision-${lado}-dia`,
@@ -40716,28 +41621,28 @@ arison (scenario)"), children: [
           }
         )
       ] }, lado)),
-      Number(comision.capital.dia) > hoy() || Number(comision.neutral.dia) > hoy() ? /* @__PURE__ */ jsx18("p", { "data-testid": "comision-futura", style: { ...S.aviso, marginTop: 6 }, children: cp(
+      Number(comision.capital.dia) > hoy() || Number(comision.neutral.dia) > hoy() ? /* @__PURE__ */ jsx19("p", { "data-testid": "comision-futura", style: { ...S.aviso, marginTop: 6 }, children: cp(
         lang,
         "Día futuro: la comisión se rechaza y el neto queda como escenario.",
         "Future day: the commission is rejected and net stays a scenario."
       ) }) : null,
-      esSerieUnica ? /* @__PURE__ */ jsx18("p", { "data-testid": "serie-unica", style: { ...S.sub, marginTop: 6 }, children: cp(
+      esSerieUnica ? /* @__PURE__ */ jsx19("p", { "data-testid": "serie-unica", style: { ...S.sub, marginTop: 6 }, children: cp(
         lang,
         "Una sola serie de precios: los canales son la misma piscina, no dos fuentes. Sin delta entre ellos.",
         "A single price series: the channels are the same pool, not two sources. No delta between them."
       ) }) : null,
-      resultadoCmp.status === "blocked" ? /* @__PURE__ */ jsxs18("div", { role: "status", "data-testid": "comparacion-bloqueada", style: { ...S.aviso, marginTop: 10 }, children: [
-        /* @__PURE__ */ jsx18("strong", { children: cp(lang, "Comparación bloqueada", "Comparison blocked") }),
-        /* @__PURE__ */ jsx18("ul", { style: { margin: "6px 0 0", paddingLeft: 18 }, children: (resultadoCmp.reasons || []).map((r, i) => /* @__PURE__ */ jsx18("li", { children: motivo(r, lang) }, i)) }),
-        esLegacy ? /* @__PURE__ */ jsx18("p", { style: { margin: "6px 0 0" }, children: cp(
+      resultadoCmp.status === "blocked" ? /* @__PURE__ */ jsxs19("div", { role: "status", "data-testid": "comparacion-bloqueada", style: { ...S.aviso, marginTop: 10 }, children: [
+        /* @__PURE__ */ jsx19("strong", { children: cp(lang, "Comparación bloqueada", "Comparison blocked") }),
+        /* @__PURE__ */ jsx19("ul", { style: { margin: "6px 0 0", paddingLeft: 18 }, children: (resultadoCmp.reasons || []).map((r, i) => /* @__PURE__ */ jsx19("li", { children: motivo(r, lang) }, i)) }),
+        esLegacy ? /* @__PURE__ */ jsx19("p", { style: { margin: "6px 0 0" }, children: cp(
           lang,
           "Los precios Auctionator reales importados tienen procedencia desconocida: no se usan como ninguno de los dos lados.",
           "Imported real Auctionator prices have UNKNOWN provenance: they are not used as either side."
         ) }) : null,
-        /* @__PURE__ */ jsx18("p", { style: { margin: "6px 0 0" }, children: cp(lang, "No se recomienda dónde vender.", "No sell recommendation.") })
-      ] }) : /* @__PURE__ */ jsxs18("div", { style: { overflowX: "auto", marginTop: 10 }, children: [
-        /* @__PURE__ */ jsxs18("table", { style: S.tabla, children: [
-          /* @__PURE__ */ jsx18("thead", { children: /* @__PURE__ */ jsx18("tr", { children: (esSerieUnica ? [
+        /* @__PURE__ */ jsx19("p", { style: { margin: "6px 0 0" }, children: cp(lang, "No se recomienda dónde vender.", "No sell recommendation.") })
+      ] }) : /* @__PURE__ */ jsxs19("div", { style: { overflowX: "auto", marginTop: 10 }, children: [
+        /* @__PURE__ */ jsxs19("table", { style: S.tabla, children: [
+          /* @__PURE__ */ jsx19("thead", { children: /* @__PURE__ */ jsx19("tr", { children: (esSerieUnica ? [
             cp(lang, "Ítem", "Item"),
             cp(lang, "Canales de una sola serie", "Channels of one series"),
             cp(lang, "Δ", "Δ")
@@ -40750,175 +41655,175 @@ arison (scenario)"), children: [
             cp(lang, "Fecha / antigüedad", "Date / age"),
             cp(lang, "Cobertura", "Coverage"),
             cp(lang, "Motivos", "Reasons")
-          ]).map((h) => /* @__PURE__ */ jsx18("th", { style: S.th, children: h }, h)) }) }),
-          /* @__PURE__ */ jsx18("tbody", { "data-testid": "comparacion-filas", children: resultadoCmp.rows.slice(0, 50).map((f, i) => {
+          ]).map((h) => /* @__PURE__ */ jsx19("th", { style: S.th, children: h }, h)) }) }),
+          /* @__PURE__ */ jsx19("tbody", { "data-testid": "comparacion-filas", children: resultadoCmp.rows.slice(0, 50).map((f, i) => {
             const d = f.deltaCopper;
             const delta = Number.isSafeInteger(d) ? `Δ ${d > 0 ? "+" : d < 0 ? "−" : ""}${fmtCobre(Math.abs(d))}` : "—";
-            return /* @__PURE__ */ jsxs18("tr", { children: [
-              /* @__PURE__ */ jsxs18("td", { style: S.td, children: [
+            return /* @__PURE__ */ jsxs19("tr", { children: [
+              /* @__PURE__ */ jsxs19("td", { style: S.td, children: [
                 nombreItem({ sourceKey: f.sourceKey, itemId: f.itemId }, D.items, CATALOGO, lang),
-                /* @__PURE__ */ jsx18("div", { style: { fontSize: 10, color: C.texto3 }, children: f.itemId == null ? f.sourceKey : `id ${f.itemId}` })
+                /* @__PURE__ */ jsx19("div", { style: { fontSize: 10, color: C.texto3 }, children: f.itemId == null ? f.sourceKey : `id ${f.itemId}` })
               ] }),
-              esSerieUnica ? (f.channels || []).map((ch, j) => /* @__PURE__ */ jsxs18("td", { style: S.td, "data-testid": "cmp-canal", children: [
-                /* @__PURE__ */ jsxs18("div", { children: [
+              esSerieUnica ? (f.channels || []).map((ch, j) => /* @__PURE__ */ jsxs19("td", { style: S.td, "data-testid": "cmp-canal", children: [
+                /* @__PURE__ */ jsxs19("div", { children: [
                   cp(lang, "Canal", "Channel"),
                   ": ",
                   ch.channel
                 ] }),
-                /* @__PURE__ */ jsxs18("div", { children: [
+                /* @__PURE__ */ jsxs19("div", { children: [
                   cp(lang, "Bruto", "Gross"),
                   ": ",
-                  /* @__PURE__ */ jsx18(Dinero, { cobre: ch.grossCopper })
+                  /* @__PURE__ */ jsx19(Dinero, { cobre: ch.grossCopper })
                 ] }),
-                /* @__PURE__ */ jsx18("div", { children: ch.netCopper == null ? cp(lang, "Neto: escenario", "Net: scenario") : /* @__PURE__ */ jsxs18(Fragment14, { children: [
+                /* @__PURE__ */ jsx19("div", { children: ch.netCopper == null ? cp(lang, "Neto: escenario", "Net: scenario") : /* @__PURE__ */ jsxs19(Fragment15, { children: [
                   cp(lang, "Neto", "Net"),
                   ": ",
-                  /* @__PURE__ */ jsx18(Dinero, { cobre: ch.netCopper })
+                  /* @__PURE__ */ jsx19(Dinero, { cobre: ch.netCopper })
                 ] }) })
-              ] }, j)) : /* @__PURE__ */ jsxs18(Fragment14, { children: [
-                /* @__PURE__ */ jsx18("td", { style: S.td, "data-testid": "cmp-capital", children: !f.a ? /* @__PURE__ */ jsx18(Chip2, { color: C.rojo, children: cp(lang, "Ausente en capital (falta de\
- datos, no precio 0)", "Missing in capital (no data, not price 0)") }) : /* @__PURE__ */ jsxs18(Fragment14, { children: [
-                  /* @__PURE__ */ jsxs18("div", { children: [
+              ] }, j)) : /* @__PURE__ */ jsxs19(Fragment15, { children: [
+                /* @__PURE__ */ jsx19("td", { style: S.td, "data-testid": "cmp-capital", children: !f.a ? /* @__PURE__ */ jsx19(Chip2, { color: C.rojo, children: cp(lang, "Ausente en capital (falta de\
+ datos, no precio 0)", "Missing in capital (no data, not price 0)") }) : /* @__PURE__ */ jsxs19(Fragment15, { children: [
+                  /* @__PURE__ */ jsxs19("div", { children: [
                     cp(lang, "Bruto", "Gross"),
                     ": ",
-                    /* @__PURE__ */ jsx18(Dinero, { cobre: f.a.grossCopper })
+                    /* @__PURE__ */ jsx19(Dinero, { cobre: f.a.grossCopper })
                   ] }),
-                  /* @__PURE__ */ jsx18("div", { children: f.netScenario ? cp(lang, "Neto: escenario (comisión no verificada)", "Net: scenario (unverified commission)") : /* @__PURE__ */ jsxs18(Fragment14,
+                  /* @__PURE__ */ jsx19("div", { children: f.netScenario ? cp(lang, "Neto: escenario (comisión no verificada)", "Net: scenario (unverified commission)") : /* @__PURE__ */ jsxs19(Fragment15,
                   { children: [
                     cp(lang, "Neto", "Net"),
                     ": ",
-                    /* @__PURE__ */ jsx18(Dinero, { cobre: f.a.netCopper })
+                    /* @__PURE__ */ jsx19(Dinero, { cobre: f.a.netCopper })
                   ] }) })
                 ] }) }),
-                /* @__PURE__ */ jsx18("td", { style: S.td, "data-testid": "cmp-neutral", children: f.b ? /* @__PURE__ */ jsxs18(Fragment14, { children: [
-                  /* @__PURE__ */ jsxs18("div", { children: [
+                /* @__PURE__ */ jsx19("td", { style: S.td, "data-testid": "cmp-neutral", children: f.b ? /* @__PURE__ */ jsxs19(Fragment15, { children: [
+                  /* @__PURE__ */ jsxs19("div", { children: [
                     cp(lang, "Bruto", "Gross"),
                     ": ",
-                    /* @__PURE__ */ jsx18(Dinero, { cobre: f.b.grossCopper })
+                    /* @__PURE__ */ jsx19(Dinero, { cobre: f.b.grossCopper })
                   ] }),
-                  /* @__PURE__ */ jsx18("div", { children: f.netScenario ? cp(lang, "Neto: escenario", "Net: scenario") : /* @__PURE__ */ jsxs18(Fragment14, { children: [
+                  /* @__PURE__ */ jsx19("div", { children: f.netScenario ? cp(lang, "Neto: escenario", "Net: scenario") : /* @__PURE__ */ jsxs19(Fragment15, { children: [
                     cp(lang, "Neto", "Net"),
                     ": ",
-                    /* @__PURE__ */ jsx18(Dinero, { cobre: f.b.netCopper })
+                    /* @__PURE__ */ jsx19(Dinero, { cobre: f.b.netCopper })
                   ] }) })
-                ] }) : /* @__PURE__ */ jsx18(Chip2, { color: C.rojo, children: cp(lang, "Ausente en neutral (falta de datos, no precio 0)", "Missing in neutral (no data, not price 0)") }) })
+                ] }) : /* @__PURE__ */ jsx19(Chip2, { color: C.rojo, children: cp(lang, "Ausente en neutral (falta de datos, no precio 0)", "Missing in neutral (no data, not price 0)") }) })
               ] }),
-              /* @__PURE__ */ jsx18("td", { style: S.td, "data-testid": "cmp-delta", children: esSerieUnica ? "—" : delta }),
-              /* @__PURE__ */ jsxs18("td", { style: S.td, "data-testid": "cmp-fecha", children: [
-                /* @__PURE__ */ jsxs18("div", { children: [
+              /* @__PURE__ */ jsx19("td", { style: S.td, "data-testid": "cmp-delta", children: esSerieUnica ? "—" : delta }),
+              /* @__PURE__ */ jsxs19("td", { style: S.td, "data-testid": "cmp-fecha", children: [
+                /* @__PURE__ */ jsxs19("div", { children: [
                   fechaDe(f.a?.observedDay) || "—",
                   f.b ? ` / ${fechaDe(f.b.observedDay) || "—"}` : ""
                 ] }),
-                /* @__PURE__ */ jsxs18("div", { style: { fontSize: 10, color: C.texto3 }, children: [
+                /* @__PURE__ */ jsxs19("div", { style: { fontSize: 10, color: C.texto3 }, children: [
                   f.a?.observedDay != null ? `${cp(lang, "hace", "ago")} ${hoy() - f.a.observedDay} ${cp(lang, "días", "d")}` : "—",
-                  f.a?.stale || f.b?.stale ? /* @__PURE__ */ jsx18(Chip2, { color: C.naranja, children: cp(lang, " antiguo", " stale") }) : null
+                  f.a?.stale || f.b?.stale ? /* @__PURE__ */ jsx19(Chip2, { color: C.naranja, children: cp(lang, " antiguo", " stale") }) : null
                 ] })
               ] }),
-              /* @__PURE__ */ jsxs18("td", { style: S.td, "data-testid": "cmp-cobertura", children: [
+              /* @__PURE__ */ jsxs19("td", { style: S.td, "data-testid": "cmp-cobertura", children: [
                 cp(lang, "filas", "rows"),
                 ": ",
                 f.coverage?.a?.itemRows ?? "—",
                 " / ",
                 f.coverage?.b?.itemRows ?? "—"
               ] }),
-              /* @__PURE__ */ jsxs18("td", { style: S.td, "data-testid": "cmp-motivos", children: [
-                (f.reasons || []).length ? (f.reasons || []).map((r, j) => /* @__PURE__ */ jsxs18("span", { children: [
+              /* @__PURE__ */ jsxs19("td", { style: S.td, "data-testid": "cmp-motivos", children: [
+                (f.reasons || []).length ? (f.reasons || []).map((r, j) => /* @__PURE__ */ jsxs19("span", { children: [
                   motivo(r, lang),
                   j < f.reasons.length - 1 ? ", " : ""
                 ] }, j)) : "—",
-                f.recommendation === "scenario" ? /* @__PURE__ */ jsx18("div", { style: { fontSize: 10, color: C.naranja }, children: cp(lang, "escenario, no recomendación", "scenario, not a recommen\
+                f.recommendation === "scenario" ? /* @__PURE__ */ jsx19("div", { style: { fontSize: 10, color: C.naranja }, children: cp(lang, "escenario, no recomendación", "scenario, not a recommen\
 dation") }) : null
               ] })
             ] }, `${f.sourceKey}-${i}`);
           }) })
         ] }),
-        resultadoCmp.rows.length > 50 ? /* @__PURE__ */ jsx18("p", { style: S.sub, children: cp(lang, `Mostradas 50 de ${resultadoCmp.rows.length}.`, `Showing 50 of ${resultadoCmp.rows.length}.`) }) :
+        resultadoCmp.rows.length > 50 ? /* @__PURE__ */ jsx19("p", { style: S.sub, children: cp(lang, `Mostradas 50 de ${resultadoCmp.rows.length}.`, `Showing 50 of ${resultadoCmp.rows.length}.`) }) :
         null
       ] }),
-      /* @__PURE__ */ jsx18("div", { "data-testid": "cmp-limites", style: { ...S.sub, marginTop: 10 }, children: (ctxCmp.limites || []).map((x, i) => /* @__PURE__ */ jsxs18("p", { style: { margin: "2p\
+      /* @__PURE__ */ jsx19("div", { "data-testid": "cmp-limites", style: { ...S.sub, marginTop: 10 }, children: (ctxCmp.limites || []).map((x, i) => /* @__PURE__ */ jsxs19("p", { style: { margin: "2p\
 x 0" }, children: [
         "• ",
         x
       ] }, i)) }),
-      ctxCmp.liquidityClaim == null ? /* @__PURE__ */ jsx18("p", { "data-testid": "sin-afirmacion-liquidez", style: S.sub, children: cp(
+      ctxCmp.liquidityClaim == null ? /* @__PURE__ */ jsx19("p", { "data-testid": "sin-afirmacion-liquidez", style: S.sub, children: cp(
         lang,
         "Sin afirmación de liquidez: que existan ofertas no garantiza que se venda.",
         "No liquidity claim: existing offers do not guarantee a sale."
       ) }) : null
     ] }) }),
-    /* @__PURE__ */ jsxs18(
+    /* @__PURE__ */ jsxs19(
       Tarjeta,
       {
         titulo: t(lang, "mercado.tabla.titulo"),
-        extra: /* @__PURE__ */ jsx18(Origen, { f: ["cliente-forever", "cmangos-1.12"], lang }),
+        extra: /* @__PURE__ */ jsx19(Origen, { f: ["cliente-forever", "cmangos-1.12"], lang }),
         children: [
-          /* @__PURE__ */ jsxs18("div", { style: { display: "flex", gap: 12, flexWrap: "wrap", alignItems: "flex-end" }, children: [
-            /* @__PURE__ */ jsxs18("label", { style: S.campo, children: [
-              /* @__PURE__ */ jsx18("span", { style: S.etiqueta, children: t(lang, "mercado.realm") }),
-              /* @__PURE__ */ jsxs18(Select4, { value: realm ? realmId(realm) : realmName, onValueChange: (v) => {
+          /* @__PURE__ */ jsxs19("div", { style: { display: "flex", gap: 12, flexWrap: "wrap", alignItems: "flex-end" }, children: [
+            /* @__PURE__ */ jsxs19("label", { style: S.campo, children: [
+              /* @__PURE__ */ jsx19("span", { style: S.etiqueta, children: t(lang, "mercado.realm") }),
+              /* @__PURE__ */ jsxs19(Select4, { value: realm ? realmId(realm) : realmName, onValueChange: (v) => {
                 const r = snapshot.realms.find((r2) => realmId(r2) === v);
                 setRealmChoice(v);
                 setRealmName(r?.name || "");
                 setPagina(0);
                 setDetalleKey(null);
               }, disabled: !snapshot, children: [
-                /* @__PURE__ */ jsx18(SelectTrigger4, { "aria-label": t(lang, "mercado.realm"), children: /* @__PURE__ */ jsx18(SelectValue4, { placeholder: "—" }) }),
-                /* @__PURE__ */ jsx18(SelectContent4, { children: (snapshot?.realms || []).map((r) => /* @__PURE__ */ jsxs18(SelectItem4, { value: realmId(r), children: [
+                /* @__PURE__ */ jsx19(SelectTrigger4, { "aria-label": t(lang, "mercado.realm"), children: /* @__PURE__ */ jsx19(SelectValue4, { placeholder: "—" }) }),
+                /* @__PURE__ */ jsx19(SelectContent4, { children: (snapshot?.realms || []).map((r) => /* @__PURE__ */ jsxs19(SelectItem4, { value: realmId(r), children: [
                   r.name,
                   snapshot.realms.filter((x) => x.name === r.name).length > 1 ? ` · ${r.identity?.auctionPool || "UNKNOWN"} · ${r.identity?.postingChannel || "—"}` : ""
                 ] }, realmId(r))) })
               ] })
             ] }),
-            /* @__PURE__ */ jsxs18("label", { style: { ...S.campo, flex: 1, minWidth: 220 }, children: [
-              /* @__PURE__ */ jsx18("span", { style: S.etiqueta, children: t(lang, "mercado.buscar") }),
-              /* @__PURE__ */ jsx18(SearchField2, { value: busqueda, onChange: (v) => {
+            /* @__PURE__ */ jsxs19("label", { style: { ...S.campo, flex: 1, minWidth: 220 }, children: [
+              /* @__PURE__ */ jsx19("span", { style: S.etiqueta, children: t(lang, "mercado.buscar") }),
+              /* @__PURE__ */ jsx19(SearchField2, { value: busqueda, onChange: (v) => {
                 setBusqueda(v);
                 setPagina(0);
               }, placeholder: t(lang, "mercado.buscar.ph") })
             ] }),
-            /* @__PURE__ */ jsxs18("label", { style: S.campo, children: [
-              /* @__PURE__ */ jsx18("span", { style: S.etiqueta, children: t(lang, "mercado.orden") }),
-              /* @__PURE__ */ jsxs18(Select4, { value: orden, onValueChange: (v) => {
+            /* @__PURE__ */ jsxs19("label", { style: S.campo, children: [
+              /* @__PURE__ */ jsx19("span", { style: S.etiqueta, children: t(lang, "mercado.orden") }),
+              /* @__PURE__ */ jsxs19(Select4, { value: orden, onValueChange: (v) => {
                 setOrden(v);
                 setPagina(0);
               }, children: [
-                /* @__PURE__ */ jsx18(SelectTrigger4, { "aria-label": t(lang, "mercado.orden"), children: /* @__PURE__ */ jsx18(SelectValue4, {}) }),
-                /* @__PURE__ */ jsx18(SelectContent4, { children: ORDENES.map((o) => /* @__PURE__ */ jsx18(SelectItem4, { value: o, children: t(lang, `mercado.orden.${o}`) }, o)) })
+                /* @__PURE__ */ jsx19(SelectTrigger4, { "aria-label": t(lang, "mercado.orden"), children: /* @__PURE__ */ jsx19(SelectValue4, {}) }),
+                /* @__PURE__ */ jsx19(SelectContent4, { children: ORDENES.map((o) => /* @__PURE__ */ jsx19(SelectItem4, { value: o, children: t(lang, `mercado.orden.${o}`) }, o)) })
               ] })
             ] })
           ] }),
-          /* @__PURE__ */ jsxs18("div", { style: { display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center" }, children: [
-            /* @__PURE__ */ jsx18(Checkbox9, { checked: soloRecientes, onCheckedChange: (v) => {
+          /* @__PURE__ */ jsxs19("div", { style: { display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center" }, children: [
+            /* @__PURE__ */ jsx19(Checkbox9, { checked: soloRecientes, onCheckedChange: (v) => {
               setSoloRecientes(!!v);
               setPagina(0);
             } }),
-            /* @__PURE__ */ jsx18("span", { style: { fontSize: 12 }, children: t(lang, "mercado.f.recientes") }),
-            /* @__PURE__ */ jsx18(Checkbox9, { checked: conFuente, onCheckedChange: (v) => {
+            /* @__PURE__ */ jsx19("span", { style: { fontSize: 12 }, children: t(lang, "mercado.f.recientes") }),
+            /* @__PURE__ */ jsx19(Checkbox9, { checked: conFuente, onCheckedChange: (v) => {
               setConFuente(!!v);
               setPagina(0);
             } }),
-            /* @__PURE__ */ jsxs18("span", { style: { fontSize: 12 }, children: [
+            /* @__PURE__ */ jsxs19("span", { style: { fontSize: 12 }, children: [
               t(lang, "mercado.f.conFuente"),
               " (",
               nivel,
               ")"
             ] }),
-            /* @__PURE__ */ jsx18(Checkbox9, { checked: soloFarmable, onCheckedChange: (v) => {
+            /* @__PURE__ */ jsx19(Checkbox9, { checked: soloFarmable, onCheckedChange: (v) => {
               setSoloFarmable(!!v);
               setPagina(0);
             } }),
-            /* @__PURE__ */ jsx18("span", { style: { fontSize: 12 }, children: t(lang, "mercado.f.farmeable") }),
-            /* @__PURE__ */ jsx18(Checkbox9, { checked: soloOfertas, onCheckedChange: (v) => {
+            /* @__PURE__ */ jsx19("span", { style: { fontSize: 12 }, children: t(lang, "mercado.f.farmeable") }),
+            /* @__PURE__ */ jsx19(Checkbox9, { checked: soloOfertas, onCheckedChange: (v) => {
               setSoloOfertas(!!v);
               setPagina(0);
             } }),
-            /* @__PURE__ */ jsx18("span", { style: { fontSize: 12 }, children: t(lang, "mercado.f.ofertas") })
+            /* @__PURE__ */ jsx19("span", { style: { fontSize: 12 }, children: t(lang, "mercado.f.ofertas") })
           ] }),
-          /* @__PURE__ */ jsxs18("details", { style: { fontSize: 12 }, children: [
-            /* @__PURE__ */ jsx18("summary", { style: { cursor: "pointer", color: C.texto3 }, children: t(lang, "mercado.filtros.titulo") }),
-            /* @__PURE__ */ jsx18("p", { style: S.sub, children: t(lang, "mercado.filtros.texto") })
+          /* @__PURE__ */ jsxs19("details", { style: { fontSize: 12 }, children: [
+            /* @__PURE__ */ jsx19("summary", { style: { cursor: "pointer", color: C.texto3 }, children: t(lang, "mercado.filtros.titulo") }),
+            /* @__PURE__ */ jsx19("p", { style: S.sub, children: t(lang, "mercado.filtros.texto") })
           ] }),
-          snapshot && fres && /* @__PURE__ */ jsxs18("p", { style: S.sub, children: [
+          snapshot && fres && /* @__PURE__ */ jsxs19("p", { style: S.sub, children: [
             t(lang, "mercado.frescura.importado"),
             ": ",
             fmtFecha(fres.importedAt),
@@ -40926,24 +41831,24 @@ x 0" }, children: [
             snapshot.sourceVersion,
             (snapshot.warnings || []).length ? ` · ${snapshot.warnings.length} ${t(lang, "mercado.avisos")}` : ""
           ] }),
-          /* @__PURE__ */ jsx18("p", { role: "status", style: S.etiqueta, children: snapshot ? t(lang, "mercado.contador", { visibles: visibles.length, total: items.length, ordenTxt, pag: paginaSegura +
+          /* @__PURE__ */ jsx19("p", { role: "status", style: S.etiqueta, children: snapshot ? t(lang, "mercado.contador", { visibles: visibles.length, total: items.length, ordenTxt, pag: paginaSegura +
           1, paginas }) : t(lang, "mercado.vacio.scan") }),
-          /* @__PURE__ */ jsx18("div", { style: { overflowX: "auto" }, children: /* @__PURE__ */ jsxs18("table", { style: S.tabla, children: [
-            /* @__PURE__ */ jsx18("thead", { children: /* @__PURE__ */ jsxs18("tr", { children: [
-              /* @__PURE__ */ jsx18("th", { style: S.th, children: t(lang, "mercado.col.item") }),
-              /* @__PURE__ */ jsx18("th", { style: S.th, children: t(lang, "mercado.col.min") }),
-              /* @__PURE__ */ jsx18("th", { style: S.th, children: t(lang, "mercado.col.dia") }),
-              /* @__PURE__ */ jsx18("th", { style: S.th, children: t(lang, "mercado.col.oferta") }),
-              /* @__PURE__ */ jsx18("th", { style: S.th, children: t(lang, "mercado.col.fuente") }),
-              /* @__PURE__ */ jsx18("th", { style: S.th, children: t(lang, "mercado.col.farmeo") })
+          /* @__PURE__ */ jsx19("div", { style: { overflowX: "auto" }, children: /* @__PURE__ */ jsxs19("table", { style: S.tabla, children: [
+            /* @__PURE__ */ jsx19("thead", { children: /* @__PURE__ */ jsxs19("tr", { children: [
+              /* @__PURE__ */ jsx19("th", { style: S.th, children: t(lang, "mercado.col.item") }),
+              /* @__PURE__ */ jsx19("th", { style: S.th, children: t(lang, "mercado.col.min") }),
+              /* @__PURE__ */ jsx19("th", { style: S.th, children: t(lang, "mercado.col.dia") }),
+              /* @__PURE__ */ jsx19("th", { style: S.th, children: t(lang, "mercado.col.oferta") }),
+              /* @__PURE__ */ jsx19("th", { style: S.th, children: t(lang, "mercado.col.fuente") }),
+              /* @__PURE__ */ jsx19("th", { style: S.th, children: t(lang, "mercado.col.farmeo") })
             ] }) }),
-            /* @__PURE__ */ jsx18("tbody", { children: !snapshot ? /* @__PURE__ */ jsx18(FilaVacia, { texto: t(lang, "mercado.vacio.scan") }) : !paginaItems.length ? /* @__PURE__ */ jsx18(FilaVacia, {
+            /* @__PURE__ */ jsx19("tbody", { children: !snapshot ? /* @__PURE__ */ jsx19(FilaVacia, { texto: t(lang, "mercado.vacio.scan") }) : !paginaItems.length ? /* @__PURE__ */ jsx19(FilaVacia, {
             texto: t(lang, "mercado.vacio.filtros") }) : paginaItems.map((i) => {
               const daily = i.history.find((h) => h.day === i.observedDay);
               const nombreVisible = nombreItem(i, D.items, CATALOGO, lang) || i.sourceKey;
-              return /* @__PURE__ */ jsxs18("tr", { children: [
-                /* @__PURE__ */ jsxs18("td", { style: S.td, children: [
-                  /* @__PURE__ */ jsx18(
+              return /* @__PURE__ */ jsxs19("tr", { children: [
+                /* @__PURE__ */ jsxs19("td", { style: S.td, children: [
+                  /* @__PURE__ */ jsx19(
                     "button",
                     {
                       type: "button",
@@ -40952,30 +41857,30 @@ x 0" }, children: [
                       children: nombreVisible
                     }
                   ),
-                  i.itemId == null && /* @__PURE__ */ jsx18("div", { style: S.etiqueta, children: t(lang, "mercado.variante") }),
-                  /* @__PURE__ */ jsx18(InsigniaOferta, { deal: dealOf(i), lang }),
-                  /* @__PURE__ */ jsxs18("div", { style: S.etiqueta, children: [
+                  i.itemId == null && /* @__PURE__ */ jsx19("div", { style: S.etiqueta, children: t(lang, "mercado.variante") }),
+                  /* @__PURE__ */ jsx19(InsigniaOferta, { deal: dealOf(i), lang }),
+                  /* @__PURE__ */ jsxs19("div", { style: S.etiqueta, children: [
                     t(lang, "mercado.clave"),
                     " ",
                     i.sourceKey
                   ] })
                 ] }),
-                /* @__PURE__ */ jsx18("td", { style: S.td, children: /* @__PURE__ */ jsx18(Dinero, { cobre: i.unitPriceCopper }) }),
-                /* @__PURE__ */ jsxs18("td", { style: S.td, children: [
+                /* @__PURE__ */ jsx19("td", { style: S.td, children: /* @__PURE__ */ jsx19(Dinero, { cobre: i.unitPriceCopper }) }),
+                /* @__PURE__ */ jsxs19("td", { style: S.td, children: [
                   fechaDe(i.observedDay) || "—",
-                  /* @__PURE__ */ jsx18("div", { style: S.etiqueta, children: edadTexto(i) })
+                  /* @__PURE__ */ jsx19("div", { style: S.etiqueta, children: edadTexto(i) })
                 ] }),
-                /* @__PURE__ */ jsx18("td", { style: S.td, children: daily?.available == null ? t(lang, "mercado.det.sinDato") : daily.available }),
-                /* @__PURE__ */ jsx18("td", { style: S.td, children: fuenteResumen(i) }),
-                /* @__PURE__ */ jsx18("td", { style: S.td, children: farmCell(i) })
+                /* @__PURE__ */ jsx19("td", { style: S.td, children: daily?.available == null ? t(lang, "mercado.det.sinDato") : daily.available }),
+                /* @__PURE__ */ jsx19("td", { style: S.td, children: fuenteResumen(i) }),
+                /* @__PURE__ */ jsx19("td", { style: S.td, children: farmCell(i) })
               ] }, i.sourceKey);
             }) })
           ] }) }),
-          snapshot && paginas > 1 && /* @__PURE__ */ jsxs18("div", { style: { display: "flex", gap: 8, alignItems: "center" }, children: [
-            /* @__PURE__ */ jsx18(Button8, { variant: "outline", size: "xs", disabled: paginaSegura === 0, onClick: () => setPagina(paginaSegura - 1), children: t(lang, "mercado.anterior") }),
-            /* @__PURE__ */ jsx18(Button8, { variant: "outline", size: "xs", disabled: paginaSegura + 1 >= paginas, onClick: () => setPagina(paginaSegura + 1), children: t(lang, "mercado.siguiente") })
+          snapshot && paginas > 1 && /* @__PURE__ */ jsxs19("div", { style: { display: "flex", gap: 8, alignItems: "center" }, children: [
+            /* @__PURE__ */ jsx19(Button9, { variant: "outline", size: "xs", disabled: paginaSegura === 0, onClick: () => setPagina(paginaSegura - 1), children: t(lang, "mercado.anterior") }),
+            /* @__PURE__ */ jsx19(Button9, { variant: "outline", size: "xs", disabled: paginaSegura + 1 >= paginas, onClick: () => setPagina(paginaSegura + 1), children: t(lang, "mercado.siguiente") })
           ] }),
-          /* @__PURE__ */ jsxs18("p", { style: S.sub, children: [
+          /* @__PURE__ */ jsxs19("p", { style: S.sub, children: [
             t(lang, "mercado.det.cobertura", { addon: CATALOGO?.source?.addon || t(lang, "mercado.det.sinCatalogo") }),
             " ",
             CATALOGO?.source?.coverage || ""
@@ -40983,7 +41888,7 @@ x 0" }, children: [
         ]
       }
     ),
-    detalle && /* @__PURE__ */ jsx18(
+    detalle && /* @__PURE__ */ jsx19(
       DetalleItem,
       {
         item: detalle,
@@ -40994,7 +41899,7 @@ x 0" }, children: [
         onCerrar: () => setDetalleKey(null)
       }
     ),
-    detalle && snapshotDavi ? /* @__PURE__ */ jsx18(Tarjeta, { titulo: t(lang, "davi.boton"), children: /* @__PURE__ */ jsx18(
+    detalle && snapshotDavi ? /* @__PURE__ */ jsx19(Tarjeta, { titulo: t(lang, "davi.boton"), children: /* @__PURE__ */ jsx19(
       PreguntarDavi,
       {
         ctx,
@@ -41004,13 +41909,13 @@ x 0" }, children: [
         preguntaInicial: t(lang, "davi.mercado")
       }
     ) }) : null,
-    /* @__PURE__ */ jsx18(Farmeo, { items, perfil, settings, onSettings: guardarFarm, lang })
+    /* @__PURE__ */ jsx19(Farmeo, { items, perfil, settings, onSettings: guardarFarm, lang })
   ] }) });
 }
 
 // src/vistas/guia.jsx
-import { useCallback as useCallback2, useEffect as useEffect6, useMemo as useMemo16, useRef as useRef4, useState as useState13 } from "react";
-import { Button as Button10, Checkbox as Checkbox11, Input as Input5, SegmentedControl as SegmentedControl5, Select as Select5, SelectContent as SelectContent5, SelectItem as SelectItem5, SelectTrigger as SelectTrigger5,
+import { useCallback as useCallback2, useEffect as useEffect7, useMemo as useMemo17, useRef as useRef4, useState as useState14 } from "react";
+import { Button as Button11, Checkbox as Checkbox11, Input as Input5, SegmentedControl as SegmentedControl5, Select as Select5, SelectContent as SelectContent5, SelectItem as SelectItem5, SelectTrigger as SelectTrigger5,
 SelectValue as SelectValue5 } from "@hermes/plugin-sdk";
 
 // src/guia-logica.js
@@ -41317,7 +42222,7 @@ var petHappyText = (v) => {
 };
 function simcHelpers(stats) {
   const st = stats || {};
-  const num6 = (sec, k, i) => {
+  const num7 = (sec, k, i) => {
     const v = fval(st[sec], k, i);
     return v == null ? null : Math.round(v);
   };
@@ -41335,7 +42240,7 @@ function simcHelpers(stats) {
     const v = (+a[0] || 0) + (+a[1] || 0) - (+a[2] || 0);
     return v ? String(Math.round(v)) : null;
   };
-  return { st, num: num6, dec, pct: pct2, ap, fval };
+  return { st, num: num7, dec, pct: pct2, ap, fval };
 }
 function simcVitals(stats) {
   if (!stats) return null;
@@ -41415,8 +42320,8 @@ function aplicarSimc(state, d, ctx) {
 var SIMC_GUIA = { warrior: "warrior", hunter: "hunter", shaman: "shaman" };
 
 // src/vistas/guia/piezas.jsx
-import { useState as useState11 } from "react";
-import { Fragment as Fragment15, jsx as jsx19, jsxs as jsxs19 } from "react/jsx-runtime";
+import { useState as useState12 } from "react";
+import { Fragment as Fragment16, jsx as jsx20, jsxs as jsxs20 } from "react/jsx-runtime";
 agregarTextos({
   "guia.ficha.retrato": "Retrato de {clase}",
   "guia.ficha.nivel": "nivel",
@@ -41800,57 +42705,57 @@ var P = {
   foldBody: { padding: "3px 0 7px" }
 };
 var ICONOS = {
-  bow: /* @__PURE__ */ jsxs19(Fragment15, { children: [
-    /* @__PURE__ */ jsx19("path", { d: "M7 3v18" }),
-    /* @__PURE__ */ jsx19("path", { d: "M7 3c9 3 13 6 13 9s-4 6-13 9" }),
-    /* @__PURE__ */ jsx19("path", { d: "M3.5 12H19M15.5 8.5L19 12l-3.5 3.5" })
+  bow: /* @__PURE__ */ jsxs20(Fragment16, { children: [
+    /* @__PURE__ */ jsx20("path", { d: "M7 3v18" }),
+    /* @__PURE__ */ jsx20("path", { d: "M7 3c9 3 13 6 13 9s-4 6-13 9" }),
+    /* @__PURE__ */ jsx20("path", { d: "M3.5 12H19M15.5 8.5L19 12l-3.5 3.5" })
   ] }),
-  pin: /* @__PURE__ */ jsxs19(Fragment15, { children: [
-    /* @__PURE__ */ jsx19("path", { d: "M12 21s-6.5-5.2-6.5-10.4a6.5 6.5 0 1 1 13 0C18.5 15.8 12 21 12 21z" }),
-    /* @__PURE__ */ jsx19("circle", { cx: "12", cy: "10.4", r: "2.3" })
+  pin: /* @__PURE__ */ jsxs20(Fragment16, { children: [
+    /* @__PURE__ */ jsx20("path", { d: "M12 21s-6.5-5.2-6.5-10.4a6.5 6.5 0 1 1 13 0C18.5 15.8 12 21 12 21z" }),
+    /* @__PURE__ */ jsx20("circle", { cx: "12", cy: "10.4", r: "2.3" })
   ] }),
-  gate: /* @__PURE__ */ jsx19(Fragment15, { children: /* @__PURE__ */ jsx19("path", { d: "M4 21V9l8-6 8 6v12M4 21h16M9 21v-7h6v7" }) }),
-  star: /* @__PURE__ */ jsx19("path", { d: "M12 3.5l2.5 5.2 5.7.8-4.1 4 1 5.7-5.1-2.7-5.1 2.7 1-5.7-4.1-4 5.7-.8z" }),
-  scroll: /* @__PURE__ */ jsxs19(Fragment15, { children: [
-    /* @__PURE__ */ jsx19("path", { d: "M7 3h11v18l-3-1.8L12 21l-3-1.8L6 21z" }),
-    /* @__PURE__ */ jsx19("path", { d: "M9.5 8h6M9.5 12h6" })
+  gate: /* @__PURE__ */ jsx20(Fragment16, { children: /* @__PURE__ */ jsx20("path", { d: "M4 21V9l8-6 8 6v12M4 21h16M9 21v-7h6v7" }) }),
+  star: /* @__PURE__ */ jsx20("path", { d: "M12 3.5l2.5 5.2 5.7.8-4.1 4 1 5.7-5.1-2.7-5.1 2.7 1-5.7-4.1-4 5.7-.8z" }),
+  scroll: /* @__PURE__ */ jsxs20(Fragment16, { children: [
+    /* @__PURE__ */ jsx20("path", { d: "M7 3h11v18l-3-1.8L12 21l-3-1.8L6 21z" }),
+    /* @__PURE__ */ jsx20("path", { d: "M9.5 8h6M9.5 12h6" })
   ] }),
-  coin: /* @__PURE__ */ jsxs19(Fragment15, { children: [
-    /* @__PURE__ */ jsx19("circle", { cx: "12", cy: "12", r: "8.5" }),
-    /* @__PURE__ */ jsx19("path", { d: "M12 7.5v9M9 9.5h6" })
+  coin: /* @__PURE__ */ jsxs20(Fragment16, { children: [
+    /* @__PURE__ */ jsx20("circle", { cx: "12", cy: "12", r: "8.5" }),
+    /* @__PURE__ */ jsx20("path", { d: "M12 7.5v9M9 9.5h6" })
   ] }),
-  alert: /* @__PURE__ */ jsxs19(Fragment15, { children: [
-    /* @__PURE__ */ jsx19("path", { d: "M12 3.5L22 20H2z" }),
-    /* @__PURE__ */ jsx19("path", { d: "M12 10v4.5M12 17.5v.01" })
+  alert: /* @__PURE__ */ jsxs20(Fragment16, { children: [
+    /* @__PURE__ */ jsx20("path", { d: "M12 3.5L22 20H2z" }),
+    /* @__PURE__ */ jsx20("path", { d: "M12 10v4.5M12 17.5v.01" })
   ] }),
-  check: /* @__PURE__ */ jsx19("path", { d: "M4.5 12.5l4.5 4.5L19.5 7" }),
-  route: /* @__PURE__ */ jsx19(Fragment15, { children: /* @__PURE__ */ jsx19("path", { d: "M5 5.5h3.5l2 4H19M5 5.5v13m0 0h4M19 9.5v4l-3.5 2-4-2M15.5 15.5l-2-4" }) }),
-  skull: /* @__PURE__ */ jsxs19(Fragment15, { children: [
-    /* @__PURE__ */ jsx19("path", { d: "M12 3a7 7 0 0 0-7 7c0 2.5 1.3 4.3 3 5.4V19a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2v-3.6c1.7-1.1 3-2.9 3-5.4a7 7 0 0 0-7-7z" }),
-    /* @__PURE__ */ jsx19("path", { d: "M9 10.5h.01M15 10.5h.01M10.5 18v-2M13.5 18v-2" })
+  check: /* @__PURE__ */ jsx20("path", { d: "M4.5 12.5l4.5 4.5L19.5 7" }),
+  route: /* @__PURE__ */ jsx20(Fragment16, { children: /* @__PURE__ */ jsx20("path", { d: "M5 5.5h3.5l2 4H19M5 5.5v13m0 0h4M19 9.5v4l-3.5 2-4-2M15.5 15.5l-2-4" }) }),
+  skull: /* @__PURE__ */ jsxs20(Fragment16, { children: [
+    /* @__PURE__ */ jsx20("path", { d: "M12 3a7 7 0 0 0-7 7c0 2.5 1.3 4.3 3 5.4V19a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2v-3.6c1.7-1.1 3-2.9 3-5.4a7 7 0 0 0-7-7z" }),
+    /* @__PURE__ */ jsx20("path", { d: "M9 10.5h.01M15 10.5h.01M10.5 18v-2M13.5 18v-2" })
   ] }),
-  copy: /* @__PURE__ */ jsxs19(Fragment15, { children: [
-    /* @__PURE__ */ jsx19("rect", { x: "8.5", y: "8.5", width: "11", height: "11", rx: "2" }),
-    /* @__PURE__ */ jsx19("path", { d: "M15.5 8.5V6a1.5 1.5 0 0 0-1.5-1.5H6A1.5 1.5 0 0 0 4.5 6v8A1.5 1.5 0 0 0 6 15.5h2.5" })
+  copy: /* @__PURE__ */ jsxs20(Fragment16, { children: [
+    /* @__PURE__ */ jsx20("rect", { x: "8.5", y: "8.5", width: "11", height: "11", rx: "2" }),
+    /* @__PURE__ */ jsx20("path", { d: "M15.5 8.5V6a1.5 1.5 0 0 0-1.5-1.5H6A1.5 1.5 0 0 0 4.5 6v8A1.5 1.5 0 0 0 6 15.5h2.5" })
   ] }),
-  kbd: /* @__PURE__ */ jsxs19(Fragment15, { children: [
-    /* @__PURE__ */ jsx19("rect", { x: "2.5", y: "6", width: "19", height: "12", rx: "2" }),
-    /* @__PURE__ */ jsx19("path", { d: "M6 10h.01M10 10h.01M14 10h.01M18 10h.01M7 14h10" })
+  kbd: /* @__PURE__ */ jsxs20(Fragment16, { children: [
+    /* @__PURE__ */ jsx20("rect", { x: "2.5", y: "6", width: "19", height: "12", rx: "2" }),
+    /* @__PURE__ */ jsx20("path", { d: "M6 10h.01M10 10h.01M14 10h.01M18 10h.01M7 14h10" })
   ] }),
-  sword: /* @__PURE__ */ jsxs19(Fragment15, { children: [
-    /* @__PURE__ */ jsx19("path", { d: "M14.5 17.5L4 7V4h3l10.5 10.5" }),
-    /* @__PURE__ */ jsx19("path", { d: "M13 19l6-6" }),
-    /* @__PURE__ */ jsx19("path", { d: "M16 16l3 3" }),
-    /* @__PURE__ */ jsx19("path", { d: "M19 13l2 2" })
+  sword: /* @__PURE__ */ jsxs20(Fragment16, { children: [
+    /* @__PURE__ */ jsx20("path", { d: "M14.5 17.5L4 7V4h3l10.5 10.5" }),
+    /* @__PURE__ */ jsx20("path", { d: "M13 19l6-6" }),
+    /* @__PURE__ */ jsx20("path", { d: "M16 16l3 3" }),
+    /* @__PURE__ */ jsx20("path", { d: "M19 13l2 2" })
   ] }),
-  staff: /* @__PURE__ */ jsxs19(Fragment15, { children: [
-    /* @__PURE__ */ jsx19("path", { d: "M12 3v18" }),
-    /* @__PURE__ */ jsx19("path", { d: "M12 3l-2.5 3M12 3l2.5 3" }),
-    /* @__PURE__ */ jsx19("circle", { cx: "12", cy: "8", r: "1.6" })
+  staff: /* @__PURE__ */ jsxs20(Fragment16, { children: [
+    /* @__PURE__ */ jsx20("path", { d: "M12 3v18" }),
+    /* @__PURE__ */ jsx20("path", { d: "M12 3l-2.5 3M12 3l2.5 3" }),
+    /* @__PURE__ */ jsx20("circle", { cx: "12", cy: "8", r: "1.6" })
   ] })
 };
 function Icono({ n, size = 16, color }) {
-  return /* @__PURE__ */ jsx19(
+  return /* @__PURE__ */ jsx20(
     "svg",
     {
       viewBox: "0 0 24 24",
@@ -41866,62 +42771,62 @@ function Icono({ n, size = 16, color }) {
   );
 }
 function Detalle({ titulo, meta, extra, children, abierto, estilo, resumenExtra }) {
-  const [open, setOpen] = useState11(!!abierto);
-  return /* @__PURE__ */ jsxs19(
+  const [open, setOpen] = useState12(!!abierto);
+  return /* @__PURE__ */ jsxs20(
     "details",
     {
       open,
       onToggle: (e) => setOpen(e.currentTarget.open),
       style: { ...P.dung, ...open ? { borderColor: C.borde2 } : {}, ...estilo },
       children: [
-        /* @__PURE__ */ jsxs19("summary", { style: P.resumen, children: [
-          /* @__PURE__ */ jsx19("span", { style: { ...P.flecha, transform: open ? "rotate(90deg)" : "none" }, children: "▶" }),
-          titulo != null ? /* @__PURE__ */ jsx19("span", { style: P.dname, children: titulo }) : null,
-          meta != null ? /* @__PURE__ */ jsx19("span", { style: P.dmeta, children: meta }) : null,
+        /* @__PURE__ */ jsxs20("summary", { style: P.resumen, children: [
+          /* @__PURE__ */ jsx20("span", { style: { ...P.flecha, transform: open ? "rotate(90deg)" : "none" }, children: "▶" }),
+          titulo != null ? /* @__PURE__ */ jsx20("span", { style: P.dname, children: titulo }) : null,
+          meta != null ? /* @__PURE__ */ jsx20("span", { style: P.dmeta, children: meta }) : null,
           extra,
           resumenExtra
         ] }),
-        /* @__PURE__ */ jsx19("div", { style: P.dloot, children })
+        /* @__PURE__ */ jsx20("div", { style: P.dloot, children })
       ]
     }
   );
 }
 function Placa({ tono = "plain", children, title, estilo }) {
   const base = { ...P.placaBase, ...P["placa" + tono[0].toUpperCase() + tono.slice(1)] || {} };
-  return /* @__PURE__ */ jsx19("span", { title, style: { ...base, ...estilo }, children });
+  return /* @__PURE__ */ jsx20("span", { title, style: { ...base, ...estilo }, children });
 }
 var locPlaca = (cont, lang) => {
   const k = cont === "K" ? "Kalimdor" : "EK";
-  return /* @__PURE__ */ jsx19(Placa, { tono: cont === "K" ? "locK" : "locE", title: k, children: k });
+  return /* @__PURE__ */ jsx20(Placa, { tono: cont === "K" ? "locK" : "locE", title: k, children: k });
 };
 var QMAP = { common: 1, uncommon: 2, rare: 3, epic: 4 };
 function NombreCalidad({ q, children, estilo }) {
-  return /* @__PURE__ */ jsx19("span", { style: { color: CALIDAD[QMAP[q]] || C.texto, ...estilo }, children });
+  return /* @__PURE__ */ jsx20("span", { style: { color: CALIDAD[QMAP[q]] || C.texto, ...estilo }, children });
 }
 function Wline({ w, lvl, dps, tipos, lang, ultimo }) {
   const diff = w.lvl - lvl, dlt = dps ? (w.dps - dps).toFixed(1) : null;
-  return /* @__PURE__ */ jsxs19("div", { className: "weapline", style: { ...P.weapline, ...ultimo ? P.weaplineUlt : {} }, children: [
-    /* @__PURE__ */ jsxs19("div", { children: [
-      /* @__PURE__ */ jsx19(NombreCalidad, { q: w.q, estilo: P.weapname, children: w.n }),
+  return /* @__PURE__ */ jsxs20("div", { className: "weapline", style: { ...P.weapline, ...ultimo ? P.weaplineUlt : {} }, children: [
+    /* @__PURE__ */ jsxs20("div", { children: [
+      /* @__PURE__ */ jsx20(NombreCalidad, { q: w.q, estilo: P.weapname, children: w.n }),
       " ",
-      /* @__PURE__ */ jsx19(Placa, { tono: "plain", estilo: { marginLeft: 0 }, children: tipos && (tipos[w.t] || w.t) }),
-      diff <= 0 ? /* @__PURE__ */ jsx19(Placa, { tono: "now", estilo: { marginLeft: 4 }, children: t(lang, "guia.rec.yaPodes") }) : /* @__PURE__ */ jsx19(Placa, { tono: "soon", estilo: { marginLeft: 4 },
+      /* @__PURE__ */ jsx20(Placa, { tono: "plain", estilo: { marginLeft: 0 }, children: tipos && (tipos[w.t] || w.t) }),
+      diff <= 0 ? /* @__PURE__ */ jsx20(Placa, { tono: "now", estilo: { marginLeft: 4 }, children: t(lang, "guia.rec.yaPodes") }) : /* @__PURE__ */ jsx20(Placa, { tono: "soon", estilo: { marginLeft: 4 },
       children: diff <= 1 ? t(lang, "guia.rec.enNivel", { n: diff }) : t(lang, "guia.rec.enNiveles", { n: diff }) }),
-      /* @__PURE__ */ jsxs19("div", { style: P.weapsrc, children: [
+      /* @__PURE__ */ jsxs20("div", { style: P.weapsrc, children: [
         w.src,
-        w.note ? /* @__PURE__ */ jsxs19(Fragment15, { children: [
+        w.note ? /* @__PURE__ */ jsxs20(Fragment16, { children: [
           " · ",
-          /* @__PURE__ */ jsx19("i", { children: w.note })
+          /* @__PURE__ */ jsx20("i", { children: w.note })
         ] }) : null
       ] })
     ] }),
-    /* @__PURE__ */ jsxs19("div", { style: { textAlign: "right", flexShrink: 0 }, children: [
-      /* @__PURE__ */ jsx19("b", { children: fmtDps(w) }),
-      /* @__PURE__ */ jsxs19("div", { style: P.weapsrc, children: [
+    /* @__PURE__ */ jsxs20("div", { style: { textAlign: "right", flexShrink: 0 }, children: [
+      /* @__PURE__ */ jsx20("b", { children: fmtDps(w) }),
+      /* @__PURE__ */ jsxs20("div", { style: P.weapsrc, children: [
         "dps · req ",
         w.lvl
       ] }),
-      dlt != null ? /* @__PURE__ */ jsxs19("div", { style: dlt > 0 ? P.delta : P.deltaNeg, children: [
+      dlt != null ? /* @__PURE__ */ jsxs20("div", { style: dlt > 0 ? P.delta : P.deltaNeg, children: [
         "+",
         dlt,
         " vs actual"
@@ -41931,9 +42836,9 @@ function Wline({ w, lvl, dps, tipos, lang, ultimo }) {
 }
 function facEscudo(fac, letra) {
   const col = fac === "alliance" ? C.azul : C.rojo;
-  return /* @__PURE__ */ jsxs19("svg", { viewBox: "0 0 24 24", "aria-hidden": "true", style: { width: 24, height: 24, display: "block" }, children: [
-    /* @__PURE__ */ jsx19("path", { d: "M12 1.8l8 3.4v6.2c0 5.2-3.4 9.2-8 11-4.6-1.8-8-5.8-8-11V5.2z", fill: col, stroke: C.amarillo, strokeWidth: "1.4" }),
-    /* @__PURE__ */ jsx19("text", { x: "12", y: "16.6", textAnchor: "middle", fontFamily: "Georgia,serif", fontSize: "11", fontWeight: "700", fill: C.texto, children: letra })
+  return /* @__PURE__ */ jsxs20("svg", { viewBox: "0 0 24 24", "aria-hidden": "true", style: { width: 24, height: 24, display: "block" }, children: [
+    /* @__PURE__ */ jsx20("path", { d: "M12 1.8l8 3.4v6.2c0 5.2-3.4 9.2-8 11-4.6-1.8-8-5.8-8-11V5.2z", fill: col, stroke: C.amarillo, strokeWidth: "1.4" }),
+    /* @__PURE__ */ jsx20("text", { x: "12", y: "16.6", textAnchor: "middle", fontFamily: "Georgia,serif", fontSize: "11", fontWeight: "700", fill: C.texto, children: letra })
   ] });
 }
 var SKINS = [C.naranja, C.amarillo];
@@ -41944,7 +42849,7 @@ function skinDe(simcRace) {
   return SKINS[k ? h % SKINS.length : 0];
 }
 function charRetrato({ G, fac, simcRace, avatar, lang }) {
-  if (avatar) return /* @__PURE__ */ jsx19("img", { src: avatar, alt: t(lang, "guia.ficha.retrato", { clase: nombreClaseGuia(G, lang) }), style: { width: "100%", height: "100%", objectFit: "cover", display: "\
+  if (avatar) return /* @__PURE__ */ jsx20("img", { src: avatar, alt: t(lang, "guia.ficha.retrato", { clase: nombreClaseGuia(G, lang) }), style: { width: "100%", height: "100%", objectFit: "cover", display: "\
 block" } });
   const skin = skinDe(simcRace), acc = G.accent || C.amarillo;
   const cloak = fac === "alliance" ? C.azul : C.rojo;
@@ -41952,52 +42857,52 @@ block" } });
   const armor = { hunter: C.naranja, warrior: C.texto3, shaman: C.morado }[G.id] || C.naranja;
   const armorD = { hunter: C.texto4, warrior: C.texto4, shaman: C.texto4 }[G.id] || C.texto4;
   const gear = {
-    hunter: /* @__PURE__ */ jsxs19(Fragment15, { children: [
-      /* @__PURE__ */ jsx19("path", { d: "M32 52 C26 18 44 2 60 2 C77 2 94 19 88 52 L83 60 C76 47 44 47 37 60 Z", fill: C.texto4 }),
-      /* @__PURE__ */ jsx19("path", { d: "M38 50 C36 26 46 12 60 12 C74 12 84 26 82 50", fill: "none", stroke: C.texto3, strokeWidth: "2", opacity: ".55" })
+    hunter: /* @__PURE__ */ jsxs20(Fragment16, { children: [
+      /* @__PURE__ */ jsx20("path", { d: "M32 52 C26 18 44 2 60 2 C77 2 94 19 88 52 L83 60 C76 47 44 47 37 60 Z", fill: C.texto4 }),
+      /* @__PURE__ */ jsx20("path", { d: "M38 50 C36 26 46 12 60 12 C74 12 84 26 82 50", fill: "none", stroke: C.texto3, strokeWidth: "2", opacity: ".55" })
     ] }),
-    warrior: /* @__PURE__ */ jsxs19(Fragment15, { children: [
-      /* @__PURE__ */ jsx19("path", { d: "M37 46 C37 18 46 8 60 8 C74 8 83 18 83 46 L41 46 Z", fill: armor }),
-      /* @__PURE__ */ jsx19("path", { d: "M37 46 C37 18 46 8 60 8 C74 8 83 18 83 46", fill: "none", stroke: armorD, strokeWidth: "2" }),
-      /* @__PURE__ */ jsx19("path", { d: "M40 34 C30 26 24 14 27 4 C36 8 42 18 43 30 Z", fill: skin }),
-      /* @__PURE__ */ jsx19("path", { d: "M80 34 C90 26 96 14 93 4 C84 8 78 18 77 30 Z", fill: skin })
+    warrior: /* @__PURE__ */ jsxs20(Fragment16, { children: [
+      /* @__PURE__ */ jsx20("path", { d: "M37 46 C37 18 46 8 60 8 C74 8 83 18 83 46 L41 46 Z", fill: armor }),
+      /* @__PURE__ */ jsx20("path", { d: "M37 46 C37 18 46 8 60 8 C74 8 83 18 83 46", fill: "none", stroke: armorD, strokeWidth: "2" }),
+      /* @__PURE__ */ jsx20("path", { d: "M40 34 C30 26 24 14 27 4 C36 8 42 18 43 30 Z", fill: skin }),
+      /* @__PURE__ */ jsx20("path", { d: "M80 34 C90 26 96 14 93 4 C84 8 78 18 77 30 Z", fill: skin })
     ] }),
-    shaman: /* @__PURE__ */ jsxs19(Fragment15, { children: [
-      /* @__PURE__ */ jsx19("path", { d: "M36 40 Q60 31 84 40 L84 47 Q60 38 36 47 Z", fill: C.amarillo }),
-      /* @__PURE__ */ jsx19("path", { d: "M44 36 C38 26 36 16 40 6 M50 34 C48 22 50 12 56 4", stroke: skin, strokeWidth: "3.4", fill: "none", strokeLinecap: "round" }),
-      /* @__PURE__ */ jsx19("path", { d: "M76 36 C82 26 84 16 80 6 M70 34 C72 22 70 12 64 4", stroke: skin, strokeWidth: "3.4", fill: "none", strokeLinecap: "round" }),
-      /* @__PURE__ */ jsx19("rect", { x: "56", y: "30", width: "8", height: "10", rx: "2", fill: skin, opacity: ".85" })
+    shaman: /* @__PURE__ */ jsxs20(Fragment16, { children: [
+      /* @__PURE__ */ jsx20("path", { d: "M36 40 Q60 31 84 40 L84 47 Q60 38 36 47 Z", fill: C.amarillo }),
+      /* @__PURE__ */ jsx20("path", { d: "M44 36 C38 26 36 16 40 6 M50 34 C48 22 50 12 56 4", stroke: skin, strokeWidth: "3.4", fill: "none", strokeLinecap: "round" }),
+      /* @__PURE__ */ jsx20("path", { d: "M76 36 C82 26 84 16 80 6 M70 34 C72 22 70 12 64 4", stroke: skin, strokeWidth: "3.4", fill: "none", strokeLinecap: "round" }),
+      /* @__PURE__ */ jsx20("rect", { x: "56", y: "30", width: "8", height: "10", rx: "2", fill: skin, opacity: ".85" })
     ] })
-  }[G.id] || /* @__PURE__ */ jsx19("path", { d: "M36 48 C34 24 46 12 60 12 C74 12 86 24 84 48 L78 44 C76 32 68 28 60 28 C52 28 44 32 42 44 Z", fill: C.texto4 });
-  return /* @__PURE__ */ jsxs19("svg", { viewBox: "0 0 120 150", preserveAspectRatio: "xMidYMid slice", role: "img", "aria-label": t(lang, "guia.ficha.retrato", { clase: nombreClaseGuia(G, lang) }), style: {
+  }[G.id] || /* @__PURE__ */ jsx20("path", { d: "M36 48 C34 24 46 12 60 12 C74 12 86 24 84 48 L78 44 C76 32 68 28 60 28 C52 28 44 32 42 44 Z", fill: C.texto4 });
+  return /* @__PURE__ */ jsxs20("svg", { viewBox: "0 0 120 150", preserveAspectRatio: "xMidYMid slice", role: "img", "aria-label": t(lang, "guia.ficha.retrato", { clase: nombreClaseGuia(G, lang) }), style: {
   width: "100%", height: "100%", display: "block" }, children: [
-    /* @__PURE__ */ jsx19("defs", { children: /* @__PURE__ */ jsxs19("linearGradient", { id: "pbg-" + G.id, x1: "0", y1: "0", x2: "0", y2: "1", children: [
-      /* @__PURE__ */ jsx19("stop", { offset: "0", stopColor: acc, stopOpacity: ".18" }),
-      /* @__PURE__ */ jsx19("stop", { offset: "1", stopColor: C.fondo3 })
+    /* @__PURE__ */ jsx20("defs", { children: /* @__PURE__ */ jsxs20("linearGradient", { id: "pbg-" + G.id, x1: "0", y1: "0", x2: "0", y2: "1", children: [
+      /* @__PURE__ */ jsx20("stop", { offset: "0", stopColor: acc, stopOpacity: ".18" }),
+      /* @__PURE__ */ jsx20("stop", { offset: "1", stopColor: C.fondo3 })
     ] }) }),
-    /* @__PURE__ */ jsx19("rect", { width: "120", height: "150", fill: "url(#pbg-" + G.id + ")" }),
-    /* @__PURE__ */ jsx19("circle", { cx: "60", cy: "58", r: "46", fill: "none", stroke: trim, strokeOpacity: ".4", strokeWidth: "1.5", strokeDasharray: "3 5" }),
-    /* @__PURE__ */ jsx19("path", { d: "M4 152 C4 104 30 90 60 90 C90 90 116 104 116 152 Z", fill: cloak }),
-    /* @__PURE__ */ jsx19("path", { d: "M16 152 C16 112 38 100 60 100 C82 100 104 112 104 152 Z", fill: armor }),
-    /* @__PURE__ */ jsx19("path", { d: "M16 152 C16 112 38 100 60 100 C82 100 104 112 104 152", fill: "none", stroke: armorD, strokeWidth: "2", opacity: ".7" }),
-    /* @__PURE__ */ jsx19("path", { d: "M52 84 h16 v14 c0 5 -16 5 -16 0 z", fill: skin }),
-    /* @__PURE__ */ jsx19("ellipse", { cx: "60", cy: "54", rx: "25", ry: "30", fill: skin }),
-    /* @__PURE__ */ jsx19("ellipse", { cx: "35", cy: "56", rx: "4", ry: "7", fill: skin }),
-    /* @__PURE__ */ jsx19("ellipse", { cx: "85", cy: "56", rx: "4", ry: "7", fill: skin }),
-    /* @__PURE__ */ jsx19("circle", { cx: "50", cy: "56", r: "2.8", fill: C.texto4 }),
-    /* @__PURE__ */ jsx19("circle", { cx: "70", cy: "56", r: "2.8", fill: C.texto4 }),
-    /* @__PURE__ */ jsx19("path", { d: "M45 48 q5 -2.5 9 -.5 M66 48 q5 -2 9 .5", stroke: C.texto4, strokeWidth: "1.6", fill: "none", strokeLinecap: "round" }),
-    /* @__PURE__ */ jsx19("path", { d: "M59 60 q2 4 -1 7", stroke: C.texto3, strokeWidth: "1.4", fill: "none", strokeLinecap: "round" }),
+    /* @__PURE__ */ jsx20("rect", { width: "120", height: "150", fill: "url(#pbg-" + G.id + ")" }),
+    /* @__PURE__ */ jsx20("circle", { cx: "60", cy: "58", r: "46", fill: "none", stroke: trim, strokeOpacity: ".4", strokeWidth: "1.5", strokeDasharray: "3 5" }),
+    /* @__PURE__ */ jsx20("path", { d: "M4 152 C4 104 30 90 60 90 C90 90 116 104 116 152 Z", fill: cloak }),
+    /* @__PURE__ */ jsx20("path", { d: "M16 152 C16 112 38 100 60 100 C82 100 104 112 104 152 Z", fill: armor }),
+    /* @__PURE__ */ jsx20("path", { d: "M16 152 C16 112 38 100 60 100 C82 100 104 112 104 152", fill: "none", stroke: armorD, strokeWidth: "2", opacity: ".7" }),
+    /* @__PURE__ */ jsx20("path", { d: "M52 84 h16 v14 c0 5 -16 5 -16 0 z", fill: skin }),
+    /* @__PURE__ */ jsx20("ellipse", { cx: "60", cy: "54", rx: "25", ry: "30", fill: skin }),
+    /* @__PURE__ */ jsx20("ellipse", { cx: "35", cy: "56", rx: "4", ry: "7", fill: skin }),
+    /* @__PURE__ */ jsx20("ellipse", { cx: "85", cy: "56", rx: "4", ry: "7", fill: skin }),
+    /* @__PURE__ */ jsx20("circle", { cx: "50", cy: "56", r: "2.8", fill: C.texto4 }),
+    /* @__PURE__ */ jsx20("circle", { cx: "70", cy: "56", r: "2.8", fill: C.texto4 }),
+    /* @__PURE__ */ jsx20("path", { d: "M45 48 q5 -2.5 9 -.5 M66 48 q5 -2 9 .5", stroke: C.texto4, strokeWidth: "1.6", fill: "none", strokeLinecap: "round" }),
+    /* @__PURE__ */ jsx20("path", { d: "M59 60 q2 4 -1 7", stroke: C.texto3, strokeWidth: "1.4", fill: "none", strokeLinecap: "round" }),
     gear,
-    /* @__PURE__ */ jsx19("g", { transform: "translate(82,104) scale(1.5)", fill: "none", stroke: trim, strokeOpacity: ".85", strokeWidth: "1.6", strokeLinecap: "round", strokeLinejoin: "round", children: ICONOS[G.
+    /* @__PURE__ */ jsx20("g", { transform: "translate(82,104) scale(1.5)", fill: "none", stroke: trim, strokeOpacity: ".85", strokeWidth: "1.6", strokeLinecap: "round", strokeLinejoin: "round", children: ICONOS[G.
     icon] || ICONOS.star })
   ] });
 }
 function Vital({ label, valor, barra, ultimo }) {
-  return /* @__PURE__ */ jsxs19("div", { style: { ...P.fv, ...ultimo ? P.fvUlt : {} }, children: [
-    /* @__PURE__ */ jsx19("span", { style: P.fl, children: label }),
-    /* @__PURE__ */ jsx19("b", { style: P.fvV, children: valor }),
-    barra != null ? /* @__PURE__ */ jsx19("i", { style: P.fbar, children: /* @__PURE__ */ jsx19("span", { style: { ...P.fbarU, width: Math.max(0, Math.min(100, barra * 100)).toFixed(1) + "%" } }) }) :
+  return /* @__PURE__ */ jsxs20("div", { style: { ...P.fv, ...ultimo ? P.fvUlt : {} }, children: [
+    /* @__PURE__ */ jsx20("span", { style: P.fl, children: label }),
+    /* @__PURE__ */ jsx20("b", { style: P.fvV, children: valor }),
+    barra != null ? /* @__PURE__ */ jsx20("i", { style: P.fbar, children: /* @__PURE__ */ jsx20("span", { style: { ...P.fbarU, width: Math.max(0, Math.min(100, barra * 100)).toFixed(1) + "%" } }) }) :
     null
   ] });
 }
@@ -42034,11 +42939,11 @@ function Ficha({ v, lang }) {
     return it;
   })() : [];
   const dpsTxt = dps ? dps.toFixed(1) + (wCur && wCur.approx ? "~" : "") : "—";
-  return /* @__PURE__ */ jsxs19("div", { className: "ficha", style: P.ficha, children: [
-    /* @__PURE__ */ jsxs19("div", { style: P.fichaEmb, children: [
-      /* @__PURE__ */ jsxs19("div", { style: P.fichaPortrait, children: [
+  return /* @__PURE__ */ jsxs20("div", { className: "ficha", style: P.ficha, children: [
+    /* @__PURE__ */ jsxs20("div", { style: P.fichaEmb, children: [
+      /* @__PURE__ */ jsxs20("div", { style: P.fichaPortrait, children: [
         charRetrato({ G, fac, simcRace: build.simc && build.simc.race, avatar: build.avatar, lang }),
-        /* @__PURE__ */ jsx19("span", { style: {
+        /* @__PURE__ */ jsx20("span", { style: {
           position: "absolute",
           right: 5,
           bottom: 5,
@@ -42051,54 +42956,54 @@ function Ficha({ v, lang }) {
           alignItems: "center",
           justifyContent: "center",
           color: G.accent || C.amarillo
-        }, children: /* @__PURE__ */ jsx19(Icono, { n: G.icon, size: 15 }) })
+        }, children: /* @__PURE__ */ jsx20(Icono, { n: G.icon, size: 15 }) })
       ] }),
-      /* @__PURE__ */ jsx19("div", { style: P.fichaCls, children: nombreClaseGuia(G, lang) }),
-      /* @__PURE__ */ jsxs19("div", { className: "ficha-lvl", style: P.fichaLvl, children: [
-        /* @__PURE__ */ jsx19("b", { style: P.fichaLvlB, children: lvl }),
-        /* @__PURE__ */ jsx19("span", { style: P.fichaLvlS, children: t(lang, "guia.ficha.nivel") })
+      /* @__PURE__ */ jsx20("div", { style: P.fichaCls, children: nombreClaseGuia(G, lang) }),
+      /* @__PURE__ */ jsxs20("div", { className: "ficha-lvl", style: P.fichaLvl, children: [
+        /* @__PURE__ */ jsx20("b", { style: P.fichaLvlB, children: lvl }),
+        /* @__PURE__ */ jsx20("span", { style: P.fichaLvlS, children: t(lang, "guia.ficha.nivel") })
       ] }),
-      /* @__PURE__ */ jsx19("div", { title: facLabel, style: { lineHeight: 0 }, children: facEscudo(fac, facLabel.charAt(0).toUpperCase()) }),
-      /* @__PURE__ */ jsxs19("div", { style: P.fichaAvbtns, children: [
-        /* @__PURE__ */ jsx19("button", { type: "button", style: P.btnMini, onClick: onAvatar, title: t(lang, "guia.ficha.capturaAyuda"), children: t(lang, "guia.ficha.captura") }),
-        build.avatar ? /* @__PURE__ */ jsx19("button", { type: "button", style: P.btnMini, onClick: onAvatarDel, title: t(lang, "guia.ficha.quitarAyuda"), children: t(lang, "guia.ficha.quitar") }) : null
+      /* @__PURE__ */ jsx20("div", { title: facLabel, style: { lineHeight: 0 }, children: facEscudo(fac, facLabel.charAt(0).toUpperCase()) }),
+      /* @__PURE__ */ jsxs20("div", { style: P.fichaAvbtns, children: [
+        /* @__PURE__ */ jsx20("button", { type: "button", style: P.btnMini, onClick: onAvatar, title: t(lang, "guia.ficha.capturaAyuda"), children: t(lang, "guia.ficha.captura") }),
+        build.avatar ? /* @__PURE__ */ jsx20("button", { type: "button", style: P.btnMini, onClick: onAvatarDel, title: t(lang, "guia.ficha.quitarAyuda"), children: t(lang, "guia.ficha.quitar") }) : null
       ] })
     ] }),
-    /* @__PURE__ */ jsxs19("div", { style: { minWidth: 0 }, children: [
-      /* @__PURE__ */ jsx19("div", { children: /* @__PURE__ */ jsx19("span", { style: { ...P.fichaName, ...build.name ? {} : P.fichaNameNon }, children: build.name || t(lang, "guia.ficha.personaje") }) }),
-      /* @__PURE__ */ jsxs19("div", { style: P.fichaSub, children: [
-        /* @__PURE__ */ jsx19(TextoRico, { html: G.title }),
+    /* @__PURE__ */ jsxs20("div", { style: { minWidth: 0 }, children: [
+      /* @__PURE__ */ jsx20("div", { children: /* @__PURE__ */ jsx20("span", { style: { ...P.fichaName, ...build.name ? {} : P.fichaNameNon }, children: build.name || t(lang, "guia.ficha.personaje") }) }),
+      /* @__PURE__ */ jsxs20("div", { style: P.fichaSub, children: [
+        /* @__PURE__ */ jsx20(TextoRico, { html: G.title }),
         " · ",
         facLabel
       ] }),
-      /* @__PURE__ */ jsxs19("div", { style: P.fichaVitals, children: [
-        /* @__PURE__ */ jsx19(Vital, { label: t(lang, "guia.ficha.dps"), valor: dpsTxt, ultimo: false }),
-        /* @__PURE__ */ jsx19(Vital, { label: t(lang, "guia.ficha.armas"), valor: `${wOwn}/${wTot}`, barra: wTot ? wOwn / wTot : null }),
-        /* @__PURE__ */ jsx19(Vital, { label: t(lang, "guia.ficha.loot"), valor: lootN, barra: lootTot ? lootN / lootTot : null }),
-        /* @__PURE__ */ jsx19(Vital, { label: t(lang, "guia.ficha.ruta"), valor: `${mileN}/${mileTot}`, barra: mileTot ? mileN / mileTot : null, ultimo: true })
+      /* @__PURE__ */ jsxs20("div", { style: P.fichaVitals, children: [
+        /* @__PURE__ */ jsx20(Vital, { label: t(lang, "guia.ficha.dps"), valor: dpsTxt, ultimo: false }),
+        /* @__PURE__ */ jsx20(Vital, { label: t(lang, "guia.ficha.armas"), valor: `${wOwn}/${wTot}`, barra: wTot ? wOwn / wTot : null }),
+        /* @__PURE__ */ jsx20(Vital, { label: t(lang, "guia.ficha.loot"), valor: lootN, barra: lootTot ? lootN / lootTot : null }),
+        /* @__PURE__ */ jsx20(Vital, { label: t(lang, "guia.ficha.ruta"), valor: `${mileN}/${mileTot}`, barra: mileTot ? mileN / mileTot : null, ultimo: true })
       ] }),
-      vit && realChips.length ? /* @__PURE__ */ jsxs19("div", { style: P.fichaReal, children: [
-        /* @__PURE__ */ jsx19("span", { style: P.fl, children: t(lang, "guia.ficha.real") }),
-        /* @__PURE__ */ jsx19("span", { style: P.frItems, children: realChips.map(([l, val], i) => /* @__PURE__ */ jsxs19("span", { children: [
+      vit && realChips.length ? /* @__PURE__ */ jsxs20("div", { style: P.fichaReal, children: [
+        /* @__PURE__ */ jsx20("span", { style: P.fl, children: t(lang, "guia.ficha.real") }),
+        /* @__PURE__ */ jsx20("span", { style: P.frItems, children: realChips.map(([l, val], i) => /* @__PURE__ */ jsxs20("span", { children: [
           l,
           " ",
-          /* @__PURE__ */ jsx19("b", { style: P.fichaRealB, children: val })
+          /* @__PURE__ */ jsx20("b", { style: P.fichaRealB, children: val })
         ] }, i)) })
       ] }) : null,
-      /* @__PURE__ */ jsx19("div", { style: P.fichaAttrs, children: attrs.map(([l, val]) => /* @__PURE__ */ jsxs19("div", { style: P.fa, children: [
-        /* @__PURE__ */ jsx19("span", { style: P.fl, children: l }),
-        /* @__PURE__ */ jsx19("b", { style: P.faB, children: val })
+      /* @__PURE__ */ jsx20("div", { style: P.fichaAttrs, children: attrs.map(([l, val]) => /* @__PURE__ */ jsxs20("div", { style: P.fa, children: [
+        /* @__PURE__ */ jsx20("span", { style: P.fl, children: l }),
+        /* @__PURE__ */ jsx20("b", { style: P.faB, children: val })
       ] }, l)) }),
-      /* @__PURE__ */ jsxs19("div", { style: P.fichaWeap, children: [
-        /* @__PURE__ */ jsxs19("div", { style: P.fw, children: [
-          /* @__PURE__ */ jsx19("span", { style: P.fl, children: t(lang, "guia.ficha.equipada") }),
-          /* @__PURE__ */ jsx19("b", { style: P.faB, children: wName }),
-          /* @__PURE__ */ jsx19("i", { style: P.fwI, children: dps ? dps.toFixed(1) + " dps" : "—" })
+      /* @__PURE__ */ jsxs20("div", { style: P.fichaWeap, children: [
+        /* @__PURE__ */ jsxs20("div", { style: P.fw, children: [
+          /* @__PURE__ */ jsx20("span", { style: P.fl, children: t(lang, "guia.ficha.equipada") }),
+          /* @__PURE__ */ jsx20("b", { style: P.faB, children: wName }),
+          /* @__PURE__ */ jsx20("i", { style: P.fwI, children: dps ? dps.toFixed(1) + " dps" : "—" })
         ] }),
-        /* @__PURE__ */ jsxs19("div", { style: P.fw, children: [
-          /* @__PURE__ */ jsx19("span", { style: P.fl, children: avail.length ? t(lang, "guia.ficha.mejorAhora") : t(lang, "guia.ficha.siguiente") }),
-          /* @__PURE__ */ jsx19("b", { style: P.faB, children: pick ? pick.n : "—" }),
-          /* @__PURE__ */ jsx19("i", { style: P.fwI, children: pick ? `${fmtDps(pick)} dps · ${pick.lvl <= lvl ? t(lang, "guia.rec.yaPodes") : t(lang, "guia.rec.req", { lvl: pick.lvl })}` : t(lang, "\
+        /* @__PURE__ */ jsxs20("div", { style: P.fw, children: [
+          /* @__PURE__ */ jsx20("span", { style: P.fl, children: avail.length ? t(lang, "guia.ficha.mejorAhora") : t(lang, "guia.ficha.siguiente") }),
+          /* @__PURE__ */ jsx20("b", { style: P.faB, children: pick ? pick.n : "—" }),
+          /* @__PURE__ */ jsx20("i", { style: P.fwI, children: pick ? `${fmtDps(pick)} dps · ${pick.lvl <= lvl ? t(lang, "guia.rec.yaPodes") : t(lang, "guia.rec.req", { lvl: pick.lvl })}` : t(lang, "\
 guia.ficha.sinMejoras") })
         ] })
       ] })
@@ -42109,9 +43014,9 @@ function SimcCard({ simc, G, lang }) {
   if (!simc || typeof simc !== "object") return null;
   const st = simc.stats || {};
   const helpers = simcHelpers(st);
-  const row = (label, val) => val == null || val === "" ? null : /* @__PURE__ */ jsxs19("div", { style: P.st, children: [
-    /* @__PURE__ */ jsx19("span", { style: P.muted, children: label }),
-    /* @__PURE__ */ jsx19("b", { style: P.stB, children: val })
+  const row = (label, val) => val == null || val === "" ? null : /* @__PURE__ */ jsxs20("div", { style: P.st, children: [
+    /* @__PURE__ */ jsx20("span", { style: P.muted, children: label }),
+    /* @__PURE__ */ jsx20("b", { style: P.stB, children: val })
   ] }, label);
   const vit = simcVitals(st);
   const SLOT_LBL = { main_hand: t(lang, "guia.simc.manoPrinc"), off_hand: t(lang, "guia.simc.manoIzq"), ranged: t(lang, "guia.simc.aDistancia") };
@@ -42120,7 +43025,7 @@ function SimcCard({ simc, G, lang }) {
   const real = w && w.dps;
   const delta = real != null && w && w.match ? real - w.match.dps : null;
   const rows = G.simc && G.simc.rows ? G.simc.rows(helpers) : [];
-  const fecha = simc.ts ? new Date(simc.ts).toLocaleDateString(lang === "en" ? "en" : "es") : "";
+  const fecha2 = simc.ts ? new Date(simc.ts).toLocaleDateString(lang === "en" ? "en" : "es") : "";
   const p = simc.pet || {};
   const hab = p.pet_abilities ? p.pet_abilities.split("/").filter(Boolean).length : 0;
   const pvp = /pvp/i.test(simc.server || "") ? "PvP" : null;
@@ -42138,36 +43043,36 @@ function SimcCard({ simc, G, lang }) {
     w ? (w.name || "arma") + (w.dps != null ? " · " + w.dps.toFixed(1) + " dps" : "") : null,
     simc.race
   ].filter(Boolean).join(" · ");
-  return /* @__PURE__ */ jsx19(
+  return /* @__PURE__ */ jsx20(
     Detalle,
     {
-      titulo: /* @__PURE__ */ jsxs19("span", { style: { display: "inline-flex", alignItems: "center", gap: 8 }, children: [
-        /* @__PURE__ */ jsx19(Icono, { n: "scroll", size: 14 }),
+      titulo: /* @__PURE__ */ jsxs20("span", { style: { display: "inline-flex", alignItems: "center", gap: 8 }, children: [
+        /* @__PURE__ */ jsx20(Icono, { n: "scroll", size: 14 }),
         t(lang, "guia.simc.tuPersonaje")
       ] }),
-      meta: /* @__PURE__ */ jsx19("span", { style: P.dmeta, children: sum }),
-      children: /* @__PURE__ */ jsxs19("div", { style: { paddingTop: 4 }, children: [
-        vit ? /* @__PURE__ */ jsxs19(Fragment15, { children: [
+      meta: /* @__PURE__ */ jsx20("span", { style: P.dmeta, children: sum }),
+      children: /* @__PURE__ */ jsxs20("div", { style: { paddingTop: 4 }, children: [
+        vit ? /* @__PURE__ */ jsxs20(Fragment16, { children: [
           (() => {
             const vrows = [];
             if (vit.hp != null) vrows.push([t(lang, "guia.ficha.vida"), vit.hp]);
             vit.powers.forEach((pp) => vrows.push(pp));
             if (vit.dpsChar != null) vrows.push(["DPS", vit.dpsChar.toFixed(1)]);
-            return vrows.length ? /* @__PURE__ */ jsx19("div", { style: P.statgrid, children: vrows.map((r) => row(r[0], r[1])) }) : null;
+            return vrows.length ? /* @__PURE__ */ jsx20("div", { style: P.statgrid, children: vrows.map((r) => row(r[0], r[1])) }) : null;
           })(),
-          vit.attrs.length ? /* @__PURE__ */ jsx19("div", { style: { ...P.muted, marginTop: 8 }, children: /* @__PURE__ */ jsx19("b", { style: { color: C.amarillo }, children: t(lang, "guia.simc.atrib\
+          vit.attrs.length ? /* @__PURE__ */ jsx20("div", { style: { ...P.muted, marginTop: 8 }, children: /* @__PURE__ */ jsx20("b", { style: { color: C.amarillo }, children: t(lang, "guia.simc.atrib\
 utos") }) }) : null,
-          vit.attrs.length ? /* @__PURE__ */ jsx19("div", { style: P.statgrid, children: vit.attrs.map((r) => row(r[0], r[1])) }) : null
+          vit.attrs.length ? /* @__PURE__ */ jsx20("div", { style: P.statgrid, children: vit.attrs.map((r) => row(r[0], r[1])) }) : null
         ] }) : null,
-        slots.length ? /* @__PURE__ */ jsxs19(Fragment15, { children: [
-          /* @__PURE__ */ jsx19("div", { style: { ...P.muted, marginTop: 8 }, children: /* @__PURE__ */ jsx19("b", { style: { color: C.amarillo }, children: t(lang, "guia.simc.danoSwing") }) }),
-          /* @__PURE__ */ jsx19("div", { style: P.statgrid, children: slots.map(([l, ww]) => /* @__PURE__ */ jsxs19("div", { style: P.st, children: [
-            /* @__PURE__ */ jsxs19("span", { style: P.muted, children: [
+        slots.length ? /* @__PURE__ */ jsxs20(Fragment16, { children: [
+          /* @__PURE__ */ jsx20("div", { style: { ...P.muted, marginTop: 8 }, children: /* @__PURE__ */ jsx20("b", { style: { color: C.amarillo }, children: t(lang, "guia.simc.danoSwing") }) }),
+          /* @__PURE__ */ jsx20("div", { style: P.statgrid, children: slots.map(([l, ww]) => /* @__PURE__ */ jsxs20("div", { style: P.st, children: [
+            /* @__PURE__ */ jsxs20("span", { style: P.muted, children: [
               l,
               " — ",
               ww.name || "?"
             ] }),
-            /* @__PURE__ */ jsxs19("b", { style: P.stB, children: [
+            /* @__PURE__ */ jsxs20("b", { style: P.stB, children: [
               ww.range.min.toFixed(1),
               "–",
               ww.range.mx.toFixed(1),
@@ -42178,24 +43083,24 @@ utos") }) }) : null,
             ] })
           ] }, l)) })
         ] }) : null,
-        w ? /* @__PURE__ */ jsxs19("div", { style: { ...P.statgrid, marginTop: 8 }, children: [
-          /* @__PURE__ */ jsxs19("div", { style: { ...P.st, gridColumn: "1/-1" }, children: [
-            /* @__PURE__ */ jsx19("span", { style: P.muted, children: t(lang, "guia.simc.armaEquipada") }),
-            /* @__PURE__ */ jsxs19("b", { style: { ...P.stB, color: C.verde }, children: [
+        w ? /* @__PURE__ */ jsxs20("div", { style: { ...P.statgrid, marginTop: 8 }, children: [
+          /* @__PURE__ */ jsxs20("div", { style: { ...P.st, gridColumn: "1/-1" }, children: [
+            /* @__PURE__ */ jsx20("span", { style: P.muted, children: t(lang, "guia.simc.armaEquipada") }),
+            /* @__PURE__ */ jsxs20("b", { style: { ...P.stB, color: C.verde }, children: [
               w.name || "arma",
               " · ",
               real != null ? real.toFixed(1) + " dps" : "?"
             ] })
           ] }),
           w.match ? row(t(lang, "guia.simc.tablaArma"), w.match.dps.toFixed(1) + " dps" + (w.match.approx ? " ~" : "")) : null,
-          delta != null && Math.abs(delta) >= 0.3 ? /* @__PURE__ */ jsx19("div", { style: { ...P.muted, gridColumn: "1/-1", fontSize: 11.5 }, children: t(lang, "guia.simc.deltaReal", { real: real.toFixed(
+          delta != null && Math.abs(delta) >= 0.3 ? /* @__PURE__ */ jsx20("div", { style: { ...P.muted, gridColumn: "1/-1", fontSize: 11.5 }, children: t(lang, "guia.simc.deltaReal", { real: real.toFixed(
           1) }) }) : null,
-          !w.match && w.name ? /* @__PURE__ */ jsx19("div", { style: { ...P.muted, gridColumn: "1/-1", fontSize: 11.5 }, children: t(lang, "guia.simc.noEnTabla", { arma: w.name }) }) : null
+          !w.match && w.name ? /* @__PURE__ */ jsx20("div", { style: { ...P.muted, gridColumn: "1/-1", fontSize: 11.5 }, children: t(lang, "guia.simc.noEnTabla", { arma: w.name }) }) : null
         ] }) : null,
-        rows.filter((r) => r[1] != null && r[1] !== "").length ? /* @__PURE__ */ jsx19("div", { style: P.statgrid, children: rows.filter((r) => r[1] != null && r[1] !== "").map((r) => row(r[0], r[1])) }) :
+        rows.filter((r) => r[1] != null && r[1] !== "").length ? /* @__PURE__ */ jsx20("div", { style: P.statgrid, children: rows.filter((r) => r[1] != null && r[1] !== "").map((r) => row(r[0], r[1])) }) :
         null,
-        G.simc && G.simc.pet && (p.pet_family || p.pet_happiness) ? /* @__PURE__ */ jsxs19("div", { style: { ...P.muted, marginTop: 8 }, children: [
-          /* @__PURE__ */ jsxs19("b", { style: { color: C.verde }, children: [
+        G.simc && G.simc.pet && (p.pet_family || p.pet_happiness) ? /* @__PURE__ */ jsxs20("div", { style: { ...P.muted, marginTop: 8 }, children: [
+          /* @__PURE__ */ jsxs20("b", { style: { color: C.verde }, children: [
             t(lang, "guia.simc.pet"),
             ":"
           ] }),
@@ -42209,21 +43114,21 @@ utos") }) }) : null,
           petHappyText(p.pet_happiness),
           hab ? ` · ${hab} ${t(lang, "guia.simc.habilidades")}` : ""
         ] }) : null,
-        meta.length ? /* @__PURE__ */ jsx19("div", { style: { ...P.chipln, marginTop: 8 }, children: meta.map((x) => /* @__PURE__ */ jsx19(Placa, { tono: "plain", estilo: { marginLeft: 0 }, children: x },
+        meta.length ? /* @__PURE__ */ jsx20("div", { style: { ...P.chipln, marginTop: 8 }, children: meta.map((x) => /* @__PURE__ */ jsx20(Placa, { tono: "plain", estilo: { marginLeft: 0 }, children: x },
         x)) }) : null,
-        simc.professions && simc.professions.length ? /* @__PURE__ */ jsx19("div", { style: { ...P.chipln, marginTop: 4 }, children: simc.professions.map((pp, i) => /* @__PURE__ */ jsxs19(Placa, { tono: "\
+        simc.professions && simc.professions.length ? /* @__PURE__ */ jsx20("div", { style: { ...P.chipln, marginTop: 4 }, children: simc.professions.map((pp, i) => /* @__PURE__ */ jsxs20(Placa, { tono: "\
 plain", estilo: { marginLeft: 0 }, children: [
           pp[0],
           pp[1] != null ? " " + pp[1] : ""
         ] }, i)) }) : null,
-        /* @__PURE__ */ jsx19("div", { style: { ...P.muted, marginTop: 8 }, children: t(lang, "guia.simc.fecha", { fecha }) })
+        /* @__PURE__ */ jsx20("div", { style: { ...P.muted, marginTop: 8 }, children: t(lang, "guia.simc.fecha", { fecha: fecha2 }) })
       ] })
     }
   );
 }
 
 // src/vistas/guia/recomendador.jsx
-import { Fragment as Fragment16, jsx as jsx20, jsxs as jsxs20 } from "react/jsx-runtime";
+import { Fragment as Fragment17, jsx as jsx21, jsxs as jsxs21 } from "react/jsx-runtime";
 agregarTextos({
   "guia.rec.donde": "Dónde levelear ahora",
   "guia.rec.rango": "rango {min}-{max} · {realm}",
@@ -42308,17 +43213,17 @@ function VistaRec({ v, lang }) {
   const nextShow = availL.length ? [] : nextL.slice(0, 3);
   const nextFold = availL.length ? nextL : nextL.slice(3);
   const foldLabel = availL.length ? t(lang, "guia.rec.mejoras") : t(lang, "guia.rec.mas", { n: nextFold.length });
-  const wline = (w, ultimo) => /* @__PURE__ */ jsx20(Wline, { w, lvl, dps, tipos, lang, ultimo }, w.id);
-  return /* @__PURE__ */ jsxs20(Fragment16, { children: [
-    /* @__PURE__ */ jsx20(Tarjeta, { titulo: t(lang, "guia.ficha.personaje"), extra: /* @__PURE__ */ jsx20(Origen, { f: "curado", lang }), children: /* @__PURE__ */ jsx20(Ficha, { v, lang }) }),
-    ownedBetter ? /* @__PURE__ */ jsx20(
+  const wline = (w, ultimo) => /* @__PURE__ */ jsx21(Wline, { w, lvl, dps, tipos, lang, ultimo }, w.id);
+  return /* @__PURE__ */ jsxs21(Fragment17, { children: [
+    /* @__PURE__ */ jsx21(Tarjeta, { titulo: t(lang, "guia.ficha.personaje"), extra: /* @__PURE__ */ jsx21(Origen, { f: "curado", lang }), children: /* @__PURE__ */ jsx21(Ficha, { v, lang }) }),
+    ownedBetter ? /* @__PURE__ */ jsx21(
       Tarjeta,
       {
         titulo: t(lang, "guia.rec.warnMejor"),
         estilo: { borderLeft: `3px solid ${C.amarillo}` },
-        extra: /* @__PURE__ */ jsx20(Origen, { f: "curado", lang }),
-        children: /* @__PURE__ */ jsxs20("div", { children: [
-          /* @__PURE__ */ jsx20(NombreCalidad, { q: ownedBetter.q, children: ownedBetter.n }),
+        extra: /* @__PURE__ */ jsx21(Origen, { f: "curado", lang }),
+        children: /* @__PURE__ */ jsxs21("div", { children: [
+          /* @__PURE__ */ jsx21(NombreCalidad, { q: ownedBetter.q, children: ownedBetter.n }),
           " (",
           fmtDps(ownedBetter),
           " dps) ",
@@ -42326,38 +43231,38 @@ function VistaRec({ v, lang }) {
         ] })
       }
     ) : null,
-    recHtml ? /* @__PURE__ */ jsx20(Tarjeta, { titulo: t(lang, "guia.rec.recomendaciones"), extra: /* @__PURE__ */ jsx20(Origen, { f: "curado", lang }), children: /* @__PURE__ */ jsx20(TextoRico, { html: recHtml }) }) :
+    recHtml ? /* @__PURE__ */ jsx21(Tarjeta, { titulo: t(lang, "guia.rec.recomendaciones"), extra: /* @__PURE__ */ jsx21(Origen, { f: "curado", lang }), children: /* @__PURE__ */ jsx21(TextoRico, { html: recHtml }) }) :
     null,
-    band ? /* @__PURE__ */ jsxs20(Tarjeta, { estilo: { borderLeft: `3px solid ${C.acento}` }, titulo: t(lang, "guia.rec.donde"), extra: /* @__PURE__ */ jsx20(Origen, { f: "curado", lang }), children: [
-      /* @__PURE__ */ jsx20("div", { style: S.sub, children: t(lang, "guia.rec.rango", { min: band.min, max: band.max, realm: realmLabel }) }),
-      /* @__PURE__ */ jsx20("div", { style: P.zonaBig, children: band.zones }),
-      band.notes ? /* @__PURE__ */ jsx20("div", { style: { ...P.tip, marginTop: 6 }, children: /* @__PURE__ */ jsx20(TextoRico, { html: band.notes }) }) : null,
-      band.dung ? /* @__PURE__ */ jsxs20("div", { style: { ...P.tip, marginTop: 4 }, children: [
-        /* @__PURE__ */ jsx20("b", { style: { color: C.amarillo }, children: t(lang, "guia.rec.dungeonsLbl") }),
+    band ? /* @__PURE__ */ jsxs21(Tarjeta, { estilo: { borderLeft: `3px solid ${C.acento}` }, titulo: t(lang, "guia.rec.donde"), extra: /* @__PURE__ */ jsx21(Origen, { f: "curado", lang }), children: [
+      /* @__PURE__ */ jsx21("div", { style: S.sub, children: t(lang, "guia.rec.rango", { min: band.min, max: band.max, realm: realmLabel }) }),
+      /* @__PURE__ */ jsx21("div", { style: P.zonaBig, children: band.zones }),
+      band.notes ? /* @__PURE__ */ jsx21("div", { style: { ...P.tip, marginTop: 6 }, children: /* @__PURE__ */ jsx21(TextoRico, { html: band.notes }) }) : null,
+      band.dung ? /* @__PURE__ */ jsxs21("div", { style: { ...P.tip, marginTop: 4 }, children: [
+        /* @__PURE__ */ jsx21("b", { style: { color: C.amarillo }, children: t(lang, "guia.rec.dungeonsLbl") }),
         " ",
-        /* @__PURE__ */ jsx20(TextoRico, { html: band.dung })
+        /* @__PURE__ */ jsx21(TextoRico, { html: band.dung })
       ] }) : null,
-      nextBand ? /* @__PURE__ */ jsxs20("div", { style: { ...P.tip, marginTop: 6 }, children: [
+      nextBand ? /* @__PURE__ */ jsxs21("div", { style: { ...P.tip, marginTop: 6 }, children: [
         t(lang, "guia.rec.despues", { min: nextBand.min }),
         " ",
-        /* @__PURE__ */ jsx20("b", { children: nextBand.zones })
+        /* @__PURE__ */ jsx21("b", { children: nextBand.zones })
       ] }) : null
     ] }) : null,
-    /* @__PURE__ */ jsx20(Tarjeta, { estilo: { borderLeft: `3px solid ${C.amarillo}` }, titulo: t(lang, "guia.rec.proximas"), extra: /* @__PURE__ */ jsxs20(Fragment16, { children: [
-      /* @__PURE__ */ jsx20("span", { style: { ...P.muted, textTransform: "none", letterSpacing: 0, fontWeight: 400 }, children: subArmas }),
-      /* @__PURE__ */ jsx20(Origen, { f: "curado", lang })
-    ] }), children: !cands.length ? /* @__PURE__ */ jsx20("div", { style: P.muted, children: dps >= 29 ? t(lang, "guia.rec.nadaPre") : t(lang, "guia.rec.nadaSub") }) : /* @__PURE__ */ jsxs20(Fragment16,
+    /* @__PURE__ */ jsx21(Tarjeta, { estilo: { borderLeft: `3px solid ${C.amarillo}` }, titulo: t(lang, "guia.rec.proximas"), extra: /* @__PURE__ */ jsxs21(Fragment17, { children: [
+      /* @__PURE__ */ jsx21("span", { style: { ...P.muted, textTransform: "none", letterSpacing: 0, fontWeight: 400 }, children: subArmas }),
+      /* @__PURE__ */ jsx21(Origen, { f: "curado", lang })
+    ] }), children: !cands.length ? /* @__PURE__ */ jsx21("div", { style: P.muted, children: dps >= 29 ? t(lang, "guia.rec.nadaPre") : t(lang, "guia.rec.nadaSub") }) : /* @__PURE__ */ jsxs21(Fragment17,
     { children: [
-      availShow.length ? /* @__PURE__ */ jsx20("div", { style: { ...P.muted, marginBottom: 2 }, children: t(lang, "guia.rec.disponibles") }) : null,
+      availShow.length ? /* @__PURE__ */ jsx21("div", { style: { ...P.muted, marginBottom: 2 }, children: t(lang, "guia.rec.disponibles") }) : null,
       availShow.map((w, i) => wline(w, i === availShow.length - 1 && !nextShow.length && !nextFold.length)),
-      nextShow.length ? /* @__PURE__ */ jsx20("div", { style: { ...P.muted, margin: "8px 0 2px" }, children: t(lang, "guia.rec.proxLista") }) : null,
+      nextShow.length ? /* @__PURE__ */ jsx21("div", { style: { ...P.muted, margin: "8px 0 2px" }, children: t(lang, "guia.rec.proxLista") }) : null,
       nextShow.map((w, i) => wline(w, i === nextShow.length - 1)),
-      nextFold.length ? /* @__PURE__ */ jsx20(Detalle, { titulo: foldLabel, meta: `(${nextFold.length})`, abierto: false, children: nextFold.map((w, i) => wline(w, i === nextFold.length - 1)) }) : null
+      nextFold.length ? /* @__PURE__ */ jsx21(Detalle, { titulo: foldLabel, meta: `(${nextFold.length})`, abierto: false, children: nextFold.map((w, i) => wline(w, i === nextFold.length - 1)) }) : null
     ] }) }),
-    dungs.length ? /* @__PURE__ */ jsxs20(Fragment16, { children: [
-      /* @__PURE__ */ jsxs20("div", { style: P.bandhead, children: [
-        /* @__PURE__ */ jsx20("span", { children: t(lang, "guia.rec.dgnRango") }),
-        /* @__PURE__ */ jsxs20("span", { style: P.bandheadZn, children: [
+    dungs.length ? /* @__PURE__ */ jsxs21(Fragment17, { children: [
+      /* @__PURE__ */ jsxs21("div", { style: P.bandhead, children: [
+        /* @__PURE__ */ jsx21("span", { children: t(lang, "guia.rec.dgnRango") }),
+        /* @__PURE__ */ jsxs21("span", { style: P.bandheadZn, children: [
           dungs.length,
           " · ",
           t(lang, "guia.rec.abrirLoot")
@@ -42366,29 +43271,29 @@ function VistaRec({ v, lang }) {
       dungs.map((d) => {
         const soon = lvl < d.r[0], late = lvl > d.r[1], inR = !soon && !late;
         const diff = d.r[0] - lvl;
-        return /* @__PURE__ */ jsxs20(
+        return /* @__PURE__ */ jsxs21(
           Detalle,
           {
             abierto: false,
             estilo: inR ? { borderLeft: `3px solid ${C.verde}` } : {},
             titulo: d.n,
             meta: `${d.loc} · ${d.r[0]}-${d.r[1]}`,
-            extra: /* @__PURE__ */ jsxs20(Fragment16, { children: [
+            extra: /* @__PURE__ */ jsxs21(Fragment17, { children: [
               locPlaca(d.cont, lang),
-              d.key ? /* @__PURE__ */ jsx20(Placa, { tono: "now", children: t(lang, "guia.rec.clave") }) : null,
-              soon ? /* @__PURE__ */ jsx20(Placa, { tono: "soon", children: diff <= 1 ? t(lang, "guia.rec.enNivel", { n: diff }) : t(lang, "guia.rec.enNiveles", { n: diff }) }) : late ? /* @__PURE__ */ jsx20(
-              Placa, { tono: "plain", children: t(lang, "guia.rec.yaPasada") }) : /* @__PURE__ */ jsx20(Placa, { tono: "now", children: t(lang, "guia.rec.disponible") }),
-              /* @__PURE__ */ jsx20("span", { style: { ...P.dprog, marginLeft: "auto" }, children: t(lang, "guia.rec.items", { n: (d.loot || []).length }) }),
-              /* @__PURE__ */ jsx20(Origen, { f: "curado", lang })
+              d.key ? /* @__PURE__ */ jsx21(Placa, { tono: "now", children: t(lang, "guia.rec.clave") }) : null,
+              soon ? /* @__PURE__ */ jsx21(Placa, { tono: "soon", children: diff <= 1 ? t(lang, "guia.rec.enNivel", { n: diff }) : t(lang, "guia.rec.enNiveles", { n: diff }) }) : late ? /* @__PURE__ */ jsx21(
+              Placa, { tono: "plain", children: t(lang, "guia.rec.yaPasada") }) : /* @__PURE__ */ jsx21(Placa, { tono: "now", children: t(lang, "guia.rec.disponible") }),
+              /* @__PURE__ */ jsx21("span", { style: { ...P.dprog, marginLeft: "auto" }, children: t(lang, "guia.rec.items", { n: (d.loot || []).length }) }),
+              /* @__PURE__ */ jsx21(Origen, { f: "curado", lang })
             ] }),
             children: [
-              d.note ? /* @__PURE__ */ jsx20("div", { style: { ...P.muted, marginBottom: 6 }, children: /* @__PURE__ */ jsx20(TextoRico, { html: d.note }) }) : null,
-              (d.loot || []).map((l, i) => /* @__PURE__ */ jsx20("div", { style: { ...P.loot, ...i === (d.loot || []).length - 1 ? P.lootSinBorde : {} }, children: /* @__PURE__ */ jsxs20("span", { children: [
-                /* @__PURE__ */ jsx20(NombreCalidad, { q: "rare", children: l[0] }),
+              d.note ? /* @__PURE__ */ jsx21("div", { style: { ...P.muted, marginBottom: 6 }, children: /* @__PURE__ */ jsx21(TextoRico, { html: d.note }) }) : null,
+              (d.loot || []).map((l, i) => /* @__PURE__ */ jsx21("div", { style: { ...P.loot, ...i === (d.loot || []).length - 1 ? P.lootSinBorde : {} }, children: /* @__PURE__ */ jsxs21("span", { children: [
+                /* @__PURE__ */ jsx21(NombreCalidad, { q: "rare", children: l[0] }),
                 " ",
-                /* @__PURE__ */ jsxs20("span", { style: P.muted, children: [
+                /* @__PURE__ */ jsxs21("span", { style: P.muted, children: [
                   "— ",
-                  /* @__PURE__ */ jsx20(TextoRico, { html: l[1] })
+                  /* @__PURE__ */ jsx21(TextoRico, { html: l[1] })
                 ] })
               ] }) }, i))
             ]
@@ -42397,37 +43302,37 @@ function VistaRec({ v, lang }) {
         );
       })
     ] }) : null,
-    miles.length ? /* @__PURE__ */ jsx20(
+    miles.length ? /* @__PURE__ */ jsx21(
       Detalle,
       {
-        titulo: /* @__PURE__ */ jsxs20("span", { style: { display: "inline-flex", alignItems: "center", gap: 8 }, children: [
-          /* @__PURE__ */ jsx20(Icono, { n: "route", size: 14 }),
+        titulo: /* @__PURE__ */ jsxs21("span", { style: { display: "inline-flex", alignItems: "center", gap: 8 }, children: [
+          /* @__PURE__ */ jsx21(Icono, { n: "route", size: 14 }),
           t(lang, "guia.rec.hitos")
         ] }),
         meta: t(lang, "guia.rec.hitosSub", { n: miles.length, min: lvl - 2, max: lvl + 10 }),
-        extra: /* @__PURE__ */ jsx20(Origen, { f: "curado", lang }),
+        extra: /* @__PURE__ */ jsx21(Origen, { f: "curado", lang }),
         children: miles.map(({ m, i }) => {
           const k = m.lvl + "|" + i, done = ss.has(k);
-          return /* @__PURE__ */ jsxs20("div", { style: { ...P.mst, ...i === miles.length - 1 ? P.mstUlt : {}, ...done ? { opacity: 0.45 } : {} }, children: [
-            /* @__PURE__ */ jsx20("span", { style: P.mstLvl, children: m.lvl }),
-            /* @__PURE__ */ jsxs20("span", { style: P.mstTxt, children: [
-              /* @__PURE__ */ jsx20(Placa, { tono: "cat", estilo: { marginLeft: 0 }, children: m.cat }),
+          return /* @__PURE__ */ jsxs21("div", { style: { ...P.mst, ...i === miles.length - 1 ? P.mstUlt : {}, ...done ? { opacity: 0.45 } : {} }, children: [
+            /* @__PURE__ */ jsx21("span", { style: P.mstLvl, children: m.lvl }),
+            /* @__PURE__ */ jsxs21("span", { style: P.mstTxt, children: [
+              /* @__PURE__ */ jsx21(Placa, { tono: "cat", estilo: { marginLeft: 0 }, children: m.cat }),
               " ",
               m.loc ? locPlaca(m.loc, lang) : null,
               " ",
-              /* @__PURE__ */ jsx20(TextoRico, { html: m.txt })
+              /* @__PURE__ */ jsx21(TextoRico, { html: m.txt })
             ] })
           ] }, k);
         })
       }
     ) : null,
-    /* @__PURE__ */ jsx20("div", { style: P.tip, children: t(lang, "guia.rec.footer") })
+    /* @__PURE__ */ jsx21("div", { style: P.tip, children: t(lang, "guia.rec.footer") })
   ] });
 }
 
 // src/vistas/guia/armas.jsx
 import { Checkbox as Checkbox10 } from "@hermes/plugin-sdk";
-import { jsx as jsx21, jsxs as jsxs21 } from "react/jsx-runtime";
+import { jsx as jsx22, jsxs as jsxs22 } from "react/jsx-runtime";
 agregarTextos({
   "guia.armas.arma": "Arma",
   "guia.armas.tipo": "Tipo",
@@ -42467,9 +43372,9 @@ function VistaArmas({ v, lang }) {
     const r = setWeaponOwnedEstado(b, w.id, checked, { weapons, dungeons: G.dungeons || [] });
     return { ...b, owned: r.owned, gear: r.gear };
   });
-  return /* @__PURE__ */ jsxs21(Tarjeta, { extra: /* @__PURE__ */ jsx21(Origen, { f: "curado", lang }), children: [
-    /* @__PURE__ */ jsxs21("div", { style: { display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }, children: [
-      (G.typeFilters || []).map((f) => /* @__PURE__ */ jsx21(
+  return /* @__PURE__ */ jsxs22(Tarjeta, { extra: /* @__PURE__ */ jsx22(Origen, { f: "curado", lang }), children: [
+    /* @__PURE__ */ jsxs22("div", { style: { display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }, children: [
+      (G.typeFilters || []).map((f) => /* @__PURE__ */ jsx22(
         "button",
         {
           type: "button",
@@ -42479,61 +43384,61 @@ function VistaArmas({ v, lang }) {
         },
         f[0]
       )),
-      /* @__PURE__ */ jsxs21("label", { style: { display: "flex", gap: 6, alignItems: "center", marginLeft: 8, cursor: "pointer", fontSize: 12, color: C.texto2 }, children: [
-        /* @__PURE__ */ jsx21(Checkbox10, { checked: !!build.who, onCheckedChange: (val) => guardar((b) => ({ ...b, who: !!val })) }),
+      /* @__PURE__ */ jsxs22("label", { style: { display: "flex", gap: 6, alignItems: "center", marginLeft: 8, cursor: "pointer", fontSize: 12, color: C.texto2 }, children: [
+        /* @__PURE__ */ jsx22(Checkbox10, { checked: !!build.who, onCheckedChange: (val) => guardar((b) => ({ ...b, who: !!val })) }),
         t(lang, "guia.armas.ocultar")
       ] }),
-      /* @__PURE__ */ jsxs21("span", { style: { ...P.muted, marginLeft: "auto" }, children: [
+      /* @__PURE__ */ jsxs22("span", { style: { ...P.muted, marginLeft: "auto" }, children: [
         t(lang, "guia.armas.obtenidas"),
         " ",
-        /* @__PURE__ */ jsxs21("b", { children: [
+        /* @__PURE__ */ jsxs22("b", { children: [
           cnt,
           "/",
           weapons.length
         ] })
       ] })
     ] }),
-    /* @__PURE__ */ jsxs21("div", { style: P.tablaScroll, children: [
-      /* @__PURE__ */ jsxs21("table", { style: S.tabla, children: [
-        /* @__PURE__ */ jsx21("thead", { children: /* @__PURE__ */ jsxs21("tr", { children: [
-          /* @__PURE__ */ jsx21("th", { style: S.th }),
-          /* @__PURE__ */ jsx21("th", { style: S.th, children: t(lang, "guia.armas.arma") }),
-          /* @__PURE__ */ jsx21("th", { style: S.th, children: t(lang, "guia.armas.tipo") }),
-          /* @__PURE__ */ jsx21("th", { style: S.th, children: t(lang, "guia.armas.dps") }),
-          /* @__PURE__ */ jsx21("th", { style: S.th, children: t(lang, "guia.armas.req") }),
-          /* @__PURE__ */ jsx21("th", { style: S.th, children: t(lang, "guia.armas.delta") }),
-          /* @__PURE__ */ jsx21("th", { style: S.th, children: t(lang, "guia.armas.fuente") })
+    /* @__PURE__ */ jsxs22("div", { style: P.tablaScroll, children: [
+      /* @__PURE__ */ jsxs22("table", { style: S.tabla, children: [
+        /* @__PURE__ */ jsx22("thead", { children: /* @__PURE__ */ jsxs22("tr", { children: [
+          /* @__PURE__ */ jsx22("th", { style: S.th }),
+          /* @__PURE__ */ jsx22("th", { style: S.th, children: t(lang, "guia.armas.arma") }),
+          /* @__PURE__ */ jsx22("th", { style: S.th, children: t(lang, "guia.armas.tipo") }),
+          /* @__PURE__ */ jsx22("th", { style: S.th, children: t(lang, "guia.armas.dps") }),
+          /* @__PURE__ */ jsx22("th", { style: S.th, children: t(lang, "guia.armas.req") }),
+          /* @__PURE__ */ jsx22("th", { style: S.th, children: t(lang, "guia.armas.delta") }),
+          /* @__PURE__ */ jsx22("th", { style: S.th, children: t(lang, "guia.armas.fuente") })
         ] }) }),
-        /* @__PURE__ */ jsx21("tbody", { children: list.map((w) => {
+        /* @__PURE__ */ jsx22("tbody", { children: list.map((w) => {
           const own = os.has(w.id), eq = build.cur === w.id, dlt = w.dps - dps;
-          return /* @__PURE__ */ jsxs21("tr", { className: (own ? "owned " : "") + (eq ? "equipped" : ""), style: { ...own ? P.trOwned : {}, ...eq ? P.trEq : {} }, children: [
-            /* @__PURE__ */ jsx21("td", { style: S.td, children: /* @__PURE__ */ jsx21(Checkbox10, { "data-wid": w.id, checked: own, onCheckedChange: (val) => toggleW(w, val) }) }),
-            /* @__PURE__ */ jsxs21("td", { style: S.td, children: [
-              /* @__PURE__ */ jsx21(NombreCalidad, { q: w.q, children: /* @__PURE__ */ jsx21("b", { children: w.n }) }),
-              eq ? /* @__PURE__ */ jsx21(Placa, { tono: "eq", children: t(lang, "guia.armas.equipada") }) : null,
-              w.note ? /* @__PURE__ */ jsx21("div", { style: { ...P.muted, fontSize: 11 }, children: /* @__PURE__ */ jsx21("i", { children: /* @__PURE__ */ jsx21(TextoRico, { html: w.note }) }) }) : null
+          return /* @__PURE__ */ jsxs22("tr", { className: (own ? "owned " : "") + (eq ? "equipped" : ""), style: { ...own ? P.trOwned : {}, ...eq ? P.trEq : {} }, children: [
+            /* @__PURE__ */ jsx22("td", { style: S.td, children: /* @__PURE__ */ jsx22(Checkbox10, { "data-wid": w.id, checked: own, onCheckedChange: (val) => toggleW(w, val) }) }),
+            /* @__PURE__ */ jsxs22("td", { style: S.td, children: [
+              /* @__PURE__ */ jsx22(NombreCalidad, { q: w.q, children: /* @__PURE__ */ jsx22("b", { children: w.n }) }),
+              eq ? /* @__PURE__ */ jsx22(Placa, { tono: "eq", children: t(lang, "guia.armas.equipada") }) : null,
+              w.note ? /* @__PURE__ */ jsx22("div", { style: { ...P.muted, fontSize: 11 }, children: /* @__PURE__ */ jsx22("i", { children: /* @__PURE__ */ jsx22(TextoRico, { html: w.note }) }) }) : null
             ] }),
-            /* @__PURE__ */ jsxs21("td", { style: S.td, children: [
+            /* @__PURE__ */ jsxs22("td", { style: S.td, children: [
               tipos[w.t] || w.t,
-              w.eng ? /* @__PURE__ */ jsx21(Placa, { tono: "eng", estilo: { marginLeft: 4 }, children: "ENG" }) : null
+              w.eng ? /* @__PURE__ */ jsx22(Placa, { tono: "eng", estilo: { marginLeft: 4 }, children: "ENG" }) : null
             ] }),
-            /* @__PURE__ */ jsx21("td", { style: S.td, children: /* @__PURE__ */ jsx21("b", { children: fmtDps(w) }) }),
-            /* @__PURE__ */ jsx21("td", { style: S.td, children: w.lvl }),
-            /* @__PURE__ */ jsx21("td", { style: { ...S.td, color: dlt > 0 ? C.verde : C.texto3 }, children: dps ? (dlt > 0 ? "+" : "") + dlt.toFixed(1) : "—" }),
-            /* @__PURE__ */ jsx21("td", { style: { ...S.td, ...P.muted }, children: /* @__PURE__ */ jsx21(TextoRico, { html: w.src }) })
+            /* @__PURE__ */ jsx22("td", { style: S.td, children: /* @__PURE__ */ jsx22("b", { children: fmtDps(w) }) }),
+            /* @__PURE__ */ jsx22("td", { style: S.td, children: w.lvl }),
+            /* @__PURE__ */ jsx22("td", { style: { ...S.td, color: dlt > 0 ? C.verde : C.texto3 }, children: dps ? (dlt > 0 ? "+" : "") + dlt.toFixed(1) : "—" }),
+            /* @__PURE__ */ jsx22("td", { style: { ...S.td, ...P.muted }, children: /* @__PURE__ */ jsx22(TextoRico, { html: w.src }) })
           ] }, w.id);
         }) })
       ] }),
-      !list.length ? /* @__PURE__ */ jsx21("div", { style: { ...P.muted, padding: "8px 0" }, children: t(lang, "guia.armas.vacia") }) : null
+      !list.length ? /* @__PURE__ */ jsx22("div", { style: { ...P.muted, padding: "8px 0" }, children: t(lang, "guia.armas.vacia") }) : null
     ] }),
-    /* @__PURE__ */ jsx21("div", { style: P.tip, children: t(lang, "guia.armas.approx") })
+    /* @__PURE__ */ jsx22("div", { style: P.tip, children: t(lang, "guia.armas.approx") })
   ] });
 }
 
 // src/vistas/guia/macros.jsx
-import { useEffect as useEffect5, useRef as useRef3, useState as useState12 } from "react";
-import { Button as Button9, SearchField as SearchField3, SegmentedControl as SegmentedControl4 } from "@hermes/plugin-sdk";
-import { Fragment as Fragment17, jsx as jsx22, jsxs as jsxs22 } from "react/jsx-runtime";
+import { useEffect as useEffect6, useRef as useRef3, useState as useState13 } from "react";
+import { Button as Button10, SearchField as SearchField3, SegmentedControl as SegmentedControl4 } from "@hermes/plugin-sdk";
+import { Fragment as Fragment18, jsx as jsx23, jsxs as jsxs23 } from "react/jsx-runtime";
 agregarTextos({
   "guia.mac.titulo": "Macros meta — WoW: Forever",
   "guia.mac.usables": "{u} de {t} usables a tu nivel",
@@ -42654,26 +43559,26 @@ var MROW_ESTADO = {
 function Tecla({ b, sctx, onJump, lang }) {
   const v = slotView(b, sctx);
   const est = KC_ESTADO[v.cls] || {};
-  const inner = /* @__PURE__ */ jsxs22(Fragment17, { children: [
-    /* @__PURE__ */ jsx22("span", { style: P.kk, children: b.k }),
-    v.mods && v.mods.length ? /* @__PURE__ */ jsx22("span", { style: P.km, children: v.mods.join(" ") }) : null,
-    /* @__PURE__ */ jsx22("span", { style: P.kn, children: v.t }),
-    /* @__PURE__ */ jsx22("span", { style: { ...P.ks, ...est.ks || {} }, children: subBarra(v, lang) })
+  const inner = /* @__PURE__ */ jsxs23(Fragment18, { children: [
+    /* @__PURE__ */ jsx23("span", { style: P.kk, children: b.k }),
+    v.mods && v.mods.length ? /* @__PURE__ */ jsx23("span", { style: P.km, children: v.mods.join(" ") }) : null,
+    /* @__PURE__ */ jsx23("span", { style: P.kn, children: v.t }),
+    /* @__PURE__ */ jsx23("span", { style: { ...P.ks, ...est.ks || {} }, children: subBarra(v, lang) })
   ] });
   const estilo = { ...P.kcBase, ...est, cursor: v.mi >= 0 ? "pointer" : "default" };
-  if (v.mi >= 0) return /* @__PURE__ */ jsx22("button", { type: "button", className: "kc", style: estilo, title: v.tip, onClick: () => onJump(v.mi), children: inner });
-  return /* @__PURE__ */ jsx22("div", { className: "kc", style: estilo, title: v.tip, children: inner });
+  if (v.mi >= 0) return /* @__PURE__ */ jsx23("button", { type: "button", className: "kc", style: estilo, title: v.tip, onClick: () => onJump(v.mi), children: inner });
+  return /* @__PURE__ */ jsx23("div", { className: "kc", style: estilo, title: v.tip, children: inner });
 }
 function Raton({ b, sctx, onJump, lang }) {
   const v = slotView(b, sctx);
-  const inner = /* @__PURE__ */ jsxs22(Fragment17, { children: [
-    /* @__PURE__ */ jsx22("span", { style: P.mrowMk, children: b.k }),
-    /* @__PURE__ */ jsx22("span", { style: { flex: 1, minWidth: 0 }, children: v.t }),
-    /* @__PURE__ */ jsx22("span", { style: P.mrowKs, children: subBarra(v, lang) })
+  const inner = /* @__PURE__ */ jsxs23(Fragment18, { children: [
+    /* @__PURE__ */ jsx23("span", { style: P.mrowMk, children: b.k }),
+    /* @__PURE__ */ jsx23("span", { style: { flex: 1, minWidth: 0 }, children: v.t }),
+    /* @__PURE__ */ jsx23("span", { style: P.mrowKs, children: subBarra(v, lang) })
   ] });
   const estilo = { ...P.mrow, ...MROW_ESTADO[v.cls] || {}, cursor: v.mi >= 0 ? "pointer" : "default" };
-  if (v.mi >= 0) return /* @__PURE__ */ jsx22("button", { type: "button", className: "mrow", style: estilo, title: v.tip, onClick: () => onJump(v.mi), children: inner });
-  return /* @__PURE__ */ jsx22("div", { className: "mrow", style: estilo, title: v.tip, children: inner });
+  if (v.mi >= 0) return /* @__PURE__ */ jsx23("button", { type: "button", className: "mrow", style: estilo, title: v.tip, onClick: () => onJump(v.mi), children: inner });
+  return /* @__PURE__ */ jsx23("div", { className: "mrow", style: estilo, title: v.tip, children: inner });
 }
 function VistaBarra({ v, lang, onJump }) {
   const { G, build, lvl } = v;
@@ -42683,16 +43588,16 @@ function VistaBarra({ v, lang, onJump }) {
   const unit = "((100% - 36px)/7 + 6px)";
   const sctx = { mdg: !!build.mdg, spec: build.spec, lvl, macros: G.macros || [] };
   const specN = (G.specs || {})[build.spec] || build.spec;
-  return /* @__PURE__ */ jsxs22(Tarjeta, { titulo: /* @__PURE__ */ jsxs22("span", { style: { display: "inline-flex", alignItems: "center", gap: 8, flexWrap: "wrap" }, children: [
-    /* @__PURE__ */ jsx22(Icono, { n: "kbd", size: 14 }),
+  return /* @__PURE__ */ jsxs23(Tarjeta, { titulo: /* @__PURE__ */ jsxs23("span", { style: { display: "inline-flex", alignItems: "center", gap: 8, flexWrap: "wrap" }, children: [
+    /* @__PURE__ */ jsx23(Icono, { n: "kbd", size: 14 }),
     t(lang, "guia.bar.titulo", { lvl }),
-    /* @__PURE__ */ jsxs22("span", { style: P.muted, children: [
+    /* @__PURE__ */ jsxs23("span", { style: P.muted, children: [
       specN,
       " · ",
       build.mdg ? t(lang, "guia.bar.dungeon") : t(lang, "guia.bar.solo")
     ] })
-  ] }), extra: /* @__PURE__ */ jsxs22(Fragment17, { children: [
-    /* @__PURE__ */ jsx22(
+  ] }), extra: /* @__PURE__ */ jsxs23(Fragment18, { children: [
+    /* @__PURE__ */ jsx23(
       SegmentedControl4,
       {
         value: build.mdg ? "1" : "0",
@@ -42700,59 +43605,59 @@ function VistaBarra({ v, lang, onJump }) {
         options: [{ id: "0", label: t(lang, "guia.bar.solo") }, { id: "1", label: t(lang, "guia.bar.dungeon") }]
       }
     ),
-    /* @__PURE__ */ jsx22(Origen, { f: "curado", lang })
+    /* @__PURE__ */ jsx23(Origen, { f: "curado", lang })
   ] }), children: [
-    N.intro ? /* @__PURE__ */ jsx22("div", { style: P.tip, children: /* @__PURE__ */ jsx22(TextoRico, { html: N.intro }) }) : null,
-    /* @__PURE__ */ jsxs22("div", { style: P.kbwrap, children: [
-      /* @__PURE__ */ jsx22("div", { style: P.kb, children: (B.rows || []).map((r, i) => /* @__PURE__ */ jsxs22("div", { style: P.kbrow, children: [
-        (B.offset || [])[i] ? /* @__PURE__ */ jsx22("span", { style: { ...P.kcoff, width: `calc(${unit} * ${(B.offset || [])[i]} - 6px)` } }) : null,
+    N.intro ? /* @__PURE__ */ jsx23("div", { style: P.tip, children: /* @__PURE__ */ jsx23(TextoRico, { html: N.intro }) }) : null,
+    /* @__PURE__ */ jsxs23("div", { style: P.kbwrap, children: [
+      /* @__PURE__ */ jsx23("div", { style: P.kb, children: (B.rows || []).map((r, i) => /* @__PURE__ */ jsxs23("div", { style: P.kbrow, children: [
+        (B.offset || [])[i] ? /* @__PURE__ */ jsx23("span", { style: { ...P.kcoff, width: `calc(${unit} * ${(B.offset || [])[i]} - 6px)` } }) : null,
         r.map((k) => {
           const b = byK[k];
-          return b ? /* @__PURE__ */ jsx22(Tecla, { b, sctx, onJump, lang }, k) : null;
+          return b ? /* @__PURE__ */ jsx23(Tecla, { b, sctx, onJump, lang }, k) : null;
         })
       ] }, i)) }),
-      /* @__PURE__ */ jsxs22("div", { style: P.mouse, children: [
-        /* @__PURE__ */ jsx22("div", { style: P.mt, children: lang === "en" ? "Mouse" : "Mouse" }),
-        (B.mouse || []).map((b, i) => /* @__PURE__ */ jsx22(Raton, { b, sctx, onJump, lang }, i))
+      /* @__PURE__ */ jsxs23("div", { style: P.mouse, children: [
+        /* @__PURE__ */ jsx23("div", { style: P.mt, children: lang === "en" ? "Mouse" : "Mouse" }),
+        (B.mouse || []).map((b, i) => /* @__PURE__ */ jsx23(Raton, { b, sctx, onJump, lang }, i))
       ] })
     ] }),
-    /* @__PURE__ */ jsxs22("div", { style: P.legend, children: [
-      /* @__PURE__ */ jsxs22("span", { children: [
-        /* @__PURE__ */ jsx22("i", { style: { ...P.legendI, background: C.fondo3, borderColor: C.verde } }),
+    /* @__PURE__ */ jsxs23("div", { style: P.legend, children: [
+      /* @__PURE__ */ jsxs23("span", { children: [
+        /* @__PURE__ */ jsx23("i", { style: { ...P.legendI, background: C.fondo3, borderColor: C.verde } }),
         t(lang, "guia.bar.leyenda1")
       ] }),
-      /* @__PURE__ */ jsxs22("span", { children: [
-        /* @__PURE__ */ jsx22("i", { style: { ...P.legendI, borderColor: C.amarillo } }),
+      /* @__PURE__ */ jsxs23("span", { children: [
+        /* @__PURE__ */ jsx23("i", { style: { ...P.legendI, borderColor: C.amarillo } }),
         t(lang, "guia.bar.leyenda2")
       ] }),
-      /* @__PURE__ */ jsxs22("span", { children: [
-        /* @__PURE__ */ jsx22("i", { style: { ...P.legendI, border: `1px dashed ${C.amarillo}`, borderColor: "transparent" } }),
+      /* @__PURE__ */ jsxs23("span", { children: [
+        /* @__PURE__ */ jsx23("i", { style: { ...P.legendI, border: `1px dashed ${C.amarillo}`, borderColor: "transparent" } }),
         t(lang, "guia.bar.leyenda3")
       ] }),
-      /* @__PURE__ */ jsxs22("span", { children: [
-        /* @__PURE__ */ jsx22("i", { style: { ...P.legendI, borderColor: C.borde2, opacity: 0.4 } }),
+      /* @__PURE__ */ jsxs23("span", { children: [
+        /* @__PURE__ */ jsx23("i", { style: { ...P.legendI, borderColor: C.borde2, opacity: 0.4 } }),
         t(lang, "guia.bar.leyenda4")
       ] })
     ] }),
-    (B.click || []).length ? /* @__PURE__ */ jsxs22("div", { style: P.chipln, children: [
-      /* @__PURE__ */ jsx22("b", { style: { color: C.texto }, children: t(lang, "guia.bar.sinTecla") }),
+    (B.click || []).length ? /* @__PURE__ */ jsxs23("div", { style: P.chipln, children: [
+      /* @__PURE__ */ jsx23("b", { style: { color: C.texto }, children: t(lang, "guia.bar.sinTecla") }),
       " ",
-      (B.click || []).map((n) => /* @__PURE__ */ jsx22(MacroChip, { n, v, lang, onJump }, n))
+      (B.click || []).map((n) => /* @__PURE__ */ jsx23(MacroChip, { n, v, lang, onJump }, n))
     ] }) : null,
-    (B.alt1 || []).length ? /* @__PURE__ */ jsxs22("div", { style: P.chipln, children: [
-      /* @__PURE__ */ jsx22("b", { style: { color: C.texto }, children: t(lang, "guia.bar.alt1") }),
+    (B.alt1 || []).length ? /* @__PURE__ */ jsxs23("div", { style: P.chipln, children: [
+      /* @__PURE__ */ jsx23("b", { style: { color: C.texto }, children: t(lang, "guia.bar.alt1") }),
       " ",
-      (B.alt1 || []).map((n) => /* @__PURE__ */ jsx22(MacroChip, { n, v, lang, onJump }, n)),
-      N.altNote ? /* @__PURE__ */ jsxs22("span", { children: [
+      (B.alt1 || []).map((n) => /* @__PURE__ */ jsx23(MacroChip, { n, v, lang, onJump }, n)),
+      N.altNote ? /* @__PURE__ */ jsxs23("span", { children: [
         "— ",
-        /* @__PURE__ */ jsx22(TextoRico, { html: N.altNote })
+        /* @__PURE__ */ jsx23(TextoRico, { html: N.altNote })
       ] }) : null
     ] }) : null,
-    N.before ? /* @__PURE__ */ jsxs22("div", { style: { ...P.tip, marginTop: 10 }, children: [
-      /* @__PURE__ */ jsx22("b", { children: t(lang, "guia.bar.antes") }),
+    N.before ? /* @__PURE__ */ jsxs23("div", { style: { ...P.tip, marginTop: 10 }, children: [
+      /* @__PURE__ */ jsx23("b", { children: t(lang, "guia.bar.antes") }),
       " ",
-      /* @__PURE__ */ jsx22(TextoRico, { html: N.before }),
-      build.mdg && N.dungeon ? /* @__PURE__ */ jsx22(TextoRico, { html: N.dungeon }) : null
+      /* @__PURE__ */ jsx23(TextoRico, { html: N.before }),
+      build.mdg && N.dungeon ? /* @__PURE__ */ jsx23(TextoRico, { html: N.dungeon }) : null
     ] }) : null
   ] });
 }
@@ -42761,7 +43666,7 @@ function MacroChip({ n, v, lang, onJump }) {
   if (!m) return null;
   const i = v.G.macros.indexOf(m);
   const ok = usableFor(m, v.lvl, v.build.spec);
-  return /* @__PURE__ */ jsxs22(
+  return /* @__PURE__ */ jsxs23(
     "button",
     {
       type: "button",
@@ -42781,7 +43686,7 @@ function MacroCard({ m, i, v, lang, onJump, flash, registerRef }) {
   const ok = usableFor(m, v.lvl, build.spec);
   const talOk = !m.tal || m.tal === build.spec;
   const key = MACRO_KEY[m.n];
-  const [cop, setCop] = useState12("");
+  const [cop, setCop] = useState13("");
   const specN = (G.specs || {})[build.spec] || build.spec;
   const copiar = async () => {
     try {
@@ -42793,10 +43698,10 @@ function MacroCard({ m, i, v, lang, onJump, flash, registerRef }) {
       setTimeout(() => setCop(""), 1400);
     }
   };
-  const badgeEstado = ok ? /* @__PURE__ */ jsx22(Placa, { tono: "now", children: t(lang, "guia.mac.usableYa") }) : m.lvl > v.lvl ? /* @__PURE__ */ jsx22(Placa, { tono: "soon", children: m.lvl - v.lvl <=
-  1 ? t(lang, "guia.rec.enNivel", { n: m.lvl - v.lvl }) : t(lang, "guia.rec.enNiveles", { n: m.lvl - v.lvl }) }) : /* @__PURE__ */ jsx22(Placa, { tono: "soon", children: t(lang, "guia.mac.otraSpecBadg\
+  const badgeEstado = ok ? /* @__PURE__ */ jsx23(Placa, { tono: "now", children: t(lang, "guia.mac.usableYa") }) : m.lvl > v.lvl ? /* @__PURE__ */ jsx23(Placa, { tono: "soon", children: m.lvl - v.lvl <=
+  1 ? t(lang, "guia.rec.enNivel", { n: m.lvl - v.lvl }) : t(lang, "guia.rec.enNiveles", { n: m.lvl - v.lvl }) }) : /* @__PURE__ */ jsx23(Placa, { tono: "soon", children: t(lang, "guia.mac.otraSpecBadg\
 e") });
-  return /* @__PURE__ */ jsxs22(
+  return /* @__PURE__ */ jsxs23(
     "div",
     {
       ref: registerRef,
@@ -42804,28 +43709,28 @@ e") });
       className: "mac",
       style: { ...S.tarjeta, ...flash === i ? { boxShadow: `0 0 0 2px ${C.amarillo}` } : {} },
       children: [
-        /* @__PURE__ */ jsxs22("div", { style: { display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }, children: [
-          /* @__PURE__ */ jsx22("b", { style: { fontSize: 13 }, children: m.n }),
-          /* @__PURE__ */ jsx22(Placa, { tono: "cat", estilo: { marginLeft: "auto" }, children: m.cat }),
-          /* @__PURE__ */ jsx22(Placa, { tono: "plain", children: t(lang, "guia.mac.lvlN", { n: m.lvl }) }),
+        /* @__PURE__ */ jsxs23("div", { style: { display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }, children: [
+          /* @__PURE__ */ jsx23("b", { style: { fontSize: 13 }, children: m.n }),
+          /* @__PURE__ */ jsx23(Placa, { tono: "cat", estilo: { marginLeft: "auto" }, children: m.cat }),
+          /* @__PURE__ */ jsx23(Placa, { tono: "plain", children: t(lang, "guia.mac.lvlN", { n: m.lvl }) }),
           badgeEstado,
-          m.tal ? /* @__PURE__ */ jsxs22(Placa, { tono: talOk ? "tal" : "talOff", title: talOk ? t(lang, "guia.mac.talento", { spec: m.tal.toUpperCase() }) : specN + t(lang, "guia.mac.otraSpecTag"), children: [
+          m.tal ? /* @__PURE__ */ jsxs23(Placa, { tono: talOk ? "tal" : "talOff", title: talOk ? t(lang, "guia.mac.talento", { spec: m.tal.toUpperCase() }) : specN + t(lang, "guia.mac.otraSpecTag"), children: [
             t(lang, "guia.mac.talento", { spec: m.tal.toUpperCase() }),
             talOk ? "" : t(lang, "guia.mac.otraSpecTag")
           ] }) : null,
-          key ? /* @__PURE__ */ jsx22(Placa, { tono: "key", title: t(lang, "guia.mac.tecla", { k: key }), children: t(lang, "guia.mac.tecla", { k: key }) }) : null,
-          /* @__PURE__ */ jsxs22("span", { title: t(lang, "guia.mac.caracteres"), style: { ...P.mlen, ...len > 255 ? P.mlenOver : {} }, children: [
+          key ? /* @__PURE__ */ jsx23(Placa, { tono: "key", title: t(lang, "guia.mac.tecla", { k: key }), children: t(lang, "guia.mac.tecla", { k: key }) }) : null,
+          /* @__PURE__ */ jsxs23("span", { title: t(lang, "guia.mac.caracteres"), style: { ...P.mlen, ...len > 255 ? P.mlenOver : {} }, children: [
             len,
             "/255"
           ] }),
-          /* @__PURE__ */ jsx22(Button9, { size: "xs", variant: "outline", onClick: copiar, title: t(lang, "guia.mac.caracteres"), children: /* @__PURE__ */ jsxs22("span", { style: { display: "inline-\
-flex", gap: 4, alignItems: "center" }, children: [
-            /* @__PURE__ */ jsx22(Icono, { n: "copy", size: 12 }),
+          /* @__PURE__ */ jsx23(Button10, { size: "xs", variant: "outline", onClick: copiar, title: t(lang, "guia.mac.caracteres"), children: /* @__PURE__ */ jsxs23("span", { style: { display: "inline\
+-flex", gap: 4, alignItems: "center" }, children: [
+            /* @__PURE__ */ jsx23(Icono, { n: "copy", size: 12 }),
             cop === "copiado" ? t(lang, "guia.mac.copiado") : cop === "ctrlc" ? t(lang, "guia.mac.ctrlc") : t(lang, "guia.mac.copiar")
           ] }) })
         ] }),
-        m.desc ? /* @__PURE__ */ jsx22("div", { style: { ...P.muted, marginTop: 2 }, children: /* @__PURE__ */ jsx22(TextoRico, { html: m.desc }) }) : null,
-        /* @__PURE__ */ jsx22("pre", { style: P.mcode, children: m.code })
+        m.desc ? /* @__PURE__ */ jsx23("div", { style: { ...P.muted, marginTop: 2 }, children: /* @__PURE__ */ jsx23(TextoRico, { html: m.desc }) }) : null,
+        /* @__PURE__ */ jsx23("pre", { style: P.mcode, children: m.code })
       ]
     }
   );
@@ -42834,10 +43739,10 @@ function VistaMacros({ v, lang }) {
   const { G, build, guardar, ctx } = v;
   const mcr = G.macros || [];
   const cats = macroCats(mcr);
-  const [mq, setMq] = useState12("");
+  const [mq, setMq] = useState13("");
   const cardRefs = useRef3(/* @__PURE__ */ new Map());
-  const [pendingJump, setPendingJump] = useState12(null);
-  const [flash, setFlash] = useState12(-1);
+  const [pendingJump, setPendingJump] = useState13(null);
+  const [flash, setFlash] = useState13(-1);
   const flashT = useRef3(null);
   const mf = curMf(build.mf, cats);
   const q = mq.trim().toLowerCase();
@@ -42868,7 +43773,7 @@ function VistaMacros({ v, lang }) {
     }
     saltar(el, i);
   };
-  useEffect5(() => {
+  useEffect6(() => {
     if (pendingJump == null) return;
     const i = pendingJump;
     setPendingJump(null);
@@ -42877,35 +43782,35 @@ function VistaMacros({ v, lang }) {
   }, [pendingJump, mq, build.mf]);
   const listaVacia = !pool.length;
   const nadaTexto = t(lang, "guia.mac.nada") + (q ? ` con "${mq.trim()}"` : "") + (mf !== "all" ? ` en ${mf}` : "") + ".";
-  return /* @__PURE__ */ jsxs22(Fragment17, { children: [
-    /* @__PURE__ */ jsxs22(Tarjeta, { titulo: /* @__PURE__ */ jsxs22("span", { style: { display: "inline-flex", alignItems: "center", gap: 8 }, children: [
-      /* @__PURE__ */ jsx22(Icono, { n: "scroll", size: 14 }),
+  return /* @__PURE__ */ jsxs23(Fragment18, { children: [
+    /* @__PURE__ */ jsxs23(Tarjeta, { titulo: /* @__PURE__ */ jsxs23("span", { style: { display: "inline-flex", alignItems: "center", gap: 8 }, children: [
+      /* @__PURE__ */ jsx23(Icono, { n: "scroll", size: 14 }),
       t(lang, "guia.mac.titulo"),
-      /* @__PURE__ */ jsx22("span", { style: P.muted, children: t(lang, "guia.mac.usables", { u: usableN, t: mcr.length }) })
-    ] }), extra: /* @__PURE__ */ jsx22(Origen, { f: "curado", lang }), children: [
-      /* @__PURE__ */ jsx22("div", { style: P.tip, children: t(lang, "guia.mac.ayuda") }),
-      /* @__PURE__ */ jsx22(Detalle, { titulo: t(lang, "guia.mac.audit"), children: /* @__PURE__ */ jsx22("div", { style: P.tip, children: /* @__PURE__ */ jsx22(TextoRico, { html: t(lang, "guia.mac.au\
+      /* @__PURE__ */ jsx23("span", { style: P.muted, children: t(lang, "guia.mac.usables", { u: usableN, t: mcr.length }) })
+    ] }), extra: /* @__PURE__ */ jsx23(Origen, { f: "curado", lang }), children: [
+      /* @__PURE__ */ jsx23("div", { style: P.tip, children: t(lang, "guia.mac.ayuda") }),
+      /* @__PURE__ */ jsx23(Detalle, { titulo: t(lang, "guia.mac.audit"), children: /* @__PURE__ */ jsx23("div", { style: P.tip, children: /* @__PURE__ */ jsx23(TextoRico, { html: t(lang, "guia.mac.au\
 ditTexto") }) }) })
     ] }),
-    /* @__PURE__ */ jsx22(VistaBarra, { v, lang, onJump: jumpToMacro }),
-    G.macroRules ? /* @__PURE__ */ jsx22(
+    /* @__PURE__ */ jsx23(VistaBarra, { v, lang, onJump: jumpToMacro }),
+    G.macroRules ? /* @__PURE__ */ jsx23(
       Detalle,
       {
-        titulo: /* @__PURE__ */ jsxs22("span", { style: { display: "inline-flex", alignItems: "center", gap: 8 }, children: [
-          /* @__PURE__ */ jsx22(Icono, { n: "alert", size: 14 }),
+        titulo: /* @__PURE__ */ jsxs23("span", { style: { display: "inline-flex", alignItems: "center", gap: 8 }, children: [
+          /* @__PURE__ */ jsx23(Icono, { n: "alert", size: 14 }),
           t(lang, "guia.mac.reglas")
         ] }),
         meta: t(lang, "guia.mac.reglasSub"),
-        extra: /* @__PURE__ */ jsx22(Origen, { f: "curado", lang }),
-        children: /* @__PURE__ */ jsx22(TextoRico, { html: G.macroRules })
+        extra: /* @__PURE__ */ jsx23(Origen, { f: "curado", lang }),
+        children: /* @__PURE__ */ jsx23(TextoRico, { html: G.macroRules })
       }
     ) : null,
-    /* @__PURE__ */ jsxs22(Tarjeta, { extra: /* @__PURE__ */ jsx22(Origen, { f: "curado", lang }), children: [
-      /* @__PURE__ */ jsx22(SearchField3, { placeholder: t(lang, "guia.mac.buscar"), value: mq, onChange: setMq }),
-      /* @__PURE__ */ jsx22("div", { style: { display: "flex", gap: 6, flexWrap: "wrap", marginTop: 8 }, children: [["all", t(lang, "guia.mac.todas")], ...cats.map((c) => [c, c])].map(([f, label]) => {
+    /* @__PURE__ */ jsxs23(Tarjeta, { extra: /* @__PURE__ */ jsx23(Origen, { f: "curado", lang }), children: [
+      /* @__PURE__ */ jsx23(SearchField3, { placeholder: t(lang, "guia.mac.buscar"), value: mq, onChange: setMq }),
+      /* @__PURE__ */ jsx23("div", { style: { display: "flex", gap: 6, flexWrap: "wrap", marginTop: 8 }, children: [["all", t(lang, "guia.mac.todas")], ...cats.map((c) => [c, c])].map(([f, label]) => {
         const n = mcr.filter((m) => (f === "all" || m.cat === f) && usableFor(m, v.lvl, build.spec)).length;
         const activo = mf === f;
-        return /* @__PURE__ */ jsxs22(
+        return /* @__PURE__ */ jsxs23(
           "button",
           {
             type: "button",
@@ -42915,38 +43820,38 @@ ditTexto") }) }) })
             children: [
               label,
               " ",
-              /* @__PURE__ */ jsx22("span", { style: P.mlen, children: n })
+              /* @__PURE__ */ jsx23("span", { style: P.mlen, children: n })
             ]
           },
           f
         );
       }) })
     ] }),
-    listaVacia ? /* @__PURE__ */ jsx22(Tarjeta, { children: /* @__PURE__ */ jsxs22("div", { style: P.muted, children: [
+    listaVacia ? /* @__PURE__ */ jsx23(Tarjeta, { children: /* @__PURE__ */ jsxs23("div", { style: P.muted, children: [
       nadaTexto,
       " ",
-      /* @__PURE__ */ jsx22(Button9, { size: "xs", variant: "ghost", onClick: () => {
+      /* @__PURE__ */ jsx23(Button10, { size: "xs", variant: "ghost", onClick: () => {
         setMq("");
         guardar((b) => ({ ...b, mf: "all" }));
       }, children: t(lang, "guia.mac.limpiar") })
-    ] }) }) : /* @__PURE__ */ jsxs22(Fragment17, { children: [
-      now.length ? /* @__PURE__ */ jsxs22(Fragment17, { children: [
-        /* @__PURE__ */ jsxs22("div", { style: P.bandhead, children: [
-          /* @__PURE__ */ jsx22("span", { children: t(lang, "guia.mac.disponibles") }),
-          /* @__PURE__ */ jsx22("span", { style: P.bandheadZn, children: t(lang, "guia.mac.nMacros", { n: now.length }) })
+    ] }) }) : /* @__PURE__ */ jsxs23(Fragment18, { children: [
+      now.length ? /* @__PURE__ */ jsxs23(Fragment18, { children: [
+        /* @__PURE__ */ jsxs23("div", { style: P.bandhead, children: [
+          /* @__PURE__ */ jsx23("span", { children: t(lang, "guia.mac.disponibles") }),
+          /* @__PURE__ */ jsx23("span", { style: P.bandheadZn, children: t(lang, "guia.mac.nMacros", { n: now.length }) })
         ] }),
-        now.map((m) => /* @__PURE__ */ jsx22(MacroCard, { m, i: mcr.indexOf(m), v, lang, flash, registerRef: registerRef(mcr.indexOf(m)) }, mcr.indexOf(m)))
+        now.map((m) => /* @__PURE__ */ jsx23(MacroCard, { m, i: mcr.indexOf(m), v, lang, flash, registerRef: registerRef(mcr.indexOf(m)) }, mcr.indexOf(m)))
       ] }) : null,
-      later.length ? /* @__PURE__ */ jsx22(Detalle, { titulo: t(lang, "guia.mac.proximas"), meta: t(lang, "guia.mac.proximasSub"), resumenExtra: /* @__PURE__ */ jsx22("span", { style: P.dprog, children: later.
-      length }), children: later.map((m) => /* @__PURE__ */ jsx22(MacroCard, { m, i: mcr.indexOf(m), v, lang, flash, registerRef: registerRef(mcr.indexOf(m)) }, mcr.indexOf(m))) }) : null,
-      other.length ? /* @__PURE__ */ jsx22(Detalle, { titulo: t(lang, "guia.mac.otraSpec"), meta: t(lang, "guia.mac.otraSpecSub"), resumenExtra: /* @__PURE__ */ jsx22("span", { style: P.dprog, children: other.
-      length }), children: other.map((m) => /* @__PURE__ */ jsx22(MacroCard, { m, i: mcr.indexOf(m), v, lang, flash, registerRef: registerRef(mcr.indexOf(m)) }, mcr.indexOf(m))) }) : null
+      later.length ? /* @__PURE__ */ jsx23(Detalle, { titulo: t(lang, "guia.mac.proximas"), meta: t(lang, "guia.mac.proximasSub"), resumenExtra: /* @__PURE__ */ jsx23("span", { style: P.dprog, children: later.
+      length }), children: later.map((m) => /* @__PURE__ */ jsx23(MacroCard, { m, i: mcr.indexOf(m), v, lang, flash, registerRef: registerRef(mcr.indexOf(m)) }, mcr.indexOf(m))) }) : null,
+      other.length ? /* @__PURE__ */ jsx23(Detalle, { titulo: t(lang, "guia.mac.otraSpec"), meta: t(lang, "guia.mac.otraSpecSub"), resumenExtra: /* @__PURE__ */ jsx23("span", { style: P.dprog, children: other.
+      length }), children: other.map((m) => /* @__PURE__ */ jsx23(MacroCard, { m, i: mcr.indexOf(m), v, lang, flash, registerRef: registerRef(mcr.indexOf(m)) }, mcr.indexOf(m))) }) : null
     ] })
   ] });
 }
 
 // src/vistas/guia/extras.jsx
-import { Fragment as Fragment18, jsx as jsx23, jsxs as jsxs23 } from "react/jsx-runtime";
+import { Fragment as Fragment19, jsx as jsx24, jsxs as jsxs24 } from "react/jsx-runtime";
 agregarTextos({
   "guia.extras.tipsN": "{n} tips",
   "guia.extras.servidor": 'Sobre el servidor "Forever"',
@@ -42961,66 +43866,66 @@ function VistaExtras({ v, lang }) {
   const X = G.extras || {};
   const ah = G.ahList || [];
   const tips = X.tips || [];
-  return /* @__PURE__ */ jsxs23(Fragment18, { children: [
-    /* @__PURE__ */ jsxs23("div", { style: { display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(340px,1fr))", gap: 12, alignItems: "start" }, children: [
-      /* @__PURE__ */ jsxs23(
+  return /* @__PURE__ */ jsxs24(Fragment19, { children: [
+    /* @__PURE__ */ jsxs24("div", { style: { display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(340px,1fr))", gap: 12, alignItems: "start" }, children: [
+      /* @__PURE__ */ jsxs24(
         Tarjeta,
         {
-          titulo: /* @__PURE__ */ jsxs23("span", { style: { display: "inline-flex", alignItems: "center", gap: 8 }, children: [
-            /* @__PURE__ */ jsx23(Icono, { n: "coin", size: 14 }),
+          titulo: /* @__PURE__ */ jsxs24("span", { style: { display: "inline-flex", alignItems: "center", gap: 8 }, children: [
+            /* @__PURE__ */ jsx24(Icono, { n: "coin", size: 14 }),
             X.ahTitle || t(lang, "tab.mercado")
           ] }),
-          extra: /* @__PURE__ */ jsx23(Origen, { f: "curado", lang }),
+          extra: /* @__PURE__ */ jsx24(Origen, { f: "curado", lang }),
           children: [
-            ah.map((a, i) => /* @__PURE__ */ jsxs23("div", { style: { ...P.loot, ...i === ah.length - 1 ? P.lootSinBorde : {} }, children: [
-              /* @__PURE__ */ jsxs23("span", { children: [
-                /* @__PURE__ */ jsx23(NombreCalidad, { q: "rare", children: /* @__PURE__ */ jsx23("b", { children: a[0] }) }),
+            ah.map((a, i) => /* @__PURE__ */ jsxs24("div", { style: { ...P.loot, ...i === ah.length - 1 ? P.lootSinBorde : {} }, children: [
+              /* @__PURE__ */ jsxs24("span", { children: [
+                /* @__PURE__ */ jsx24(NombreCalidad, { q: "rare", children: /* @__PURE__ */ jsx24("b", { children: a[0] }) }),
                 " ",
-                /* @__PURE__ */ jsx23("span", { style: P.muted, children: /* @__PURE__ */ jsx23(TextoRico, { html: a[1] }) })
+                /* @__PURE__ */ jsx24("span", { style: P.muted, children: /* @__PURE__ */ jsx24(TextoRico, { html: a[1] }) })
               ] }),
-              a[2] ? /* @__PURE__ */ jsx23("span", { style: { ...P.muted, textAlign: "right", maxWidth: "45%", flexShrink: 0 }, children: /* @__PURE__ */ jsx23(TextoRico, { html: a[2] }) }) : null
+              a[2] ? /* @__PURE__ */ jsx24("span", { style: { ...P.muted, textAlign: "right", maxWidth: "45%", flexShrink: 0 }, children: /* @__PURE__ */ jsx24(TextoRico, { html: a[2] }) }) : null
             ] }, i)),
-            !ah.length ? /* @__PURE__ */ jsx23("div", { style: P.muted, children: "—" }) : null
+            !ah.length ? /* @__PURE__ */ jsx24("div", { style: P.muted, children: "—" }) : null
           ]
         }
       ),
-      /* @__PURE__ */ jsx23(
+      /* @__PURE__ */ jsx24(
         Detalle,
         {
-          titulo: /* @__PURE__ */ jsxs23("span", { style: { display: "inline-flex", alignItems: "center", gap: 8 }, children: [
-            /* @__PURE__ */ jsx23(Icono, { n: "scroll", size: 14 }),
+          titulo: /* @__PURE__ */ jsxs24("span", { style: { display: "inline-flex", alignItems: "center", gap: 8 }, children: [
+            /* @__PURE__ */ jsx24(Icono, { n: "scroll", size: 14 }),
             X.tipsTitle || ""
           ] }),
           meta: t(lang, "guia.extras.tipsN", { n: tips.length }),
-          extra: /* @__PURE__ */ jsx23(Origen, { f: "curado", lang }),
-          children: tips.map((tip, i) => /* @__PURE__ */ jsxs23("div", { style: { ...P.mst, ...i === tips.length - 1 ? P.mstUlt : {} }, children: [
-            /* @__PURE__ */ jsx23("span", { style: P.tdot }),
-            /* @__PURE__ */ jsxs23("span", { style: P.mstTxt, children: [
-              /* @__PURE__ */ jsx23("b", { children: /* @__PURE__ */ jsx23(TextoRico, { html: tip[0] }) }),
+          extra: /* @__PURE__ */ jsx24(Origen, { f: "curado", lang }),
+          children: tips.map((tip, i) => /* @__PURE__ */ jsxs24("div", { style: { ...P.mst, ...i === tips.length - 1 ? P.mstUlt : {} }, children: [
+            /* @__PURE__ */ jsx24("span", { style: P.tdot }),
+            /* @__PURE__ */ jsxs24("span", { style: P.mstTxt, children: [
+              /* @__PURE__ */ jsx24("b", { children: /* @__PURE__ */ jsx24(TextoRico, { html: tip[0] }) }),
               " ",
-              /* @__PURE__ */ jsx23(TextoRico, { html: tip[1] })
+              /* @__PURE__ */ jsx24(TextoRico, { html: tip[1] })
             ] })
           ] }, i))
         }
       )
     ] }),
-    /* @__PURE__ */ jsx23(
+    /* @__PURE__ */ jsx24(
       Detalle,
       {
-        titulo: /* @__PURE__ */ jsxs23("span", { style: { display: "inline-flex", alignItems: "center", gap: 8 }, children: [
-          /* @__PURE__ */ jsx23(Icono, { n: "alert", size: 14 }),
+        titulo: /* @__PURE__ */ jsxs24("span", { style: { display: "inline-flex", alignItems: "center", gap: 8 }, children: [
+          /* @__PURE__ */ jsx24(Icono, { n: "alert", size: 14 }),
           t(lang, "guia.extras.servidor")
         ] }),
         meta: t(lang, "guia.extras.contexto"),
-        extra: /* @__PURE__ */ jsx23(Origen, { f: "curado", lang }),
-        children: /* @__PURE__ */ jsx23("div", { style: P.muted, children: /* @__PURE__ */ jsx23(TextoRico, { html: X.warn || "" }) })
+        extra: /* @__PURE__ */ jsx24(Origen, { f: "curado", lang }),
+        children: /* @__PURE__ */ jsx24("div", { style: P.muted, children: /* @__PURE__ */ jsx24(TextoRico, { html: X.warn || "" }) })
       }
     )
   ] });
 }
 
 // src/vistas/guia.jsx
-import { Fragment as Fragment19, jsx as jsx24, jsxs as jsxs24 } from "react/jsx-runtime";
+import { Fragment as Fragment20, jsx as jsx25, jsxs as jsxs25 } from "react/jsx-runtime";
 agregarTextos({
   "guia.sinGuiaClase": "Todavía no hay guía curada para esta clase en WoW: Forever.",
   "guia.sinGuiaFac": "La guía curada de {clase} solo cubre la Horda por ahora; tu facción queda para una actualización futura.",
@@ -43102,16 +44007,16 @@ var SUBTABS = ["rec", "weapons", "macros", "extras"];
 var VISTAS = { rec: VistaRec, weapons: VistaArmas, macros: VistaMacros, extras: VistaExtras };
 var FAC_A_FACCION = { horde: "horda", alliance: "alianza" };
 function VistaGuia({ ctx, almacen, estado, recargar, perfil, guardarPerfil, lang }) {
-  const curada = useMemo16(() => guiaCurada(perfil), [perfil]);
+  const curada = useMemo17(() => guiaCurada(perfil), [perfil]);
   if (!curada) {
-    return /* @__PURE__ */ jsx24(Tarjeta, { titulo: t(lang, "tab.guia"), extra: /* @__PURE__ */ jsx24(Origen, { f: "curado", lang }), children: /* @__PURE__ */ jsx24(Hueco, { lang, children: t(lang, "\
+    return /* @__PURE__ */ jsx25(Tarjeta, { titulo: t(lang, "tab.guia"), extra: /* @__PURE__ */ jsx25(Origen, { f: "curado", lang }), children: /* @__PURE__ */ jsx25(Hueco, { lang, children: t(lang, "\
 guia.sinGuiaClase") }) });
   }
   if (!curada.datos) {
-    return /* @__PURE__ */ jsx24(Tarjeta, { titulo: nombreClaseGuia(curada.guia, lang) + " · " + t(lang, "tab.guia"), extra: /* @__PURE__ */ jsx24(Origen, { f: "curado", lang }), children: /* @__PURE__ */ jsx24(
+    return /* @__PURE__ */ jsx25(Tarjeta, { titulo: nombreClaseGuia(curada.guia, lang) + " · " + t(lang, "tab.guia"), extra: /* @__PURE__ */ jsx25(Origen, { f: "curado", lang }), children: /* @__PURE__ */ jsx25(
     Hueco, { lang, children: t(lang, "guia.sinGuiaFac", { clase: nombreClaseGuia(curada.guia, lang) }) }) });
   }
-  return /* @__PURE__ */ jsx24(
+  return /* @__PURE__ */ jsx25(
     GuiaPrincipal,
     {
       ctx,
@@ -43127,23 +44032,23 @@ guia.sinGuiaClase") }) });
 }
 function GuiaPrincipal({ ctx, almacen, estado, recargar, perfil, guardarPerfil, lang, curada }) {
   const { guia: G, fac: facKey, datos: GF } = curada;
-  const ctxGuia = useMemo16(() => ({ G, GF, facKey, perfil }), [G, GF, facKey, perfil]);
-  const [build, setBuild] = useState13(() => leerBuild2(estado.build, ctxGuia));
+  const ctxGuia = useMemo17(() => ({ G, GF, facKey, perfil }), [G, GF, facKey, perfil]);
+  const [build, setBuild] = useState14(() => leerBuild2(estado.build, ctxGuia));
   const ref = useRef4(build);
-  useEffect6(() => {
+  useEffect7(() => {
     const b = leerBuild2(estado.build, ctxGuia);
     ref.current = b;
     setBuild(b);
   }, [estado.build, ctxGuia]);
-  const [errorG, setErrorG] = useState13("");
-  const [sub, setSub] = useState13(() => SUBTABS.includes(build.tab) ? build.tab : "rec");
-  const [simcOpen, setSimcOpen] = useState13(false);
-  const [simcTxt, setSimcTxt] = useState13("");
-  const [simcErr, setSimcErr] = useState13("");
-  const [simcNota, setSimcNota] = useState13("");
-  const [dpsTxt, setDpsTxt] = useState13(String(build.customDps || ""));
+  const [errorG, setErrorG] = useState14("");
+  const [sub, setSub] = useState14(() => SUBTABS.includes(build.tab) ? build.tab : "rec");
+  const [simcOpen, setSimcOpen] = useState14(false);
+  const [simcTxt, setSimcTxt] = useState14("");
+  const [simcErr, setSimcErr] = useState14("");
+  const [simcNota, setSimcNota] = useState14("");
+  const [dpsTxt, setDpsTxt] = useState14(String(build.customDps || ""));
   const avatarRef = useRef4(null);
-  useEffect6(() => {
+  useEffect7(() => {
     setDpsTxt(String(build.customDps || ""));
   }, [build.customDps]);
   const guardar = useCallback2((mutar) => {
@@ -43265,13 +44170,13 @@ function GuiaPrincipal({ ctx, almacen, estado, recargar, perfil, guardarPerfil, 
     onAvatarDel: () => guardar((b) => ({ ...b, avatar: null }))
   };
   const Vista = VISTAS[sub] || VistaRec;
-  return /* @__PURE__ */ jsxs24(Fragment19, { children: [
-    /* @__PURE__ */ jsx24("input", { ref: avatarRef, type: "file", accept: "image/*", style: { display: "none" }, onChange: onAvatarFile }),
-    /* @__PURE__ */ jsxs24(Tarjeta, { titulo: t(lang, "guia.build.titulo"), extra: /* @__PURE__ */ jsx24(Origen, { f: "curado", lang }), children: [
-      /* @__PURE__ */ jsxs24("div", { style: { display: "flex", flexWrap: "wrap", gap: "12px 22px", alignItems: "flex-end" }, children: [
-        /* @__PURE__ */ jsxs24("div", { style: S.campo, children: [
-          /* @__PURE__ */ jsx24("span", { style: S.etiqueta, children: t(lang, "guia.build.spec") }),
-          /* @__PURE__ */ jsx24(
+  return /* @__PURE__ */ jsxs25(Fragment20, { children: [
+    /* @__PURE__ */ jsx25("input", { ref: avatarRef, type: "file", accept: "image/*", style: { display: "none" }, onChange: onAvatarFile }),
+    /* @__PURE__ */ jsxs25(Tarjeta, { titulo: t(lang, "guia.build.titulo"), extra: /* @__PURE__ */ jsx25(Origen, { f: "curado", lang }), children: [
+      /* @__PURE__ */ jsxs25("div", { style: { display: "flex", flexWrap: "wrap", gap: "12px 22px", alignItems: "flex-end" }, children: [
+        /* @__PURE__ */ jsxs25("div", { style: S.campo, children: [
+          /* @__PURE__ */ jsx25("span", { style: S.etiqueta, children: t(lang, "guia.build.spec") }),
+          /* @__PURE__ */ jsx25(
             SegmentedControl5,
             {
               value: build.spec,
@@ -43279,11 +44184,11 @@ function GuiaPrincipal({ ctx, almacen, estado, recargar, perfil, guardarPerfil, 
               options: Object.entries(G.specs || {}).map(([id, label]) => ({ id, label }))
             }
           ),
-          G.specNote ? /* @__PURE__ */ jsx24("span", { style: S.sub, children: G.specNote }) : null
+          G.specNote ? /* @__PURE__ */ jsx25("span", { style: S.sub, children: G.specNote }) : null
         ] }),
-        /* @__PURE__ */ jsxs24("div", { style: S.campo, children: [
-          /* @__PURE__ */ jsx24("span", { style: S.etiqueta, children: t(lang, "guia.build.pref") }),
-          /* @__PURE__ */ jsx24(
+        /* @__PURE__ */ jsxs25("div", { style: S.campo, children: [
+          /* @__PURE__ */ jsx25("span", { style: S.etiqueta, children: t(lang, "guia.build.pref") }),
+          /* @__PURE__ */ jsx25(
             SegmentedControl5,
             {
               value: build.pref,
@@ -43291,11 +44196,11 @@ function GuiaPrincipal({ ctx, almacen, estado, recargar, perfil, guardarPerfil, 
               options: (G.prefs || []).map(([id, label]) => ({ id, label }))
             }
           ),
-          G.prefNote ? /* @__PURE__ */ jsx24("span", { style: S.sub, children: G.prefNote }) : null
+          G.prefNote ? /* @__PURE__ */ jsx25("span", { style: S.sub, children: G.prefNote }) : null
         ] }),
-        /* @__PURE__ */ jsxs24("div", { style: S.campo, children: [
-          /* @__PURE__ */ jsx24("span", { style: S.etiqueta, children: t(lang, "guia.build.continente") }),
-          /* @__PURE__ */ jsx24(
+        /* @__PURE__ */ jsxs25("div", { style: S.campo, children: [
+          /* @__PURE__ */ jsx25("span", { style: S.etiqueta, children: t(lang, "guia.build.continente") }),
+          /* @__PURE__ */ jsx25(
             SegmentedControl5,
             {
               value: build.realm,
@@ -43304,20 +44209,20 @@ function GuiaPrincipal({ ctx, almacen, estado, recargar, perfil, guardarPerfil, 
             }
           )
         ] }),
-        G.useEng ? /* @__PURE__ */ jsxs24("label", { style: { display: "flex", gap: 6, alignItems: "center", paddingBottom: 5, cursor: "pointer" }, children: [
-          /* @__PURE__ */ jsx24(Checkbox11, { checked: !!build.eng, onCheckedChange: (val) => guardar((b) => ({ ...b, eng: !!val })) }),
-          /* @__PURE__ */ jsx24("span", { style: { fontSize: 12 }, children: t(lang, "guia.build.ing") })
+        G.useEng ? /* @__PURE__ */ jsxs25("label", { style: { display: "flex", gap: 6, alignItems: "center", paddingBottom: 5, cursor: "pointer" }, children: [
+          /* @__PURE__ */ jsx25(Checkbox11, { checked: !!build.eng, onCheckedChange: (val) => guardar((b) => ({ ...b, eng: !!val })) }),
+          /* @__PURE__ */ jsx25("span", { style: { fontSize: 12 }, children: t(lang, "guia.build.ing") })
         ] }) : null,
-        /* @__PURE__ */ jsxs24("div", { style: S.campo, children: [
-          /* @__PURE__ */ jsx24("span", { style: S.etiqueta, children: t(lang, "guia.build.arma") }),
-          /* @__PURE__ */ jsxs24(Select5, { value: build.cur, onValueChange: (val) => guardar((b) => ({ ...b, cur: val, weaponDps: null })), children: [
-            /* @__PURE__ */ jsx24(SelectTrigger5, { "aria-label": t(lang, "guia.build.arma"), children: /* @__PURE__ */ jsx24(SelectValue5, {}) }),
-            /* @__PURE__ */ jsx24(SelectContent5, { children: armaOps.map((o) => /* @__PURE__ */ jsx24(SelectItem5, { value: o.value, children: o.label }, o.value || "none")) })
+        /* @__PURE__ */ jsxs25("div", { style: S.campo, children: [
+          /* @__PURE__ */ jsx25("span", { style: S.etiqueta, children: t(lang, "guia.build.arma") }),
+          /* @__PURE__ */ jsxs25(Select5, { value: build.cur, onValueChange: (val) => guardar((b) => ({ ...b, cur: val, weaponDps: null })), children: [
+            /* @__PURE__ */ jsx25(SelectTrigger5, { "aria-label": t(lang, "guia.build.arma"), children: /* @__PURE__ */ jsx25(SelectValue5, {}) }),
+            /* @__PURE__ */ jsx25(SelectContent5, { children: armaOps.map((o) => /* @__PURE__ */ jsx25(SelectItem5, { value: o.value, children: o.label }, o.value || "none")) })
           ] })
         ] }),
-        build.cur === "other" ? /* @__PURE__ */ jsxs24("div", { style: S.campo, children: [
-          /* @__PURE__ */ jsx24("span", { style: S.etiqueta, children: t(lang, "guia.build.dpsArma") }),
-          /* @__PURE__ */ jsx24(
+        build.cur === "other" ? /* @__PURE__ */ jsxs25("div", { style: S.campo, children: [
+          /* @__PURE__ */ jsx25("span", { style: S.etiqueta, children: t(lang, "guia.build.dpsArma") }),
+          /* @__PURE__ */ jsx25(
             Input5,
             {
               value: dpsTxt,
@@ -43334,9 +44239,9 @@ function GuiaPrincipal({ ctx, almacen, estado, recargar, perfil, guardarPerfil, 
             }
           )
         ] }) : null,
-        /* @__PURE__ */ jsxs24("div", { style: S.campo, children: [
-          /* @__PURE__ */ jsx24("span", { style: S.etiqueta, children: t(lang, "guia.build.nombre") }),
-          /* @__PURE__ */ jsx24(
+        /* @__PURE__ */ jsxs25("div", { style: S.campo, children: [
+          /* @__PURE__ */ jsx25("span", { style: S.etiqueta, children: t(lang, "guia.build.nombre") }),
+          /* @__PURE__ */ jsx25(
             Input5,
             {
               value: build.name,
@@ -43348,19 +44253,19 @@ function GuiaPrincipal({ ctx, almacen, estado, recargar, perfil, guardarPerfil, 
           )
         ] })
       ] }),
-      errorG ? /* @__PURE__ */ jsx24("div", { role: "alert", style: S.aviso, children: errorG }) : null
+      errorG ? /* @__PURE__ */ jsx25("div", { role: "alert", style: S.aviso, children: errorG }) : null
     ] }),
-    /* @__PURE__ */ jsxs24(Tarjeta, { titulo: t(lang, "guia.datos.titulo"), extra: /* @__PURE__ */ jsx24(Origen, { f: "curado", lang }), children: [
-      build.simc ? /* @__PURE__ */ jsx24(SimcCard, { simc: build.simc, G, lang }) : null,
-      /* @__PURE__ */ jsxs24("div", { style: { display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }, children: [
-        /* @__PURE__ */ jsx24(Button10, { variant: build.simc ? "outline" : "default", size: "xs", onClick: () => setSimcOpen((o) => !o), children: build.simc ? t(lang, "guia.simc.importarOtro") : t(lang,
+    /* @__PURE__ */ jsxs25(Tarjeta, { titulo: t(lang, "guia.datos.titulo"), extra: /* @__PURE__ */ jsx25(Origen, { f: "curado", lang }), children: [
+      build.simc ? /* @__PURE__ */ jsx25(SimcCard, { simc: build.simc, G, lang }) : null,
+      /* @__PURE__ */ jsxs25("div", { style: { display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }, children: [
+        /* @__PURE__ */ jsx25(Button11, { variant: build.simc ? "outline" : "default", size: "xs", onClick: () => setSimcOpen((o) => !o), children: build.simc ? t(lang, "guia.simc.importarOtro") : t(lang,
         "guia.simc.boton") }),
-        build.simc ? /* @__PURE__ */ jsx24(Button10, { variant: "ghost", size: "xs", onClick: () => guardar((b) => ({ ...b, simc: null })), children: t(lang, "guia.simc.quitar") }) : /* @__PURE__ */ jsx24(
+        build.simc ? /* @__PURE__ */ jsx25(Button11, { variant: "ghost", size: "xs", onClick: () => guardar((b) => ({ ...b, simc: null })), children: t(lang, "guia.simc.quitar") }) : /* @__PURE__ */ jsx25(
         "span", { style: S.sub, children: t(lang, "guia.simc.ayuda") })
       ] }),
-      simcOpen ? /* @__PURE__ */ jsxs24("div", { style: { marginTop: 10 }, children: [
-        /* @__PURE__ */ jsx24("p", { style: { ...S.sub, margin: "0 0 6px" }, children: t(lang, "guia.simc.instrucciones") }),
-        /* @__PURE__ */ jsx24(
+      simcOpen ? /* @__PURE__ */ jsxs25("div", { style: { marginTop: 10 }, children: [
+        /* @__PURE__ */ jsx25("p", { style: { ...S.sub, margin: "0 0 6px" }, children: t(lang, "guia.simc.instrucciones") }),
+        /* @__PURE__ */ jsx25(
           "textarea",
           {
             value: simcTxt,
@@ -43381,19 +44286,19 @@ function GuiaPrincipal({ ctx, almacen, estado, recargar, perfil, guardarPerfil, 
             }
           }
         ),
-        simcErr ? /* @__PURE__ */ jsx24("div", { role: "alert", style: { ...S.aviso, marginTop: 6 }, children: simcErr }) : null,
-        simcNota ? /* @__PURE__ */ jsx24("div", { style: { ...S.sub, marginTop: 6 }, children: simcNota }) : null,
-        /* @__PURE__ */ jsxs24("div", { style: { display: "flex", gap: 8, marginTop: 8 }, children: [
-          /* @__PURE__ */ jsx24(Button10, { size: "xs", onClick: importarSimc, children: t(lang, "guia.simc.importar") }),
-          /* @__PURE__ */ jsx24(Button10, { variant: "ghost", size: "xs", onClick: () => {
+        simcErr ? /* @__PURE__ */ jsx25("div", { role: "alert", style: { ...S.aviso, marginTop: 6 }, children: simcErr }) : null,
+        simcNota ? /* @__PURE__ */ jsx25("div", { style: { ...S.sub, marginTop: 6 }, children: simcNota }) : null,
+        /* @__PURE__ */ jsxs25("div", { style: { display: "flex", gap: 8, marginTop: 8 }, children: [
+          /* @__PURE__ */ jsx25(Button11, { size: "xs", onClick: importarSimc, children: t(lang, "guia.simc.importar") }),
+          /* @__PURE__ */ jsx25(Button11, { variant: "ghost", size: "xs", onClick: () => {
             setSimcOpen(false);
             setSimcErr("");
           }, children: t(lang, "guia.simc.cancelar") })
         ] })
       ] }) : null,
-      !simcOpen && simcNota ? /* @__PURE__ */ jsx24("div", { style: { ...S.sub, marginTop: 6 }, children: simcNota }) : null
+      !simcOpen && simcNota ? /* @__PURE__ */ jsx25("div", { style: { ...S.sub, marginTop: 6 }, children: simcNota }) : null
     ] }),
-    /* @__PURE__ */ jsx24("div", { style: { display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }, children: /* @__PURE__ */ jsx24(
+    /* @__PURE__ */ jsx25("div", { style: { display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }, children: /* @__PURE__ */ jsx25(
       SegmentedControl5,
       {
         value: sub,
@@ -43401,12 +44306,12 @@ function GuiaPrincipal({ ctx, almacen, estado, recargar, perfil, guardarPerfil, 
         options: SUBTABS.map((s) => ({ id: s, label: t(lang, "guia.sub." + s) }))
       }
     ) }),
-    /* @__PURE__ */ jsx24(Vista, { v, lang })
+    /* @__PURE__ */ jsx25(Vista, { v, lang })
   ] });
 }
 
 // src/vistas/legacy.jsx
-import { Fragment as Fragment20, jsx as jsx25, jsxs as jsxs25 } from "react/jsx-runtime";
+import { Fragment as Fragment21, jsx as jsx26, jsxs as jsxs26 } from "react/jsx-runtime";
 agregarTextos({
   "guia.leg.titulo": "Legacy — puntos de cuenta",
   "guia.leg.sub": "WoW: Forever · 65 pts ganables · 16 por personaje",
@@ -43578,57 +44483,57 @@ function VistaLegacy({ estado, perfil, lang }) {
   const clsName = claseDato ? nombre(claseDato.n, lang) : t(lang, "guia.leg.sinClase");
   const fac = perfil && perfil.faccion === "horda" ? "h" : perfil && perfil.faccion === "alianza" ? "a" : null;
   const sys = L.sys || [], progress = L.progress || [], challenges = L.challenges || [], perks = L.perks || {}, scarce = L.scarce || [], gather = L.gather || {};
-  const origen = /* @__PURE__ */ jsx25(Origen, { f: "curado", lang });
+  const origen = /* @__PURE__ */ jsx26(Origen, { f: "curado", lang });
   const nombreProf = (id, alt) => {
     const p = D.profesiones && D.profesiones.profesiones && D.profesiones.profesiones[id];
     return p ? nombre(p.n, lang) : alt;
   };
-  return /* @__PURE__ */ jsxs25(Fragment20, { children: [
-    /* @__PURE__ */ jsxs25(Tarjeta, { estilo: GOLD, titulo: /* @__PURE__ */ jsxs25("span", { style: { display: "inline-flex", alignItems: "center", gap: 8 }, children: [
-      /* @__PURE__ */ jsx25(Icono, { n: "coin", size: 14 }),
+  return /* @__PURE__ */ jsxs26(Fragment21, { children: [
+    /* @__PURE__ */ jsxs26(Tarjeta, { estilo: GOLD, titulo: /* @__PURE__ */ jsxs26("span", { style: { display: "inline-flex", alignItems: "center", gap: 8 }, children: [
+      /* @__PURE__ */ jsx26(Icono, { n: "coin", size: 14 }),
       t(lang, "guia.leg.titulo"),
-      /* @__PURE__ */ jsx25("span", { style: P.muted, children: t(lang, "guia.leg.sub") })
+      /* @__PURE__ */ jsx26("span", { style: P.muted, children: t(lang, "guia.leg.sub") })
     ] }), extra: origen, children: [
-      sys.map((s, i) => /* @__PURE__ */ jsxs25("div", { style: { ...P.mst, ...i === sys.length - 1 ? P.mstUlt : {} }, children: [
-        /* @__PURE__ */ jsx25("span", { style: P.tdot }),
-        /* @__PURE__ */ jsx25("span", { style: P.mstTxt, children: /* @__PURE__ */ jsx25(TextoRico, { html: s }) })
+      sys.map((s, i) => /* @__PURE__ */ jsxs26("div", { style: { ...P.mst, ...i === sys.length - 1 ? P.mstUlt : {} }, children: [
+        /* @__PURE__ */ jsx26("span", { style: P.tdot }),
+        /* @__PURE__ */ jsx26("span", { style: P.mstTxt, children: /* @__PURE__ */ jsx26(TextoRico, { html: s }) })
       ] }, i)),
-      /* @__PURE__ */ jsx25("div", { style: { ...P.tip, marginTop: 8 }, children: lvl < 25 ? /* @__PURE__ */ jsx25(TextoRico, { html: L.now && L.now.locked || "" }) : /* @__PURE__ */ jsxs25(Fragment20,
+      /* @__PURE__ */ jsx26("div", { style: { ...P.tip, marginTop: 8 }, children: lvl < 25 ? /* @__PURE__ */ jsx26(TextoRico, { html: L.now && L.now.locked || "" }) : /* @__PURE__ */ jsxs26(Fragment21,
       { children: [
         t(lang, "guia.leg.desbloqueadoPre", { lvl }),
         " ",
-        /* @__PURE__ */ jsx25("b", { children: "Y" }),
+        /* @__PURE__ */ jsx26("b", { children: "Y" }),
         " ",
         t(lang, "guia.leg.desbloqueadoPost")
       ] }) })
     ] }),
-    /* @__PURE__ */ jsxs25(Tarjeta, { titulo: /* @__PURE__ */ jsxs25("span", { style: { display: "inline-flex", alignItems: "center", gap: 8 }, children: [
-      /* @__PURE__ */ jsx25(Icono, { n: "star", size: 14 }),
+    /* @__PURE__ */ jsxs26(Tarjeta, { titulo: /* @__PURE__ */ jsxs26("span", { style: { display: "inline-flex", alignItems: "center", gap: 8 }, children: [
+      /* @__PURE__ */ jsx26(Icono, { n: "star", size: 14 }),
       t(lang, "guia.leg.proximos"),
-      /* @__PURE__ */ jsx25("span", { style: P.muted, children: t(lang, "guia.leg.aNivel", { lvl, clase: clsName }) })
+      /* @__PURE__ */ jsx26("span", { style: P.muted, children: t(lang, "guia.leg.aNivel", { lvl, clase: clsName }) })
     ] }), extra: origen, children: [
-      /* @__PURE__ */ jsx25("div", { style: { ...P.loot, borderBottom: "none", paddingBottom: 2 }, children: /* @__PURE__ */ jsxs25("span", { children: [
-        /* @__PURE__ */ jsx25("b", { children: clsName }),
+      /* @__PURE__ */ jsx26("div", { style: { ...P.loot, borderBottom: "none", paddingBottom: 2 }, children: /* @__PURE__ */ jsxs26("span", { children: [
+        /* @__PURE__ */ jsx26("b", { children: clsName }),
         " ",
-        /* @__PURE__ */ jsx25("span", { style: P.muted, children: t(lang, "guia.leg.hitosClase") })
+        /* @__PURE__ */ jsx26("span", { style: P.muted, children: t(lang, "guia.leg.hitosClase") })
       ] }) }),
       MILESTONES.map(([m, label]) => {
         const got = lvl >= m;
-        return /* @__PURE__ */ jsxs25("div", { style: P.loot, children: [
-          /* @__PURE__ */ jsxs25("span", { style: got ? P.lootOwn : {}, children: [
-            /* @__PURE__ */ jsxs25("b", { children: [
+        return /* @__PURE__ */ jsxs26("div", { style: P.loot, children: [
+          /* @__PURE__ */ jsxs26("span", { style: got ? P.lootOwn : {}, children: [
+            /* @__PURE__ */ jsxs26("b", { children: [
               label,
               " ",
               clsName
             ] }),
             " ",
-            /* @__PURE__ */ jsxs25("span", { style: P.muted, children: [
+            /* @__PURE__ */ jsxs26("span", { style: P.muted, children: [
               "— ",
               t(lang, "guia.leg.nivel", { m }),
               got ? t(lang, "guia.leg.yaGanado") : t(lang, "guia.leg.teFalta")
             ] })
           ] }),
-          /* @__PURE__ */ jsx25(Placa, { tono: got ? "now" : "soon", children: got ? "OK" : "lvl " + m })
+          /* @__PURE__ */ jsx26(Placa, { tono: got ? "now" : "soon", children: got ? "OK" : "lvl " + m })
         ] }, m);
       }),
       [
@@ -43637,105 +44542,105 @@ function VistaLegacy({ estado, perfil, lang }) {
         [t(lang, "guia.leg.pvp"), t(lang, "guia.leg.pvpD"), "pvp"],
         [t(lang, "guia.leg.raids"), t(lang, "guia.leg.raidsD"), "raid"],
         [t(lang, "guia.leg.aventura"), t(lang, "guia.leg.aventuraD"), "world"]
-      ].map(([n, d, tag], i, arr) => /* @__PURE__ */ jsxs25("div", { style: { ...P.loot, ...i === arr.length - 1 ? P.lootSinBorde : {} }, children: [
-        /* @__PURE__ */ jsxs25("span", { children: [
-          /* @__PURE__ */ jsx25("b", { children: n }),
+      ].map(([n, d, tag], i, arr) => /* @__PURE__ */ jsxs26("div", { style: { ...P.loot, ...i === arr.length - 1 ? P.lootSinBorde : {} }, children: [
+        /* @__PURE__ */ jsxs26("span", { children: [
+          /* @__PURE__ */ jsx26("b", { children: n }),
           " ",
-          /* @__PURE__ */ jsxs25("span", { style: P.muted, children: [
+          /* @__PURE__ */ jsxs26("span", { style: P.muted, children: [
             "— ",
             d
           ] })
         ] }),
-        /* @__PURE__ */ jsx25(Placa, { tono: "soon", children: tag })
+        /* @__PURE__ */ jsx26(Placa, { tono: "soon", children: tag })
       ] }, tag)),
-      /* @__PURE__ */ jsx25("p", { style: { ...P.tip, margin: "8px 0 0" }, children: /* @__PURE__ */ jsx25(TextoRico, { html: lvl < 25 ? t(lang, "guia.leg.notaBaja") : t(lang, "guia.leg.notaAlta", { lvl }) }) })
+      /* @__PURE__ */ jsx26("p", { style: { ...P.tip, margin: "8px 0 0" }, children: /* @__PURE__ */ jsx26(TextoRico, { html: lvl < 25 ? t(lang, "guia.leg.notaBaja") : t(lang, "guia.leg.notaAlta", { lvl }) }) })
     ] }),
-    /* @__PURE__ */ jsxs25(Tarjeta, { titulo: /* @__PURE__ */ jsxs25("span", { style: { display: "inline-flex", alignItems: "center", gap: 8 }, children: [
-      /* @__PURE__ */ jsx25(Icono, { n: "pin", size: 14 }),
+    /* @__PURE__ */ jsxs26(Tarjeta, { titulo: /* @__PURE__ */ jsxs26("span", { style: { display: "inline-flex", alignItems: "center", gap: 8 }, children: [
+      /* @__PURE__ */ jsx26(Icono, { n: "pin", size: 14 }),
       t(lang, "guia.leg.progress"),
-      /* @__PURE__ */ jsx25("span", { style: P.muted, children: t(lang, "guia.leg.progressSub") })
+      /* @__PURE__ */ jsx26("span", { style: P.muted, children: t(lang, "guia.leg.progressSub") })
     ] }), extra: origen, children: [
-      progress.map((p, i) => /* @__PURE__ */ jsx25("div", { style: { ...P.loot, ...i === progress.length - 1 ? P.lootSinBorde : {} }, children: /* @__PURE__ */ jsxs25("span", { children: [
-        /* @__PURE__ */ jsxs25("b", { children: [
+      progress.map((p, i) => /* @__PURE__ */ jsx26("div", { style: { ...P.loot, ...i === progress.length - 1 ? P.lootSinBorde : {} }, children: /* @__PURE__ */ jsxs26("span", { children: [
+        /* @__PURE__ */ jsxs26("b", { children: [
           p[0],
           " pts"
         ] }),
         " — ",
         p[1],
         " ",
-        /* @__PURE__ */ jsx25("span", { style: P.muted, children: p[2] })
+        /* @__PURE__ */ jsx26("span", { style: P.muted, children: p[2] })
       ] }) }, i)),
-      L.progressNote ? /* @__PURE__ */ jsx25("p", { style: { ...P.tip, margin: "6px 0 0" }, children: L.progressNote }) : null
+      L.progressNote ? /* @__PURE__ */ jsx26("p", { style: { ...P.tip, margin: "6px 0 0" }, children: L.progressNote }) : null
     ] }),
-    /* @__PURE__ */ jsx25(Tarjeta, { titulo: /* @__PURE__ */ jsxs25("span", { style: { display: "inline-flex", alignItems: "center", gap: 8 }, children: [
-      /* @__PURE__ */ jsx25(Icono, { n: "scroll", size: 14 }),
+    /* @__PURE__ */ jsx26(Tarjeta, { titulo: /* @__PURE__ */ jsxs26("span", { style: { display: "inline-flex", alignItems: "center", gap: 8 }, children: [
+      /* @__PURE__ */ jsx26(Icono, { n: "scroll", size: 14 }),
       t(lang, "guia.leg.challenges"),
-      /* @__PURE__ */ jsxs25("span", { style: P.muted, children: [
+      /* @__PURE__ */ jsxs26("span", { style: P.muted, children: [
         t(lang, "guia.leg.loQuePaga"),
         " · ",
         L.challengesNote || ""
       ] })
     ] }), extra: origen }),
-    challenges.map((c) => /* @__PURE__ */ jsxs25(
+    challenges.map((c) => /* @__PURE__ */ jsxs26(
       Detalle,
       {
         titulo: c.name,
         meta: `~${c.pts} pts · ${c.desc || ""}`,
         extra: origen,
         children: [
-          (c.rows || []).map((r, i) => /* @__PURE__ */ jsx25("div", { style: { ...P.loot, ...i === (c.rows || []).length - 1 ? P.lootSinBorde : {} }, children: /* @__PURE__ */ jsxs25("span", { children: [
-            /* @__PURE__ */ jsx25("b", { children: r[0] }),
+          (c.rows || []).map((r, i) => /* @__PURE__ */ jsx26("div", { style: { ...P.loot, ...i === (c.rows || []).length - 1 ? P.lootSinBorde : {} }, children: /* @__PURE__ */ jsxs26("span", { children: [
+            /* @__PURE__ */ jsx26("b", { children: r[0] }),
             " ",
-            /* @__PURE__ */ jsxs25("span", { style: P.muted, children: [
+            /* @__PURE__ */ jsxs26("span", { style: P.muted, children: [
               "— ",
-              /* @__PURE__ */ jsx25(TextoRico, { html: r[1] })
+              /* @__PURE__ */ jsx26(TextoRico, { html: r[1] })
             ] })
           ] }) }, i)),
-          c.note ? /* @__PURE__ */ jsx25("p", { style: { ...P.tip, margin: "6px 0 0" }, children: /* @__PURE__ */ jsx25(TextoRico, { html: c.note }) }) : null
+          c.note ? /* @__PURE__ */ jsx26("p", { style: { ...P.tip, margin: "6px 0 0" }, children: /* @__PURE__ */ jsx26(TextoRico, { html: c.note }) }) : null
         ]
       },
       c.id || c.name
     )),
     Object.entries(perks).map(([pk, Pk]) => {
       const total = (Pk.perks || []).reduce((a, x) => a + (x.r || 0), 0);
-      return /* @__PURE__ */ jsxs25(
+      return /* @__PURE__ */ jsxs26(
         Detalle,
         {
           abierto: pk === "prof",
           estilo: pk === "prof" ? { borderLeft: `3px solid ${C.verde}` } : {},
-          titulo: /* @__PURE__ */ jsxs25("span", { style: { display: "inline-flex", alignItems: "center", gap: 8 }, children: [
-            /* @__PURE__ */ jsx25(Icono, { n: "star", size: 14 }),
+          titulo: /* @__PURE__ */ jsxs26("span", { style: { display: "inline-flex", alignItems: "center", gap: 8 }, children: [
+            /* @__PURE__ */ jsx26(Icono, { n: "star", size: 14 }),
             Pk.name
           ] }),
           meta: `${Pk.sub || ""} · ${t(lang, "guia.leg.ranks", { n: total })}`,
           extra: origen,
           children: [
-            (Pk.perks || []).map((p, i) => /* @__PURE__ */ jsx25("div", { style: { ...P.loot, ...i === (Pk.perks || []).length - 1 ? P.lootSinBorde : {} }, children: /* @__PURE__ */ jsxs25("div", { children: [
-              /* @__PURE__ */ jsx25("b", { children: p.n }),
+            (Pk.perks || []).map((p, i) => /* @__PURE__ */ jsx26("div", { style: { ...P.loot, ...i === (Pk.perks || []).length - 1 ? P.lootSinBorde : {} }, children: /* @__PURE__ */ jsxs26("div", { children: [
+              /* @__PURE__ */ jsx26("b", { children: p.n }),
               " ",
-              /* @__PURE__ */ jsxs25(Placa, { tono: p.tag === "gather" ? "now" : "plain", estilo: { marginLeft: 0 }, children: [
+              /* @__PURE__ */ jsxs26(Placa, { tono: p.tag === "gather" ? "now" : "plain", estilo: { marginLeft: 0 }, children: [
                 tagTxt(lang, p.tag),
                 " · ",
                 p.r,
                 "r"
               ] }),
-              p.pre ? /* @__PURE__ */ jsxs25(Placa, { tono: "soon", children: [
+              p.pre ? /* @__PURE__ */ jsxs26(Placa, { tono: "soon", children: [
                 t(lang, "guia.leg.req"),
                 " ",
                 p.pre
               ] }) : null,
-              /* @__PURE__ */ jsx25("div", { style: { ...P.muted, marginTop: 2 }, children: /* @__PURE__ */ jsx25(TextoRico, { html: p.fx }) })
+              /* @__PURE__ */ jsx26("div", { style: { ...P.muted, marginTop: 2 }, children: /* @__PURE__ */ jsx26(TextoRico, { html: p.fx }) })
             ] }) }, i)),
-            L.perksNote ? /* @__PURE__ */ jsx25("p", { style: { ...P.tip, margin: "6px 0 0" }, children: L.perksNote }) : null
+            L.perksNote ? /* @__PURE__ */ jsx26("p", { style: { ...P.tip, margin: "6px 0 0" }, children: L.perksNote }) : null
           ]
         },
         pk
       );
     }),
-    /* @__PURE__ */ jsxs25(Tarjeta, { estilo: GOLD, titulo: /* @__PURE__ */ jsxs25("span", { style: { display: "inline-flex", alignItems: "center", gap: 8 }, children: [
-      /* @__PURE__ */ jsx25(Icono, { n: "star", size: 14 }),
+    /* @__PURE__ */ jsxs26(Tarjeta, { estilo: GOLD, titulo: /* @__PURE__ */ jsxs26("span", { style: { display: "inline-flex", alignItems: "center", gap: 8 }, children: [
+      /* @__PURE__ */ jsx26(Icono, { n: "star", size: 14 }),
       t(lang, "guia.leg.recoleccion"),
-      /* @__PURE__ */ jsxs25("span", { style: P.muted, children: [
+      /* @__PURE__ */ jsxs26("span", { style: P.muted, children: [
         nombreProf("182", "Herbalism"),
         " · ",
         nombreProf("186", "Mining"),
@@ -43743,88 +44648,88 @@ function VistaLegacy({ estado, perfil, lang }) {
         nombreProf("393", "Skinning")
       ] })
     ] }), extra: origen, children: [
-      /* @__PURE__ */ jsxs25("div", { style: { ...P.mst, marginBottom: 4 }, children: [
-        /* @__PURE__ */ jsx25("span", { style: P.tdot }),
-        /* @__PURE__ */ jsx25("span", { style: P.mstTxt, children: /* @__PURE__ */ jsx25(TextoRico, { html: t(lang, "guia.leg.recoleccionTxt") }) })
+      /* @__PURE__ */ jsxs26("div", { style: { ...P.mst, marginBottom: 4 }, children: [
+        /* @__PURE__ */ jsx26("span", { style: P.tdot }),
+        /* @__PURE__ */ jsx26("span", { style: P.mstTxt, children: /* @__PURE__ */ jsx26(TextoRico, { html: t(lang, "guia.leg.recoleccionTxt") }) })
       ] }),
-      /* @__PURE__ */ jsxs25("div", { style: { ...P.loot, borderBottom: "none" }, children: [
-        /* @__PURE__ */ jsxs25("span", { children: [
-          /* @__PURE__ */ jsx25("b", { children: t(lang, "guia.leg.bountiful") }),
+      /* @__PURE__ */ jsxs26("div", { style: { ...P.loot, borderBottom: "none" }, children: [
+        /* @__PURE__ */ jsxs26("span", { children: [
+          /* @__PURE__ */ jsx26("b", { children: t(lang, "guia.leg.bountiful") }),
           " ",
-          /* @__PURE__ */ jsx25(Placa, { tono: "now", children: profs.skin ? t(lang, "guia.leg.tuSkinning") : t(lang, "guia.leg.perkArbol") })
+          /* @__PURE__ */ jsx26(Placa, { tono: "now", children: profs.skin ? t(lang, "guia.leg.tuSkinning") : t(lang, "guia.leg.perkArbol") })
         ] }),
-        /* @__PURE__ */ jsx25("span", { style: P.muted, children: t(lang, "guia.leg.bountifulTxt") })
+        /* @__PURE__ */ jsx26("span", { style: P.muted, children: t(lang, "guia.leg.bountifulTxt") })
       ] }),
-      /* @__PURE__ */ jsx25("p", { style: { ...P.tip, margin: "8px 0 0" }, children: /* @__PURE__ */ jsx25(TextoRico, { html: t(lang, "guia.leg.tierNota", {
+      /* @__PURE__ */ jsx26("p", { style: { ...P.tip, margin: "8px 0 0" }, children: /* @__PURE__ */ jsx26(TextoRico, { html: t(lang, "guia.leg.tierNota", {
         lvl,
         tier: lvl <= 25 ? "tier 1" : lvl < 46 ? "tier 2" : "tier 3 (aprox)",
         items: t(lang, lvl <= 25 ? "guia.leg.tierItems1" : lvl < 46 ? "guia.leg.tierItems2" : "guia.leg.tierItems3")
       }) }) })
     ] }),
-    /* @__PURE__ */ jsxs25(Tarjeta, { titulo: /* @__PURE__ */ jsxs25("span", { style: { display: "inline-flex", alignItems: "center", gap: 8 }, children: [
-      /* @__PURE__ */ jsx25(Icono, { n: "coin", size: 14 }),
+    /* @__PURE__ */ jsxs26(Tarjeta, { titulo: /* @__PURE__ */ jsxs26("span", { style: { display: "inline-flex", alignItems: "center", gap: 8 }, children: [
+      /* @__PURE__ */ jsx26(Icono, { n: "coin", size: 14 }),
       t(lang, "guia.leg.scarce"),
-      /* @__PURE__ */ jsx25("span", { style: P.muted, children: t(lang, "guia.leg.scarceSub") })
+      /* @__PURE__ */ jsx26("span", { style: P.muted, children: t(lang, "guia.leg.scarceSub") })
     ] }), extra: origen, children: [
-      /* @__PURE__ */ jsx25("div", { style: { ...P.loot, borderBottom: "none", paddingBottom: 2 }, children: /* @__PURE__ */ jsx25("span", { style: { ...P.muted, fontSize: 11 }, children: t(lang, "gui\
+      /* @__PURE__ */ jsx26("div", { style: { ...P.loot, borderBottom: "none", paddingBottom: 2 }, children: /* @__PURE__ */ jsx26("span", { style: { ...P.muted, fontSize: 11 }, children: t(lang, "gui\
 a.leg.scarceCols") }) }),
-      scarce.map((s, i) => /* @__PURE__ */ jsx25("div", { style: { ...P.loot, ...i === scarce.length - 1 ? P.lootSinBorde : {} }, children: /* @__PURE__ */ jsxs25("div", { children: [
-        /* @__PURE__ */ jsx25("b", { children: s[0] }),
+      scarce.map((s, i) => /* @__PURE__ */ jsx26("div", { style: { ...P.loot, ...i === scarce.length - 1 ? P.lootSinBorde : {} }, children: /* @__PURE__ */ jsxs26("div", { children: [
+        /* @__PURE__ */ jsx26("b", { children: s[0] }),
         " ",
-        /* @__PURE__ */ jsx25(Placa, { tono: "plain", estilo: { marginLeft: 0 }, children: s[1] }),
+        /* @__PURE__ */ jsx26(Placa, { tono: "plain", estilo: { marginLeft: 0 }, children: s[1] }),
         " ",
-        /* @__PURE__ */ jsx25(Placa, { tono: "soon", children: t(lang, "guia.leg.ilvl", { n: s[2] }) }),
-        /* @__PURE__ */ jsxs25("div", { style: { ...P.muted, marginTop: 2 }, children: [
+        /* @__PURE__ */ jsx26(Placa, { tono: "soon", children: t(lang, "guia.leg.ilvl", { n: s[2] }) }),
+        /* @__PURE__ */ jsxs26("div", { style: { ...P.muted, marginTop: 2 }, children: [
           "→ ",
           s[3],
           " · ",
           s[4]
         ] }),
-        /* @__PURE__ */ jsx25("div", { style: { ...P.muted, fontSize: 11 }, children: s[5] })
+        /* @__PURE__ */ jsx26("div", { style: { ...P.muted, fontSize: 11 }, children: s[5] })
       ] }) }, i)),
-      L.scarceNote ? /* @__PURE__ */ jsx25("p", { style: { ...P.tip, margin: "6px 0 0" }, children: L.scarceNote }) : null
+      L.scarceNote ? /* @__PURE__ */ jsx26("p", { style: { ...P.tip, margin: "6px 0 0" }, children: L.scarceNote }) : null
     ] }),
     PROF_META.map(([pk, id, ic]) => {
       const has = !!profs[pk];
       const rows = (gather[pk] || []).filter((e) => !e.fac || e.fac === "both" || e.fac === fac);
-      return /* @__PURE__ */ jsxs25(Tarjeta, { titulo: /* @__PURE__ */ jsxs25("span", { style: { display: "inline-flex", alignItems: "center", gap: 8, flexWrap: "wrap" }, children: [
-        /* @__PURE__ */ jsx25(Icono, { n: ic, size: 14 }),
+      return /* @__PURE__ */ jsxs26(Tarjeta, { titulo: /* @__PURE__ */ jsxs26("span", { style: { display: "inline-flex", alignItems: "center", gap: 8, flexWrap: "wrap" }, children: [
+        /* @__PURE__ */ jsx26(Icono, { n: ic, size: 14 }),
         nombreProf(id, pk),
         t(lang, "guia.leg.dondeFarmear"),
-        /* @__PURE__ */ jsxs25("span", { style: P.muted, children: [
-          has ? /* @__PURE__ */ jsx25("b", { style: { color: C.verde }, children: t(lang, "guia.leg.tenesProf") }) : null,
+        /* @__PURE__ */ jsxs26("span", { style: P.muted, children: [
+          has ? /* @__PURE__ */ jsx26("b", { style: { color: C.verde }, children: t(lang, "guia.leg.tenesProf") }) : null,
           t(lang, "guia.leg.porNivel")
         ] })
       ] }), extra: origen, children: [
         rows.map((e, i) => {
           const inR = lvl >= e.lvl[0] && lvl <= e.lvl[1];
-          return /* @__PURE__ */ jsxs25("div", { style: {
+          return /* @__PURE__ */ jsxs26("div", { style: {
             ...P.loot,
             ...i === rows.length - 1 ? P.lootSinBorde : {},
             ...inR ? { borderLeft: `2px solid ${C.verde}`, paddingLeft: 8 } : {}
           }, children: [
-            /* @__PURE__ */ jsxs25("div", { children: [
-              /* @__PURE__ */ jsx25("b", { children: e.what }),
+            /* @__PURE__ */ jsxs26("div", { children: [
+              /* @__PURE__ */ jsx26("b", { children: e.what }),
               " ",
-              /* @__PURE__ */ jsxs25("span", { style: P.muted, children: [
+              /* @__PURE__ */ jsxs26("span", { style: P.muted, children: [
                 "· ",
                 t(lang, "guia.leg.nv", { a: e.lvl[0], b: e.lvl[1] })
               ] }),
-              /* @__PURE__ */ jsx25("div", { style: { ...P.muted, marginTop: 2 }, children: e.zones }),
-              e.note ? /* @__PURE__ */ jsx25("div", { style: { ...P.muted, fontSize: 11, marginTop: 1 }, children: e.note }) : null
+              /* @__PURE__ */ jsx26("div", { style: { ...P.muted, marginTop: 2 }, children: e.zones }),
+              e.note ? /* @__PURE__ */ jsx26("div", { style: { ...P.muted, fontSize: 11, marginTop: 1 }, children: e.note }) : null
             ] }),
-            inR ? /* @__PURE__ */ jsx25(Placa, { tono: "now", children: t(lang, "guia.leg.tuNivel") }) : null
+            inR ? /* @__PURE__ */ jsx26(Placa, { tono: "now", children: t(lang, "guia.leg.tuNivel") }) : null
           ] }, i);
         }),
-        !rows.length ? /* @__PURE__ */ jsx25("div", { style: P.muted, children: "—" }) : null
+        !rows.length ? /* @__PURE__ */ jsx26("div", { style: P.muted, children: "—" }) : null
       ] }, pk);
     }),
-    L.gatherNote ? /* @__PURE__ */ jsx25("p", { style: { ...P.tip, margin: 0 }, children: L.gatherNote }) : null
+    L.gatherNote ? /* @__PURE__ */ jsx26("p", { style: { ...P.tip, margin: 0 }, children: L.gatherNote }) : null
   ] });
 }
 
 // src/app.jsx
-import { jsx as jsx26, jsxs as jsxs26 } from "react/jsx-runtime";
+import { jsx as jsx27, jsxs as jsxs27 } from "react/jsx-runtime";
 var PESTANAS = [
   ["personaje", VistaPersonaje],
   ["clase", VistaClase],
@@ -43848,7 +44753,7 @@ var Contencion = class extends Component {
   }
   render() {
     if (!this.state.error) return this.props.children;
-    return /* @__PURE__ */ jsx26("div", { role: "alert", style: S.aviso, children: String(this.state.error && this.state.error.message || this.state.error) });
+    return /* @__PURE__ */ jsx27("div", { role: "alert", style: S.aviso, children: String(this.state.error && this.state.error.message || this.state.error) });
   }
 };
 async function guardarConfirmado(ctx, clave, valor) {
@@ -43867,15 +44772,15 @@ function perfilInicial(guardado, build) {
   return { perfil: m.perfil, ok: validarPerfil(m.perfil, D.personaje).ok, errores: [], razaSupuesta: m.razaSupuesta };
 }
 function App({ ctx, almacen, sincronizador, ventas, puente }) {
-  const [estado, setEstado] = useState14(null);
-  const [error, setError] = useState14("");
-  const [perfil, setPerfil] = useState14(null);
-  const [razaSupuesta, setRazaSupuesta] = useState14(false);
-  const [lang, setLang] = useState14(() => ctx.storage.get("idioma", "es") === "en" ? "en" : "es");
-  const [pestana, setPestana] = useState14(() => ctx.storage.get("pestana", "personaje"));
-  const [vuelta, setVuelta] = useState14(0);
+  const [estado, setEstado] = useState15(null);
+  const [error, setError] = useState15("");
+  const [perfil, setPerfil] = useState15(null);
+  const [razaSupuesta, setRazaSupuesta] = useState15(false);
+  const [lang, setLang] = useState15(() => ctx.storage.get("idioma", "es") === "en" ? "en" : "es");
+  const [pestana, setPestana] = useState15(() => ctx.storage.get("pestana", "personaje"));
+  const [vuelta, setVuelta] = useState15(0);
   const recargar = useCallback3(() => setVuelta((v) => v + 1), []);
-  useEffect7(() => {
+  useEffect8(() => {
     let previous = sincronizador?.getState().changed;
     return sincronizador?.subscribe((s) => {
       if (s.changed !== previous) {
@@ -43884,7 +44789,7 @@ function App({ ctx, almacen, sincronizador, ventas, puente }) {
       }
     });
   }, [sincronizador, recargar]);
-  useEffect7(() => {
+  useEffect8(() => {
     let vivo = true;
     setError("");
     almacen.read().then((v) => {
@@ -43925,7 +44830,7 @@ function App({ ctx, almacen, sincronizador, ventas, puente }) {
     }
   };
   const listo = perfil && validarPerfil(perfil, D.personaje).ok;
-  const visibles = useMemo17(() => PESTANAS.filter(([id]) => id === "personaje" || id === "legacy" || listo && (id !== "guia" || guiaCurada(perfil))), [listo, perfil]);
+  const visibles = useMemo18(() => PESTANAS.filter(([id]) => id === "personaje" || id === "legacy" || listo && (id !== "guia" || guiaCurada(perfil))), [listo, perfil]);
   const activa = visibles.some(([id]) => id === pestana) ? pestana : "personaje";
   const Vista = (visibles.find(([id]) => id === activa) || PESTANAS[0])[1];
   const resumen = listo ? [
@@ -43934,20 +44839,20 @@ function App({ ctx, almacen, sincronizador, ventas, puente }) {
     t(lang, "clase.nivel") + " " + perfil.nivel,
     nombre(D.personaje.facciones[perfil.faccion].n, lang)
   ].join(" · ") : t(lang, "perfil.vacio");
-  return /* @__PURE__ */ jsxs26("div", { style: S.pagina, children: [
-    /* @__PURE__ */ jsxs26("div", { style: S.cabecera, children: [
-      /* @__PURE__ */ jsx26("strong", { children: t(lang, "app") }),
-      /* @__PURE__ */ jsx26("span", { style: { ...S.sub, flex: 1 }, children: resumen }),
-      /* @__PURE__ */ jsx26(SegmentedControl6, { value: lang, onChange: cambiarLang, options: [{ id: "es", label: "ES" }, { id: "en", label: "EN" }] }),
-      /* @__PURE__ */ jsx26(Button11, { variant: "outline", size: "xs", onClick: async () => {
+  return /* @__PURE__ */ jsxs27("div", { style: S.pagina, children: [
+    /* @__PURE__ */ jsxs27("div", { style: S.cabecera, children: [
+      /* @__PURE__ */ jsx27("strong", { children: t(lang, "app") }),
+      /* @__PURE__ */ jsx27("span", { style: { ...S.sub, flex: 1 }, children: resumen }),
+      /* @__PURE__ */ jsx27(SegmentedControl6, { value: lang, onChange: cambiarLang, options: [{ id: "es", label: "ES" }, { id: "en", label: "EN" }] }),
+      /* @__PURE__ */ jsx27(Button12, { variant: "outline", size: "xs", onClick: async () => {
         await almacen.reset();
         recargar();
       }, children: t(lang, "reintentar") })
     ] }),
-    /* @__PURE__ */ jsx26("div", { style: { padding: "6px 16px 0" }, children: /* @__PURE__ */ jsx26(Tabs, { value: activa, onValueChange: cambiarPestana, children: /* @__PURE__ */ jsx26(TabsList, { children: visibles.
-    map(([id]) => /* @__PURE__ */ jsx26(TabsTrigger, { value: id, children: t(lang, "tab." + id) }, id)) }) }) }),
-    /* @__PURE__ */ jsx26("div", { style: S.cuerpo, children: error ? /* @__PURE__ */ jsx26("div", { role: "alert", style: S.aviso, children: error }) : !estado || !perfil ? /* @__PURE__ */ jsx26("p",
-    { role: "status", style: S.sub, children: t(lang, "cargando") }) : /* @__PURE__ */ jsx26(Contencion, { children: /* @__PURE__ */ jsx26(
+    /* @__PURE__ */ jsx27("div", { style: { padding: "6px 16px 0" }, children: /* @__PURE__ */ jsx27(Tabs, { value: activa, onValueChange: cambiarPestana, children: /* @__PURE__ */ jsx27(TabsList, { children: visibles.
+    map(([id]) => /* @__PURE__ */ jsx27(TabsTrigger, { value: id, children: t(lang, "tab." + id) }, id)) }) }) }),
+    /* @__PURE__ */ jsx27("div", { style: S.cuerpo, children: error ? /* @__PURE__ */ jsx27("div", { role: "alert", style: S.aviso, children: error }) : !estado || !perfil ? /* @__PURE__ */ jsx27("p",
+    { role: "status", style: S.sub, children: t(lang, "cargando") }) : /* @__PURE__ */ jsx27(Contencion, { children: /* @__PURE__ */ jsx27(
       Vista,
       {
         ctx,
@@ -44312,7 +45217,25 @@ function parseBridge(bytes) {
   }
   entries.sort((a, b) => a.day - b.day || a.at - b.at);
   const retentionDays = isInt(db.retentionDays) && db.retentionDays >= 1 && db.retentionDays <= 60 ? db.retentionDays : 14;
-  return { version: 1, retentionDays, entries };
+  const PERSONAGEM_MAX = 512 * 1024;
+  let personagem = null;
+  const pj = db.personagem;
+  if (pj && typeof pj === "object" && typeof pj.simc === "string" && pj.simc.length > 0 && pj.simc.length <= PERSONAGEM_MAX) {
+    personagem = {
+      simc: pj.simc,
+      capturado: isInt(pj.capturado) && pj.capturado > 0 ? pj.capturado : null,
+      origem: "addon"
+    };
+  }
+  let personagemErro = null;
+  const pe = db.personagemErro;
+  if (pe && typeof pe === "object" && typeof pe.erro === "string" && pe.erro.length > 0 && pe.erro.length <= 4096) {
+    personagemErro = {
+      erro: pe.erro,
+      capturado: isInt(pe.capturado) && pe.capturado > 0 ? pe.capturado : null
+    };
+  }
+  return { version: 1, retentionDays, entries, personagem, personagemErro };
 }
 function bridgeToSnapshot(journal, { now = /* @__PURE__ */ new Date() } = {}) {
   const realms = /* @__PURE__ */ new Map();
@@ -44484,6 +45407,12 @@ function createBridgeSync(ctx, marketSync) {
       return { status: "unchanged" };
     }
     const journal = parseBridge(bytes);
+    try {
+      const ps = await sincronizarPersonagem(ctx, journal);
+      if (ps.status === "ok") publish({ personagem: "ok" });
+    } catch (e) {
+      publish({ personagem: "error", personagemError: String(e?.message || e).slice(0, 200) });
+    }
     if (!journal.entries.length) {
       lastDigest = hash;
       const r2 = { status: "ok", message: "El diario del puente está vacío. Haz un escaneo y /reload.", entries: 0, items: 0, lastDay: null, lastCaptureAt: null, error: null };
@@ -44604,7 +45533,7 @@ function limpiarClavesHeredadas(storage = almacenamientoLocal()) {
 }
 
 // src/plugin.src.jsx
-import { jsx as jsx27 } from "react/jsx-runtime";
+import { jsx as jsx28 } from "react/jsx-runtime";
 var RUTA = "/wow-forever";
 var plugin_src_default = {
   id: "wow-hunter-guide",
@@ -44624,7 +45553,7 @@ s autorizadas.",
     startBridgeSync(ctx, puente);
     ctx.registerMany([
       { id: "nav", area: SIDEBAR_NAV_AREA, order: 73, data: { path: RUTA, label: "WoW Forever", codicon: "target" } },
-      { id: "route", area: ROUTES_AREA, data: { path: RUTA }, render: () => /* @__PURE__ */ jsx27(App, { ctx, almacen, sincronizador, ventas, puente }) },
+      { id: "route", area: ROUTES_AREA, data: { path: RUTA }, render: () => /* @__PURE__ */ jsx28(App, { ctx, almacen, sincronizador, ventas, puente }) },
       { id: "open", area: PALETTE_AREA, data: {
         id: "wow-forever.open",
         label: "WoW Forever: abrir guía y mercado",

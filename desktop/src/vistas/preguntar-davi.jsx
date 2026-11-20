@@ -95,6 +95,12 @@ export function PreguntarDavi({ ctx, lang, seccion, snapshot, preguntaInicial = 
                 {t(lang, 'davi.partes.precios')}
               </label>
             ) : null}
+            {partes.includes('simc') ? (
+              <label style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
+                <Checkbox disabled={deshabilitado} checked={activas.has('simc')} onCheckedChange={() => alternar('simc')} />
+                {t(lang, 'davi.partes.simc')}
+              </label>
+            ) : null}
           </div>
           <div style={S.etiqueta}>{t(lang, 'davi.vistaPreviaAyuda')}</div>
           <textarea readOnly value={textoVista} aria-label={t(lang, 'davi.vistaPrevia')}

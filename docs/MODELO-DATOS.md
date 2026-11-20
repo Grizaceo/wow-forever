@@ -164,6 +164,28 @@ Reglas, en `src/perfil.js` (módulo ES puro, sin DOM):
 - `migrarPerfil(estadoViejo)` convierte el estado de la guía actual
   (`cls: "hunter"|"warrior"|"shaman"`, `fac`, `lvl`) sin perder nivel ni facción.
 
+### Estado del personaje desde SimulationCraft
+
+Clave `personaje-simc` en `ctx.storage` (módulo `desktop/src/simc.js`):
+
+```json
+{"v": 1, "origem": "addon", "texto": "<export SimC crudo>", "capturado": 1763300000,
+ "erro": null}
+```
+
+- `origem`: `addon` (lo escribió `WoWForeverBridgeDB.personaje` dentro del juego) o
+  `pegado` (lo pegó el usuario en la pestaña Personaje). `capturado` es unix;
+  `erro` guarda el último fallo de captura del addon sin borrar el último export
+  bueno.
+- `texto` es el export **crudo** de SimulationCraft (nunca sale del plugin salvo
+  que el usuario lo copie a mano). El parser puro `parsearSimc` lo convierte en un
+  objeto con clase/nivel/raza/reino, stats de `# character_stats*`, equipo por slot
+  (`# Nombre (ilvl)` + `slot=,id=…`), talentos, profesiones, mascota y una lista
+  `desconhecidas` con todo lo no reconocido. Nunca evalúa el texto.
+- `propostaPerfil(personagem, perfil, datos)` propone campos del export que difieren
+  del perfil manual (nivel, reino, raza/facción solo si son válidas para la clase,
+  profesiones); la vista pide confirmación antes de aplicar.
+
 ## Guías curadas
 
 Las guías escritas a mano (hoy Cazador de la Horda y Legacy en `standalone/guide-*.js`;

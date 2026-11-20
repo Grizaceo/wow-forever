@@ -139,5 +139,60 @@ AUCTIONATOR_PRICE_DATABASE = { __dbversion = 99 }
 scripts['OnUpdate'](nil, 21)
 ok(true, 'versión desconocida se ignora')
 
+-- ===== Personaje.lua (captura SimC) =====
+events, scripts = {}, {}
+_G.SimulationcraftAPI = {
+  GetSimcProfile = function(_, debug, noBags, showMerchant)
+    assert(debug == false and noBags == true and showMerchant == false, 'GetSimcProfile args (debug/noBags/showMerchant)')
+    return 'hunter="T"\nlevel=30\nrace=human\nserver=reino\nspec=unknown\n# Checksum: x\n', nil
+  end,
+}
+local simcCalls = 0
+local realGet = SimulationcraftAPI.GetSimcProfile
+SimulationcraftAPI.GetSimcProfile = function(...)
+  simcCalls = simcCalls + 1
+  return realGet(...)
+end
+dofile('addon/WoWForeverBridge/Personaje.lua')
+ok(events['PLAYER_ENTERING_WORLD'] and events['PLAYER_LOGOUT'] and events['PLAYER_QUITING'], 'Personaje registra eventos')
+ok(type(SlashCmdList['WOWFOREVERBRIDGE2']) == 'function', 'Personaje registra /wfbp')
+
+scripts['OnEvent'](nil, 'PLAYER_ENTERING_WORLD')
+ok(type(WoWForeverBridgeDB.personagem) == 'table', 'PEW captura export')
+eq(WoWForeverBridgeDB.personagem.capturado, nowValue, 'personagem capturado=now')
+eq(WoWForeverBridgeDB.personagem.origem, 'addon', 'personagem origem')
+ok(WoWForeverBridgeDB.personagem.simc:find('level=30', 1, true) ~= nil, 'simc contiene level=30')
+local calls1 = simcCalls
+
+nowValue = nowValue + 60
+scripts['OnEvent'](nil, 'PLAYER_ENTERING_WORLD')
+eq(simcCalls, calls1, 'throttle 300s no recaptura')
+
+SlashCmdList['WOWFOREVERBRIDGE2']('personagem')
+eq(simcCalls, calls1 + 1, '/wfbp personagem fuerza captura')
+
+-- API que lanza error: se conserva el último export bueno y se registra o erro.
+SimulationcraftAPI.GetSimcProfile = function() error('boom simc') end
+nowValue = nowValue + 400
+scripts['OnEvent'](nil, 'PLAYER_LOGOUT')
+ok(WoWForeverBridgeDB.personagem.simc:find('level=30', 1, true) ~= nil, 'export bueno se conserva tras erro')
+ok(type(WoWForeverBridgeDB.personagemErro) == 'table', 'personagemErro registrado')
+eq(WoWForeverBridgeDB.personagemErro.capturado, nowValue, 'personagemErro capturado=now')
+ok(tostring(WoWForeverBridgeDB.personagemErro.erro):find('boom', 1, true) ~= nil, 'personagemErro mensaje')
+
+-- SimC devolviendo erro na 2a saida: também vai p/ personagemErro.
+SimulationcraftAPI.GetSimcProfile = function() return nil, 'spec no escolhida' end
+nowValue = nowValue + 400
+scripts['OnEvent'](nil, 'PLAYER_QUITING')
+eq(WoWForeverBridgeDB.personagemErro.erro, 'spec no escolhida', 'erro da API de 2a saida')
+ok(WoWForeverBridgeDB.personagem.simc:find('level=30', 1, true) ~= nil, 'export bom segue intacto')
+
+-- SimulationcraftAPI ausente: silencio, sem erro novo, sem quebrar.
+_G.SimulationcraftAPI = nil
+local erroAntes = WoWForeverBridgeDB.personagemErro.capturado
+SlashCmdList['WOWFOREVERBRIDGE2']('simc')
+eq(WoWForeverBridgeDB.personagemErro.capturado, erroAntes, 'sem API nao grava erro novo')
+ok(true, 'sem SimulationcraftAPI no revienta')
+
 print(string.format('test_bridge.lua: %d checks, %d fallos', checks, failures))
 os.exit(failures == 0 and 0 or 1)

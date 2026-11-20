@@ -8,6 +8,7 @@ import { agregarTextos, t } from '../i18n.js'
 import { Aviso, Origen, Tarjeta } from '../ui.jsx'
 import { construirContextoPersonaje } from '../davi.js'
 import { PreguntarDavi } from './preguntar-davi.jsx'
+import { TarjetaSimc } from './personaje-simc.jsx'
 
 agregarTextos({
   'perfil.copiar': 'Copiar perfil para el agente',
@@ -46,10 +47,11 @@ function Selector({ etiqueta, valor, opciones, onChange, id }) {
   )
 }
 
-export function VistaPersonaje({ ctx, perfil, guardarPerfil, razaSupuesta, lang, irA }) {
+export function VistaPersonaje({ ctx, perfil, guardarPerfil, razaSupuesta, lang, irA, puente }) {
   const [borrador, setBorrador] = useState(perfil)
   const [estado, setEstado] = useState('')
   const [copia, setCopia] = useState(null)
+  const [resumenSimc, setResumenSimc] = useState(null)
   const p = borrador
 
   const cambiar = async (parcial) => {
@@ -69,8 +71,8 @@ export function VistaPersonaje({ ctx, perfil, guardarPerfil, razaSupuesta, lang,
 
   const resumen = perfilParaAgente(p, D.personaje, NOMBRES_PROF, lang)
   const snapshotDavi = useMemo(
-    () => construirContextoPersonaje({ resumen, procedencia: PROCEDENCIA_PERSONAJE, lang }),
-    [resumen, lang],
+    () => construirContextoPersonaje({ resumen, procedencia: PROCEDENCIA_PERSONAJE, lang, resumenSimc }),
+    [resumen, lang, resumenSimc],
   )
   const copiar = async () => {
     let ok = false
@@ -110,6 +112,7 @@ export function VistaPersonaje({ ctx, perfil, guardarPerfil, razaSupuesta, lang,
           ? <div style={{ ...S.sub, color: C.verde }}>★ {t(lang, 'perfil.nueva')}</div> : null}
         <div style={S.sub} role="status">{estado}</div>
       </Tarjeta>
+      <TarjetaSimc ctx={ctx} lang={lang} perfil={p} onAplicar={cambiar} puente={puente} onResumen={setResumenSimc} />
       <Tarjeta titulo={t(lang, 'perfil.profesiones')}>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>
           {PRINCIPALES.map((id) => (

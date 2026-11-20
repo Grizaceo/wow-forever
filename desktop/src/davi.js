@@ -55,6 +55,7 @@ const ETIQUETAS = {
     mercado: 'Mercado',
     perfil: 'Perfil',
     precios: 'Precios y ofertas',
+    simc: 'Estado SimC',
     sinNombre: 'sin nombre',
     sinId: 'sin ID',
     sinClave: 'sin clave',
@@ -64,6 +65,7 @@ const ETIQUETAS = {
     desconocido: 'desconocido',
     perfilIncompleto: 'Perfil incompleto: faltan facción, raza o clase.',
     limitePerfil: 'Perfil cargado a mano; no es el estado del juego en vivo.',
+    limiteSimc: 'Resumen del export de SimulationCraft (addon); equipo y talentos sin decodificar; no es una simulación.',
     limiteSinHistorial: 'No se incluye el historial completo de Auctionator.lua.',
     limiteSinHistorialNiArchivo: 'No se incluye el historial completo ni el contenido de Auctionator.lua.',
     limiteOfertas: 'Precios = ofertas anunciadas, no ventas.',
@@ -109,6 +111,7 @@ const ETIQUETAS = {
     mercado: 'Market',
     perfil: 'Profile',
     precios: 'Prices and offers',
+    simc: 'SimC state',
     sinNombre: 'no name',
     sinId: 'no ID',
     sinClave: 'no key',
@@ -118,6 +121,7 @@ const ETIQUETAS = {
     desconocido: 'unknown',
     perfilIncompleto: 'Incomplete profile: faction, race or class missing.',
     limitePerfil: 'Hand-entered profile; it is not the live game state.',
+    limiteSimc: 'Summary of the SimulationCraft export (addon); gear and talents not decoded; it is not a simulation.',
     limiteSinHistorial: 'The full Auctionator.lua history is not included.',
     limiteSinHistorialNiArchivo: 'Neither the full history nor the Auctionator.lua contents are included.',
     limiteOfertas: 'Prices = posted offers, not sales.',
@@ -187,20 +191,26 @@ export function partesDisponibles(snapshot) {
   if (!snapshot || !snapshot.partes) return out
   if (snapshot.partes.perfil) out.push('perfil')
   if (snapshot.partes.precios) out.push('precios')
+  if (snapshot.partes.simc) out.push('simc')
   return out
 }
 
 /* ------------------------------------------------------------- personaje */
 
-export function construirContextoPersonaje({ resumen, procedencia = [], lang = 'es' }) {
+export function construirContextoPersonaje({ resumen, procedencia = [], lang = 'es', resumenSimc = null }) {
   const e = et(lang)
   const ok = linea(resumen) !== ''
+  const simc = linea(resumenSimc)
   return {
     seccion: 'personaje',
     titulo: e.personaje,
     seleccion: ok ? [] : [e.perfilIncompleto],
-    partes: { perfil: ok ? { titulo: e.perfil, lineas: [linea(resumen)] } : null, precios: null },
-    limites: [e.limitePerfil, e.limiteSinHistorial],
+    partes: {
+      perfil: ok ? { titulo: e.perfil, lineas: [linea(resumen)] } : null,
+      precios: null,
+      simc: simc ? { titulo: e.simc, lineas: [simc] } : null,
+    },
+    limites: [e.limitePerfil, e.limiteSinHistorial].concat(simc ? [e.limiteSimc] : []),
     procedencia: [...procedencia],
   }
 }
@@ -397,6 +407,10 @@ export function previsualizarDavi({ pregunta, snapshot, activas, lang = 'es' }) 
   if (snapshot.partes && snapshot.partes.precios && set.has('precios')) {
     out.push(snapshot.partes.precios.titulo + ':')
     for (const l of snapshot.partes.precios.lineas) out.push('- ' + l)
+  }
+  if (snapshot.partes && snapshot.partes.simc && set.has('simc')) {
+    out.push(snapshot.partes.simc.titulo + ':')
+    for (const l of snapshot.partes.simc.lineas) out.push('- ' + l)
   }
   out.push(e.limites + ':')
   for (const l of snapshot.limites || []) out.push('- ' + l)

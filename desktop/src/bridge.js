@@ -60,7 +60,27 @@ export function parseBridge(bytes) {
   }
   entries.sort((a, b) => a.day - b.day || a.at - b.at)
   const retentionDays = isInt(db.retentionDays) && db.retentionDays >= 1 && db.retentionDays <= 60 ? db.retentionDays : 14
-  return { version: 1, retentionDays, entries }
+  // Bloque del personaje (Personaje.lua): último export SimC válido y último
+  // intento fallido. Se acota aquí; el sync decide qué guardar.
+  const PERSONAGEM_MAX = 512 * 1024
+  let personagem = null
+  const pj = db.personagem
+  if (pj && typeof pj === 'object' && typeof pj.simc === 'string' && pj.simc.length > 0 && pj.simc.length <= PERSONAGEM_MAX) {
+    personagem = {
+      simc: pj.simc,
+      capturado: isInt(pj.capturado) && pj.capturado > 0 ? pj.capturado : null,
+      origem: 'addon',
+    }
+  }
+  let personagemErro = null
+  const pe = db.personagemErro
+  if (pe && typeof pe === 'object' && typeof pe.erro === 'string' && pe.erro.length > 0 && pe.erro.length <= 4096) {
+    personagemErro = {
+      erro: pe.erro,
+      capturado: isInt(pe.capturado) && pe.capturado > 0 ? pe.capturado : null,
+    }
+  }
+  return { version: 1, retentionDays, entries, personagem, personagemErro }
 }
 
 // bridgeToSnapshot(journal) -> snapshot crudo schemaVersion 1 (mismo formato

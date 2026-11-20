@@ -179,6 +179,44 @@ node --test tests/bridge-sync.test.mjs
 node desktop/test/bridge.mjs
 ```
 
+## Estado del personaje (SimulationCraft)
+
+Desde la v1.1.0 el puente también captura el **export de SimulationCraft**:
+`addon/WoWForeverBridge/Personaje.lua` llama a `SimulationcraftAPI.GetSimcProfile`
+(API pública del addon SimulationCraft 12.1.5-04, `core.lua:1599`) dentro de `pcall`
+y guarda el resultado en `WoWForeverBridgeDB.personaje = {simc, capturado, origem}`.
+Si la llamada falla guarda solo `personagemErro = {erro, capturado}` — nunca borra
+el último export bueno. Captura automática al entrar al mundo (throttle 300 s) y
+forzada al logout/quit; `/wfbp personagem` la fuerza a mano.
+
+- `desktop/src/bridge.js` (`parseBridge`) extrae ambos bloques del diario con
+  topes (simc ≤ 512 KiB, erro ≤ 4 KiB); `bridge-sync.js` los pasa a
+  `sincronizarPersonagem` (`desktop/src/simc.js`) en cada ingesta, gane o no el
+  mercado. Un `capturado` más nuevo del addon reemplaza al anterior; un `pegado`
+  manual solo cede ante una captura real.
+- El parser `parsearSimc` (puro, sin DOM) entiende el formato real del addon
+  Forever: cabecera `clase="Nombre"`, `level/race/server/spec/role`, talentos
+  activos y por grupos (`# talents=`), `legacy_talents`, equipo por slot
+  (`slot=,id=…,enchant_id=…,gem_id=…,bonus_id=…` con `# Nombre (ilvl)` encima),
+  bolsas (`bagN=,id=`), `### Gear from Bags` comentado → `equipable`, recompensas
+  semanales aparte, `# character_stats*`, `# skills=`, `# buffs=`, líneas de
+  combate y bloque de mascota (`pet_*`). Lo no reconocido va a `desconhecidas`;
+  ausente queda `null`, nunca 0.
+- La pestaña **Personaje** muestra la tarjeta «Estado del personaje»: origen
+  (juego vs pegado), fecha y frescura (>7 días = desactualizado), stats, equipo por
+  slot, talentos y profesiones, propuesta de perfil (nivel/reino/raza/facción/
+  profesiones, solo si validan contra `personaje.json`) y pegado manual del export.
+- DAVI recibe solo un **resumen acotado** (identidad + stats primarios + conteo de
+  equipo + fecha de captura) como parte `simc` del contexto, con su límite
+  declarado; el export crudo nunca se adjunta.
+
+Pruebas específicas:
+
+```sh
+node --test tests/simc.test.mjs
+lua addon/tests/test_bridge.lua
+```
+
 ## Almacenamiento v2 y respaldo pre-v2
 
 Mercado e historial viven en un **bundle v2** (`market-v2-a/b.json`,

@@ -26,9 +26,9 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const KEEP_GOING = process.argv.includes('--keep-going');
 
 // Conteos esperados del stack canónico (actualizar a mano si se añaden tests).
-const EXPECT_NODE = 286;
+const EXPECT_NODE = 307;
 const EXPECT_PY = 86;
-const EXPECT_LUA = 52;
+const EXPECT_LUA = 68;
 // Tests unitarios del motor en standalone/tests/*.cjs (node:test). Los «real
 // fixture» son stat-only por defecto; WOW_FOREVER_REAL_FIXTURE=1 los hace leer
 // contenido de SavedVariables (solo para diagnóstico manual, nunca en gates).
@@ -37,6 +37,7 @@ const BROWSER = [
   ['navegador', 36], ['mercado-auto', 11], ['mercado-procedencia', 24],
   ['tsm', 28], ['vista-mercado', 55], ['vista-davi', 50], ['vista-guia', 28],
   ['vista-profesiones', 41], ['vista-ruta-dungeons', 31], ['bridge', 19],
+  ['vista-personaje-simc', 11],
 ];
 const EXPECT_BROWSER_TOTAL = BROWSER.reduce((n, [, c]) => n + c, 0); // 323
 

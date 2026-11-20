@@ -10,6 +10,7 @@
 // capturado por el puente llega al histórico durable del plugin.
 import { dataUrlBytes } from './auctionator.js'
 import { BRIDGE_FILE, BRIDGE_MAX_BYTES, parseBridge, bridgeToSnapshot } from './bridge.js'
+import { sincronizarPersonagem } from './simc.js'
 
 const safePath = p => typeof p === 'string' && p.length <= 2048 && !p.includes('\\') && !/[\x00-\x1f]/.test(p) && p.split('/').every(s => s && s !== '.' && s !== '..' && !s.includes(':'))
 
@@ -132,6 +133,14 @@ export function createBridgeSync(ctx, marketSync) {
     const hash = await digest(bytes)
     if (hash === lastDigest) { publish({ status: 'unchanged', message: 'Puente sin cambios.', error: null }); return { status: 'unchanged' } }
     const journal = parseBridge(bytes)
+    // El bloque del personaje vive en el mismo diario: se sincroniza aunque no
+    // haya entradas de mercado nuevas. Un fallo aquí no debe tumbar la importación.
+    try {
+      const ps = await sincronizarPersonagem(ctx, journal)
+      if (ps.status === 'ok') publish({ personagem: 'ok' })
+    } catch (e) {
+      publish({ personagem: 'error', personagemError: String(e?.message || e).slice(0, 200) })
+    }
     if (!journal.entries.length) {
       lastDigest = hash
       const r = { status: 'ok', message: 'El diario del puente está vacío. Haz un escaneo y /reload.', entries: 0, items: 0, lastDay: null, lastCaptureAt: null, error: null }
