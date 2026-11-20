@@ -161,7 +161,7 @@ standalone/guide-*.js (curado) ── tools/build-referencias-skill.mjs ──�
 - La mitad de escritorio son componentes React del SDK de Hermes (`desktop/src/`), empaquetados
   sin minificar por esbuild en un solo `desktop/plugin.js`. `desktop/BUNDLE.json` guarda su
   sha256, y un test lo reconstruye y lo compara. Solo importa `@hermes/plugin-sdk` y React.
-  Ver `docs/DESKTOP.md`.
+  Ver `docs/DESKTOP.md` y `docs/ARQUITECTURA.md` (capas y grafo de dependencias).
 - La página conserva el id interno de la versión anterior (`wow-hunter-guide`): Hermes guarda
   datos y permisos por id, así que el progreso, los precios y el permiso de carpeta se
   mantienen.
@@ -171,10 +171,16 @@ standalone/guide-*.js (curado) ── tools/build-referencias-skill.mjs ──�
 Tests:
 
 ```sh
-python3 -m unittest discover -s tests     # datos, lint de Hermes, bundle reproducible, skill
-node --test tests/                         # lógica pura (perfil, crafteo, mercado, ruta, guía, referencias, curado vs datos)
-PLAYWRIGHT_MODULE=… CHROMIUM_PATH=… node desktop/test/navegador.mjs   # y desktop/test/vista-*.mjs
+node scripts/run-gates.mjs                 # TODOS los gates canónicos en un comando; reporta conteos esperados
+# Individualmente:
+python3 -m unittest discover -s tests     # datos, lint de Hermes, bundle reproducible, skill (87)
+node --test tests/                         # lógica pura: perfil, crafteo, mercado, ruta, guía, referencias (261)
+lua5.1 addon/tests/test_bridge.lua         # diario del puente (52)
+PLAYWRIGHT_MODULE=… CHROMIUM_PATH=… node desktop/test/navegador.mjs   # + 9 suites (307 total)
 ```
+
+El stack canónico, los conteos esperados y el harness legado de `standalone/tests/` (excluido
+del runner porque su «real fixture» lee SavedVariables vivos) están en `docs/TESTING.md`.
 
 ## Cómo se hizo
 
