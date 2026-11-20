@@ -8,6 +8,7 @@ import { costoReceta, valorCreado, margen } from '../../src/crafteo.js'
 // Acotes defensivos: una receta no debería pasar de esto, y un nombre se corta.
 export const LIMITE_REACTIVOS = 30
 export const LIMITE_NOMBRE = 120
+export const LIMITE_FALTANTES = 40
 const LIMITE_HISTORIAL = 200
 
 // Únicos campos del ítem de mercado que se leen. `history` y cualquier otro campo
@@ -90,6 +91,11 @@ const ETIQUETAS = {
     ofertaMaxima: 'Oferta máxima diaria observada',
     tipoDato: 'Tipo de dato: ofertas anunciadas (mínimo unitario), no ventas.',
     referencia: 'Referencia de botín/farmeo: Classic 1.12 (CMaNGOS), no verificada en Forever.',
+    propias: 'Recetas propias',
+    faltan: 'Recetas que te faltan',
+    limitePropias: 'Recetas propias declaradas a mano en el plugin (no el estado del juego); la lista de faltantes se corta por tope.',
+    declarado: 'declarado a mano',
+    nivelDeclarado: 'Nivel de oficio declarado a mano en el plugin, no leído del juego.',
   },
   en: {
     titulo: 'Ask DAVI',
@@ -139,6 +145,11 @@ const ETIQUETAS = {
     ofertaMaxima: 'Peak daily supply observed',
     tipoDato: 'Data type: posted offers (unit minimum), not sales.',
     referencia: 'Loot/farming reference: Classic 1.12 (CMaNGOS), not verified in Forever.',
+    propias: 'Owned recipes',
+    faltan: 'Recipes you are missing',
+    limitePropias: 'Owned recipes are hand-declared in the plugin (not the live game state); the missing list is capped.',
+    declarado: 'hand-declared',
+    nivelDeclarado: 'Profession level hand-declared in the plugin, not read from the game.',
   },
 }
 
@@ -198,10 +209,25 @@ export function construirContextoPersonaje({ resumen, procedencia = [], lang = '
 
 export function construirContextoProfesion({
   id, nombre, skill, receta, itemsJson, catalogo, precios, lang = 'es',
-  resumenPerfil = null, procedencia = [], market = null, reino = null,
+  resumenPerfil = null, procedencia = [], market = null, reino = null, recetario = null,
+  skillDeclarado = false,
 }) {
   const e = et(lang)
-  const seleccion = [e.profesion + ': ' + (txt(nombre, lang) || texto(nombre)) + ' (id ' + id + ') · ' + e.deSkill(skill)]
+  const nivel = e.deSkill(skill) + (skillDeclarado ? ' (' + e.declarado + ')' : '')
+  const seleccion = [e.profesion + ': ' + (txt(nombre, lang) || texto(nombre)) + ' (id ' + id + ') · ' + nivel]
+  // Recetas propias: solo el conteo y los spells que faltan (acotados). La tabla completa
+  // nunca se adjunta; el tope queda declarado en los límites.
+  if (recetario && Number.isSafeInteger(recetario.total) && recetario.total > 0) {
+    const tiene = Number.isSafeInteger(recetario.tiene) && recetario.tiene >= 0 ? recetario.tiene : 0
+    seleccion.push(e.propias + ': ' + tiene + ' de ' + recetario.total)
+    const faltan = (Array.isArray(recetario.faltantes) ? recetario.faltantes : [])
+      .filter((s) => Number.isSafeInteger(s) && s > 0)
+    if (faltan.length) {
+      const tope = Math.min(faltan.length, LIMITE_FALTANTES)
+      seleccion.push(e.faltan + ': ' + faltan.slice(0, tope).join(', ')
+        + (faltan.length > tope ? ' · ' + e.masNoIncluidos(faltan.length - tope, LIMITE_FALTANTES) : ''))
+    }
+  }
   const preciosLineas = []
   if (receta && typeof receta === 'object') {
     const spell = Number.isFinite(receta.spell) ? receta.spell : null
@@ -267,7 +293,9 @@ export function construirContextoProfesion({
     titulo: e.profesiones,
     seleccion,
     partes: { perfil: partePerfil(resumenPerfil, e), precios: preciosLineas.length ? { titulo: e.precios, lineas: preciosLineas } : null },
-    limites: [e.acotadoReceta, e.costosOfertas],
+    limites: [e.acotadoReceta, e.costosOfertas]
+      .concat(skillDeclarado ? [e.nivelDeclarado] : [])
+      .concat(recetario && Number.isSafeInteger(recetario.total) && recetario.total > 0 ? [e.limitePropias] : []),
     procedencia: [...procedencia],
   }
 }

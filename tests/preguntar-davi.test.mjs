@@ -5,6 +5,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import {
+  LIMITE_FALTANTES,
   LIMITE_REACTIVOS,
   construirContextoMercado,
   construirContextoPersonaje,
@@ -171,6 +172,41 @@ test('profesión: sin mercado no hay bloque de precios y la receta se acota', ()
   const lineas = texto.split('\n').filter((l) => l.startsWith('- Reactivo:'))
   assert.equal(lineas.length, LIMITE_REACTIVOS)
   assert.match(texto, /acotado/)
+})
+
+test('profesión: recetario propio (conteo + faltantes acotados) y su límite', () => {
+  const base = { id: 185, nombre: 'Cocina', skill: 300, receta: null, itemsJson: ITEMS, catalogo: CATALOGO, precios: new Map(), lang: 'es' }
+  const corto = construirContextoProfesion({ ...base, recetario: { tiene: 2, total: 3, faltantes: [20, 30] } })
+  const t1 = previsualizarDavi({ pregunta: 'x', snapshot: corto, activas: [] })
+  assert.match(t1, /Recetas propias: 2 de 3/)
+  assert.match(t1, /Recetas que te faltan: 20, 30/)
+  assert.match(t1, /declaradas a mano/)
+
+  const muchos = Array.from({ length: LIMITE_FALTANTES + 5 }, (_, i) => 100 + i)
+  const largo = construirContextoProfesion({ ...base, recetario: { tiene: 0, total: muchos.length, faltantes: muchos } })
+  const t2 = previsualizarDavi({ pregunta: 'x', snapshot: largo, activas: [] })
+  assert.match(t2, new RegExp('5 más no incluidos \\(acotado a ' + LIMITE_FALTANTES + '\\)'))
+  assert.ok(!t2.includes(String(muchos[LIMITE_FALTANTES])), 'no se cuela el spell fuera del tope')
+
+  // Sin recetario no aparece nada del tema ni el límite extra.
+  const sin = construirContextoProfesion(base)
+  assert.equal(sin.limites.length, 2)
+  assert.ok(!previsualizarDavi({ pregunta: 'x', snapshot: sin, activas: [] }).includes('Recetas propias'))
+})
+
+test('profesión: un nivel declarado a mano se marca en la selección y en los límites', () => {
+  const base = { id: 356, nombre: 'Pesca', skill: 93, receta: null, itemsJson: ITEMS, catalogo: CATALOGO, precios: new Map(), lang: 'es' }
+  const manual = construirContextoProfesion(base)
+  const t1 = previsualizarDavi({ pregunta: 'x', snapshot: manual, activas: [] })
+  assert.match(t1, /93 de skill/)
+  assert.ok(!t1.includes('(declarado a mano)'), 'sin la marca no se dice declarado')
+  assert.equal(manual.limites.length, 2, 'sin la marca no se agrega límite')
+
+  const decl = construirContextoProfesion({ ...base, skillDeclarado: true })
+  const t2 = previsualizarDavi({ pregunta: 'x', snapshot: decl, activas: [] })
+  assert.match(t2, /93 de skill \(declarado a mano\)/)
+  assert.match(t2, /Nivel de oficio declarado a mano en el plugin, no leído del juego/)
+  assert.equal(decl.limites.length, 3)
 })
 
 test('ofertaMaximaDe: lee solo available del historial y con tope', () => {

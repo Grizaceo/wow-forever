@@ -1,14 +1,16 @@
 // Tabla de recetas de una profesión: filtros (aprendibles ahora / todas / nuevas de
 // Forever), búsqueda por nombre y columnas de dificultad, qué crea, reactivos, cómo
 // se aprende, costo, valor, margen y origen. Click en una fila la selecciona para el
-// panel de reactivos.
+// panel de reactivos. La primera columna marca las recetas que el jugador ya tiene
+// (estado de recetas-propias.js) y el switch de al lado las oculta.
 import { useEffect, useMemo, useState } from 'react'
-import { SearchField, SegmentedControl } from '@hermes/plugin-sdk'
+import { Checkbox, SearchField, SegmentedControl } from '@hermes/plugin-sdk'
 import { costoReceta, dificultadReceta, margen, valorCreado } from '../../../../src/crafteo.js'
 import { dinero, nombre } from '../../datos.js'
 import { C, DIFICULTAD, S } from '../../estilos.js'
 import { agregarTextos, t } from '../../i18n.js'
 import { Dinero, NombreItem, Origen, Tarjeta } from '../../ui.jsx'
+import { normalizarLista } from '../../recetas-propias.js'
 
 agregarTextos({
   'prof.recetas': 'Recetas',
@@ -36,6 +38,10 @@ agregarTextos({
   'prof.recetaItem': 'se aprende con',
   'prof.encantamiento': 'encantamiento',
   'prof.recetas.vacio': 'Ninguna receta coincide con estos filtros.',
+  'prof.col.tengo': 'La tengo',
+  'prof.col.tengo.ayuda': 'Marca las recetas que ya tienes',
+  'prof.ocultar.tengo': 'Ocultar las que tengo',
+  'prof.tienes': 'tienes {n}',
 }, {
   'prof.recetas': 'Recipes',
   'prof.filtro.ahora': 'Learnable now',
@@ -62,6 +68,10 @@ agregarTextos({
   'prof.recetaItem': 'learned from',
   'prof.encantamiento': 'enchant',
   'prof.recetas.vacio': 'No recipe matches these filters.',
+  'prof.col.tengo': 'Have it',
+  'prof.col.tengo.ayuda': 'Mark the recipes you already have',
+  'prof.ocultar.tengo': 'Hide the ones I have',
+  'prof.tienes': 'you have {n}',
 })
 
 const APRENDIBLES = new Set(['naranja', 'amarillo', 'verde', 'gris'])
@@ -101,9 +111,13 @@ function ComoAprende({ r, faccion, lang }) {
   )
 }
 
-export function TablaRecetas({ prof, skill, precios, items, faccion, lang, sel, onSel }) {
+export function TablaRecetas({ prof, skill, precios, items, faccion, lang, sel, onSel, propias, onPropia }) {
   const [filtro, setFiltro] = useState('ahora')
   const [q, setQ] = useState('')
+  const [ocultarMias, setOcultarMias] = useState(false)
+  // Set de spells propios; si la vista no pasa nada, la tabla no marca ni oculta nada.
+  const mias = useMemo(() => (propias instanceof Set ? propias : new Set(normalizarLista(propias))), [propias])
+  const tiene = (r) => mias.has(r.spell)
 
   const conteos = useMemo(() => ({
     ahora: prof.recetas.filter((r) => APRENDIBLES.has(dificultadReceta(r, skill))).length,
@@ -116,10 +130,11 @@ export function TablaRecetas({ prof, skill, precios, items, faccion, lang, sel, 
     let rs = prof.recetas.filter((r) => {
       if (filtro === 'ahora' && !APRENDIBLES.has(dificultadReceta(r, skill))) return false
       if (filtro === 'forever' && r.f !== 'cliente-forever') return false
+      if (ocultarMias && mias.has(r.spell)) return false
       return !buscado || textoDe(r, items).includes(buscado)
     })
     return [...rs].sort((a, b) => nivelDe(a) - nivelDe(b) || a.spell - b.spell)
-  }, [prof, skill, filtro, q, items])
+  }, [prof, skill, filtro, q, items, ocultarMias, mias])
 
   // Si no hay selección (o cambió de profesión), propone la primera fila visible.
   useEffect(() => {
@@ -140,8 +155,11 @@ export function TablaRecetas({ prof, skill, precios, items, faccion, lang, sel, 
     return m
   }, [filas, skill, precios, items])
 
+  const propiasAqui = conteos.todas ? [...mias].filter((s) => prof.recetas.some((r) => r.spell === s)).length : 0
+
   return (
-    <Tarjeta titulo={t(lang, 'prof.recetas') + ' · ' + prof.recetas.length}
+    <Tarjeta titulo={t(lang, 'prof.recetas') + ' · ' + prof.recetas.length
+      + (propiasAqui ? ' · ' + t(lang, 'prof.tienes', { n: propiasAqui }) : '')}
       extra={<Origen f={prof.f || 'cmangos-1.12'} lang={lang} />}>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center' }}>
         <SegmentedControl value={filtro} onChange={setFiltro} options={[
@@ -150,12 +168,19 @@ export function TablaRecetas({ prof, skill, precios, items, faccion, lang, sel, 
           { id: 'forever', label: `${t(lang, 'prof.filtro.forever')} (${conteos.forever})` },
         ]} />
         <SearchField placeholder={t(lang, 'prof.buscar')} value={q} onChange={setQ} />
+        {propiasAqui ? (
+          <label style={{ ...S.chip, display: 'inline-flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
+            <Checkbox checked={ocultarMias} onCheckedChange={(v) => setOcultarMias(!!v)} />
+            <span>{t(lang, 'prof.ocultar.tengo')}</span>
+          </label>
+        ) : null}
       </div>
       {filas.length ? (
         <div style={{ overflowX: 'auto' }}>
           <table style={S.tabla}>
             <thead>
               <tr>
+                <th style={{ ...S.th, width: 1 }} title={t(lang, 'prof.col.tengo.ayuda')} />
                 <th style={S.th}>{t(lang, 'prof.col.dificultad')}</th>
                 <th style={S.th}>{t(lang, 'prof.col.crea')}</th>
                 <th style={S.th}>{t(lang, 'prof.col.reactivos')}</th>
@@ -173,6 +198,13 @@ export function TablaRecetas({ prof, skill, precios, items, faccion, lang, sel, 
                 return (
                   <tr key={r.spell} onClick={() => onSel(r.spell)}
                     style={{ cursor: 'pointer', background: activa ? C.fondo3 : undefined }}>
+                    <td style={{ ...S.td, width: 1 }} onClick={(e) => e.stopPropagation()}>
+                      {onPropia ? (
+                        <Checkbox checked={tiene(r)}
+                          onCheckedChange={() => onPropia(r.spell)}
+                          aria-label={nombre(r.n, lang) + ' · ' + t(lang, 'prof.col.tengo')} />
+                      ) : null}
+                    </td>
                     <td style={{ ...S.td, color: DIFICULTAD[i.d] || C.texto3, whiteSpace: 'nowrap' }}>
                       {t(lang, 'prof.diff.' + i.d)}
                     </td>

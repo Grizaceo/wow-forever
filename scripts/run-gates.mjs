@@ -26,7 +26,7 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const KEEP_GOING = process.argv.includes('--keep-going');
 
 // Conteos esperados del stack canónico (actualizar a mano si se añaden tests).
-const EXPECT_NODE = 267;
+const EXPECT_NODE = 286;
 const EXPECT_PY = 86;
 const EXPECT_LUA = 52;
 // Tests unitarios del motor en standalone/tests/*.cjs (node:test). Los «real
@@ -36,9 +36,9 @@ const EXPECT_CJS = 78;
 const BROWSER = [
   ['navegador', 36], ['mercado-auto', 11], ['mercado-procedencia', 24],
   ['tsm', 28], ['vista-mercado', 55], ['vista-davi', 50], ['vista-guia', 28],
-  ['vista-profesiones', 27], ['vista-ruta-dungeons', 31], ['bridge', 19],
+  ['vista-profesiones', 41], ['vista-ruta-dungeons', 31], ['bridge', 19],
 ];
-const EXPECT_BROWSER_TOTAL = BROWSER.reduce((n, [, c]) => n + c, 0); // 307
+const EXPECT_BROWSER_TOTAL = BROWSER.reduce((n, [, c]) => n + c, 0); // 323
 
 function sh(cmd, args, cwd = ROOT, env = process.env) {
   const r = spawnSync(cmd, args, { cwd, env, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });

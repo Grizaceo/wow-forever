@@ -1,7 +1,8 @@
 // Profesiones: elige una (las del perfil primero), mira sus entrenadores de tu
 // facción, el plan de subida estimado y la tabla de recetas con costo, valor y
-// margen según tus precios de mercado. El skill se guarda en ctx.storage ('skill-<id>').
-import { useMemo, useState } from 'react'
+// margen según tus precios de mercado. El skill se guarda en ctx.storage ('skill-<id>');
+// las recetas que ya tienes, en ('recetas-propias') vía recetas-propias.js.
+import { useEffect, useMemo, useState } from 'react'
 import { Button, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@hermes/plugin-sdk'
 import { preciosDelMercado } from '../../../src/crafteo.js'
 import { perfilParaAgente } from '../../../src/perfil.js'
@@ -11,13 +12,17 @@ import { agregarTextos, t } from '../i18n.js'
 import { Hueco, Origen, Tarjeta } from '../ui.jsx'
 import { construirContextoProfesion } from '../davi.js'
 import { catalogoMercado } from '../mercado-logica.js'
+import { SEMILLA, alternar, guardarPropias, leerPropias, normalizarLista, resumenRecetario } from '../recetas-propias.js'
+import { SEMILLA as SEMILLA_NIVELES, leerNiveles as leerNivelesOficio, nivelDe } from '../oficios.js'
 import { TablaRecetas } from './profesiones/tabla.jsx'
+import { PanelVenta } from './profesiones/venta.jsx'
 import { PlanSubida } from './profesiones/plan.jsx'
 import { FuentesReceta } from './profesiones/fuentes.jsx'
 import { PreguntarDavi } from './preguntar-davi.jsx'
 
 agregarTextos({
   'prof.skill': 'Skill',
+  'prof.skill.declarado': 'Declarado a mano (no lo leyó el juego)',
   'prof.tipo.principal': 'Principal',
   'prof.tipo.secundaria': 'Secundaria',
   'prof.recoleccion': 'Recolección',
@@ -31,6 +36,7 @@ agregarTextos({
   'prof.elegirReceta': 'Elige una receta de la tabla para ver de dónde sacar sus reactivos.',
 }, {
   'prof.skill': 'Skill',
+  'prof.skill.declarado': 'Hand-declared (the game did not read it)',
   'prof.tipo.principal': 'Primary',
   'prof.tipo.secundaria': 'Secondary',
   'prof.recoleccion': 'Gathering',
@@ -68,16 +74,31 @@ export function VistaProfesiones({ ctx, estado, perfil, lang, irA }) {
   }, [perfil, datos])
   const [pid, setPid] = useState(() => orden[0])
   const [skills, setSkills] = useState({})
+  // Niveles de oficio declarados a mano (oficios.js, p. ej. Pesca 93): solo siembran
+  // cuando el jugador no escribió un nivel propio en `skill-<id>`.
+  const [niveles, setNiveles] = useState(() => ({ ...SEMILLA_NIVELES }))
+  useEffect(() => {
+    let vivo = true
+    leerNivelesOficio(ctx)
+      .then((r) => { if (vivo) setNiveles(r.niveles) })
+      .catch(() => { /* sin storage queda la semilla en pantalla */ })
+    return () => { vivo = false }
+  }, [ctx])
   const [sel, setSel] = useState(null)
   const pidReal = datos[String(pid)] ? pid : orden[0]
   const prof = datos[String(pidReal)]
 
+  // {v, origen}: el nivel escrito a mano manda; si no hay, el declarado; si no, 0.
   const skillDe = (id) => {
-    if (Object.prototype.hasOwnProperty.call(skills, id)) return skills[id]
-    const v = ctx.storage.get('skill-' + id, 0)
-    return Number.isInteger(v) && v >= 0 && v <= 300 ? v : 0
+    if (Object.prototype.hasOwnProperty.call(skills, id)) return { v: skills[id], origen: 'manual' }
+    const guardado = ctx.storage.get('skill-' + id, null)
+    if (Number.isInteger(guardado) && guardado >= 0 && guardado <= 300) return { v: guardado, origen: 'manual' }
+    const declarado = nivelDe(niveles, id, null)
+    return declarado === null ? { v: 0, origen: 'vacio' } : { v: declarado, origen: 'declarado' }
   }
-  const skill = prof ? skillDe(pidReal) : 0
+  const skillInfo = prof ? skillDe(pidReal) : { v: 0, origen: 'vacio' }
+  const skill = skillInfo.v
+  const skillDeclarado = skillInfo.origen === 'declarado'
   const cambiarSkill = async (v) => {
     const n = Math.floor(Number(v))
     if (!Number.isFinite(n)) return
@@ -87,6 +108,22 @@ export function VistaProfesiones({ ctx, estado, perfil, lang, irA }) {
   }
 
   const [todosEntr, setTodosEntr] = useState(false)
+  // Recetas propias (declaradas por el jugador): la semilla pinta la primera vez y lo
+  // guardado la reemplaza en cuanto llega; cada marca se persiste y se relee.
+  const [propias, setPropias] = useState(() => normalizarLista(SEMILLA))
+  useEffect(() => {
+    let vivo = true
+    leerPropias(ctx)
+      .then((r) => { if (vivo) setPropias(r.spells) })
+      .catch(() => { /* sin storage queda la semilla en pantalla */ })
+    return () => { vivo = false }
+  }, [ctx])
+  const conjuntoPropias = useMemo(() => new Set(propias), [propias])
+  const alternarPropia = async (spell) => {
+    const nueva = alternar(propias, spell)
+    setPropias(nueva)
+    try { await guardarPropias(ctx, nueva) } catch { /* queda solo en pantalla */ }
+  }
   const precios = useMemo(() => preciosDelMercado(estado.market, perfil.reino), [estado.market, perfil.reino])
   const trainers = prof && prof.entrenadores ? prof.entrenadores[perfil.faccion] || [] : []
   // Plegada: solo los que enseñan el siguiente tramo por encima de tu skill.
@@ -108,10 +145,12 @@ export function VistaProfesiones({ ctx, estado, perfil, lang, irA }) {
     () => (prof && sel == null ? null : prof ? prof.recetas.find((r) => r.spell === sel) || null : null),
     [prof, sel],
   )
+  const recetario = useMemo(() => resumenRecetario(prof?.recetas, propias), [prof, propias])
   const snapshotDavi = useMemo(() => (!prof ? null : construirContextoProfesion({
     id: pidReal, nombre: prof.n, skill, receta: recetaSel, itemsJson: D.items, catalogo,
     precios, lang, resumenPerfil, procedencia: PROCEDENCIA_PROF, market: estado.market, reino: perfil.reino,
-  })), [prof, pidReal, skill, recetaSel, catalogo, precios, lang, resumenPerfil, estado.market, perfil.reino])
+    recetario, skillDeclarado,
+  })), [prof, pidReal, skill, recetaSel, catalogo, precios, lang, resumenPerfil, estado.market, perfil.reino, recetario, skillDeclarado])
 
   if (!prof) return <Tarjeta titulo={t(lang, 'tab.profesiones')}><Hueco lang={lang}>{t(lang, 'prof.huecoEntrenadores')}</Hueco></Tarjeta>
 
@@ -139,6 +178,7 @@ export function VistaProfesiones({ ctx, estado, perfil, lang, irA }) {
           </label>
           <span style={S.chip}>{t(lang, prof.tipo === 'secundaria' ? 'prof.tipo.secundaria' : 'prof.tipo.principal')}</span>
           {prof.recoleccion ? <span style={S.chip}>{t(lang, 'prof.recoleccion')}</span> : null}
+          {skillDeclarado ? <span style={S.chip}>{t(lang, 'prof.skill.declarado')}</span> : null}
           {enPerfil.has(pidReal) ? <span style={S.chip}>{t(lang, 'prof.enPerfil')}</span> : null}
         </div>
       </Tarjeta>
@@ -173,7 +213,11 @@ export function VistaProfesiones({ ctx, estado, perfil, lang, irA }) {
         items={D.items.items} lang={lang} irA={irA} faccion={perfil.faccion} />
 
       <TablaRecetas prof={prof} skill={skill} precios={precios} items={D.items.items}
-        faccion={perfil.faccion} lang={lang} sel={sel} onSel={setSel} />
+        faccion={perfil.faccion} lang={lang} sel={sel} onSel={setSel}
+        propias={conjuntoPropias} onPropia={alternarPropia} />
+
+      <PanelVenta recetas={prof.recetas} propias={conjuntoPropias} precios={precios}
+        items={D.items.items} market={estado.market} lang={lang} />
 
       <FuentesReceta prof={prof} sel={sel} precios={precios} items={D.items.items}
         faccion={perfil.faccion} lang={lang} />

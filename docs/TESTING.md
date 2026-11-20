@@ -21,17 +21,17 @@ byte-idéntico si no hay cambios en `desktop/src/`).
 
 | Harness | Comando | Esperado | Qué cubre |
 |---|---|---|---|
-| `tests/` (node) | `node --test tests/` | **267** pass, 0 fail | lógica de `desktop/src/` + motor: mercado v2/atómico/sync/migración, puente (`bridge*.test.mjs`), TSM, ROI, ruta/maxeo, guía, perfil, preguntar-davi, referencias-skill, claves heredadas |
+| `tests/` (node) | `node --test tests/` | **286** pass, 0 fail | lógica de `desktop/src/` + motor: mercado v2/atómico/sync/migración, puente (`bridge*.test.mjs`), TSM, ROI, ruta/maxeo, guía, perfil, recetas propias, niveles de oficio, preguntar-davi, referencias-skill, claves heredadas |
 | `tests/` (python) | `python3 -m unittest discover -s tests` | **86** OK | datos (`test_datos`, catálogo reproducible), desktop (`test_desktop`), maxeo, ROI, skill (`consultar.py`), reproducibilidad de `data/`+drops+bundle |
 | `addon/tests/` (lua) | `lua5.1 addon/tests/test_bridge.lua` | **52** checks, 0 fallos | diario del puente WoWForeverBridge (captura, poda, retención, epoch) |
 | `desktop/test/` (navegador) | 10 suites, ver abajo | **309** checks, red 0, errores 0 | bundle real en Chromium headless con dobles del SDK |
 | build | `cd desktop && node build.mjs` | OK | bundle esbuild reproducible |
 | bundle-check | `python3 scripts/check_desktop_bundle.py desktop/plugin.js` | OK | tamaño/líneas/contratos del bundle |
 
-### Suites navegador (309)
+### Suites navegador (323)
 
 `navegador 36 · mercado-auto 11 · mercado-procedencia 24 · tsm 28 · vista-mercado 55 ·
-vista-davi 50 · vista-guia 28 · vista-profesiones 27 · vista-ruta-dungeons 31 · bridge 19`
+vista-davi 50 · vista-guia 28 · vista-profesiones 41 · vista-ruta-dungeons 31 · bridge 19`
 
 Cada suite imprime al final una línea JSON `{"suite":…,"pasadas":N,"red":0,"errores":0}`.
 El arnés (`desktop/test/arnes.mjs`) carga `desktop/plugin.js` en un Chromium headless

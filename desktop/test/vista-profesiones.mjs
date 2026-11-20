@@ -26,6 +26,19 @@ for (const r of profs['164'].recetas) {
   for (const par of (r.reactivos || [])) idsHerreria.add(Number(Array.isArray(par) ? par[0] : par))
   if (r.receta_item != null) idsHerreria.add(Number(r.receta_item))
 }
+// Precios mínimos para Cocina: dos platos con margen (arco iris 235c, pargo 180c) y el
+// pececito en pérdida, para probar el panel de venta.
+const itemsCocina = [[4592, 200, 900], [6289, 10, 4000], [5095, 300, 700], [6361, 50, 2500], [6290, 60, 800], [6291, 100, 900]]
+const mercaCocina = {
+  storage: { 'market-pointer': { slot: 'a', revision: 1 } },
+  archivos: { 'market-a.json': JSON.stringify({ revision: 1, values: { realm: 'Prueba', snapshot: {
+    schemaVersion: 1, sourceVersion: 8, importedAt: '2026-11-20T17:20:39.563Z', warnings: [],
+    realms: [{ name: 'Prueba', items: itemsCocina.map(([id, p, n]) => ({
+      sourceKey: String(id), itemId: id, unitPriceCopper: p, observedDay: 2514,
+      history: [{ day: 2514, low: p, high: Math.round(p * 1.1), available: n }],
+    })) }],
+  } } }) },
+}
 const mercadoHerreria = {
   storage: { 'market-pointer': { slot: 'a', revision: 1 } },
   archivos: { 'market-a.json': JSON.stringify({ revision: 1, values: { realm: 'Prueba', snapshot: {
@@ -180,6 +193,108 @@ await p.getByRole('button', { name: 'Plan rápido' }).click()
 await p.getByText(/Plan de subida ·/).waitFor()
 check('toggle de vuelta al plan rápido (comportamiento anterior intacto)',
   await p.getByText(/Plan de subida ·/).count() > 0)
+await cerrar()
+
+// 8) Recetas propias (Cocina, perfil cazadorHorda): la semilla declarada se marca, el
+//    cambio se guarda y se relee, un estado guardado manda sobre la semilla y el filtro
+//    «Ocultar las que tengo» esconde exactamente las marcadas.
+const CLAVE_PROPIAS = PREF + 'recetas-propias'
+const casillas = (pg) => pg.locator('tbody input[type="checkbox"]:checked').count()
+const filasTabla = (pg) => pg.locator('tbody tr').count()
+
+;({ p, cerrar } = await a.abrir('claro', { perfil: PERFILES.cazadorHorda }))
+await p.click('[data-tab="profesiones"]')
+await p.selectOption('#wf-profesion', '185')
+await p.getByRole('radio', { name: /^Todas \(/ }).click()
+await p.waitForFunction(() => /TIENES 25/i.test(document.body.innerText))
+check('Cocina: la tarjeta declara las recetas propias y marca las 25 sembradas',
+  await p.getByText(/tienes 25/i).count() > 0 && await casillas(p) === 25,
+  { marcadas: await casillas(p) })
+
+const antesQuitar = await p.evaluate((k) => JSON.parse(localStorage.getItem(k)), CLAVE_PROPIAS)
+const sinSemilla = await p.locator('tbody input[type="checkbox"]:checked').first()
+  .getAttribute('aria-label')
+await p.locator('tbody input[type="checkbox"]:checked').first().click()
+await p.waitForTimeout(60)
+const guardado = await p.evaluate((k) => JSON.parse(localStorage.getItem(k)), CLAVE_PROPIAS)
+check('desmarcar una receta la persiste en ctx.storage (24, con relectura)',
+  await casillas(p) === 24 && guardado && guardado.v === 1 && guardado.spells.length === 24
+  && antesQuitar === null,
+  { guardado: guardado && guardado.spells.length, etiqueta: sinSemilla })
+
+await cerrar()
+;({ p, cerrar } = await a.abrir('claro', { perfil: PERFILES.cazadorHorda, storage: { 'recetas-propias': guardado } }))
+await p.click('[data-tab="profesiones"]')
+await p.selectOption('#wf-profesion', '185')
+await p.getByRole('radio', { name: /^Todas \(/ }).click()
+await p.waitForFunction(() => !/TIENES 25/i.test(document.body.innerText))
+check('lo guardado manda sobre la semilla al reabrir (24, no vuelve a 25)',
+  await casillas(p) === 24 && await p.getByText(/tienes 24/i).count() > 0,
+  { marcadas: await casillas(p) })
+await cerrar()
+
+;({ p, cerrar } = await a.abrir('claro', { perfil: PERFILES.cazadorHorda, storage: { 'recetas-propias': { v: 1, spells: [] } } }))
+await p.click('[data-tab="profesiones"]')
+await p.selectOption('#wf-profesion', '185')
+await p.getByRole('radio', { name: /^Todas \(/ }).click()
+await p.waitForTimeout(80)
+check('un estado guardado vacío no siembra nada (ni marca ni ofrece ocultar)',
+  await casillas(p) === 0 && await p.getByText(/tienes \d+/i).count() === 0
+  && await p.getByLabel('Ocultar las que tengo').count() === 0)
+await cerrar()
+
+;({ p, cerrar } = await a.abrir('claro', { perfil: PERFILES.cazadorHorda }))
+await p.click('[data-tab="profesiones"]')
+await p.selectOption('#wf-profesion', '185')
+await p.getByRole('radio', { name: /^Todas \(/ }).click()
+await p.waitForFunction(() => /TIENES 25/i.test(document.body.innerText))
+const nTodas = await filasTabla(p)
+await p.getByLabel('Ocultar las que tengo').click()
+await p.waitForTimeout(80)
+const nOcultas = await filasTabla(p)
+check('«Ocultar las que tengo» esconde exactamente las 25 marcadas',
+  nTodas - nOcultas === 25 && nOcultas > 0 && await p.locator('[role="alert"]').count() === 0,
+  { nTodas, nOcultas })
+await cerrar()
+
+// 9) Nivel de oficio declarado a mano (oficios.js): Pesca arranca en 93, el chip avisa
+//    que no lo leyó el juego y un nivel escrito a mano lo pisa y persiste.
+;({ p, cerrar } = await a.abrir('claro', { perfil: PERFILES.magoCielonato }))
+await p.click('[data-tab="profesiones"]')
+await p.selectOption('#wf-profesion', '356')
+await p.waitForFunction(() => document.querySelector('#wf-skill-356') !== null)
+check('Pesca arranca con el nivel declarado (93) y lo marca como tal',
+  await p.inputValue('#wf-skill-356') === '93'
+  && await p.getByText(/Declarado a mano/).count() > 0,
+  { skill: await p.inputValue('#wf-skill-356') })
+await p.fill('#wf-skill-356', '150')
+await p.waitForTimeout(80)
+check('un nivel escrito a mano pisa al declarado y persiste en ctx.storage',
+  await p.evaluate((k) => JSON.parse(localStorage.getItem(k)) === 150, PREF + 'skill-356')
+  && await p.evaluate(() => document.querySelector('#wf-skill-356').value) === '150', null)
+check('sin el nivel declarado, el chip desaparece', await p.getByText(/Declarado a mano/).count() === 0)
+check('sin errores ni alertas (nivel declarado)', await p.locator('[role="alert"]').count() === 0)
+await cerrar()
+
+// 10) Panel «Qué vender ahora»: cruza tus recetas con los precios, ordena por neto
+//     tras 5% de subasta y reactivos comprados, y declara que son ofertas anunciadas.
+;({ p, cerrar } = await a.abrir('claro', { perfil: PERFILES.cazadorHorda, ...mercaCocina }))
+await p.click('[data-tab="profesiones"]')
+await p.selectOption('#wf-profesion', '185')
+await p.getByRole('radio', { name: /^Todas \(/ }).click()
+await p.waitForFunction(() => /Qué vender ahora/i.test(document.body.innerText))
+const panel = p.locator('section', { hasText: 'Qué vender ahora' }).last()
+const filasVenta = await panel.locator('[data-venta-fila]').count()
+const primeraVenta = filasVenta ? await panel.locator('[data-venta-fila]').first().innerText() : ''
+check('el panel de venta ordena por neto y pone primero el plato más rentable',
+  filasVenta === 2 && /Atún blanco arco iris/.test(primeraVenta), { filasVenta, primeraVenta })
+check('la segunda plaza es el pargo y el pececito en pérdida no entra',
+  /Pargo de lodo boquilargo/.test(await panel.locator('[data-venta-fila]').last().innerText())
+  && !/Pececito luminoso/.test(await panel.innerText()), null)
+check('muestra las existencias listadas del plato', /\b700\b/.test(primeraVenta), { primeraVenta })
+check('declara que son ofertas anunciadas y no ventas cerradas',
+  await panel.getByText(/ofertas anunciadas, no de ventas cerradas/i).count() > 0)
+check('sin errores ni alertas (panel de venta)', await p.locator('[role="alert"]').count() === 0)
 await cerrar()
 
 await a.terminar('vista-profesiones')
