@@ -194,7 +194,7 @@ export function VistaProfesiones({ ctx, estado, perfil, lang, irA }) {
             {lista.map((e) => (
               <div key={e.npc} style={S.fila}>
                 <span style={{ flex: 1 }}>{nombre(e.n, lang)}</span>
-                <span style={S.sub}>{pct(e.x)}%, {pct(e.y)}%</span>
+                <span style={S.sub} title={lang === 'en' ? 'Map coordinates (X, Y)' : 'Coordenadas en el mapa (X, Y)'}>X {pct(e.x)}% · Y {pct(e.y)}%</span>
                 <span style={S.sub}>{t(lang, 'prof.hasta', { max: num(e.max) })}</span>
               </div>
             ))}

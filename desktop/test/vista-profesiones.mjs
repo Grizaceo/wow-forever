@@ -48,6 +48,13 @@ const mercadoHerreria = {
       history: [{ day: 2140, low: 100, high: 110, available: 20 }] })) }] } } }) },
 }
 
+const escribirSkill = async (p, id, valor) => {
+  // Playwright 1.64 + React 19: fill() se queda esperando acción sobre inputs
+  // controlados que se re-renderizan; foco + teclado ejercita el mismo onChange.
+  await p.locator('#wf-skill-' + id).focus()
+  await p.keyboard.press('Control+A')
+  await p.keyboard.type(String(valor))
+}
 const a = await iniciar()
 const { check } = a
 const cuentaAprendibles = (p) => p.evaluate(() => {
@@ -69,20 +76,20 @@ check('ve todos los entrenadores de la Horda (Herrería)', await p.getByText('Br
   && await p.getByText('Karn Stonehoof').count() > 0)
 // Snarl (herrería) está en Orgrimmar, no en Azshara: el NPC va a la zona más chica que lo contiene.
 check('los entrenadores muestran zona y coordenadas', await p.getByText('Orgrimmar').count() > 0
-  && await p.getByText('79.6%, 23.3%').count() > 0 && await p.getByText('Cima del Trueno').count() > 0)
+  && await p.getByText('X 79.6% · Y 23.3%').count() > 0 && await p.getByText('Cima del Trueno').count() > 0)
 check('la tarjeta de plan existe y se marca como estimación', await p.getByText('Plan de subida').count() > 0
   && await p.getByText(/Estimación/).count() > 0)
 
 // 2) El skill guardado cambia las recetas aprendibles.
 const antes = await cuentaAprendibles(p)
-await p.fill('#wf-skill-164', '300')
+await escribirSkill(p, 164, 300)
 await p.waitForFunction(() => /Aprendibles ahora \(4\d\d\)/.test(document.body.innerText) || document.body.innerText.includes('Aprendibles ahora (3'))
 const despues = await cuentaAprendibles(p)
 check('cambiar el skill cambia las aprendibles', antes !== null && despues !== null && antes !== despues,
   { antes, despues })
 check('el skill quedó guardado en ctx.storage', await p.evaluate((k) =>
   JSON.parse(localStorage.getItem(k)) === 300, PREF + 'skill-164'))
-await p.fill('#wf-skill-164', '1')
+await escribirSkill(p, 164, 1)
 await p.waitForTimeout(80)
 
 // 3) Con mercado precargado aparecen costos: Primeros auxilios, Venda de lino
@@ -152,7 +159,7 @@ await cerrar()
 // 7b) Mercado completo de Herrería: ruta con pasos, adquisiciones pagadas, cobertura y total.
 ;({ p, cerrar } = await a.abrir('claro', { perfil: PERFILES.paladinHorda, ...mercadoHerreria }))
 await p.click('[data-tab="profesiones"]')
-await p.fill('#wf-skill-164', '1')
+await escribirSkill(p, 164, 1)
 await p.waitForTimeout(80)
 await p.getByRole('button', { name: 'Maxear a 300' }).click()
 await p.getByText('Adquisición de recetas').first().waitFor()
@@ -173,7 +180,7 @@ await cerrar()
 ;({ p, cerrar } = await a.abrir('claro', { perfil: PERFILES.chamanAlianza, ...MERCADO }))
 await p.click('[data-tab="profesiones"]')
 await p.selectOption('#wf-profesion', '129')
-await p.fill('#wf-skill-129', '1')
+await escribirSkill(p, 129, 1)
 await p.waitForTimeout(80)
 await p.getByRole('button', { name: 'Maxear a 300' }).click()
 await p.waitForFunction(() => document.body.innerText.includes('Maxear a 300'))
@@ -267,7 +274,7 @@ check('Pesca arranca con el nivel declarado (93) y lo marca como tal',
   await p.inputValue('#wf-skill-356') === '93'
   && await p.getByText(/Declarado a mano/).count() > 0,
   { skill: await p.inputValue('#wf-skill-356') })
-await p.fill('#wf-skill-356', '150')
+await escribirSkill(p, 356, 150)
 await p.waitForTimeout(80)
 check('un nivel escrito a mano pisa al declarado y persiste en ctx.storage',
   await p.evaluate((k) => JSON.parse(localStorage.getItem(k)) === 150, PREF + 'skill-356')
