@@ -393,7 +393,7 @@ ficha del personaje.
   `tests/market-deals.cjs`: pruebas unitarias del motor (`node:test`), dentro
   del runner canónico (`node motor .cjs`).
 - Las suites de la app retirada (`*.mjs` de navegador) ya no existen; la
-  cobertura de UI vive en `desktop/test/` (10 suites, 307 checks).
+  cobertura de UI vive en `desktop/test/` (11 suites, 334 checks).
 
 Los tests usan fixtures sintéticas; no demuestran mecánicas ni compatibilidad
 del servidor. La validación contra un `Auctionator.lua` real es opt-in manual
