@@ -1,0 +1,15 @@
+{
+  "schema": 1,
+  "generadoPor": "tools/build-iconos.py",
+  "fuente": "Wowhead tooltip (dataEnv 4/8/1) + CDN de iconos; activos de Blizzard Entertainment",
+  "items": 22821,
+  "conMiniatura": 17712,
+  "sinMiniatura": 5109,
+  "iconosUnicos": 2165,
+  "celda": 48,
+  "columnas": 64,
+  "filas": 34,
+  "spriteBytes": 1719716,
+  "spriteSha256": "2dbf9ca20642637748f9396994d7dfc066110439df0eaf13b2482881eea52cfa",
+  "moduloBytes": 2640879
+}

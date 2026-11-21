@@ -12,6 +12,7 @@ entradas fijadas (versión y sha256) en `tools/fuentes.json`.
 | **CMaNGOS classic-db** (<https://github.com/cmangos/classic-db>) | commit `28ef6259c782928b08a8dc9cacf6bc02e64f2b29`, dump `ClassicDB_1_12_1_z2815` | **GPL-3.0** (texto completo abajo) | misiones, NPC, entrenadores, vendedores, botín y spawns de WoW 1.12 |
 | **Tablas del cliente WoW Classic Era** vía wago.tools | build 1.15.9.70576 | datos de Blizzard Entertainment | zonas, mapas, cerraduras, facciones |
 | **Tablas del cliente WoW Forever** vía wago.tools, en inglés y `esMX` | build 1.60.1.70888 | datos de Blizzard Entertainment | razas, clases y combinaciones, profesiones, recetas, reactivos, ítems, zonas, dungeons |
+| **Miniaturas de ítems** (`desktop/src/iconos-datos.js`, `data/iconos.json`), generadas por `tools/build-iconos.py` | tooltip de Wowhead + CDN de iconos, consultados solo en build-time | activos de Blizzard Entertainment | un sprite WebP con la miniatura de cada `itemID`; no hay descargas en runtime |
 
 **Aviso:** el material de Blizzard Entertainment (nombres y contenido de World of
 Warcraft) conserva sus marcas registradas y derechos de autor. Se usa con fines no

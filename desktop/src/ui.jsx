@@ -3,6 +3,9 @@ import { Fragment } from 'react'
 import { C, CALIDAD, CLASES_RICAS, S } from './estilos.js'
 import { dinero, item, nombre } from './datos.js'
 import { t } from './i18n.js'
+import { ICONOS } from './iconos-datos.js'
+
+const SPRITE_URL = `url("data:image/webp;base64,${ICONOS.sprite}")`
 
 export function Tarjeta({ titulo, extra, children, estilo }) {
   return (
@@ -42,13 +45,43 @@ export function Aviso({ children }) {
   return <div role="note" style={S.aviso}>{children}</div>
 }
 
+// Miniatura local del ítem, indexada por itemID. Sin icono se reserva el
+// espacio (sin interrogantes ni ruido visual) para que las filas no salten.
+export function IconoItem({ id, size = 24, titulo }) {
+  const celda = id == null ? undefined : ICONOS.mapa[String(id)]
+  if (celda == null) return <span aria-hidden="true" style={{ width: size, height: size, flex: '0 0 auto', display: 'inline-block' }} />
+  const col = celda % ICONOS.columnas
+  const fila = Math.floor(celda / ICONOS.columnas)
+  return (
+    <span
+      role="img"
+      aria-label={titulo || ''}
+      title={titulo || undefined}
+      style={{
+        width: size,
+        height: size,
+        flex: '0 0 auto',
+        display: 'inline-block',
+        borderRadius: 3,
+        backgroundImage: SPRITE_URL,
+        backgroundRepeat: 'no-repeat',
+        backgroundSize: `${ICONOS.columnas * size}px ${ICONOS.filas * size}px`,
+        backgroundPosition: `${-col * size}px ${-fila * size}px`,
+      }}
+    />
+  )
+}
+
 export function NombreItem({ id, lang, cantidad }) {
   const it = item(id)
   if (!it) return <span style={{ color: C.texto3 }}>#{id}</span>
   const otro = nombre(it.n, lang === 'en' ? 'es' : 'en')
   return (
-    <span title={otro !== nombre(it.n, lang) ? otro : undefined} style={{ color: CALIDAD[it.calidad] || C.texto }}>
-      {nombre(it.n, lang) || '#' + id}{cantidad > 1 ? ' ×' + cantidad : ''}
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+      <IconoItem id={id} size={20} titulo={nombre(it.n, lang)} />
+      <span title={otro !== nombre(it.n, lang) ? otro : undefined} style={{ color: CALIDAD[it.calidad] || C.texto }}>
+        {nombre(it.n, lang) || '#' + id}{cantidad > 1 ? ' ×' + cantidad : ''}
+      </span>
     </span>
   )
 }
