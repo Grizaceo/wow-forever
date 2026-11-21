@@ -67,9 +67,18 @@ export function huecos(archivo, filtro) {
   return (D[archivo].huecos || []).filter((h) => Object.entries(filtro).every(([k, v]) => h[k] === v))
 }
 
-// Precio en cobre a "1o 2p 3c".
-export function dinero(cobre) {
+// Precio en cobre a "1g 2s 3c" (inglés) o "1o 2p 3c" (español).
+// El idioma se fija al arrancar la app y al cambiarlo; así las vistas no
+// tienen que pasar `lang` a cada precio.
+let IDIOMA_DINERO = 'es'
+
+export function setIdioma(lang) {
+  IDIOMA_DINERO = lang === 'es' ? 'es' : 'en'
+}
+
+export function dinero(cobre, lang = IDIOMA_DINERO) {
   if (cobre == null || !Number.isFinite(cobre)) return '—'
   const c = Math.round(cobre), o = Math.floor(c / 10000), p = Math.floor((c % 10000) / 100), b = c % 100
-  return [o ? o + 'o' : '', p ? p + 'p' : '', b || (!o && !p) ? b + 'c' : ''].filter(Boolean).join(' ')
+  const [uO, uP, uC] = lang === 'es' ? ['o', 'p', 'c'] : ['g', 's', 'c']
+  return [o ? o + uO : '', p ? p + uP : '', b || (!o && !p) ? b + uC : ''].filter(Boolean).join(' ')
 }

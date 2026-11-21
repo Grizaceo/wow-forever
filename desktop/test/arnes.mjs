@@ -135,6 +135,9 @@ const reactDomDir = path.dirname(reqDesk.resolve('react-dom/package.json'))
     const kv = {}
     if (previo.perfil) kv[PREF + 'perfil'] = JSON.stringify(previo.perfil)
     if (previo.build) kv[PREF + 'build'] = JSON.stringify(previo.build)
+    // Las suites históricas están escritas en español: se siembra `es` salvo que
+    // la prueba pida explícitamente el arranque por defecto (`idioma: null`).
+    if (previo.idioma !== null) kv[PREF + 'idioma'] = JSON.stringify(previo.idioma ?? 'es')
     for (const [k, v] of Object.entries(previo.storage || {})) kv[PREF + k] = JSON.stringify(v)
     // Claves CRUDAS (sin el prefijo del SDK): para sembrar las claves heredadas
     // que la 1.0.0 dejó en el localStorage (p.ej. `auction-path`).

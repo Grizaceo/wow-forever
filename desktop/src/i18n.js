@@ -1,4 +1,4 @@
-// Textos de la interfaz: español por defecto, inglés opcional (perfil.idioma). Los nombres
+// Textos de la interfaz: inglés por defecto, español opcional (perfil.idioma). Los nombres
 // del juego (razas, ítems, zonas…) vienen de data/ en ambos idiomas.
 const ES = {
   app: 'WoW Forever',
@@ -86,8 +86,8 @@ const TEXTOS = { es: ES, en: EN }
 
 // t(lang, clave, vars?) — {x} en el texto se sustituye por vars.x.
 export function t(lang, clave, vars) {
-  const s = (TEXTOS[lang] || ES)[clave] ?? ES[clave] ?? clave
-  return vars ? s.replace(/\{(\w+)\}/g, (m, k) => (vars[k] ?? m)) : s
+  const texto = (TEXTOS[lang] || EN)[clave] ?? EN[clave] ?? ES[clave] ?? clave
+  return vars ? texto.replace(/\{(\w+)\}/g, (m, k) => (vars[k] ?? m)) : texto
 }
 
 // Para que cada sección agregue sus textos sin tocar este archivo.

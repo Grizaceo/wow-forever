@@ -39,6 +39,10 @@ check('la columna de nombres se titula Hechizo, no Clase', await p.getByRole('co
 await cerrar()
 
 // 4) Cada pestaña se pinta sin errores, en claro y oscuro; idioma inglés.
+;({ p, cerrar } = await a.abrir('claro', { perfil: PERFILES.cazadorHorda, idioma: null }))
+check('sin preferencia guardada arranca en inglés', await p.evaluate(() =>
+  document.body.innerText.includes('Character') && !document.body.innerText.includes('Personaje')))
+await cerrar()
 for (const tema of ['claro', 'oscuro']) {
   ;({ p, cerrar } = await a.abrir(tema, { perfil: PERFILES.cazadorHorda }))
   const pestanas = await p.locator('[role="tab"]').evaluateAll((els) => els.map((e) => e.dataset.tab))

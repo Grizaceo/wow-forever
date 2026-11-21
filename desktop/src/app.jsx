@@ -2,7 +2,7 @@
 import { Component, useCallback, useEffect, useMemo, useState } from 'react'
 import { Button, SegmentedControl, Tabs, TabsList, TabsTrigger } from '@hermes/plugin-sdk'
 import { migrarPerfil, validarPerfil } from '../../src/perfil.js'
-import { D, guiaCurada, nombre } from './datos.js'
+import { D, guiaCurada, nombre, setIdioma } from './datos.js'
 import { S } from './estilos.js'
 import { t } from './i18n.js'
 import { VistaPersonaje } from './vistas/personaje.jsx'
@@ -48,7 +48,11 @@ export function App({ ctx, almacen, sincronizador, ventas, puente }) {
   const [error, setError] = useState('')
   const [perfil, setPerfil] = useState(null)
   const [razaSupuesta, setRazaSupuesta] = useState(false)
-  const [lang, setLang] = useState(() => (ctx.storage.get('idioma', 'es') === 'en' ? 'en' : 'es'))
+  const [lang, setLang] = useState(() => {
+    const inicial = ctx.storage.get('idioma', 'en') === 'es' ? 'es' : 'en'
+    setIdioma(inicial)
+    return inicial
+  })
   const [pestana, setPestana] = useState(() => ctx.storage.get('pestana', 'personaje'))
   const [vuelta, setVuelta] = useState(0)
 
@@ -83,7 +87,12 @@ export function App({ ctx, almacen, sincronizador, ventas, puente }) {
     return r
   }, [ctx])
 
-  const cambiarLang = (l) => { setLang(l); try { ctx.storage.set('idioma', l) } catch { /* preferencia */ } }
+  const cambiarLang = (l) => {
+    const idioma = l === 'es' ? 'es' : 'en'
+    setIdioma(idioma)
+    setLang(idioma)
+    try { ctx.storage.set('idioma', idioma) } catch { /* preferencia */ }
+  }
   const cambiarPestana = (p) => { setPestana(p); try { ctx.storage.set('pestana', p) } catch { /* preferencia */ } }
 
   const listo = perfil && validarPerfil(perfil, D.personaje).ok
@@ -102,7 +111,7 @@ export function App({ ctx, almacen, sincronizador, ventas, puente }) {
       <div style={S.cabecera}>
         <strong>{t(lang, 'app')}</strong>
         <span style={{ ...S.sub, flex: 1 }}>{resumen}</span>
-        <SegmentedControl value={lang} onChange={cambiarLang} options={[{ id: 'es', label: 'ES' }, { id: 'en', label: 'EN' }]} />
+        <SegmentedControl value={lang} onChange={cambiarLang} options={[{ id: 'en', label: 'EN' }, { id: 'es', label: 'ES' }]} />
         <Button variant="outline" size="xs" onClick={async () => { await almacen.reset(); recargar() }}>{t(lang, 'reintentar')}</Button>
       </div>
       <div style={{ padding: '6px 16px 0' }}>
