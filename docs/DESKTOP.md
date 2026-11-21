@@ -228,6 +228,25 @@ claves numéricas, máx. 40) y el valor del equipo con
 `pcall`. Resultado en `WoWForeverBridgeDB.pawn`; en fallo, `pawnErro` sin borrar
 la captura buena. `/wfbpawn` (o `/wfbp pawn`) fuerza la captura.
 
+**Cuándo se captura (y por qué).** Pawn apaga sus proveedores al salir:
+`PawnOnLogout()` (`Pawn.lua:524`) llama `PawnUnitializePlugins()`
+(`Pawn.lua:5665-5676`), que deja `ProviderActive = nil` y `Values = nil` en toda
+escala de proveedor. Como Pawn carga antes (`P` < `W`), en `PLAYER_LOGOUT` su
+handler corre primero y una captura ingenua grabaría «sin escala para classID N»
+en cada salida. Por eso (v1.2.1):
+
+- la captura final va en **`PLAYER_LEAVING_WORLD`**, que dispara antes del
+  apagado de Pawn (`pcall` al registrarlo por si el cliente no lo conoce);
+- `pluginsAtivos()` distingue «Pawn apagado» de «falta la escala»: sin
+  proveedores vivos la captura sale en silencio, sin `pawnErro` y sin pisar la
+  captura buena;
+- el `pawnErro` real (Pawn vivo y ninguna escala con el `ClassID`) incluye
+  `escalas=N, ativas=M` para diagnosticar sin abrir el juego;
+- si el equipo vuelve con `ilvl` pero sin valores por escala (Pawn aún no
+  cacheó los ítems: `PawnAddStatToTable` descarta `Amount == 0`,
+  `Pawn.lua:2693`), hay **un reintento acotado** a los 45 s y como máximo dos
+  intentos por entrada al mundo.
+
 - `desktop/src/pawn.js` (puro): `parsePawnScales` lee el `PawnCommon` de
   `SavedVariables/Pawn.lua` (catálogo: nombre, localized, provider, classID,
   specID, role, `temPesos`); `parsePawnCaptura` normaliza el bloque del diario;

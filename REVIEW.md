@@ -124,3 +124,45 @@ APIs/símbolos de Pawn usados en `addon/WoWForeverBridge/Pawn.lua`, todos existe
 - `PawnGetInventoryItemValues` itera slots y consulta datos de ítems: si Pawn no está inicializado (`PawnIsInitialized` false) falla con `VgerCore.Fail` → `pcall` lo captura y `equipo` queda `null`; nunca rompe la captura de pesos.
 - El wrapper de `/wfbp` depende de que `Personaje.lua` cargue antes que `Pawn.lua` (orden del `.toc`); si se reordena, `/wfbp pawn` dejaría de funcionar (el resto sigue).
 - `pawn-catalogo` crece con el `Pawn.lua` del usuario (tope 200 escalas, campos acotados); sin datos de escalas no se guarda nada.
+
+---
+
+## Corrección v1.2.1 — el `pawnErro` falso de cada salida (2026-11-21)
+
+**Síntoma en datos reales del plugin** (storage `wow-hunter-guide.pawn`): última
+captura buena `capturado=1795285517` (15:25:17) y, 527 s después,
+`erro.msg = "pawn: sem escala para classID 3"` (`capturado=1795286044`, 15:34:04,
+el mismo instante en que WoW escribió SavedVariables). La tarjeta mostraba un
+fallo permanente con la captura buena intacta, y `equipo.valores` venía vacío
+con `ilvl 24`.
+
+**Causa raíz (leída en el Pawn instalado, no supuesta):**
+`PawnOnLogout()` (`Pawn.lua:524`) llama `PawnUnitializePlugins()`
+(`Pawn.lua:5665-5676`), que recorre las escalas y deja `ProviderActive = nil`,
+`Values = nil`. Pawn carga antes que `WoWForeverBridge` (`P` < `W`), así que en
+`PLAYER_LOGOUT` su handler corre primero: nuestro `escolherEscala` exigía
+`ProviderActive` y no encontraba ninguna candidata, grabando un error que no era
+de datos sino de orden de eventos. El `ilvl` sin valores por escala es el mismo
+problema visto en `PLAYER_ENTERING_WORLD`: `PawnGetAllItemValues` devuelve 0
+para todo mientras no haya caché de ítems y `PawnAddStatToTable` descarta
+`Amount == 0` (`Pawn.lua:2693`).
+
+**Cambios (`addon/WoWForeverBridge/Pawn.lua`, toc 1.2.1):**
+1. Captura final en `PLAYER_LEAVING_WORLD` (antes de `PLAYER_LOGOUT`), registrado
+   dentro de `pcall` por compatibilidad con clientes que no lo conozcan.
+2. `pluginsAtivos()`: si Pawn ya no tiene proveedores vivos, la captura sale en
+   silencio — ni captura, ni `pawnErro`, ni throttle consumido.
+3. El `pawnErro` real (Pawn vivo, ninguna escala con el `ClassID`) ahora declara
+   `(escalas=N, ativas=M)`.
+4. Reintento acotado del equipo a los 45 s, máximo 2 intentos por entrada al
+   mundo, solo si `equipo.valores` vino vacío.
+
+**Pruebas:** 18 checks nuevos en `addon/tests/test_bridge.lua`
+(**113** checks, 0 fallos) que reproducen el estado real: Pawn apagado antes del
+logout, `/wfbpawn` en ese estado, `PLAYER_LEAVING_WORLD` con Pawn vivo, error
+real con conteo, y el reintento del equipo con reloj avanzado.
+`scripts/run-gates.mjs` (`EXPECT_LUA`) y `docs/TESTING.md` actualizados.
+
+**Hueco que sigue:** la confirmación en vivo depende de reiniciar el cliente con
+el addon 1.2.1; el reintento del equipo solo se puede validar en sesión real
+(el arnés simula el reloj).

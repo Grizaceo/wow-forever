@@ -12,9 +12,13 @@
 --   UnitClass('player')                  -> _, _, ClassID
 --   VgerCore.SpecsExist + GetSpecialization() -> SpecID (Pawn.lua:839-843)
 -- Não existe API "escala ativa": a candidata é inferida por ClassID/SpecID.
--- Em SavedVariables as escalas de provedor perdem .Values (Pawn.lua:5665-5671),
--- mas em runtime existem (PawnAddPluginScale, Pawn.lua:5779) — por isso a
--- captura precisa acontecer dentro do jogo.
+--   Em SavedVariables as escalas de provedor perdem .Values (Pawn.lua:5665-5671),
+--   mas em runtime existem (PawnAddPluginScale, Pawn.lua:5779) — por isso a
+--   captura precisa acontecer dentro do jogo.
+--   Mesmo motivo para capturar em PLAYER_LEAVING_WORLD e não em PLAYER_LOGOUT:
+--   PawnOnLogout() (Pawn.lua:524) apaga ProviderActive/Values antes do nosso
+--   handler rodar. Já desinicializado, a captura sai em silêncio em vez de
+--   gravar um pawnErro falso.
 
 local Logic = WoWForeverBridgeLogic
 
@@ -22,12 +26,19 @@ local frame = CreateFrame('Frame')
 frame:RegisterEvent('PLAYER_ENTERING_WORLD')
 frame:RegisterEvent('PLAYER_LOGOUT')
 frame:RegisterEvent('PLAYER_QUITING')
+-- PLAYER_LEAVING_WORLD dispara ANTES de PLAYER_LOGOUT, cuando Pawn todavía
+-- tiene vivos los proveedores: es el último punto donde pesos y equipo son
+-- legibles. En pcall porque un cliente viejo puede no conocer el evento.
+pcall(frame.RegisterEvent, frame, 'PLAYER_LEAVING_WORLD')
 
 local INTERVALO = 300 -- segundos entre capturas automáticas
 local MAX_PESOS = 40
 local MAX_EQUIPE = 8
 local MAX_CANDIDATAS = 3
+local REINTENTO_EQUIPO = 45 -- segundos tras entrar al mundo para reintentar el equipo
+local MAX_REINTENTOS = 2
 local lastCaptura = 0
+local pendenteEquipo, tentativasEquipo = 0, 0
 
 local function chat(msg)
   DEFAULT_CHAT_FRAME:AddMessage('|cFF00FF00WoW Forever|r ' .. msg)
@@ -42,6 +53,30 @@ end
 
 local function texto(v)
   return type(v) == 'string' and v ~= '' and v or nil
+end
+
+-- Pawn apaga los proveedores al salir: PawnOnLogout() (Pawn.lua:524) llama
+-- PawnUnitializePlugins() (Pawn.lua:5665-5676), que deja ProviderActive = nil y
+-- Values = nil en toda escala de proveedor. Pawn carga antes que este addon
+-- (P < W), así que en PLAYER_LOGOUT su handler corre primero: sin esta guarda
+-- leeríamos "sin escala para classID N" y grabaríamos un error falso.
+-- Devuelve vivo, total de escalas y escalas con datos (diagnóstico del error).
+local function pluginsAtivos()
+  if type(PawnCommon) ~= 'table' or type(PawnCommon.Scales) ~= 'table' then return false, 0, 0 end
+  local total, ativas, temProvedor = 0, 0, false
+  for _, escala in pairs(PawnCommon.Scales) do
+    if type(escala) == 'table' then
+      total = total + 1
+      if escala.Provider ~= nil then
+        temProvedor = true
+        if escala.ProviderActive == true then ativas = ativas + 1 end
+      elseif type(escala.Values) == 'table' then
+        ativas = ativas + 1 -- escala custom: nunca la desinicializa Pawn
+      end
+    end
+  end
+  -- Sin escalas de proveedor no hay nada que Pawn pueda apagar al salir.
+  return (not temProvedor) or ativas > 0, total, ativas
 end
 
 -- Escolhe a escala do jogador entre PawnCommon.Scales. Não há API de "escala
@@ -126,6 +161,10 @@ local function capturarPawn(forcar)
   local ok, err = pcall(function()
     -- Pawn ausente/desativado: silêncio (o plugin declara "sin captura").
     if type(PawnCommon) ~= 'table' or type(PawnCommon.Scales) ~= 'table' then return end
+    -- Pawn já desinicializado (logout/reload, ver pluginsAtivos): não é falha
+    -- de dados, é Pawn apagado. Silêncio: nem captura, nem erro, nem throttle.
+    local vivo, totalEscalas, escalasAtivas = pluginsAtivos()
+    if not vivo then return end
     local j = garantirDB()
     local now = time()
     if not forcar and now - lastCaptura < INTERVALO then return end
@@ -139,7 +178,13 @@ local function capturarPawn(forcar)
 
     local escolhida, candidatas = escolherEscala(classID, specID)
     if not escolhida then
-      j.pawnErro = { erro = 'pawn: sem escala para classID ' .. tostring(classID), capturado = now }
+      -- Falha real: Pawn vivo e ninguna escala con el ClassID del jugador.
+      -- Se declara con el contexto de lo que sí había, para diagnosticar.
+      j.pawnErro = {
+        erro = 'pawn: sem escala para classID ' .. tostring(classID) ..
+          ' (escalas=' .. tostring(totalEscalas) .. ', ativas=' .. tostring(escalasAtivas) .. ')',
+        capturado = now,
+      }
       return
     end
 
@@ -179,13 +224,46 @@ local function reportPawn()
   end
 end
 
+-- Equipo incompleto: Pawn devolve ilvl mas nenhum valor por escala quando os
+-- dados de ítem ainda não estão cacheados (PawnAddStatToTable descarta Amount 0,
+-- Pawn.lua:2693). Não é dado ausente de verdade: é cedo. Se reintenta una vez.
+local function equipamentoIncompleto()
+  local j = WoWForeverBridgeDB
+  if type(j) ~= 'table' or type(j.pawn) ~= 'table' then return false end
+  local eq = j.pawn.equipo
+  return type(eq) == 'table' and type(eq.valores) == 'table' and #eq.valores == 0
+end
+
 frame:SetScript('OnEvent', function(_, event)
   if event == 'PLAYER_ENTERING_WORLD' then
     garantirDB()
+    tentativasEquipo = 0
     capturarPawn(false)
-  else
-    -- logout/quit: captura final antes do flush de SavedVariables.
+    if equipamentoIncompleto() then pendenteEquipo = REINTENTO_EQUIPO end
+  elseif event == 'PLAYER_LEAVING_WORLD' then
+    -- Salida del mundo: Pawn todavía vivo (PawnUnitializePlugins llega después,
+    -- en PLAYER_LOGOUT). Es la captura final real; nada de reintentos aquí.
+    pendenteEquipo = 0
     capturarPawn(true)
+  else
+    -- logout/quit: si Pawn ya se apagó, capturarPawn sale en silencio en vez de
+    -- grabar un error falso. Si sigue vivo, captura igual que antes.
+    pendenteEquipo = 0
+    capturarPawn(true)
+  end
+end)
+
+-- Un solo reintento del equipo (máx. MAX_REINTENTOS) para no capturar en bucle.
+frame:SetScript('OnUpdate', function(_, elapsed)
+  if pendenteEquipo <= 0 then return end
+  pendenteEquipo = pendenteEquipo - (elapsed or 0)
+  if pendenteEquipo > 0 then return end
+  tentativasEquipo = tentativasEquipo + 1
+  capturarPawn(true)
+  if tentativasEquipo < MAX_REINTENTOS and equipamentoIncompleto() then
+    pendenteEquipo = REINTENTO_EQUIPO
+  else
+    pendenteEquipo = 0
   end
 end)
 

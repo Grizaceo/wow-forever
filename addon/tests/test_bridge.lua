@@ -214,6 +214,8 @@ _G.PawnGetInventoryItemValues = function()
 end
 dofile('addon/WoWForeverBridge/Pawn.lua')
 ok(events['PLAYER_ENTERING_WORLD'] and events['PLAYER_LOGOUT'] and events['PLAYER_QUITING'], 'Pawn registra eventos')
+ok(events['PLAYER_LEAVING_WORLD'], 'Pawn registra PLAYER_LEAVING_WORLD (antes del logout)')
+ok(type(scripts['OnUpdate']) == 'function', 'Pawn registra OnUpdate para reintentar el equipo')
 ok(type(SlashCmdList['WOWFOREVERBRIDGE3']) == 'function', 'Pawn registra /wfbpawn')
 ok(type(SlashCmdList['WOWFOREVERBRIDGE2']) == 'function', 'Pawn mantém /wfbp (wrapper)')
 
@@ -259,11 +261,78 @@ ok(type(WoWForeverBridgeDB.pawnErro) == 'table', 'pawnErro registrado')
 ok(tostring(WoWForeverBridgeDB.pawnErro.erro):find('boom', 1, true) ~= nil, 'pawnErro mensaje')
 _G.UnitClass = function() return 'Cazador', 'Cazador', 3 end
 
+-- Regresión: Pawn se apaga al salir (PawnOnLogout -> PawnUnitializePlugins deja
+-- ProviderActive y Values en nil). Antes eso grababa "sem escala para classID 3"
+-- en cada logout y el plugin lo mostraba como fallo permanente.
+local function apagarPawn()
+  for _, escala in pairs(PawnCommon.Scales) do
+    if escala.Provider then escala.ProviderActive = nil; escala.Values = nil end
+  end
+end
+local function ligarPawn()
+  PawnCommon.Scales['"Classic":HUNTER1'].ProviderActive = true
+  PawnCommon.Scales['"Classic":HUNTER1'].Values = { Agility = 1.4, Strength = 1 }
+  PawnCommon.Scales['"Classic":HUNTER2'].ProviderActive = true
+  PawnCommon.Scales['"Classic":HUNTER2'].Values = { Agility = 1.5, Crit = 0.8 }
+  PawnCommon.Scales['"Classic":MAGE1'].ProviderActive = true
+end
+
+local capturaAntes = WoWForeverBridgeDB.pawn.capturado
+WoWForeverBridgeDB.pawnErro = nil
+apagarPawn()
+nowValue = nowValue + 400
+scripts['OnEvent'](nil, 'PLAYER_LOGOUT')
+eq(WoWForeverBridgeDB.pawn.capturado, capturaAntes, 'logout con Pawn apagado no recaptura')
+eq(WoWForeverBridgeDB.pawnErro, nil, 'logout con Pawn apagado no graba error falso')
+ok(type(WoWForeverBridgeDB.pawn) == 'table', 'captura buena sobrevive al logout')
+
+nowValue = nowValue + 400
+SlashCmdList['WOWFOREVERBRIDGE3']('pawn')
+eq(WoWForeverBridgeDB.pawnErro, nil, '/wfbpawn con Pawn apagado tampoco inventa error')
+eq(WoWForeverBridgeDB.pawn.capturado, capturaAntes, '/wfbpawn con Pawn apagado no recaptura')
+
+-- Con Pawn vivo, PLAYER_LEAVING_WORLD sí es la captura final (antes del apagado).
+ligarPawn()
+nowValue = nowValue + 400
+scripts['OnEvent'](nil, 'PLAYER_LEAVING_WORLD')
+eq(WoWForeverBridgeDB.pawn.capturado, nowValue, 'PLAYER_LEAVING_WORLD captura con Pawn vivo')
+eq(WoWForeverBridgeDB.pawn.escala, '"Classic":HUNTER2', 'captura final respeta la spec activa')
+
+-- Error real (Pawn vivo, ninguna escala con el ClassID): se declara con contexto.
+_G.UnitClass = function() return 'X', 'X', 99 end
+nowValue = nowValue + 400
+SlashCmdList['WOWFOREVERBRIDGE3']('pawn')
+ok(type(WoWForeverBridgeDB.pawnErro) == 'table', 'Pawn vivo sin escala sí registra error')
+ok(tostring(WoWForeverBridgeDB.pawnErro.erro):find('classID 99', 1, true) ~= nil, 'el error real declara el classID')
+ok(tostring(WoWForeverBridgeDB.pawnErro.erro):find('escalas=', 1, true) ~= nil, 'el error real incluye el conteo de escalas')
+eq(WoWForeverBridgeDB.pawn.capturado, nowValue - 400, 'un error real no pisa la captura buena')
+_G.UnitClass = function() return 'Cazador', 'Cazador', 3 end
+
+-- Reintento del equipo: en PEW Pawn devuelve ilvl sin valores (datos de ítem sin
+-- cachear). Un reintento a los 45 s los recupera; nunca entra en bucle.
+local inventarioBom = _G.PawnGetInventoryItemValues
+_G.PawnGetInventoryItemValues = function() return {}, 0, 33 end
+nowValue = nowValue + 400
+scripts['OnEvent'](nil, 'PLAYER_ENTERING_WORLD')
+eq(#WoWForeverBridgeDB.pawn.equipo.valores, 0, 'PEW temprano: equipo con ilvl y sin valores')
+_G.PawnGetInventoryItemValues = inventarioBom
+local capturadoCedo = WoWForeverBridgeDB.pawn.capturado
+nowValue = nowValue + 21
+scripts['OnUpdate'](nil, 21)
+eq(WoWForeverBridgeDB.pawn.capturado, capturadoCedo, 'OnUpdate no captura antes del plazo')
+nowValue = nowValue + 30
+scripts['OnUpdate'](nil, 30)
+ok(WoWForeverBridgeDB.pawn.capturado > capturadoCedo, 'el reintento recaptura pasado el plazo')
+ok(#WoWForeverBridgeDB.pawn.equipo.valores > 0, 'el reintento recupera los valores del equipo')
+local capturadoRetry = WoWForeverBridgeDB.pawn.capturado
+scripts['OnUpdate'](nil, 500)
+eq(WoWForeverBridgeDB.pawn.capturado, capturadoRetry, 'sin equipo incompleto ya no reintenta')
+
 -- PawnCommon ausente: silencio, sem erro novo, sem quebrar.
 _G.PawnCommon = nil
-local erroAntes = WoWForeverBridgeDB.pawnErro.capturado
+local erroAntes = WoWForeverBridgeDB.pawnErro
 SlashCmdList['WOWFOREVERBRIDGE3']('')
-eq(WoWForeverBridgeDB.pawnErro.capturado, erroAntes, 'sem PawnCommon nao grava erro novo')
+eq(WoWForeverBridgeDB.pawnErro, erroAntes, 'sem PawnCommon nao grava erro novo')
 ok(true, 'sem PawnCommon no revienta')
 
 print(string.format('test_bridge.lua: %d checks, %d fallos', checks, failures))
