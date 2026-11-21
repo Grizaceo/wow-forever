@@ -25,6 +25,8 @@ agregarTextos({
   'pawn.catalogo': 'Catálogo de escalas',
   'pawn.catalogo.n': '{n} escalas en Pawn.lua',
   'pawn.catalogo.ayuda': 'SavedVariables/Pawn.lua no guarda los pesos de las escalas de proveedor (Pawn los borra al cerrar); solo el catálogo.',
+  'pawn.consent': 'Leer Pawn.lua (catálogo de escalas) de la carpeta concedida. Sin esta casilla el plugin no abre ese archivo.',
+  'pawn.consent.ayuda': 'Pawn.lua está fuera de los tres archivos que el plugin declara leer. Se lee solo si lo autorizas aquí; puedes revocarlo cuando quieras.',
   'pawn.catalogo.elegida': 'Escala según tu clase',
   'pawn.motivo.capturada': 'Capturada por el addon',
   'pawn.motivo.catalogo-clase-spec': 'Clase y spec del catálogo',
@@ -46,6 +48,8 @@ agregarTextos({
   'pawn.catalogo': 'Scale catalog',
   'pawn.catalogo.n': '{n} scales in Pawn.lua',
   'pawn.catalogo.ayuda': 'SavedVariables/Pawn.lua does not store provider scale weights (Pawn clears them on logout); catalog only.',
+  'pawn.consent': 'Read Pawn.lua (scale catalog) from the granted folder. Without this box the plugin does not open that file.',
+  'pawn.consent.ayuda': 'Pawn.lua is outside the three files the plugin declares it reads. It is read only if you allow it here; you can revoke it at any time.',
   'pawn.catalogo.elegida': 'Scale matching your class',
   'pawn.motivo.capturada': 'Captured by the addon',
   'pawn.motivo.catalogo-clase-spec': 'Class and spec from the catalog',
@@ -88,13 +92,19 @@ export function TarjetaPawn({ ctx, lang, perfil, puente, onResumen }) {
   const [cargado, setCargado] = useState(false)
   const [estado, setEstado] = useState('')
   const [frescura, setFrescura] = useState(0)
+  const [consentimiento, setConsentimiento] = useState(() => ctx.storage.get('pawn-consent', false) === true)
 
   const leer = async () => {
     setEstado(t(lang, 'simc.leyendo'))
     if (puente && typeof puente.poll === 'function') {
       try { await puente.poll() } catch { /* el estado del puente se muestra en su pestaña */ }
     }
-    const [reg, cat] = await Promise.all([lerPawn(ctx), lerCatalogoPawn(ctx)])
+    // El catálogo guardado se muestra siempre; el consentimiento solo gobierna
+    // la lectura del archivo SavedVariables/Pawn.lua (bridge-sync.js).
+    const [reg, cat] = await Promise.all([
+      lerPawn(ctx),
+      lerCatalogoPawn(ctx),
+    ])
     setRegistro(reg)
     setCatalogo(cat)
     setCargado(true)
@@ -123,8 +133,19 @@ export function TarjetaPawn({ ctx, lang, perfil, puente, onResumen }) {
   const viejo = registro?.capturado ? (frescura - registro.capturado) > 7 * 86400 : false
   const nEscalas = catalogo?.escalas?.length ?? 0
 
+  const cambiarConsentimiento = (v) => {
+    setConsentimiento(v)
+    try { ctx.storage.set('pawn-consent', v) } catch { /* preferencia */ }
+    void leer()
+  }
+
   return (
     <Tarjeta titulo={t(lang, 'pawn.titulo')}>
+      <label style={{ ...S.sub, display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+        <input data-testid="pawn-consent" type="checkbox" checked={consentimiento}
+          onChange={(e) => cambiarConsentimiento(e.target.checked)} style={{ marginTop: 2 }} />
+        <span title={t(lang, 'pawn.consent.ayuda')}>{t(lang, 'pawn.consent')}</span>
+      </label>
       {!cargado ? <div style={S.sub}>{t(lang, 'simc.leyendo')}</div> : null}
       {cargado && !registro ? (
         <div style={S.sub}>

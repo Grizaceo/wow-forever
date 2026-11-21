@@ -131,11 +131,13 @@ export function createBridgeSync(ctx, marketSync) {
     return [...new Uint8Array(hash)].map(b => b.toString(16).padStart(2, '0')).join('')
   }
   // El catálogo de escalas Pawn vive en SavedVariables/Pawn.lua (archivo de
-  // cuenta), hermano del diario en la misma carpeta concedida. Es opcional:
-  // sin él el plugin sigue funcionando con la captura del addon.
+  // cuenta), hermano del diario en la misma carpeta concedida. Es opcional y
+  // solo se lee con consentimiento explícito en la pestaña Pawn: está fuera de
+  // los tres archivos que declara el manifiesto.
   const PAWN_LUA_MAX = 1024 * 1024
   const syncCatalogoPawn = async hit => {
     try {
+      if (ctx.storage.get('pawn-consent', false) !== true) return
       if (typeof ctx.files.readText !== 'function' || !hit?.folderId || !hit?.path) return
       const dir = hit.path.includes('/') ? hit.path.slice(0, hit.path.lastIndexOf('/') + 1) : ''
       const pr = await ctx.files.readText(hit.folderId, dir + 'Pawn.lua')
