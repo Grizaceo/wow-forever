@@ -252,6 +252,12 @@ en cada salida. Por eso (v1.2.1):
   specID, role, `temPesos`); `parsePawnCaptura` normaliza el bloque del diario;
   `escalaDoJogador` elige la escala con motivo declarado (captura > clase+spec >
   clase > null).
+- **Tablas Lua = objetos.** `parseSavedVariables` (`standalone/market.js:769`)
+  devuelve toda tabla como objeto con claves string: `{a,b,c}` llega como
+  `{1:a,2:b,3:c}`. Por eso `parsePawnCaptura` normaliza con `listaNumerada()` en
+  vez de `Array.isArray` (que en producción nunca se cumplía y tiraba
+  `equipo.valores` y `candidatas`); ordena por índice numérico y descarta la
+  lista entera si aparece una clave no numérica.
 - Ojo: `PawnUnitializePlugins` borra `Scale.Values` de las escalas de proveedor
   antes de serializar (`Pawn.lua:5665-5671`), así que el `Pawn.lua` de cuenta
   **no** trae pesos (`temPesos:false`); en runtime sí existen

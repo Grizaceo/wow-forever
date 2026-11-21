@@ -168,6 +168,20 @@ export async function sincronizarCatalogoPawn(ctx, bytes) {
 
 // ---------- captura: WoWForeverBridgeDB.pawn (escrita por Pawn.lua del addon) ----------
 
+// El lector de SavedVariables devuelve TODA tabla Lua como objeto: un array
+// `{a,b,c}` llega como {1:a,2:b,3:c} con claves string (standalone/market.js:769).
+// En JS los tests usan arrays reales, pero en producción nunca lo son, así que
+// sin esto el equipo y las candidatas se caían siempre. Acepta ambas formas.
+// Cualquier clave no numérica invalida la lista (no adivinamos).
+function listaNumerada(v) {
+  if (Array.isArray(v)) return v
+  if (!v || typeof v !== 'object') return []
+  const claves = Object.keys(v)
+  if (!claves.length) return []
+  for (const k of claves) if (!/^[1-9][0-9]*$/.test(k)) return []
+  return claves.sort((a, b) => Number(a) - Number(b)).map(k => v[k])
+}
+
 // parsePawnCaptura(valor) -> captura normalizada o null.
 // Forma esperada (la escribe addon/WoWForeverBridge/Pawn.lua):
 //   { v:1, escala, localized, provider, classID, specID, pesos:{stat:n},
@@ -190,17 +204,15 @@ export function parsePawnCaptura(v) {
   const eq = v.equipo
   if (eq && typeof eq === 'object' && !Array.isArray(eq)) {
     const valores = []
-    if (Array.isArray(eq.valores)) {
-      for (const item of eq.valores.slice(0, MAX_EQUIPE)) {
-        if (!item || typeof item !== 'object') continue
-        if (typeof item.escala !== 'string' || !item.escala || item.escala.length > MAX_CAMPO) continue
-        if (typeof item.valor !== 'number' || !Number.isFinite(item.valor)) continue
-        valores.push({
-          escala: item.escala.slice(0, MAX_CAMPO),
-          valor: item.valor,
-          localized: textoOuNull(item.localized),
-        })
-      }
+    for (const item of listaNumerada(eq.valores).slice(0, MAX_EQUIPE)) {
+      if (!item || typeof item !== 'object') continue
+      if (typeof item.escala !== 'string' || !item.escala || item.escala.length > MAX_CAMPO) continue
+      if (typeof item.valor !== 'number' || !Number.isFinite(item.valor)) continue
+      valores.push({
+        escala: item.escala.slice(0, MAX_CAMPO),
+        valor: item.valor,
+        localized: textoOuNull(item.localized),
+      })
     }
     const ilvl = intOuNull(eq.ilvl)
     equipe = {
@@ -210,18 +222,16 @@ export function parsePawnCaptura(v) {
   }
 
   const candidatas = []
-  if (Array.isArray(v.candidatas)) {
-    for (const c of v.candidatas.slice(0, 3)) {
-      if (!c || typeof c !== 'object' || typeof c.nome !== 'string' || !c.nome) continue
-      candidatas.push({
-        nome: c.nome.slice(0, MAX_CAMPO),
-        localized: textoOuNull(c.localized) || c.nome.slice(0, MAX_CAMPO),
-        provider: textoOuNull(c.provider),
-        classID: intOuNull(c.classID),
-        specID: intOuNull(c.specID),
-        role: textoOuNull(c.role, 50),
-      })
-    }
+  for (const c of listaNumerada(v.candidatas).slice(0, 3)) {
+    if (!c || typeof c !== 'object' || typeof c.nome !== 'string' || !c.nome) continue
+    candidatas.push({
+      nome: c.nome.slice(0, MAX_CAMPO),
+      localized: textoOuNull(c.localized) || c.nome.slice(0, MAX_CAMPO),
+      provider: textoOuNull(c.provider),
+      classID: intOuNull(c.classID),
+      specID: intOuNull(c.specID),
+      role: textoOuNull(c.role, 50),
+    })
   }
 
   return {

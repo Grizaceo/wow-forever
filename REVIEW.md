@@ -166,3 +166,30 @@ real con conteo, y el reintento del equipo con reloj avanzado.
 **Hueco que sigue:** la confirmación en vivo depende de reiniciar el cliente con
 el addon 1.2.1; el reintento del equipo solo se puede validar en sesión real
 (el arnés simula el reloj).
+
+## Corrección del contrato de datos (tablas Lua como objetos) — 2026-11-21
+
+**Síntoma:** la tarjeta mostraba `equipo` con `ilvl 24` y **cero valores** por
+escala, aunque Pawn sí calculaba valores en el juego (confirmado por Cristóbal y
+verificado en el SavedVariables: `equipo.valores` con 3 entradas y números
+reales).
+
+**Causa raíz:** `parseSavedVariables` (`standalone/market.js:769-779`) convierte
+toda tabla Lua en objeto con claves string; un array `{a,b,c}` llega como
+`{1:a,2:b,3:c}`. `desktop/src/pawn.js` exigía `Array.isArray(eq.valores)` —y lo
+mismo con `candidatas`—, guarda que en producción **nunca** se cumplía porque los
+tests en JS construyen arrays reales. Comprobado sobre el archivo real:
+`typeof eq.valores === 'object'`, `isArray === false`, claves `1..3`.
+
+**Cambios:** `listaNumerada()` en `desktop/src/pawn.js` acepta array JS o
+cualquier objeto con claves enteras positivas, ordena por índice numérico (no por
+orden de inserción) y descarta la lista entera si aparece una clave no numérica
+en vez de adivinar. Se usa para `equipo.valores` y `candidatas`.
+
+**Pruebas:** 1 test nuevo en `tests/pawn.test.mjs` (**325** node, 0 fallos) más
+verificación sobre el SavedVariables real: 3 valores (240.22 / 252.98 / 239.89) y
+3 candidatas.
+
+**Nota de diseño:** no se tocó `parseSavedVariables`. Es el lector genérico que
+también alimenta mercado y TSM; normalizar en el borde de Pawn acota el cambio al
+productor que sí escribe arrays.

@@ -26,7 +26,7 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const KEEP_GOING = process.argv.includes('--keep-going');
 
 // Conteos esperados del stack canónico (actualizar a mano si se añaden tests).
-const EXPECT_NODE = 324;
+const EXPECT_NODE = 325;
 const EXPECT_PY = 86;
 const EXPECT_LUA = 113;
 // Tests unitarios del motor en standalone/tests/*.cjs (node:test). Los «real
