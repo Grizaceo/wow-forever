@@ -56,6 +56,8 @@ const ETIQUETAS = {
     perfil: 'Perfil',
     precios: 'Precios y ofertas',
     simc: 'Estado SimC',
+    pawn: 'Escala Pawn',
+    limitePawn: 'Pesos y valor de Pawn leídos del juego; no son una simulación de DPS.',
     sinNombre: 'sin nombre',
     sinId: 'sin ID',
     sinClave: 'sin clave',
@@ -112,6 +114,8 @@ const ETIQUETAS = {
     perfil: 'Profile',
     precios: 'Prices and offers',
     simc: 'SimC state',
+    pawn: 'Pawn scale',
+    limitePawn: 'Pawn weights and gear value read from the game; they are not a DPS simulation.',
     sinNombre: 'no name',
     sinId: 'no ID',
     sinClave: 'no key',
@@ -192,15 +196,17 @@ export function partesDisponibles(snapshot) {
   if (snapshot.partes.perfil) out.push('perfil')
   if (snapshot.partes.precios) out.push('precios')
   if (snapshot.partes.simc) out.push('simc')
+  if (snapshot.partes.pawn) out.push('pawn')
   return out
 }
 
 /* ------------------------------------------------------------- personaje */
 
-export function construirContextoPersonaje({ resumen, procedencia = [], lang = 'es', resumenSimc = null }) {
+export function construirContextoPersonaje({ resumen, procedencia = [], lang = 'es', resumenSimc = null, resumoPawn = null }) {
   const e = et(lang)
   const ok = linea(resumen) !== ''
   const simc = linea(resumenSimc)
+  const pawn = linea(resumoPawn)
   return {
     seccion: 'personaje',
     titulo: e.personaje,
@@ -209,8 +215,9 @@ export function construirContextoPersonaje({ resumen, procedencia = [], lang = '
       perfil: ok ? { titulo: e.perfil, lineas: [linea(resumen)] } : null,
       precios: null,
       simc: simc ? { titulo: e.simc, lineas: [simc] } : null,
+      pawn: pawn ? { titulo: e.pawn, lineas: [pawn] } : null,
     },
-    limites: [e.limitePerfil, e.limiteSinHistorial].concat(simc ? [e.limiteSimc] : []),
+    limites: [e.limitePerfil, e.limiteSinHistorial].concat(simc ? [e.limiteSimc] : []).concat(pawn ? [e.limitePawn] : []),
     procedencia: [...procedencia],
   }
 }
@@ -411,6 +418,10 @@ export function previsualizarDavi({ pregunta, snapshot, activas, lang = 'es' }) 
   if (snapshot.partes && snapshot.partes.simc && set.has('simc')) {
     out.push(snapshot.partes.simc.titulo + ':')
     for (const l of snapshot.partes.simc.lineas) out.push('- ' + l)
+  }
+  if (snapshot.partes && snapshot.partes.pawn && set.has('pawn')) {
+    out.push(snapshot.partes.pawn.titulo + ':')
+    for (const l of snapshot.partes.pawn.lineas) out.push('- ' + l)
   }
   out.push(e.limites + ':')
   for (const l of snapshot.limites || []) out.push('- ' + l)

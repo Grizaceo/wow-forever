@@ -101,6 +101,12 @@ export function PreguntarDavi({ ctx, lang, seccion, snapshot, preguntaInicial = 
                 {t(lang, 'davi.partes.simc')}
               </label>
             ) : null}
+            {partes.includes('pawn') ? (
+              <label style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
+                <Checkbox disabled={deshabilitado} checked={activas.has('pawn')} onCheckedChange={() => alternar('pawn')} />
+                {t(lang, 'davi.partes.pawn')}
+              </label>
+            ) : null}
           </div>
           <div style={S.etiqueta}>{t(lang, 'davi.vistaPreviaAyuda')}</div>
           <textarea readOnly value={textoVista} aria-label={t(lang, 'davi.vistaPrevia')}

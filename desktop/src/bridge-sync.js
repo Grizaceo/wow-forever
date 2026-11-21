@@ -11,6 +11,7 @@
 import { dataUrlBytes } from './auctionator.js'
 import { BRIDGE_FILE, BRIDGE_MAX_BYTES, parseBridge, bridgeToSnapshot } from './bridge.js'
 import { sincronizarPersonagem } from './simc.js'
+import { sincronizarPawn, sincronizarCatalogoPawn } from './pawn.js'
 
 const safePath = p => typeof p === 'string' && p.length <= 2048 && !p.includes('\\') && !/[\x00-\x1f]/.test(p) && p.split('/').every(s => s && s !== '.' && s !== '..' && !s.includes(':'))
 
@@ -129,18 +130,41 @@ export function createBridgeSync(ctx, marketSync) {
     const hash = await crypto.subtle.digest('SHA-256', bytes)
     return [...new Uint8Array(hash)].map(b => b.toString(16).padStart(2, '0')).join('')
   }
-  const ingest = async bytes => {
+  // El catálogo de escalas Pawn vive en SavedVariables/Pawn.lua (archivo de
+  // cuenta), hermano del diario en la misma carpeta concedida. Es opcional:
+  // sin él el plugin sigue funcionando con la captura del addon.
+  const PAWN_LUA_MAX = 1024 * 1024
+  const syncCatalogoPawn = async hit => {
+    try {
+      if (typeof ctx.files.readText !== 'function' || !hit?.folderId || !hit?.path) return
+      const dir = hit.path.includes('/') ? hit.path.slice(0, hit.path.lastIndexOf('/') + 1) : ''
+      const pr = await ctx.files.readText(hit.folderId, dir + 'Pawn.lua')
+      if (pr?.ok && typeof pr.text === 'string' && pr.text.length > 0 && pr.text.length <= PAWN_LUA_MAX) {
+        await sincronizarCatalogoPawn(ctx, new TextEncoder().encode(pr.text))
+      }
+    } catch { /* catálogo opcional: nunca tumba la sincronización */ }
+  }
+  const ingest = async hit => {
+    const bytes = hit.bytes ?? hit
     const hash = await digest(bytes)
     if (hash === lastDigest) { publish({ status: 'unchanged', message: 'Puente sin cambios.', error: null }); return { status: 'unchanged' } }
     const journal = parseBridge(bytes)
-    // El bloque del personaje vive en el mismo diario: se sincroniza aunque no
-    // haya entradas de mercado nuevas. Un fallo aquí no debe tumbar la importación.
+    // Los bloques del personaje viven en el mismo diario: se sincronizan aunque
+    // no haya entradas de mercado nuevas. Un fallo aquí no debe tumbar la
+    // importación.
     try {
       const ps = await sincronizarPersonagem(ctx, journal)
       if (ps.status === 'ok') publish({ personagem: 'ok' })
     } catch (e) {
       publish({ personagem: 'error', personagemError: String(e?.message || e).slice(0, 200) })
     }
+    try {
+      const pn = await sincronizarPawn(ctx, journal)
+      if (pn.status === 'ok') publish({ pawn: 'ok' })
+    } catch (e) {
+      publish({ pawn: 'error', pawnError: String(e?.message || e).slice(0, 200) })
+    }
+    await syncCatalogoPawn(hit)
     if (!journal.entries.length) {
       lastDigest = hash
       const r = { status: 'ok', message: 'El diario del puente está vacío. Haz un escaneo y /reload.', entries: 0, items: 0, lastDay: null, lastCaptureAt: null, error: null }
@@ -177,7 +201,7 @@ export function createBridgeSync(ctx, marketSync) {
       const r = await leerBridge(ctx, { silent: true })
       if (stopped) return { status: 'stopped' }
       if (r.status !== 'ok') return surface(r)
-      return await ingest(r.bytes)
+      return await ingest(r)
     } catch (e) { return error(e) }
   })
   const api = {
@@ -196,7 +220,7 @@ export function createBridgeSync(ctx, marketSync) {
         const r = await leerBridge(ctx, { pick })
         if (r.status === 'cancelled') { publish({ status: 'idle', message: 'Lectura cancelada.' }); return r }
         if (r.status !== 'ok') return surface(r)
-        return await ingest(r.bytes)
+        return await ingest(r)
       } catch (e) { return error(e) }
     }),
     setEnabled: value => exclusive(async () => {

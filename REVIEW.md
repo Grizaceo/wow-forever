@@ -1,145 +1,126 @@
-# REVIEW — fase 1
+# REVIEW — fase 2
 
 ## Qué hice
 
-- `desktop/src/simc.js` (nuevo): parser puro `parsearSimc` del export string de
-  SimulationCraft (sin DOM, sin eval; lo no reconocido va a `desconhecidas`),
-  persistencia `ctx.storage['personaje-simc']` (`{v:1, origem, texto, capturado,
-  erro}`), `sincronizarPersonagem` y `propostaPerfil` (propone nivel, reino,
-  raza/facción solo si validan contra `personaje.json`, y profesiones; nunca
-  sobrescribe sin pasar por `validarPerfil`).
-- `desktop/src/bridge.js`: `parseBridge` ahora extrae `WoWForeverBridgeDB.personagem`
-  y `.personagemErro` con topes (simc ≤512 KiB, erro ≤4 KiB); campos aditivos,
-  el journal de mercado no cambia.
-- `desktop/src/bridge-sync.js`: cada ingesta llama `sincronizarPersonagem` antes
-  del early-return de «diario vacío», con try/catch propio para no tumbar la
-  importación de mercado.
-- `addon/WoWForeverBridge/Personaje.lua` (nuevo, TOC → v1.1.0, `OptionalDeps` +=
-  `Simulationcraft`): llama `SimulationcraftAPI.GetSimcProfile` dentro de `pcall`,
-  throttle 300 s en `PLAYER_ENTERING_WORLD`, captura forzada en logout/quit y
-  `/wfbp personagem`. Errores van a `personagemErro` sin borrar el último export
-  bueno; `SimulationcraftAPI` ausente = silencio.
-- UI: `desktop/src/vistas/personaje-simc.jsx` (tarjeta con chip de origen
-  juego/pegado, fecha y frescura >7 días, stats, equipo por slot con nombre de
-  ítem, talentos, profesiones, contador de líneas no reconocidas, pegado manual,
-  copia del export y botón «Aplicar» de la propuesta de perfil). Integrada en
-  `vistas/personaje.jsx`; DAVI recibe solo un resumen acotado como parte `simc`
-  (`davi.js` + checkbox en `preguntar-davi.jsx` + i18n es/en).
-- Tests: `tests/simc.test.mjs` (21 casos), +16 checks en `addon/tests/test_bridge.lua`
-  (68 total), suite de navegador `desktop/test/vista-personaje-simc.mjs` (11).
-- Docs: `docs/DESKTOP.md` (sección «Estado del personaje»), `docs/MODELO-DATOS.md`
-  (clave `personaje-simc`). Gates actualizados: EXPECT_NODE 307, EXPECT_LUA 68,
-  nueva suite browser (TOTAL 334).
+- `desktop/src/pawn.js` (nuevo, puro): `parsePawnScales` (catálogo `PawnCommon` de `SavedVariables/Pawn.lua` → `{versao, escalas:[{nome, localized, provider, classID, specID, role, temPesos, pesos?}], erros}`), `parsePawnCaptura` (normaliza `WoWForeverBridgeDB.pawn`, `null` si inválido), `escalaDoJogador` (captura > clase+spec > clase > null, con `motivo`, `candidatas`, `temPesos`), persistencia `ctx.storage['pawn']` + `['pawn-catalogo']` y `sincronizarPawn`/`sincronizarCatalogoPawn`.
+- `addon/WoWForeverBridge/Pawn.lua` (nuevo, toc v1.2.0): captura en `PLAYER_ENTERING_WORLD`/`PLAYER_LOGOUT`/`PLAYER_QUITING` + `/wfbpawn` y `/wfbp pawn` (wrapper sobre `SlashCmdList['WOWFOREVERBRIDGE2']`); guarda `WoWForeverBridgeDB.pawn = {v, escala, localized, provider, classID, specID, pesos, equipo, candidatas, capturado, origem, truncado}` y `pawnErro` en fallo, sin borrar captura buena.
+- `desktop/src/bridge.js`: `parseBridge` extrae `pawn` (vía `parsePawnCaptura`, inválido → `null`) y `pawnErro` (≤4096) del diario.
+- `desktop/src/bridge-sync.js`: sincroniza `pawn`/`pawnErro` en cada ingesta y lee el `Pawn.lua` hermano del diario como catálogo.
+- UI: `desktop/src/vistas/pawn.jsx` (tarjeta «Escala Pawn» con `data-pawn-fila`, chip de procedencia, fecha, pesos descendente, ilvl, estado «sin captura» con `/wfbpawn`), integrada en `personaje.jsx`; DAVI recibe la parte `pawn` con límite declarado (`davi.js`, `preguntar-davi.jsx`, `i18n.js` es/en).
+- Tests: `tests/pawn.test.mjs` (17 casos), bloque Pawn en `addon/tests/test_bridge.lua` (+27 checks → 95), suite `desktop/test/vista-pawn.mjs` (13 checks). Conteos actualizados en `scripts/run-gates.mjs` y `docs/TESTING.md` (node 324, lua 95, navegador 347 en 12 suites); `docs/DESKTOP.md` documenta la pieza.
 
 ## Comandos y salida
 
-```text
-$ node --test tests/simc.test.mjs        → 21 pass / 0 fail
-$ node --test tests/                     → 307 pass / 0 fail
-$ lua5.1 addon/tests/test_bridge.lua     → 68 checks, 0 fallos
-$ cd desktop && node build.mjs           → plugin.js 6786856 chars
-$ python3 scripts/check_desktop_bundle.py → OK (6798380 bytes)
-$ DESKTOP_PLUGIN=$PWD/desktop/plugin.js node desktop/test/vista-personaje-simc.mjs
-  → 11 PASS, 0 red, 0 errores de JS
-$ node scripts/run-gates.mjs             → GATES: 18/18 verdes (browser TOTAL 334)
+```
+$ node --test tests/pawn.test.mjs
+ℹ tests 17
+ℹ pass 17
+ℹ fail 0
+```
+
+```
+$ lua5.1 addon/tests/test_bridge.lua
+test_bridge.lua: 95 checks, 0 fallos
+```
+
+```
+$ cd desktop && node build.mjs && cd ..
+plugin.js 6809308 chars
+```
+
+```
+$ python3 scripts/check_desktop_bundle.py desktop/plugin.js
+… 6820861 bytes … OK
+```
+
+```
+$ DESKTOP_PLUGIN=$PWD/desktop/plugin.js node desktop/test/vista-pawn.mjs
+PASS pawn: estado vacío declara que no hay captura
+PASS pawn: el estado vacío explica cómo capturar (/wfbpawn)
+PASS pawn: tarjeta «Escala Pawn» visible
+PASS pawn: chip «Leído del juego»
+PASS pawn: filas de pesos data-pawn-fila
+PASS pawn: peso Agility 1.5 visible
+PASS pawn: nombre de escala y proveedor
+PASS pawn: ilvl del equipo puesto
+PASS pawn: catálogo declara 4 escalas
+PASS pawn: DAVI ofrece «Incluir escala Pawn»
+PASS pawn: captura sin pesos lo declara (no inventa)
+PASS pawn: sin filas de pesos
+PASS sin red ni errores de JS
+{"suite":"vista-pawn","pasadas":13,"red":0,"errores":0}
+```
+
+```
+$ node scripts/run-gates.mjs
+✓ node tests/                esperado=324     obtenido=324     tests=324 fail=0
+✓ python tests/              esperado=86      obtenido=86      OK
+✓ node motor .cjs            esperado=78      obtenido=78
+✓ lua bridge                 esperado=95      obtenido=95      fallos=0
+✓ build desktop              esperado=OK      obtenido=OK      plugin.js 6809308 chars
+✓ bundle-check               esperado=OK      obtenido=OK      6820861 bytes
+✓ browser:navegador          esperado=36      obtenido=36
+✓ browser:mercado-auto       esperado=11      obtenido=11
+✓ browser:mercado-procedencia esperado=24      obtenido=24
+✓ browser:tsm                esperado=28      obtenido=28
+✓ browser:vista-mercado      esperado=55      obtenido=55
+✓ browser:vista-davi         esperado=50      obtenido=50
+✓ browser:vista-guia         esperado=28      obtenido=28
+✓ browser:vista-profesiones  esperado=41      obtenido=41
+✓ browser:vista-ruta-dungeons esperado=31      obtenido=31
+✓ browser:bridge             esperado=19      obtenido=19
+✓ browser:vista-personaje-simc esperado=11      obtenido=11
+✓ browser:vista-pawn         esperado=13      obtenido=13
+✓ browser TOTAL              esperado=347     obtenido=347
+GATES: 19/19 verdes — TODO VERDE ✓
+```
+
+Verificación extra contra el cliente real (no va a fixtures):
+
+```
+$ node --input-type=module -e "…parsePawnScales(readFileSync(Pawn.lua de cuenta))…"
+versao 2.1403 escalas 29 erros []
+→ las 29 escalas '"Classic":*' con temPesos:false (aceptación del runbook)
 ```
 
 ## Evidencia de datos
 
-Todo verificado contra los archivos instalados del cliente
-(`~/Games/battlenet/drive_c/Program Files (x86)/World of Warcraft/_forever_/`):
+APIs/símbolos de Pawn usados en `addon/WoWForeverBridge/Pawn.lua`, todos existentes en `~/Games/battlenet/drive_c/Program Files (x86)/World of Warcraft/_forever_/Interface/AddOns/Pawn/`:
 
-- `Interface/AddOns/Simulationcraft/core.lua:1598-1600` —
-  `SimulationcraftAPI = { GetSimcProfile = Simulationcraft.GetSimcProfile }`:
-  API global invocable real (no hace falta raspar UI ni portapapeles).
-- `core.lua:1109` — `function Simulationcraft:GetSimcProfile(debugOutput, noBags,
-  showMerchant, links)`; el cuerpo (1109-1465) no usa `self` → se llama con nil.
-- `core.lua:542` `GetItemStringFromItemLink` y `core.lua:646` — líneas de equipo
-  `slot=,id=…,enchant_id=…,gem_id=a/b,bonus_id=…`.
-- `extras.lua:173-191` `simcSlotNames` (head…ammo) + `extras.lua:232` slot
-  Forever `ranged`; `core.lua:1401/1419/1445` secciones `### Gear from Bags`,
-  `### Weekly Reward Choices`, `### End of Weekly Reward Choices`.
-- `forever/stats.lua:102` (`character_stats_gear`) y líneas `# skills=`/`# buffs=`;
-  `forever/pet.lua:35/41/50` (`pet_family/pet_level/pet_abilities`);
-  `forever/legacytalents.lua` (`legacy_talents=`).
-- `Simulationcraft.toc` — `SavedVariables: SimulationCraftDB`, pero el addon solo
-  usa AceDB (`libs/AceDB-3.0/AceDB-3.0.lua:212-217`, perfiles/minimapa): **no
-  guarda exports** → la vía (a) del plan queda descartada con evidencia.
-- `Pawn/Pawn.lua:5146` `PawnGetAllStatValues`, `:834` `PawnGetDefaultScale`,
-  `:908` `PawnCanItemHaveStats`, `:1328` `PawnGetItemData` — APIs reales para la
-  fase 2. `PawnCommon.Scales` se puebla en runtime (`Pawn.lua:627-647`); los
-  pesos numéricos están en `Scale.Values`, no en el stub de 9 KB que sugería el
-  plan (el archivo real tiene >5000 líneas).
-- `WTF/Account/<cuenta>/SavedVariables/WoWForeverBridge.lua` = 1.389.473 bytes:
-  el bloque `personagem` (un export ~50-200 KB) es marginal, sin riesgo de cuota.
+- `PawnCommon` (global, `## SavedVariables: PawnCommon` en `Pawn.toc`): `PawnCommon.Scales` — leído solo, nunca escrito.
+- `PawnCommon.Scales[nome].Values` — pesos; en runtime las escalas de proveedor sí lo tienen (`PawnAddPluginScale`, `Pawn.lua:5780`), pero `PawnUnitializePlugins` lo borra antes de serializar (`Pawn.lua:5665-5671`), de ahí que el `Pawn.lua` guardado no traiga pesos.
+- `PawnGetAllStatValues(ScaleName)` → `PawnCommon.Scales[ScaleName].Values` — `Pawn.lua:5146-5162` (usado como fallback en `pcall`).
+- `PawnGetInventoryItemValues('player')` → `TotalValues, Count, TotalItemLevel`; entradas `{ScaleName, Value, 0, LocalizedName}` — `Pawn.lua:2028-2101`.
+- Criterio de escala activa inferida: `(not Scale.Provider) or Scale.ProviderActive` (mismo de `PawnGetAllScales`, `Pawn.lua:5208-5212` y `PawnGetAllScalesEx`, `Pawn.lua:5248`) + `ClassID == select(3, UnitClass('player'))` + preferencia `SpecID == GetSpecialization()` cuando `VgerCore.SpecsExist` (patrón de `PawnGetDefaultScale`, `Pawn.lua:837-843`).
+- `VgerCore.SpecsExist`, `GetSpecialization`, `UnitClass`, `time`, `DEFAULT_CHAT_FRAME`, `CreateFrame`, `SLASH_*`/`SlashCmdList` — API estándar del cliente, con guardas.
+- No existe `PawnGetScaleForPlayer` (confirmado por búsqueda en `Pawn.lua`): la «escala activa» se infiere como pide el runbook.
+- `WoWForeverBridgeDB.pawn` / `pawnErro` — campos nuevos del SavedVariables propio; `parseSavedVariables` (`standalone/market.js:759`) los lee sin eval.
 
 ## Contradicciones
 
-- **«tres diccionarios de i18n»**: el repo tiene solo dos (`agregarTextos(es, en)`
-  en `desktop/src/i18n.js:81,90`). Los textos nuevos van en es y en; no existe
-  tercera variante que actualizar.
-- **Pawn.lua «9.886 bytes»**: el archivo real pesa cientos de KB y miles de
-  líneas. La afirmación «sin pesos numéricos» hay que revisarla en fase 2:
-  `PawnCommon.Scales[ScaleName].Values` existe y `PawnGetAllStatValues`
-  (`Pawn.lua:5146`) lo expone; el comentario en `:5157-5160` muestra que
-  devuelve copia de `Values`. Los pesos probablemente SÍ son obtenibles en
-  runtime — lo confirmará la fase 2, no la 1.
-- **`SimulationCraftDB.profiles[*].simc`**: confirmado ausente (AceDB solo
-  guarda opciones de UI). Se usó la vía (b) del plan: bloque nuevo en
-  `WoWForeverBridgeDB`.
+- **`/wfbp` «para todo»**: el runbook pide disparadores «`/wfbp pawn` (y `/wfbp` para todo)» sin definir el comportamiento de `/wfbp` a secas. Implementé `/wfbpawn` + wrapper para que `/wfbp pawn` capture Pawn y `/wfbp personagem|simc` siga intacto; `/wfbp` sin argumentos mantiene el uso de fase 1 (`uso: /wfbp personagem`). Si la intención era que `/wfbp` a secas capture ambos, hay que decirlo.
+- **`spec` en `escalaDoJogador`/UI**: el runbook pasa `{clase, spec}` pero `perfil` (v1) no tiene `specID` numérico (el export SimC da `spec` como token, p. ej. `unknown`). La UI llama con `spec: null` → motivo `catalogo-clase`; la spec solo la aprovecha la captura del addon (que sí trae `specID` real). Fase 5 (`jugador.js`) puede mapear spec si hace falta.
+- **`candidatas`**: el runbook pide «guarda hasta 3 candidatas con `LocalizedName`, Provider, ClassID, SpecID, Role»; incluí además `nome` (la clave interna) porque sin ella la candidata no es identificable ni casable con el catálogo. `parsePawnCaptura` las re-normaliza.
+- **Catálogo `Pawn.lua`**: el runbook no dice de dónde sale el texto para `parsePawnScales`; lo leí del `Pawn.lua` hermano del diario en la carpeta SavedVariables concedida (mismo canal que `WoWForeverBridge.lua`). Si el humano concede otra carpeta, el catálogo queda ausente y la UI solo muestra la captura — degrada sin romper.
+- **Versión del addon**: subí el `.toc` a 1.2.0 (el runbook no lo pedía; el deploy lo hace DAVI).
 
 ## Huecos
 
-- Talentos: el export trae el string crudo (`talents=CdE…`, `# talents=` por
-  grupo, `legacy_talents=`) pero **no** se decodifican a puntos/nodos: la fase 1
-  solo declara «exportados / no declarados» y conserva el string para fases
-  futuras. Requiere tabla de talentos Forever que hoy no existe en `data/`.
-- `# character_stats_*` y líneas de combate se parsean a mapas `nombre→valor`
-  sin validar semántica por clase (los nombres de stats los define el addon);
-  stats ausentes quedan fuera del objeto, no en 0.
-- `pet_info`/`pet_stats` se guardan planos; `pet_info` puede llevar valores no
-  numéricos (tipo de mascota) — se conservan como texto.
-- El nombre del personaje (`class="Nombre"`) se guarda en `p.nome` del objeto
-  parseado pero **no** se muestra ni se propone al perfil (dato personal).
+- **Sin captura real todavía**: `SavedVariables/WoWForeverBridge.lua` aún no tiene `pawn`/`pawnErro` (el cliente no se abrió desde el despliegue). Todo lo probado es con mocks/fixtures; la captura en vivo queda pendiente del humano.
+- **`PawnGetInventoryItemValues` puede devolver `nil`** si falta data de algún ítem equipado (`Pawn.lua:2078-2086`): en ese caso `equipo` queda `null` y la UI solo muestra escala/pesos — declarado, no inventado.
+- **`GetSpecialization` puede no existir** en el cliente 1.60: el addon lo guarda con guarda (`VgerCore.SpecsExist and GetSpecialization`); sin spec, la candidata se elige solo por `ClassID`. Pawn mismo cae a `GetPrimaryTalentTree()` (`Pawn.lua:4521`); no lo implementé por seguir el runbook al pie — si en vivo la spec nunca se detecta, es el primer sitio a mirar.
+- **`ProviderActive` no persiste** en SavedVariables: en el catálogo del archivo todas las escalas `"Classic":*` tienen `Provider="Classic"` sin `ProviderActive`; `temPesos:false` es lo correcto ahí (los pesos solo existen en runtime). El filtro `ProviderActive` solo aplica a la captura en vivo.
 
 ## Qué necesita un humano
 
-- **Probar en el juego real**: instalar/recargar WoWForeverBridge 1.1.0 +
-  SimulationCraft, entrar al mundo (o `/wfbp personagem`), `/reload`, y verificar
-  que `WoWForeverBridgeDB.personagem` aparece en el SavedVariables y que el
-  plugin lo sincroniza en la pestaña Personaje. Los tests cubren el formato con
-  fixtures, no el cliente en vivo.
-- Confirmar que `GetSimcProfile(nil,false,true,false)` (sin bags ni merchant)
-  es la combinación deseada: hoy exporta equipo puesto + stats + talentos; las
-  bolsas comentadas quedan en `equipable` solo si el usuario exporta con bags.
+1. Instalar/recargar `WoWForeverBridge` **1.2.0** en el cliente y entrar al mundo con Pawn activo.
+2. En el plugin: conceder la carpeta SavedVariables si hace falta, pulsar «Actualizar» en la tarjeta Escala Pawn (o esperar el sondeo de 30 s del puente).
+3. Verificar que aparece la escala real con pesos y `ilvl`; si no, `/wfbpawn` en el juego y `/reload`, y mirar `pawnErro`.
+4. Confirmar que el `Pawn.lua` de cuenta se lee como catálogo (línea «N escalas en Pawn.lua» bajo la tarjeta).
 
 ## Riesgos
 
-- Si el addon SimulationCraft cambia el formato del export (versión mayor), el
-  parser es tolerante pero los campos nuevos caerán en `desconhecidas` — la UI
-  muestra el contador, no rompe.
-- `propostaPerfil` propone profesiones solo cuando el export las lista; si el
-  addon omitiera la línea `professions=` en un personaje sin profesiones, el
-  perfil manual no se toca (decisión conservadora, documentada).
-- El export crudo contiene el nombre del personaje y queda en
-  `ctx.storage`/`WoWForeverBridgeDB`; nunca se adjunta a DAVI ni sale del plugin
-  salvo copia manual del usuario.
-- `personagemErro` más nuevo que el último buen export se muestra como chip de
-  error conservando los datos buenos — si el usuario interpreta mal la frescura,
-  puede fiarse de un export viejo (la UI lo marca «Desactualizado» >7 días).
-
-## Revisión DAVI (arquitecto)
-
-Correcciones aplicadas sobre la entrega antes de aceptar la fase:
-
-- **Dato personal en `REVIEW.md`**: la ruta citada traía el identificador real de
-  cuenta (`WTF/Account/<id>#1/…`). Reemplazado por `WTF/Account/<cuenta>/…`
-  (§4.8). El identificador no debe volver a aparecer en docs ni commits.
-- **Tope de export desalineado**: el addon aceptaba hasta 700.000 caracteres y el
-  plugin descarta en silencio cualquier `simc` mayor de 512 KiB
-  (`bridge.js`, `PERSONAGEM_MAX`). Alineado a `512 * 1024` en
-  `addon/WoWForeverBridge/Personaje.lua`: un export mayor ahora produce
-  `personagemErro` visible en vez de guardarse y perderse sin aviso.
-- **i18n**: la propuesta de perfil mostraba «Facción → …» con el texto fijo en
-  español. Movido a la clave `simc.faccion` en los dos diccionarios.
-
+- Si la inferencia de escala activa elige mal (p. ej. varias escalas custom del mismo `ClassID`), la UI lo muestra con su motivo y candidatas — no es silencioso, pero la fase 4 dependerá de esta elección para el ΔPawn.
+- `PawnGetInventoryItemValues` itera slots y consulta datos de ítems: si Pawn no está inicializado (`PawnIsInitialized` false) falla con `VgerCore.Fail` → `pcall` lo captura y `equipo` queda `null`; nunca rompe la captura de pesos.
+- El wrapper de `/wfbp` depende de que `Personaje.lua` cargue antes que `Pawn.lua` (orden del `.toc`); si se reordena, `/wfbp pawn` dejaría de funcionar (el resto sigue).
+- `pawn-catalogo` crece con el `Pawn.lua` del usuario (tope 200 escalas, campos acotados); sin datos de escalas no se guarda nada.

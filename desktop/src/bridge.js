@@ -8,6 +8,7 @@
 // siendo la guardia de Auctionator sin verificar (confidence unknown). No se
 // inventa identidad ni se promociona confianza.
 import HunterMarket from '../../standalone/market.js'
+import { parsePawnCaptura } from './pawn.js'
 
 export const BRIDGE_FILE = 'WoWForeverBridge.lua'
 export const BRIDGE_MAX_BYTES = 8 * 1024 * 1024
@@ -80,7 +81,18 @@ export function parseBridge(bytes) {
       capturado: isInt(pe.capturado) && pe.capturado > 0 ? pe.capturado : null,
     }
   }
-  return { version: 1, retentionDays, entries, personagem, personagemErro }
+  // Bloque Pawn (Pawn.lua del addon): escala activa, pesos por stat y valor del
+  // equipo puesto. Se normaliza con el parser puro; entrada inválida -> null.
+  const pawn = parsePawnCaptura(db.pawn)
+  let pawnErro = null
+  const pwe = db.pawnErro
+  if (pwe && typeof pwe === 'object' && typeof pwe.erro === 'string' && pwe.erro.length > 0 && pwe.erro.length <= 4096) {
+    pawnErro = {
+      erro: pwe.erro,
+      capturado: isInt(pwe.capturado) && pwe.capturado > 0 ? pwe.capturado : null,
+    }
+  }
+  return { version: 1, retentionDays, entries, personagem, personagemErro, pawn, pawnErro }
 }
 
 // bridgeToSnapshot(journal) -> snapshot crudo schemaVersion 1 (mismo formato

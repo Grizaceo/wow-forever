@@ -194,5 +194,77 @@ SlashCmdList['WOWFOREVERBRIDGE2']('simc')
 eq(WoWForeverBridgeDB.personagemErro.capturado, erroAntes, 'sem API nao grava erro novo')
 ok(true, 'sem SimulationcraftAPI no revienta')
 
+-- ===== Pawn.lua (captura de escala Pawn) =====
+events, scripts = {}, {}
+_G.UnitClass = function() return 'Cazador', 'Cazador', 3 end
+_G.VgerCore = { SpecsExist = true }
+_G.GetSpecialization = function() return 2 end
+_G.PawnCommon = {
+  Scales = {
+    ['"Classic":HUNTER1'] = { LocalizedName = 'Hunter: BM', Provider = 'Classic', ProviderActive = true, ClassID = 3, SpecID = 1, Role = 'DAMAGER',
+      Values = { Agility = 1.4, Strength = 1, Aninhada = { x = 1 }, Texto = 'no' } },
+    ['"Classic":HUNTER2'] = { LocalizedName = 'Hunter: MM', Provider = 'Classic', ProviderActive = true, ClassID = 3, SpecID = 2, Role = 'DAMAGER',
+      Values = { Agility = 1.5, Crit = 0.8 } },
+    ['"Classic":MAGE1'] = { LocalizedName = 'Mage', Provider = 'Classic', ProviderActive = true, ClassID = 8, SpecID = 1, Role = 'DAMAGER' },
+  },
+}
+_G.PawnGetAllStatValues = function(nome) return PawnCommon.Scales[nome] and PawnCommon.Scales[nome].Values or nil end
+_G.PawnGetInventoryItemValues = function()
+  return { { '"Classic":HUNTER2', 12.5, 0, 'Hunter: MM' }, { '"Classic":HUNTER2', 8, 0, nil } }, 2, 33
+end
+dofile('addon/WoWForeverBridge/Pawn.lua')
+ok(events['PLAYER_ENTERING_WORLD'] and events['PLAYER_LOGOUT'] and events['PLAYER_QUITING'], 'Pawn registra eventos')
+ok(type(SlashCmdList['WOWFOREVERBRIDGE3']) == 'function', 'Pawn registra /wfbpawn')
+ok(type(SlashCmdList['WOWFOREVERBRIDGE2']) == 'function', 'Pawn mantém /wfbp (wrapper)')
+
+scripts['OnEvent'](nil, 'PLAYER_ENTERING_WORLD')
+local pw = WoWForeverBridgeDB.pawn
+ok(type(pw) == 'table', 'PEW captura pawn')
+eq(pw.v, 1, 'pawn v=1')
+eq(pw.origem, 'addon', 'pawn origem')
+eq(pw.escala, '"Classic":HUNTER2', 'pawn prefere SpecID=2 (GetSpecialization)')
+eq(pw.localized, 'Hunter: MM', 'pawn localized')
+eq(pw.pesos.Agility, 1.5, 'pawn peso Agility')
+eq(pw.pesos.Crit, 0.8, 'pawn peso Crit')
+eq(pw.pesos.Aninhada, nil, 'pawn descarta sub-tabela')
+eq(pw.pesos.Texto, nil, 'pawn descarta no-numérico')
+eq(pw.equipo.ilvl, 33, 'pawn ilvl')
+eq(pw.equipo.valores[1].valor, 12.5, 'pawn valor de escala')
+eq(pw.equipo.valores[1].escala, '"Classic":HUNTER2', 'pawn escala do valor')
+eq(pw.truncado, false, 'pawn sin truncado')
+eq(pw.capturado, nowValue, 'pawn capturado=now')
+ok(type(pw.candidatas) == 'table' and #pw.candidatas <= 3, 'pawn candidatas <=3')
+eq(WoWForeverBridgeDB.pawnErro, nil, 'pawnErro limpo tras captura boa')
+
+-- /wfbpawn fuerza recaptura; /wfbp pawn também (wrapper).
+nowValue = nowValue + 400
+SlashCmdList['WOWFOREVERBRIDGE3']('pawn')
+eq(WoWForeverBridgeDB.pawn.capturado, nowValue, '/wfbpawn fuerza captura')
+nowValue = nowValue + 400
+SlashCmdList['WOWFOREVERBRIDGE2']('pawn')
+eq(WoWForeverBridgeDB.pawn.capturado, nowValue, '/wfbp pawn fuerza captura')
+
+-- /wfbp personagem segue intacto (delega al handler original).
+_G.SimulationcraftAPI = { GetSimcProfile = function() return 'level=30\n', nil end }
+nowValue = nowValue + 400
+SlashCmdList['WOWFOREVERBRIDGE2']('personagem')
+ok(type(WoWForeverBridgeDB.personagem) == 'table', '/wfbp personagem sigue funcionando')
+
+-- pcall que falla: conserva la captura buena y registra pawnErro.
+_G.UnitClass = function() error('boom unitclass') end
+nowValue = nowValue + 400
+scripts['OnEvent'](nil, 'PLAYER_QUITING')
+ok(type(WoWForeverBridgeDB.pawn) == 'table' and WoWForeverBridgeDB.pawn.capturado ~= nowValue, 'captura boa de pawn se conserva tras erro')
+ok(type(WoWForeverBridgeDB.pawnErro) == 'table', 'pawnErro registrado')
+ok(tostring(WoWForeverBridgeDB.pawnErro.erro):find('boom', 1, true) ~= nil, 'pawnErro mensaje')
+_G.UnitClass = function() return 'Cazador', 'Cazador', 3 end
+
+-- PawnCommon ausente: silencio, sem erro novo, sem quebrar.
+_G.PawnCommon = nil
+local erroAntes = WoWForeverBridgeDB.pawnErro.capturado
+SlashCmdList['WOWFOREVERBRIDGE3']('')
+eq(WoWForeverBridgeDB.pawnErro.capturado, erroAntes, 'sem PawnCommon nao grava erro novo')
+ok(true, 'sem PawnCommon no revienta')
+
 print(string.format('test_bridge.lua: %d checks, %d fallos', checks, failures))
 os.exit(failures == 0 and 0 or 1)

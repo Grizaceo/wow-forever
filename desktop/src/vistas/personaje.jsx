@@ -9,6 +9,7 @@ import { Aviso, Origen, Tarjeta } from '../ui.jsx'
 import { construirContextoPersonaje } from '../davi.js'
 import { PreguntarDavi } from './preguntar-davi.jsx'
 import { TarjetaSimc } from './personaje-simc.jsx'
+import { TarjetaPawn } from './pawn.jsx'
 
 agregarTextos({
   'perfil.copiar': 'Copiar perfil para el agente',
@@ -52,6 +53,7 @@ export function VistaPersonaje({ ctx, perfil, guardarPerfil, razaSupuesta, lang,
   const [estado, setEstado] = useState('')
   const [copia, setCopia] = useState(null)
   const [resumenSimc, setResumenSimc] = useState(null)
+  const [resumenPawn, setResumenPawn] = useState(null)
   const p = borrador
 
   const cambiar = async (parcial) => {
@@ -71,8 +73,8 @@ export function VistaPersonaje({ ctx, perfil, guardarPerfil, razaSupuesta, lang,
 
   const resumen = perfilParaAgente(p, D.personaje, NOMBRES_PROF, lang)
   const snapshotDavi = useMemo(
-    () => construirContextoPersonaje({ resumen, procedencia: PROCEDENCIA_PERSONAJE, lang, resumenSimc }),
-    [resumen, lang, resumenSimc],
+    () => construirContextoPersonaje({ resumen, procedencia: PROCEDENCIA_PERSONAJE, lang, resumenSimc, resumoPawn: resumenPawn }),
+    [resumen, lang, resumenSimc, resumenPawn],
   )
   const copiar = async () => {
     let ok = false
@@ -113,6 +115,7 @@ export function VistaPersonaje({ ctx, perfil, guardarPerfil, razaSupuesta, lang,
         <div style={S.sub} role="status">{estado}</div>
       </Tarjeta>
       <TarjetaSimc ctx={ctx} lang={lang} perfil={p} onAplicar={cambiar} puente={puente} onResumen={setResumenSimc} />
+      <TarjetaPawn ctx={ctx} lang={lang} perfil={p} puente={puente} onResumen={setResumenPawn} />
       <Tarjeta titulo={t(lang, 'perfil.profesiones')}>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>
           {PRINCIPALES.map((id) => (

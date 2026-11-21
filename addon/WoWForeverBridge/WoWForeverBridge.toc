@@ -3,10 +3,11 @@
 ## Notes: Captures each Auctionator scan into a local journal for the WoW Forever Hermes plugin. Nothing leaves your PC.
 ## Notes-esES: Captura cada escaneo de Auctionator en un diario local para el plugin WoW Forever de Hermes. Nada sale de tu PC.
 ## Author: DAVI + Cristóbal
-## Version: 1.1.0
+## Version: 1.2.0
 ## SavedVariables: WoWForeverBridgeDB
-## OptionalDeps: Auctionator, Simulationcraft
+## OptionalDeps: Auctionator, Simulationcraft, Pawn
 
 Logic.lua
 Bridge.lua
 Personaje.lua
+Pawn.lua

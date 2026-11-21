@@ -217,6 +217,41 @@ node --test tests/simc.test.mjs
 lua addon/tests/test_bridge.lua
 ```
 
+## Escala Pawn (pesos y valor del equipo)
+
+Desde la v1.2.0 el puente también captura la **escala Pawn** del personaje:
+`addon/WoWForeverBridge/Pawn.lua` lee `PawnCommon.Scales` (global del addon Pawn
+2.14.3) y elige la escala activa por `ClassID`/`SpecID` —no hay API de «escala
+activa»—, extrae los pesos de `Scale.Values` (o `PawnGetAllStatValues`, solo
+claves numéricas, máx. 40) y el valor del equipo con
+`PawnGetInventoryItemValues('player')` (`Pawn.lua:2028-2101`), todo dentro de
+`pcall`. Resultado en `WoWForeverBridgeDB.pawn`; en fallo, `pawnErro` sin borrar
+la captura buena. `/wfbpawn` (o `/wfbp pawn`) fuerza la captura.
+
+- `desktop/src/pawn.js` (puro): `parsePawnScales` lee el `PawnCommon` de
+  `SavedVariables/Pawn.lua` (catálogo: nombre, localized, provider, classID,
+  specID, role, `temPesos`); `parsePawnCaptura` normaliza el bloque del diario;
+  `escalaDoJogador` elige la escala con motivo declarado (captura > clase+spec >
+  clase > null).
+- Ojo: `PawnUnitializePlugins` borra `Scale.Values` de las escalas de proveedor
+  antes de serializar (`Pawn.lua:5665-5671`), así que el `Pawn.lua` de cuenta
+  **no** trae pesos (`temPesos:false`); en runtime sí existen
+  (`PawnAddPluginScale`, `Pawn.lua:5779`) y por eso la captura es en vivo.
+- `bridge-sync.js` sincroniza `pawn`/`pawnErro` en cada ingesta y lee el
+  `Pawn.lua` hermano del diario como catálogo (`pawn-catalogo`).
+- La tarjeta «Escala Pawn» (pestaña Personaje) muestra la escala, el chip de
+  procedencia, la fecha, los pesos ordenados y el ilvl del equipo; sin captura
+  lo declara y explica `/wfbpawn`. DAVI recibe un resumen acotado como parte
+  `pawn` del contexto, con el límite «pesos del juego, no simulación de DPS».
+
+Pruebas específicas:
+
+```sh
+node --test tests/pawn.test.mjs
+lua addon/tests/test_bridge.lua
+DESKTOP_PLUGIN=$PWD/desktop/plugin.js node desktop/test/vista-pawn.mjs
+```
+
 ## Almacenamiento v2 y respaldo pre-v2
 
 Mercado e historial viven en un **bundle v2** (`market-v2-a/b.json`,
