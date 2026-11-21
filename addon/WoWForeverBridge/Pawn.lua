@@ -79,46 +79,6 @@ local function pluginsAtivos()
   return (not temProvedor) or ativas > 0, total, ativas
 end
 
--- Diagnóstico de por qué el equipo viene sin valores: cuenta ítems con stats en
--- la caché de Pawn (Item.Stats sale de C_Item.GetItemStats, Pawn.lua:4664) y
--- escalas visibles para ESTE personaje (PawnIsScaleVisible exige
--- PerCharacterOptions[PawnPlayerFullName], Pawn.lua:5504-5521). Todo en pcall y
--- tolerante a globals ausentes: el diagnóstico nunca debe romper la captura.
-local function diagnosticoEquipe(nomeEscala)
-  local d = { itens = 0, comStats = 0, escalas = 0, visiveis = 0, temValues = false, perChar = false }
-  if type(PawnCommon) ~= 'table' or type(PawnCommon.Scales) ~= 'table' then return d end
-  for nome in pairs(PawnCommon.Scales) do
-    d.escalas = d.escalas + 1
-    local ok, vis = pcall(function() return PawnIsScaleVisible and PawnIsScaleVisible(nome) end)
-    if ok and vis == true then d.visiveis = d.visiveis + 1 end
-  end
-  local escala = PawnCommon.Scales[nomeEscala]
-  if type(escala) == 'table' then
-    d.temValues = type(escala.Values) == 'table'
-    local opcoes = escala.PerCharacterOptions
-    if type(opcoes) == 'table' and PawnPlayerFullName ~= nil then
-      d.perChar = type(opcoes[PawnPlayerFullName]) == 'table'
-    end
-  end
-  if PawnGetItemDataForInventorySlot ~= nil and GetInventoryItemLink ~= nil then
-    for slot = 1, 18 do
-      if slot ~= 4 then
-        local okLink, link = pcall(GetInventoryItemLink, 'player', slot)
-        if okLink and link then
-          d.itens = d.itens + 1
-          local okItem, item = pcall(PawnGetItemDataForInventorySlot, slot, false, 'player')
-          if okItem and type(item) == 'table' and type(item.Stats) == 'table' then
-            local conta = 0
-            for _ in pairs(item.Stats) do conta = conta + 1 end
-            if conta > 0 then d.comStats = d.comStats + 1 end
-          end
-        end
-      end
-    end
-  end
-  return d
-end
-
 -- Escolhe a escala do jogador entre PawnCommon.Scales. Não há API de "escala
 -- ativa": filtramos escalas de provedor ativas ou custom do personagem
 -- ((not Provider) or ProviderActive, mesmo critério de PawnGetAllScales,
@@ -230,16 +190,6 @@ local function capturarPawn(forcar)
 
     local pesos, truncadoPesos = lerPesos(escolhida.nome)
     local equipo = lerEquipe()
-    if type(equipo) == 'table' and #equipo.valores == 0 then
-      -- Autopsia en el chat (temporal, sin comandos que tipear): dice qué ve
-      -- Pawn cuando el equipo viene vacío. Se retira al cerrar el diagnóstico.
-      local d = diagnosticoEquipe(escolhida.nome)
-      equipo.diag = d
-      chat('pawn diag: itens=' .. d.itens .. ' comStats=' .. d.comStats ..
-        ' escalas=' .. d.escalas .. ' visiveis=' .. d.visiveis ..
-        ' temValues=' .. tostring(d.temValues) .. ' perChar=' .. tostring(d.perChar) ..
-        ' ilvl=' .. tostring(equipo.ilvl))
-    end
     j.pawn = {
       v = 1,
       escala = escolhida.nome,
