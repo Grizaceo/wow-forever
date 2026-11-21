@@ -315,6 +315,29 @@ _G.PawnGetInventoryItemValues = function() return {}, 0, 33 end
 nowValue = nowValue + 400
 scripts['OnEvent'](nil, 'PLAYER_ENTERING_WORLD')
 eq(#WoWForeverBridgeDB.pawn.equipo.valores, 0, 'PEW temprano: equipo con ilvl y sin valores')
+local diagEquipo = WoWForeverBridgeDB.pawn.equipo.diag
+ok(type(diagEquipo) == 'table', 'equipo vacío deja diagnóstico')
+ok(type(diagEquipo.escalas) == 'number' and diagEquipo.escalas > 0, 'el diagnóstico cuenta escalas')
+eq(diagEquipo.itens, 0, 'sin GetInventoryItemLink el diagnóstico no inventa ítems')
+eq(diagEquipo.comStats, 0, 'sin caché de Pawn el diagnóstico no inventa stats')
+local ultimoChat = chatLog[#chatLog] or ''
+ok(ultimoChat:find('pawn diag:', 1, true) ~= nil, 'el diagnóstico sale en el chat')
+ok(ultimoChat:find('ilvl=33', 1, true) ~= nil, 'el diagnóstico incluye el ilvl')
+
+-- Con la API del cliente presente, el diagnóstico mide de verdad: 17 slots con
+-- ítem (sin el 4, el de la tabarda), todos con stats, y solo una escala visible.
+_G.GetInventoryItemLink = function(_, slot) return '|Hitem:1|h[Item]|h' end
+_G.PawnIsScaleVisible = function(nome) return nome == '"Classic":HUNTER2' end
+_G.PawnGetItemDataForInventorySlot = function() return { Stats = { Agility = 5 } } end
+_G.PawnGetInventoryItemValues = function() return {}, 0, 33 end
+nowValue = nowValue + 301
+scripts['OnEvent'](nil, 'PLAYER_ENTERING_WORLD')
+local diagCheio = WoWForeverBridgeDB.pawn.equipo.diag
+eq(diagCheio.itens, 17, 'el diagnóstico cuenta 17 slots con ítem')
+eq(diagCheio.comStats, 17, 'el diagnóstico ve stats en los 17 ítems')
+eq(diagCheio.visiveis, 1, 'el diagnóstico cuenta la escala visible del personaje')
+eq(diagCheio.temValues, true, 'el diagnóstico confirma pesos en runtime')
+_G.GetInventoryItemLink, _G.PawnIsScaleVisible, _G.PawnGetItemDataForInventorySlot = nil, nil, nil
 _G.PawnGetInventoryItemValues = inventarioBom
 local capturadoCedo = WoWForeverBridgeDB.pawn.capturado
 nowValue = nowValue + 21
