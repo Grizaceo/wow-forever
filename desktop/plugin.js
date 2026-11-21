@@ -74194,6 +74194,14 @@ async function sincronizarCatalogoPawn(ctx, bytes) {
   });
   return { status: "ok", catalogo: await lerCatalogoPawn(ctx) };
 }
+function listaNumerada(v) {
+  if (Array.isArray(v)) return v;
+  if (!v || typeof v !== "object") return [];
+  const claves = Object.keys(v);
+  if (!claves.length) return [];
+  for (const k of claves) if (!/^[1-9][0-9]*$/.test(k)) return [];
+  return claves.sort((a, b) => Number(a) - Number(b)).map((k) => v[k]);
+}
 function parsePawnCaptura(v) {
   if (!v || typeof v !== "object" || Array.isArray(v)) return null;
   if (v.v !== VERSION3) return null;
@@ -74207,17 +74215,15 @@ function parsePawnCaptura(v) {
   const eq = v.equipo;
   if (eq && typeof eq === "object" && !Array.isArray(eq)) {
     const valores = [];
-    if (Array.isArray(eq.valores)) {
-      for (const item3 of eq.valores.slice(0, MAX_EQUIPE)) {
-        if (!item3 || typeof item3 !== "object") continue;
-        if (typeof item3.escala !== "string" || !item3.escala || item3.escala.length > MAX_CAMPO2) continue;
-        if (typeof item3.valor !== "number" || !Number.isFinite(item3.valor)) continue;
-        valores.push({
-          escala: item3.escala.slice(0, MAX_CAMPO2),
-          valor: item3.valor,
-          localized: textoOuNull(item3.localized)
-        });
-      }
+    for (const item3 of listaNumerada(eq.valores).slice(0, MAX_EQUIPE)) {
+      if (!item3 || typeof item3 !== "object") continue;
+      if (typeof item3.escala !== "string" || !item3.escala || item3.escala.length > MAX_CAMPO2) continue;
+      if (typeof item3.valor !== "number" || !Number.isFinite(item3.valor)) continue;
+      valores.push({
+        escala: item3.escala.slice(0, MAX_CAMPO2),
+        valor: item3.valor,
+        localized: textoOuNull(item3.localized)
+      });
     }
     const ilvl = intOuNull2(eq.ilvl);
     equipe = {
@@ -74226,18 +74232,16 @@ function parsePawnCaptura(v) {
     };
   }
   const candidatas = [];
-  if (Array.isArray(v.candidatas)) {
-    for (const c of v.candidatas.slice(0, 3)) {
-      if (!c || typeof c !== "object" || typeof c.nome !== "string" || !c.nome) continue;
-      candidatas.push({
-        nome: c.nome.slice(0, MAX_CAMPO2),
-        localized: textoOuNull(c.localized) || c.nome.slice(0, MAX_CAMPO2),
-        provider: textoOuNull(c.provider),
-        classID: intOuNull2(c.classID),
-        specID: intOuNull2(c.specID),
-        role: textoOuNull(c.role, 50)
-      });
-    }
+  for (const c of listaNumerada(v.candidatas).slice(0, 3)) {
+    if (!c || typeof c !== "object" || typeof c.nome !== "string" || !c.nome) continue;
+    candidatas.push({
+      nome: c.nome.slice(0, MAX_CAMPO2),
+      localized: textoOuNull(c.localized) || c.nome.slice(0, MAX_CAMPO2),
+      provider: textoOuNull(c.provider),
+      classID: intOuNull2(c.classID),
+      specID: intOuNull2(c.specID),
+      role: textoOuNull(c.role, 50)
+    });
   }
   return {
     v: VERSION3,
