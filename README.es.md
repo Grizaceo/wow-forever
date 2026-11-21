@@ -9,7 +9,10 @@ facción, con una skill para que tu agente responda con los mismos datos.
 
 ## Estado
 
-- Versión 2.0.0. La 1.0.0 solo cubría tres clases (Cazador, Guerrero y Chamán).
+- Versión 2.1.0. El inglés es ahora el idioma por defecto de la interfaz, con español opcional.
+  El mercado muestra la miniatura de cada ítem, ligada a su id. La 2.0.0 añadió el mercado
+  local, el planificador de profesiones y la skill del agente; la 1.0.0 solo cubría tres
+  clases (Cazador, Guerrero y Chamán).
 - Todavía no está en el catálogo de plugins de Hermes. Probado en Linux con Hermes Agent
   v0.23.0, que es la versión mínima.
 - WoW Forever es el juego oficial de Blizzard (producto `wowf`, cliente 1.60), no un servidor
@@ -47,14 +50,15 @@ permiso de carpeta. La ruta pasa de `/wow-hunter-guide` a `/wow-forever`.
 - **Dungeons**: jefes en orden con su botín, filtro de lo que tu clase puede usar, y los 9
   dungeons nuevos de Forever con sus jefes.
 - **Mercado**: importa tu `Auctionator.lua`, la contabilidad TSM y el diario del puente
-  WoWForeverBridge; acumula el historial, marca ofertas y recomienda dónde farmear.
+  WoWForeverBridge; acumula el historial, marca ofertas, muestra la miniatura de cada ítem
+  desde su id y recomienda dónde farmear.
 - **Guía curada** del Cazador de la Horda y **Legacy**. Un test las compara con los datos generados
   (ítems, botín, misiones, hechizos, razas); las demás clases usan solo los datos generados.
 - **Skill del agente**: responde preguntas como «soy Paladín no-muerto nivel 24, ¿dónde
   entreno?» o «¿qué subo de herrería con 120 de skill?» consultando los datos del plugin. El
   botón **Copiar perfil para el agente** de la pestaña Personaje le pasa tu personaje al chat.
 
-La interfaz está en español, con un botón para inglés, en tema claro u oscuro. Cada dato dice si
+La interfaz está en inglés por defecto, con un botón para español, en tema claro u oscuro. Cada dato dice si
 viene de WoW Classic 1.12 (aproximado para Forever), del cliente de Forever o de la guía
 curada. Lo que no está en ninguna fuente publicable se muestra como **sin datos**.
 
@@ -92,6 +96,18 @@ exportador verificado: los precios que trae se etiquetan con procedencia **UNKNO
 **Sondeo automático** — las tres fuentes se sondean cada 30 s mientras Hermes esté abierto y
 el plugin habilitado, aunque Mercado no esté montado. Concede la carpeta SavedVariables una
 vez; el sondeo nunca abre un selector en segundo plano y espera si falta o se revocó el permiso.
+
+**Escalas de Pawn (opcional)** — `Pawn.lua` está fuera de los tres archivos declarados arriba.
+La guía lo abre solo si marcas **Leer Pawn.lua (catálogo de escalas)** en la pestaña Pawn;
+también necesita el mismo permiso de carpeta. La elección queda guardada y es revocable; sin
+ella la pestaña muestra solo el catálogo ya guardado. No se lee nada más de ese archivo.
+
+### Miniaturas de ítems
+
+Las filas del Mercado muestran una miniatura junto al nombre, elegida por el id del ítem en
+`data/items.json`. La imagen es un único sprite WebP incluido en el build a partir de los
+iconos de ítems de Blizzard; el plugin nunca descarga imágenes en tiempo de ejecución. Los
+ítems sin icono conocido dejan el espacio en blanco en vez de mostrar una imagen inventada.
 
 ### Preguntar a DAVI
 
@@ -169,10 +185,10 @@ Tests:
 ```sh
 node scripts/run-gates.mjs                 # TODOS los gates canónicos en un comando; reporta conteos esperados
 # Individualmente:
-python3 -m unittest discover -s tests     # datos, lint de Hermes, bundle reproducible, skill (87)
-node --test tests/                         # lógica pura: perfil, crafteo, mercado, ruta, guía, referencias (261)
-lua5.1 addon/tests/test_bridge.lua         # diario del puente (52)
-PLAYWRIGHT_MODULE=… CHROMIUM_PATH=… node desktop/test/navegador.mjs   # + 9 suites (307 total)
+python3 -m unittest discover -s tests     # datos, lint de Hermes, bundle reproducible, skill (86)
+node --test tests/                         # lógica pura: perfil, crafteo, mercado, ruta, guía, referencias (324)
+lua5.1 addon/tests/test_bridge.lua         # diario del puente (95)
+PLAYWRIGHT_MODULE=… CHROMIUM_PATH=… node desktop/test/navegador.mjs   # + 12 suites (349 total)
 ```
 
 El stack canónico y los conteos esperados están en `docs/TESTING.md`; un solo comando

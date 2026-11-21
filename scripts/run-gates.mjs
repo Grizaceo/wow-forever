@@ -34,12 +34,12 @@ const EXPECT_LUA = 95;
 // contenido de SavedVariables (solo para diagnóstico manual, nunca en gates).
 const EXPECT_CJS = 78;
 const BROWSER = [
-  ['navegador', 36], ['mercado-auto', 11], ['mercado-procedencia', 24],
-  ['tsm', 28], ['vista-mercado', 55], ['vista-davi', 50], ['vista-guia', 28],
+  ['navegador', 37], ['mercado-auto', 11], ['mercado-procedencia', 24],
+  ['tsm', 28], ['vista-mercado', 56], ['vista-davi', 50], ['vista-guia', 28],
   ['vista-profesiones', 41], ['vista-ruta-dungeons', 31], ['bridge', 19],
   ['vista-personaje-simc', 11], ['vista-pawn', 13],
 ];
-const EXPECT_BROWSER_TOTAL = BROWSER.reduce((n, [, c]) => n + c, 0); // 347
+const EXPECT_BROWSER_TOTAL = BROWSER.reduce((n, [, c]) => n + c, 0); // 349
 
 function sh(cmd, args, cwd = ROOT, env = process.env) {
   const r = spawnSync(cmd, args, { cwd, env, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
@@ -153,7 +153,7 @@ console.log(`raíz: ${ROOT}\n`);
   record('bundle-check', 'OK', ok ? 'OK' : 'FALLO', ok, ok ? `${bytes} bytes` : tail(r.out));
 }
 
-// 6) 10 suites navegador headless (Playwright prestado + Chromium propio).
+// 6) 12 suites navegador headless (Playwright prestado + Chromium propio).
 //    Cada suite imprime una línea JSON {pasadas, red, errores} al final.
 {
   const { pm, ch } = resolveBrowserEnv();

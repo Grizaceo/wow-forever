@@ -1,7 +1,7 @@
 ---
 name: wow-forever
 description: "Asiste a jugadores de World of Warcraft: Forever (juego oficial de Blizzard, cliente 1.60, basado en Classic) con los datos del plugin wow-forever de Hermes: entrenadores, hechizos y misiones de clase, zonas por nivel, profesiones (recetas, plan de subida, materiales), dungeons con jefes y botín, ítems, la guía curada del Cazador de la Horda, Legacy y el mercado local (Auctionator, contabilidad TSM y diario del puente WoWForeverBridge). Usar cuando el usuario juegue WoW Forever o pregunte por su personaje, dónde entrenar o subir de nivel, profesiones, drops, dungeons, precios o farmeo. Assists WoW Forever players (any race, class and faction) with the plugin's offline game data."
-version: 2.0.0
+version: 2.1.0
 author: Cristóbal Muñoz
 license: GPL-3.0-or-later
 metadata:

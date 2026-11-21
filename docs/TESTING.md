@@ -24,13 +24,13 @@ byte-idéntico si no hay cambios en `desktop/src/`).
 | `tests/` (node) | `node --test tests/` | **324** pass, 0 fail | lógica de `desktop/src/` + motor: mercado v2/atómico/sync/migración, puente (`bridge*.test.mjs`), TSM, ROI, ruta/maxeo, guía, perfil, recetas propias, niveles de oficio, personaje SimC (`simc.test.mjs`), escala Pawn (`pawn.test.mjs`), preguntar-davi, referencias-skill, claves heredadas |
 | `tests/` (python) | `python3 -m unittest discover -s tests` | **86** OK | datos (`test_datos`, catálogo reproducible), desktop (`test_desktop`), maxeo, ROI, skill (`consultar.py`), reproducibilidad de `data/`+drops+bundle |
 | `addon/tests/` (lua) | `lua5.1 addon/tests/test_bridge.lua` | **95** checks, 0 fallos | diario del puente WoWForeverBridge (captura, poda, retención, epoch) + captura SimC de `Personaje.lua` (eventos, `/wfbp`, `personagemErro`, conservación del export bueno) + captura Pawn de `Pawn.lua` (escala por ClassID/SpecID, pesos, `equipo.ilvl`, `pawnErro`, `/wfbpawn`, wrapper `/wfbp pawn`) |
-| `desktop/test/` (navegador) | 12 suites, ver abajo | **347** checks, red 0, errores 0 | bundle real en Chromium headless con dobles del SDK |
+| `desktop/test/` (navegador) | 12 suites, ver abajo | **349** checks, red 0, errores 0 | bundle real en Chromium headless con dobles del SDK |
 | build | `cd desktop && node build.mjs` | OK | bundle esbuild reproducible |
 | bundle-check | `python3 scripts/check_desktop_bundle.py desktop/plugin.js` | OK | tamaño/líneas/contratos del bundle |
 
-### Suites navegador (347)
+### Suites navegador (349)
 
-`navegador 36 · mercado-auto 11 · mercado-procedencia 24 · tsm 28 · vista-mercado 55 ·
+`navegador 37 · mercado-auto 11 · mercado-procedencia 24 · tsm 28 · vista-mercado 56 ·
 vista-davi 50 · vista-guia 28 · vista-profesiones 41 · vista-ruta-dungeons 31 ·
 vista-personaje-simc 11 · vista-pawn 13 · bridge 19`
 

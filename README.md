@@ -9,7 +9,10 @@ faction, with a skill so your agent answers from the same data.
 
 ## Status
 
-- Version 2.0.0. Version 1.0.0 covered three classes only (Hunter, Warrior and Shaman).
+- Version 2.1.0. English is now the default interface language, with Spanish optional. The
+  market shows each item's thumbnail, tied to its item id. Version 2.0.0 added the local
+  market, professions planner and the agent skill; 1.0.0 covered three classes only (Hunter,
+  Warrior and Shaman).
 - Not yet in the Hermes plugin catalog. Tested on Linux with Hermes Agent v0.23.0, which is
   the minimum version.
 - WoW Forever is Blizzard's official game (product `wowf`, client 1.60), not a private
@@ -46,14 +49,15 @@ grant carry over. The route changes from `/wow-hunter-guide` to `/wow-forever`.
 - **Dungeons**: bosses in order with their loot, a filter for what your class can use, and the
   9 new Forever dungeons with their bosses.
 - **Market**: imports your `Auctionator.lua`, TSM accounting and the WoWForeverBridge daily
-  diary; builds up price history, flags deals and suggests where to farm.
+  diary; builds up price history, flags deals, shows each item's thumbnail from its item id
+  and suggests where to farm.
 - **Curated guide** for the Horde Hunter, and **Legacy**. A test checks them against the generated
   data (items, loot, quests, spells, races); the other classes use the generated data only.
 - **Agent skill**: answers questions such as "I'm a level 24 Undead Paladin, where do I
   train?" or "what do I craft at 120 Blacksmithing?" by querying the plugin's data. The
   **Copy profile for the agent** button on the Character tab hands your character to the chat.
 
-The interface is in Spanish, with a button for English, in light or dark theme. Every piece of
+The interface is in English by default, with a button for Spanish, in light or dark theme. Every piece of
 data says whether it comes from WoW Classic 1.12 (approximate for Forever), from the Forever
 client or from the curated guide. Whatever no publishable source covers is shown as **no
 data**.
@@ -91,6 +95,18 @@ prices it carries are labelled **UNKNOWN** provenance by design.
 **Automatic polling** — all three sources are polled every 30 s while Hermes is open and the
 plugin enabled, even when Market is not mounted. Grant the SavedVariables folder once; the
 poll never opens a picker in the background and waits if the grant is missing or revoked.
+
+**Pawn scales (optional)** — `Pawn.lua` is outside the three files declared above. The guide
+opens it only after you tick **Read Pawn.lua (scale catalog)** on the Pawn tab; it also needs
+the same folder grant. The choice is stored as a revocable preference, and without it the tab
+shows only the catalog already saved. Nothing else is read from that file.
+
+### Item thumbnails
+
+Market rows show a thumbnail next to each item name, selected by the item id in
+`data/items.json`. The image is a single WebP sprite bundled at build time from Blizzard's
+item icons; the plugin never downloads images at runtime. Items without a known icon leave the
+space blank rather than showing a made-up picture.
 
 ### Ask DAVI
 
@@ -167,10 +183,10 @@ Tests:
 ```sh
 node scripts/run-gates.mjs                 # ALL canonical gates in one command; reports expected counts
 # Individually:
-python3 -m unittest discover -s tests     # data, Hermes lint, reproducible bundle, skill (87)
-node --test tests/                         # pure logic: profile, crafting, market, route, guide, references (261)
-lua5.1 addon/tests/test_bridge.lua         # bridge diary (52)
-PLAYWRIGHT_MODULE=… CHROMIUM_PATH=… node desktop/test/navegador.mjs   # + 9 suites (307 total)
+python3 -m unittest discover -s tests     # data, Hermes lint, reproducible bundle, skill (86)
+node --test tests/                         # pure logic: profile, crafting, market, route, guide, references (324)
+lua5.1 addon/tests/test_bridge.lua         # bridge diary (95)
+PLAYWRIGHT_MODULE=… CHROMIUM_PATH=… node desktop/test/navegador.mjs   # + 12 suites (349 total)
 ```
 
 The canonical stack and expected counts are in `docs/TESTING.md`; one command runs all
