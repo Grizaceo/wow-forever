@@ -11,7 +11,7 @@ import { construirContextoComparacionCapitalNeutral, construirContextoMercado, o
 import { perfilParaAgente } from '../../../src/perfil.js'
 import { C, S } from '../estilos.js'
 import { agregarTextos, t } from '../i18n.js'
-import { Aviso, Dinero, Origen, Tarjeta } from '../ui.jsx'
+import { Aviso, Dinero, IconoItem, Origen, Tarjeta } from '../ui.jsx'
 import {
   Farm, HunterChart, HunterDeals, HunterHistory, HunterIdentity, HunterMarket,
   PAGE_SIZE, ajustesFarm, catalogoMercado, compararPools, edadItem, fechaDe, filtrarMercado,
@@ -982,7 +982,6 @@ export function VistaMercado({ ctx, almacen, sincronizador, ventas, puente, esta
   return (
     <div style={S.pagina}>
       <div style={S.cuerpo}>
-        <MisVentas ventas={ventas} auctionSnapshot={snapshot} perfil={perfil} lang={lang} />
         <Tarjeta titulo={t(lang, 'mercado.scan.titulo')} extra={<span style={S.chip}>{t(lang, 'mercado.tusDatos')}</span>}>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
             <Button onClick={() => leerCarpeta(false)} disabled={importando}>{t(lang, 'mercado.leer')}</Button>
@@ -1062,6 +1061,123 @@ export function VistaMercado({ ctx, almacen, sincronizador, ventas, puente, esta
         <Tarjeta titulo={t(lang, 'mercado.aviso.titulo')}>
           <p style={{ ...S.sub, margin: 0 }}>{t(lang, 'mercado.aviso.texto')}</p>
         </Tarjeta>
+
+        <Tarjeta titulo={t(lang, 'mercado.tabla.titulo')}
+          extra={<Origen f={['cliente-forever', 'cmangos-1.12']} lang={lang} />}>
+          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+            <label style={S.campo}>
+              <span style={S.etiqueta}>{t(lang, 'mercado.realm')}</span>
+              <Select value={realm ? realmId(realm) : realmName} onValueChange={(v) => { const r=snapshot.realms.find(r=>realmId(r)===v);setRealmChoice(v);setRealmName(r?.name||'');setPagina(0);setDetalleKey(null) }} disabled={!snapshot}>
+                <SelectTrigger aria-label={t(lang, 'mercado.realm')}><SelectValue placeholder="—" /></SelectTrigger>
+                <SelectContent>
+                  {(snapshot?.realms || []).map((r) => <SelectItem key={realmId(r)} value={realmId(r)}>{r.name}{snapshot.realms.filter(x=>x.name===r.name).length>1 ? ` · ${r.identity?.auctionPool || 'UNKNOWN'} · ${r.identity?.postingChannel || '—'}` : ''}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </label>
+            <label style={{ ...S.campo, flex: 1, minWidth: 220 }}>
+              <span style={S.etiqueta}>{t(lang, 'mercado.buscar')}</span>
+              <SearchField value={busqueda} onChange={(v) => { setBusqueda(v); setPagina(0) }} placeholder={t(lang, 'mercado.buscar.ph')} />
+            </label>
+            <label style={S.campo}>
+              <span style={S.etiqueta}>{t(lang, 'mercado.orden')}</span>
+              <Select value={orden} onValueChange={(v) => { setOrden(v); setPagina(0) }}>
+                <SelectTrigger aria-label={t(lang, 'mercado.orden')}><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {ORDENES.map((o) => <SelectItem key={o} value={o}>{t(lang, `mercado.orden.${o}`)}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </label>
+          </div>
+          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
+            <Checkbox checked={soloRecientes} onCheckedChange={(v) => { setSoloRecientes(!!v); setPagina(0) }} />
+            <span style={{ fontSize: 12 }}>{t(lang, 'mercado.f.recientes')}</span>
+            <Checkbox checked={conFuente} onCheckedChange={(v) => { setConFuente(!!v); setPagina(0) }} />
+            <span style={{ fontSize: 12 }}>{t(lang, 'mercado.f.conFuente')} ({nivel})</span>
+            <Checkbox checked={soloFarmable} onCheckedChange={(v) => { setSoloFarmable(!!v); setPagina(0) }} />
+            <span style={{ fontSize: 12 }}>{t(lang, 'mercado.f.farmeable')}</span>
+            <Checkbox checked={soloOfertas} onCheckedChange={(v) => { setSoloOfertas(!!v); setPagina(0) }} />
+            <span style={{ fontSize: 12 }}>{t(lang, 'mercado.f.ofertas')}</span>
+          </div>
+          <details style={{ fontSize: 12 }}>
+            <summary style={{ cursor: 'pointer', color: C.texto3 }}>{t(lang, 'mercado.filtros.titulo')}</summary>
+            <p style={S.sub}>{t(lang, 'mercado.filtros.texto')}</p>
+          </details>
+          {snapshot && fres && (
+            <p style={S.sub}>
+              {t(lang, 'mercado.frescura.importado')}: {fmtFecha(fres.importedAt)} · DB {snapshot.sourceVersion}
+              {(snapshot.warnings || []).length ? ` · ${snapshot.warnings.length} ${t(lang, 'mercado.avisos')}` : ''}
+            </p>
+          )}
+          <p role="status" style={S.etiqueta}>
+            {snapshot
+              ? t(lang, 'mercado.contador', { visibles: visibles.length, total: items.length, ordenTxt, pag: paginaSegura + 1, paginas })
+              : t(lang, 'mercado.vacio.scan')}
+          </p>
+          <div style={{ overflowX: 'auto' }}>
+            <table style={S.tabla}>
+              <thead>
+                <tr>
+                  <th style={S.th}>{t(lang, 'mercado.col.item')}</th>
+                  <th style={S.th}>{t(lang, 'mercado.col.min')}</th>
+                  <th style={S.th}>{t(lang, 'mercado.col.dia')}</th>
+                  <th style={S.th}>{t(lang, 'mercado.col.oferta')}</th>
+                  <th style={S.th}>{t(lang, 'mercado.col.fuente')}</th>
+                  <th style={S.th}>{t(lang, 'mercado.col.farmeo')}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {!snapshot ? <FilaVacia texto={t(lang, 'mercado.vacio.scan')} />
+                  : !paginaItems.length ? <FilaVacia texto={t(lang, 'mercado.vacio.filtros')} />
+                  : paginaItems.map((i) => {
+                  const daily = i.history.find((h) => h.day === i.observedDay)
+                  const nombreVisible = nombreItem(i, D.items, CATALOGO, lang) || i.sourceKey
+                  const fuente = fuenteResumen(i)
+                  return (
+                    <tr key={i.sourceKey}>
+                      <td style={S.td}>
+                        <div style={{ display: 'flex', gap: 6, alignItems: 'flex-start', minWidth: 0 }}>
+                          <IconoItem id={i.itemId} size={28} titulo={nombreVisible} />
+                          <div style={{ minWidth: 0 }}>
+                            <button type="button" onClick={() => setDetalleKey(i.sourceKey)}
+                              style={{ background: 'none', border: 'none', padding: 0, color: C.acento, cursor: 'pointer', font: 'inherit', textAlign: 'left' }}>
+                              {nombreVisible}
+                            </button>
+                            {i.itemId == null
+                              ? <div style={S.etiqueta}>{t(lang, 'mercado.variante')} · {i.sourceKey}</div>
+                              : <div style={S.etiqueta} title={t(lang, 'mercado.clave') + ' ' + i.sourceKey}>#{i.itemId}</div>}
+                            <InsigniaOferta deal={dealOf(i)} lang={lang} />
+                          </div>
+                        </div>
+                      </td>
+                      <td style={S.td}><Dinero cobre={i.unitPriceCopper} /></td>
+                      <td style={S.td}>
+                        {fechaDe(i.observedDay) || '—'}
+                        <div style={S.etiqueta}>{edadTexto(i)}</div>
+                      </td>
+                      <td style={S.td}>{daily?.available == null ? t(lang, 'mercado.det.sinDato') : daily.available}</td>
+                      <td style={{ ...S.td, maxWidth: 220 }}>
+                        <div title={fuente} style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{fuente}</div>
+                      </td>
+                      <td style={S.td}>{farmCell(i)}</td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+          {snapshot && paginas > 1 && (
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <Button variant="outline" size="xs" disabled={paginaSegura === 0} onClick={() => setPagina(paginaSegura - 1)}>{t(lang, 'mercado.anterior')}</Button>
+              <Button variant="outline" size="xs" disabled={paginaSegura + 1 >= paginas} onClick={() => setPagina(paginaSegura + 1)}>{t(lang, 'mercado.siguiente')}</Button>
+            </div>
+          )}
+          <p style={S.sub}>
+            {t(lang, 'mercado.det.cobertura', { addon: CATALOGO?.source?.addon || t(lang, 'mercado.det.sinCatalogo') })}{' '}
+            {CATALOGO?.source?.coverage || ''}
+          </p>
+        </Tarjeta>
+
+        <MisVentas ventas={ventas} auctionSnapshot={snapshot} perfil={perfil} lang={lang} />
 
         <Tarjeta titulo={cp(lang, 'Procedencia y ámbitos aislados', 'Provenance and isolated scopes')}>
           <p style={S.sub}>
@@ -1293,112 +1409,6 @@ export function VistaMercado({ ctx, almacen, sincronizador, ventas, puente, esta
             ) : null}
           </Tarjeta>
         </div>
-
-        <Tarjeta titulo={t(lang, 'mercado.tabla.titulo')}
-          extra={<Origen f={['cliente-forever', 'cmangos-1.12']} lang={lang} />}>
-          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-end' }}>
-            <label style={S.campo}>
-              <span style={S.etiqueta}>{t(lang, 'mercado.realm')}</span>
-              <Select value={realm ? realmId(realm) : realmName} onValueChange={(v) => { const r=snapshot.realms.find(r=>realmId(r)===v);setRealmChoice(v);setRealmName(r?.name||'');setPagina(0);setDetalleKey(null) }} disabled={!snapshot}>
-                <SelectTrigger aria-label={t(lang, 'mercado.realm')}><SelectValue placeholder="—" /></SelectTrigger>
-                <SelectContent>
-                  {(snapshot?.realms || []).map((r) => <SelectItem key={realmId(r)} value={realmId(r)}>{r.name}{snapshot.realms.filter(x=>x.name===r.name).length>1 ? ` · ${r.identity?.auctionPool || 'UNKNOWN'} · ${r.identity?.postingChannel || '—'}` : ''}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </label>
-            <label style={{ ...S.campo, flex: 1, minWidth: 220 }}>
-              <span style={S.etiqueta}>{t(lang, 'mercado.buscar')}</span>
-              <SearchField value={busqueda} onChange={(v) => { setBusqueda(v); setPagina(0) }} placeholder={t(lang, 'mercado.buscar.ph')} />
-            </label>
-            <label style={S.campo}>
-              <span style={S.etiqueta}>{t(lang, 'mercado.orden')}</span>
-              <Select value={orden} onValueChange={(v) => { setOrden(v); setPagina(0) }}>
-                <SelectTrigger aria-label={t(lang, 'mercado.orden')}><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {ORDENES.map((o) => <SelectItem key={o} value={o}>{t(lang, `mercado.orden.${o}`)}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </label>
-          </div>
-          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
-            <Checkbox checked={soloRecientes} onCheckedChange={(v) => { setSoloRecientes(!!v); setPagina(0) }} />
-            <span style={{ fontSize: 12 }}>{t(lang, 'mercado.f.recientes')}</span>
-            <Checkbox checked={conFuente} onCheckedChange={(v) => { setConFuente(!!v); setPagina(0) }} />
-            <span style={{ fontSize: 12 }}>{t(lang, 'mercado.f.conFuente')} ({nivel})</span>
-            <Checkbox checked={soloFarmable} onCheckedChange={(v) => { setSoloFarmable(!!v); setPagina(0) }} />
-            <span style={{ fontSize: 12 }}>{t(lang, 'mercado.f.farmeable')}</span>
-            <Checkbox checked={soloOfertas} onCheckedChange={(v) => { setSoloOfertas(!!v); setPagina(0) }} />
-            <span style={{ fontSize: 12 }}>{t(lang, 'mercado.f.ofertas')}</span>
-          </div>
-          <details style={{ fontSize: 12 }}>
-            <summary style={{ cursor: 'pointer', color: C.texto3 }}>{t(lang, 'mercado.filtros.titulo')}</summary>
-            <p style={S.sub}>{t(lang, 'mercado.filtros.texto')}</p>
-          </details>
-          {snapshot && fres && (
-            <p style={S.sub}>
-              {t(lang, 'mercado.frescura.importado')}: {fmtFecha(fres.importedAt)} · DB {snapshot.sourceVersion}
-              {(snapshot.warnings || []).length ? ` · ${snapshot.warnings.length} ${t(lang, 'mercado.avisos')}` : ''}
-            </p>
-          )}
-          <p role="status" style={S.etiqueta}>
-            {snapshot
-              ? t(lang, 'mercado.contador', { visibles: visibles.length, total: items.length, ordenTxt, pag: paginaSegura + 1, paginas })
-              : t(lang, 'mercado.vacio.scan')}
-          </p>
-          <div style={{ overflowX: 'auto' }}>
-            <table style={S.tabla}>
-              <thead>
-                <tr>
-                  <th style={S.th}>{t(lang, 'mercado.col.item')}</th>
-                  <th style={S.th}>{t(lang, 'mercado.col.min')}</th>
-                  <th style={S.th}>{t(lang, 'mercado.col.dia')}</th>
-                  <th style={S.th}>{t(lang, 'mercado.col.oferta')}</th>
-                  <th style={S.th}>{t(lang, 'mercado.col.fuente')}</th>
-                  <th style={S.th}>{t(lang, 'mercado.col.farmeo')}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {!snapshot ? <FilaVacia texto={t(lang, 'mercado.vacio.scan')} />
-                  : !paginaItems.length ? <FilaVacia texto={t(lang, 'mercado.vacio.filtros')} />
-                  : paginaItems.map((i) => {
-                  const daily = i.history.find((h) => h.day === i.observedDay)
-                  const nombreVisible = nombreItem(i, D.items, CATALOGO, lang) || i.sourceKey
-                  return (
-                    <tr key={i.sourceKey}>
-                      <td style={S.td}>
-                        <button type="button" onClick={() => setDetalleKey(i.sourceKey)}
-                          style={{ background: 'none', border: 'none', padding: 0, color: C.acento, cursor: 'pointer', font: 'inherit', textAlign: 'left' }}>
-                          {nombreVisible}
-                        </button>
-                        {i.itemId == null && <div style={S.etiqueta}>{t(lang, 'mercado.variante')}</div>}
-                        <InsigniaOferta deal={dealOf(i)} lang={lang} />
-                        <div style={S.etiqueta}>{t(lang, 'mercado.clave')} {i.sourceKey}</div>
-                      </td>
-                      <td style={S.td}><Dinero cobre={i.unitPriceCopper} /></td>
-                      <td style={S.td}>
-                        {fechaDe(i.observedDay) || '—'}
-                        <div style={S.etiqueta}>{edadTexto(i)}</div>
-                      </td>
-                      <td style={S.td}>{daily?.available == null ? t(lang, 'mercado.det.sinDato') : daily.available}</td>
-                      <td style={S.td}>{fuenteResumen(i)}</td>
-                      <td style={S.td}>{farmCell(i)}</td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
-          {snapshot && paginas > 1 && (
-            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-              <Button variant="outline" size="xs" disabled={paginaSegura === 0} onClick={() => setPagina(paginaSegura - 1)}>{t(lang, 'mercado.anterior')}</Button>
-              <Button variant="outline" size="xs" disabled={paginaSegura + 1 >= paginas} onClick={() => setPagina(paginaSegura + 1)}>{t(lang, 'mercado.siguiente')}</Button>
-            </div>
-          )}
-          <p style={S.sub}>
-            {t(lang, 'mercado.det.cobertura', { addon: CATALOGO?.source?.addon || t(lang, 'mercado.det.sinCatalogo') })}{' '}
-            {CATALOGO?.source?.coverage || ''}
-          </p>
-        </Tarjeta>
 
         {detalle && (
           <DetalleItem item={detalle} lang={lang} catalogo={CATALOGO} metrica={detalleMetrica} deal={detalleDeal}

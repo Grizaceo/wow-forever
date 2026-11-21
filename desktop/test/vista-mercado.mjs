@@ -60,6 +60,8 @@ const tabla = await texto(p)
 check('nombres en español (Paño de lino)', /Paño de lino/.test(tabla))
 check(' Venomstrike visible', /Venomstrike/.test(tabla))
 check('precio en cobre visible', /12s|1s 20c|120c/.test(tabla) || /12s/.test(tabla))
+check('miniatura local por id en la tabla', await p.evaluate(() =>
+  [...document.querySelectorAll('[role="img"]')].some((e) => getComputedStyle(e).backgroundImage.startsWith('url("data:image/webp;base64,'))))
 check('aviso de datos antiguos (>3 días)', await p.getByText('Los precios tienen más de 3 días').count() === 1)
 check('contador de claves', /2 de 2 claves/.test(tabla))
 
