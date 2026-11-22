@@ -21,6 +21,7 @@
 //   'pawn'            = captura normalizada + erro (ver normalizarEstadoPawn)
 //   'pawn-catalogo'   = { v:1, versao, escalas } leído de SavedVariables/Pawn.lua
 import HunterMarket from '../../standalone/market.js'
+import { parseEquipado } from './item-stats.js'
 
 export const CLAVE = 'pawn'
 export const CLAVE_CATALOGO = 'pawn-catalogo'
@@ -222,6 +223,7 @@ export function parsePawnCaptura(v) {
   }
 
   const candidatas = []
+  const equipado = parseEquipado(v.equipado)
   for (const c of listaNumerada(v.candidatas).slice(0, 3)) {
     if (!c || typeof c !== 'object' || typeof c.nome !== 'string' || !c.nome) continue
     candidatas.push({
@@ -244,6 +246,7 @@ export function parsePawnCaptura(v) {
     specID: intOuNull(v.specID),
     pesos,
     equipo: equipe,
+    equipado,
     candidatas,
     capturado: v.capturado,
     truncado,

@@ -9,6 +9,7 @@
 // inventa identidad ni se promociona confianza.
 import HunterMarket from '../../standalone/market.js'
 import { parsePawnCaptura } from './pawn.js'
+import { parsePawnCatalogo } from './item-stats.js'
 
 export const BRIDGE_FILE = 'WoWForeverBridge.lua'
 export const BRIDGE_MAX_BYTES = 8 * 1024 * 1024
@@ -92,7 +93,10 @@ export function parseBridge(bytes) {
       capturado: isInt(pwe.capturado) && pwe.capturado > 0 ? pwe.capturado : null,
     }
   }
-  return { version: 1, retentionDays, entries, personagem, personagemErro, pawn, pawnErro }
+  // Catálogo de stats por ítem (Pawn.lua del addon cosecha C_Item.GetItemStats
+  // para los ids del snapshot). Sin bloque -> null: la vista lo dirá, no lo finge.
+  const pawnCatalogo = parsePawnCatalogo(db.pawnCatalogo)
+  return { version: 1, retentionDays, entries, personagem, personagemErro, pawn, pawnErro, pawnCatalogo }
 }
 
 // bridgeToSnapshot(journal) -> snapshot crudo schemaVersion 1 (mismo formato
