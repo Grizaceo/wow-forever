@@ -34,7 +34,7 @@ const EXPECT_LUA = 180;
 // contenido de SavedVariables (solo para diagnóstico manual, nunca en gates).
 const EXPECT_CJS = 78;
 const BROWSER = [
-  ['navegador', 51], ['mercado-auto', 11], ['mercado-procedencia', 24],
+  ['navegador', process.env.HERMES_SDK_TABS === '1' ? 52 : 51], ['mercado-auto', 11], ['mercado-procedencia', 24],
   ['tsm', 28], ['vista-mercado', 56], ['vista-davi', 50], ['vista-guia', 28],
   ['vista-profesiones', 41], ['vista-ruta-dungeons', 31], ['bridge', 19],
   ['vista-personaje-simc', 11], ['vista-pawn', 13], ['vista-subasta-pawn', 28],
