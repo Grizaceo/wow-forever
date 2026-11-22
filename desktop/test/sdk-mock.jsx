@@ -37,11 +37,11 @@ export function SearchField({ placeholder, value, onChange }) {
 }
 
 const TabsCtx = createContext(null)
-export function Tabs({ value, onValueChange, children }) { return <TabsCtx.Provider value={{ value, onValueChange }}>{children}</TabsCtx.Provider> }
-export function TabsList({ children }) { return <div role="tablist">{children}</div> }
-export function TabsTrigger({ value, children }) {
+export function Tabs({ value, onValueChange, children, ...props }) { return <TabsCtx.Provider value={{ value, onValueChange }}><div {...props}>{children}</div></TabsCtx.Provider> }
+export function TabsList({ children, ...props }) { return <div role="tablist" {...props}>{children}</div> }
+export function TabsTrigger({ value, children, ...props }) {
   const c = useContext(TabsCtx)
-  return <button type="button" role="tab" data-tab={value} aria-selected={c.value === value} onClick={() => c.onValueChange(value)}>{children}</button>
+  return <button type="button" role="tab" data-tab={value} aria-selected={c.value === value} onClick={() => c.onValueChange(value)} {...props}>{children}</button>
 }
 
 // Select: se aplana a un <select> nativo con las opciones de sus SelectItem.

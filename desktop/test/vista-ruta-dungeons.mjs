@@ -3,7 +3,7 @@
 // Cubre: esqueleto generado por facción, capa curada por continente persistida en
 // build.realm, huecos de inicio/zona, filtros y botín útil de dungeons, los 9 de
 // Forever con hueco de botín, el tilde persistente en build.gear y ambos temas.
-import { iniciar, PERFILES, PREF } from './arnes.mjs'
+import { abrirVista, iniciar, PERFILES, PREF } from './arnes.mjs'
 
 const a = await iniciar()
 const { check } = a
@@ -16,7 +16,7 @@ const leerBuild = (p) => p.evaluate((k) => {
 
 // ---------------------------------------------------------------- 1) Ruta — Cazador de la Horda nivel 30
 let { p, cerrar } = await a.abrir('claro', { perfil: PERFILES.cazadorHorda })
-await p.click('[data-tab="ruta"]')
+await abrirVista(p, 'ruta')
 await p.locator('[data-zona="1441"]').waitFor()
 check('ruta: zona ~30 (Mil Agujas 1441) en el esqueleto', await p.locator('[data-zona="1441"]').count() === 1)
 check('ruta: Desolace (1443) en el esqueleto', await p.locator('[data-zona="1443"]').count() === 1)
@@ -45,7 +45,7 @@ await cerrar()
 
 // ---------------------------------------------------------------- 2) Ruta — Mago Cielonato nivel 12 (huecos)
 ;({ p, cerrar } = await a.abrir('claro', { perfil: PERFILES.magoCielonato }))
-await p.click('[data-tab="ruta"]')
+await abrirVista(p, 'ruta')
 await p.getByText('Zonas a tu nivel').waitFor()
 check('ruta: hueco de zona inicial para Skyborne (raza sin inicio)',
   await p.getByText(/zona de inicio para tu raza/).count() > 0)
@@ -57,7 +57,7 @@ await cerrar()
 
 // ---------------------------------------------------------------- 3) Dungeons — Paladín no-muerto nivel 24
 ;({ p, cerrar } = await a.abrir('claro', { perfil: PERFILES.paladinHorda }))
-await p.click('[data-tab="dungeons"]')
+await abrirVista(p, 'dungeons')
 await p.locator('[data-dungeon="43"]').waitFor()
 check('dungeons: Wailing Caverns (17-24) en rango del 24', await p.locator('[data-dungeon="43"]').count() === 1)
 check('dungeons: Scarlet Monastery entra justo en rango (29-5=24)', await p.locator('[data-dungeon="189"]').count() === 1)
@@ -95,7 +95,7 @@ await cerrar()
 
 // ---------------------------------------------------------------- 4) Dungeons — Cazador: tilde persistente en build.gear
 ;({ p, cerrar } = await a.abrir('claro', { perfil: PERFILES.cazadorHorda }))
-await p.click('[data-tab="dungeons"]')
+await abrirVista(p, 'dungeons')
 await p.locator('[data-dungeon="48"]').waitFor() // Blackfathom Deeps 20-34, en rango del 30
 check('dungeons: BFD en rango del cazador 30', await p.locator('[data-dungeon="48"]').count() === 1)
 const gid = await p.locator('[data-dungeon="48"] [data-loot]').first().getAttribute('data-loot')
@@ -111,10 +111,10 @@ await cerrar()
 
 // ---------------------------------------------------------------- 5) Temas: ruta y dungeons en oscuro
 ;({ p, cerrar } = await a.abrir('oscuro', { perfil: PERFILES.cazadorHorda }))
-await p.click('[data-tab="ruta"]')
+await abrirVista(p, 'ruta')
 await p.locator('[data-zona="1441"]').waitFor()
 check('oscuro: ruta generada se pinta', await p.evaluate(() => document.body.innerText.length > 400))
-await p.click('[data-tab="dungeons"]')
+await abrirVista(p, 'dungeons')
 await p.locator('[data-dungeon="48"]').waitFor()
 check('oscuro: dungeons se pintan', await p.evaluate(() => document.body.innerText.length > 400))
 await cerrar()

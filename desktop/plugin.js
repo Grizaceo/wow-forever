@@ -14150,7 +14150,7 @@ function createStore(ctx) {
     return out;
   };
   async function load() {
-    if (poisoned) throw new Error("Guardado sin confirmar; usá Reabrir para releer los datos.");
+    if (poisoned) throw new Error("Guardado sin confirmar; usa Recargar datos en Configuración.");
     if (cached) return cached;
     const build = await ctx.storage.get("build") ?? null;
     if (!validBuild(build)) throw new Error("Progreso guardado inválido. No se sobrescribió.");
@@ -14284,7 +14284,7 @@ rket", "history"].every((k) => b.slots[s][k] === null || typeof b.slots[s][k] ==
     } catch (e) {
       poisoned = true;
       cached = null;
-      throw Error("No se pudo confirmar el conjunto v2; reabrir para recuperar: " + e.message);
+      throw Error("No se pudo confirmar el conjunto v2; usa Recargar datos en Configuración: " + e.message);
     }
     v2active = true;
     v2slot = slot;
@@ -14296,7 +14296,7 @@ rket", "history"].every((k) => b.slots[s][k] === null || typeof b.slots[s][k] ==
       const s = await load();
       return structuredClone({ build: s.build, market: s.market, history: s.history, revision: s.revision, legacyMarket: s.legacyMarket, legacyHistory: s.legacyHistory });
     }),
-    // Reabrir: drop the cached snapshot and the poisoned latch, then re-read
+    // Recargar datos: drop the cached snapshot and the poisoned latch, then re-read
     // durable state from disk. Queued like every op, so it cannot race a write.
     reset: () => serial(async () => {
       cached = null;
@@ -14318,7 +14318,7 @@ rket", "history"].every((k) => b.slots[s][k] === null || typeof b.slots[s][k] ==
     market: (value) => serial(async () => {
       if (!ownKeys(value, ["values", "revision"]) || !int(value.revision) || !validMarket(value.values)) throw new Error("Scan inválido o demasiado grande para Hermes (máximo 4 MiB normalizado).");
       const s = await load();
-      if (value.revision !== s.revision) throw new Error("El mercado cambió en otra vista. Usá Reabrir antes de guardar.");
+      if (value.revision !== s.revision) throw new Error("El mercado cambió en otra vista. Usa Recargar datos en Configuración antes de guardar.");
       if (v2active) {
         if (value.values.snapshot && value.values.snapshot.schemaVersion !== 2) throw Error("No se puede degradar v2; restaurá el respaldo primero.");
         return persistV2(s, value.values, Object.keys(value.values).length ? s.history.store : { v: 2, scopes: {} });
@@ -14346,7 +14346,7 @@ rket", "history"].every((k) => b.slots[s][k] === null || typeof b.slots[s][k] ==
     history: (value) => serial(async () => {
       if (!ownKeys(value, ["store", "revision"]) || !int(value.revision) || !validHistoryStore(value.store)) throw new Error("Historial inválido o demasiado grande para Hermes (máximo 4 MiB).");
       const s = await load();
-      if (value.revision !== s.hrevision) throw new Error("El historial cambió en otra vista. Usá Reabrir antes de guardar.");
+      if (value.revision !== s.hrevision) throw new Error("El historial cambió en otra vista. Usa Recargar datos en Configuración antes de guardar.");
       if (v2active) {
         if (value.store.v !== 2) throw Error("No se puede degradar historial v2.");
         return persistV2(s, s.market, value.store);
@@ -14422,7 +14422,7 @@ rket", "history"].every((k) => b.slots[s][k] === null || typeof b.slots[s][k] ==
       const backup = await readBackupDoc();
       if (!backup?.ok) throw new Error("Falta el respaldo previo a v2; no se escribió.");
       const s = await load();
-      if (p.revision !== s.revision || p.hrevision !== s.hrevision) throw new Error("El mercado cambió en otra vista. Usá Reabrir antes de guardar.");
+      if (p.revision !== s.revision || p.hrevision !== s.hrevision) throw new Error("El mercado cambió en otra vista. Usa Recargar datos en Configuración antes de guardar.");
       return persistV2(s, p.market, p.store);
     }),
     // Rollback explícito: restaura los bytes originales de A/B y los punteros.
@@ -14468,7 +14468,7 @@ rket", "history"].every((k) => b.slots[s][k] === null || typeof b.slots[s][k] ==
 }
 
 // src/app.jsx
-import { Component, useCallback as useCallback3, useEffect as useEffect10, useMemo as useMemo20, useState as useState17 } from "react";
+import { Component, useCallback as useCallback3, useEffect as useEffect10, useId, useState as useState17 } from "react";
 import { Button as Button13, SegmentedControl as SegmentedControl7, Tabs, TabsList, TabsTrigger } from "@hermes/plugin-sdk";
 
 // ../src/perfil.js
@@ -34650,6 +34650,36 @@ var S = {
     padding: "8px 16px",
     borderBottom: `1px solid ${C.borde}`
   },
+  navegacion: { display: "flex", flexDirection: "column", flex: 1, minHeight: 0, minWidth: 0, gap: 0 },
+  panelNavegacion: { display: "flex", flexDirection: "column", flex: 1, minHeight: 0, minWidth: 0 },
+  filaPrincipal: { padding: "8px 16px 0" },
+  filaSecundaria: { padding: "4px 16px 6px", borderBottom: `1px solid ${C.borde2}` },
+  listaPrincipal: {
+    display: "inline-flex",
+    flexWrap: "wrap",
+    justifyContent: "flex-start",
+    gap: 2,
+    width: "fit-content",
+    maxWidth: "100%",
+    height: "auto",
+    padding: 4,
+    boxSizing: "border-box",
+    borderRadius: 8,
+    background: C.fondo2
+  },
+  listaSecundaria: {
+    display: "flex",
+    flexWrap: "wrap",
+    justifyContent: "flex-start",
+    gap: 2,
+    width: "fit-content",
+    maxWidth: "100%",
+    height: "auto",
+    padding: 0,
+    background: "transparent"
+  },
+  enlaceSecundario: { fontSize: 12, paddingInline: 9 },
+  enlaceSecundarioActivo: { fontSize: 12, paddingInline: 9, boxShadow: `inset 0 -2px ${C.acento}` },
   cuerpo: { flex: 1, minHeight: 0, overflowY: "auto", padding: 16, display: "flex", flexDirection: "column", gap: 12 },
   titulo: { fontSize: 15, fontWeight: 600, margin: 0 },
   sub: { fontSize: 12, color: C.texto3 },
@@ -34740,7 +34770,18 @@ var ES = {
   "tab.legacy": "Legacy",
   sinDatos: "Sin datos:",
   cargando: "Cargando tus datos guardados…",
-  reintentar: "Reabrir",
+  "tab.perfil": "Perfil",
+  "tab.otros": "Otros y configuración",
+  "tab.configuracion": "Configuración",
+  "nav.principal": "Secciones principales",
+  "nav.personaje": "Secciones de Personaje",
+  "nav.otros": "Otras secciones",
+  "config.idioma": "Idioma de la interfaz",
+  "config.datos": "Datos locales",
+  "config.datosNota": "Vuelve a leer los datos del plugin sin borrar tu perfil ni tu historial.",
+  "config.error": "No se pudieron recargar los datos.",
+  "mercado.sinPerfil": "Completa tu perfil de personaje para usar el Mercado.",
+  reintentar: "Recargar datos",
   "origen.cmangos": "Classic 1.12",
   "origen.cmangos.ayuda": "Generado de CMaNGOS (WoW 1.12): aproximado, Forever puede diferir",
   "origen.cliente": "Cliente Forever",
@@ -34811,7 +34852,18 @@ var EN = {
   "tab.legacy": "Legacy",
   sinDatos: "No data:",
   cargando: "Loading your saved data…",
-  reintentar: "Reopen",
+  "tab.perfil": "Profile",
+  "tab.otros": "Others and Configuration",
+  "tab.configuracion": "Settings",
+  "nav.principal": "Main sections",
+  "nav.personaje": "Character sections",
+  "nav.otros": "Other sections",
+  "config.idioma": "Interface language",
+  "config.datos": "Local data",
+  "config.datosNota": "Read plugin data again without deleting your profile or history.",
+  "config.error": "Could not reload the data.",
+  "mercado.sinPerfil": "Complete your character profile to use Market.",
+  reintentar: "Reload data",
   "origen.cmangos": "Classic 1.12",
   "origen.cmangos.ayuda": "Generated from CMaNGOS (WoW 1.12): approximate, Forever may differ",
   "origen.cliente": "Forever client",
@@ -78521,8 +78573,8 @@ agregarTextos({
   "mercado.sinArchivos": "Las APIs de archivos no están disponibles en este contexto.",
   "mercado.borrando": "Borrando solo el mercado local…",
   "mercado.borrado": "Mercado local borrado. El juego y tu personaje no cambiaron.",
-  "mercado.errorBorrar": "Se conservan los datos: no se pudo confirmar el borrado. Usá Reabrir para recuperar el estado guardado. {msg}",
-  "mercado.errorBorrarParcial": "No se confirmó el borrado del scan; el historial acumulado sí se vació. Usá Reabrir para comprobar el estado. {msg}",
+  "mercado.errorBorrar": "Se conservan los datos: no se pudo confirmar el borrado. Ve a Otros y configuración → Configuración → Recargar datos. {msg}",
+  "mercado.errorBorrarParcial": "No se confirmó el borrado del scan; el historial acumulado sí se vació. Ve a Otros y configuración → Configuración → Recargar datos para comprobar el estado. {msg}",
   "mercado.notaCarpeta": "Auctionator.lua (carpeta concedida)",
   "mercado.frescura.importado": "Importado",
   "mercado.frescura.max": "Día observado más reciente",
@@ -78714,8 +78766,8 @@ s. Ningún número es una venta ni un ingreso garantizado."
   "mercado.sinArchivos": "File APIs are not available in this context.",
   "mercado.borrando": "Deleting only the local market…",
   "mercado.borrado": "Local market deleted. The game and your character are untouched.",
-  "mercado.errorBorrar": "Data preserved: deletion was not confirmed. Reopen to recover the saved state. {msg}",
-  "mercado.errorBorrarParcial": "Scan deletion was not confirmed; the accumulated history was emptied. Reopen to check saved data. {msg}",
+  "mercado.errorBorrar": "Data preserved: deletion was not confirmed. Go to Others and Configuration → Settings → Reload data. {msg}",
+  "mercado.errorBorrarParcial": "Scan deletion was not confirmed; the accumulated history was emptied. Go to Others and Configuration → Settings → Reload data to check saved data. {msg}",
   "mercado.notaCarpeta": "Auctionator.lua (granted folder)",
   "mercado.frescura.importado": "Imported",
   "mercado.frescura.max": "Most recent observed day",
@@ -82879,17 +82931,80 @@ a.leg.scarceCols") }) }),
 }
 
 // src/app.jsx
-import { jsx as jsx29, jsxs as jsxs29 } from "react/jsx-runtime";
-var PESTANAS = [
-  ["personaje", VistaPersonaje],
-  ["clase", VistaClase],
-  ["ruta", VistaRuta],
-  ["profesiones", VistaProfesiones],
-  ["dungeons", VistaDungeons],
-  ["mercado", VistaMercado],
-  ["guia", VistaGuia],
-  ["legacy", VistaLegacy]
-];
+import { Fragment as Fragment23, jsx as jsx29, jsxs as jsxs29 } from "react/jsx-runtime";
+var GRUPOS = ["personaje", "mercado", "otros"];
+var SUBPESTANAS = {
+  personaje: ["perfil", "ruta", "clase", "profesiones"],
+  otros: ["dungeons", "guia", "legacy", "configuracion"]
+};
+var INICIO = { personaje: "perfil", mercado: "mercado", otros: "configuracion" };
+var VISTAS2 = {
+  perfil: VistaPersonaje,
+  ruta: VistaRuta,
+  clase: VistaClase,
+  profesiones: VistaProfesiones,
+  dungeons: VistaDungeons,
+  guia: VistaGuia,
+  legacy: VistaLegacy,
+  mercado: VistaMercado
+};
+function Navegacion({ ids, activa, elegir, lang, etiqueta, secundaria = false, children }) {
+  const uid = useId();
+  const idTab = (id) => `${uid}-tab-${id}`;
+  const idPanel = (id) => `${uid}-panel-${id}`;
+  return /* @__PURE__ */ jsxs29(Tabs, { value: activa, onValueChange: elegir, style: S.navegacion, children: [
+    /* @__PURE__ */ jsx29("div", { style: secundaria ? S.filaSecundaria : S.filaPrincipal, children: /* @__PURE__ */ jsx29(TabsList, { "aria-label": etiqueta, style: secundaria ? S.listaSecundaria : S.
+    listaPrincipal, children: ids.map((id) => /* @__PURE__ */ jsx29(
+      TabsTrigger,
+      {
+        value: id,
+        id: idTab(id),
+        "data-tab": id,
+        "aria-controls": idPanel(id),
+        style: secundaria ? id === activa ? S.enlaceSecundarioActivo : S.enlaceSecundario : void 0,
+        children: t(lang, "tab." + id)
+      },
+      id
+    )) }) }),
+    ids.map((id) => /* @__PURE__ */ jsx29(
+      "div",
+      {
+        id: idPanel(id),
+        role: "tabpanel",
+        "aria-labelledby": idTab(id),
+        hidden: id !== activa,
+        tabIndex: id === activa && (secundaria || !SUBPESTANAS[id]) ? 0 : void 0,
+        style: id === activa ? S.panelNavegacion : void 0,
+        children: id === activa ? children : null
+      },
+      id
+    ))
+  ] });
+}
+function Configuracion({ lang, cambiarLang, reabrir, errorLectura }) {
+  const [estado, setEstado] = useState17("");
+  return /* @__PURE__ */ jsxs29(Fragment23, { children: [
+    /* @__PURE__ */ jsxs29("section", { style: S.tarjeta, children: [
+      /* @__PURE__ */ jsx29("strong", { children: t(lang, "config.idioma") }),
+      /* @__PURE__ */ jsx29("div", { children: /* @__PURE__ */ jsx29(SegmentedControl7, { value: lang, onChange: cambiarLang, options: [{ id: "en", label: "EN" }, { id: "es", label: "ES" }] }) })
+    ] }),
+    /* @__PURE__ */ jsxs29("section", { style: S.tarjeta, children: [
+      /* @__PURE__ */ jsx29("strong", { children: t(lang, "config.datos") }),
+      /* @__PURE__ */ jsx29("span", { style: S.sub, children: t(lang, "config.datosNota") }),
+      /* @__PURE__ */ jsx29("div", { children: /* @__PURE__ */ jsx29(Button13, { variant: "outline", size: "xs", disabled: estado === "cargando", onClick: async () => {
+        setEstado("cargando");
+        try {
+          await reabrir();
+          setEstado("");
+        } catch {
+          setEstado("error");
+        }
+      }, children: t(lang, "reintentar") }) }),
+      estado === "error" && /* @__PURE__ */ jsx29("span", { role: "alert", style: S.aviso, children: t(lang, "config.error") }),
+      errorLectura && /* @__PURE__ */ jsx29("span", { role: "alert", style: S.aviso, children: errorLectura })
+    ] })
+  ] });
+}
 var Contencion = class extends Component {
   constructor(p) {
     super(p);
@@ -82931,9 +83046,13 @@ function App({ ctx, almacen, sincronizador, ventas, puente }) {
     setIdioma(inicial);
     return inicial;
   });
-  const [pestana, setPestana] = useState17(() => ctx.storage.get("pestana", "personaje"));
+  const [pestana, setPestana] = useState17(() => ctx.storage.get("pestana", "perfil"));
   const [vuelta, setVuelta] = useState17(0);
   const recargar = useCallback3(() => setVuelta((v) => v + 1), []);
+  const releer = async () => {
+    await almacen.reset();
+    recargar();
+  };
   useEffect10(() => {
     let previous = sincronizador?.getState().changed;
     return sincronizador?.subscribe((s) => {
@@ -82979,52 +83098,67 @@ function App({ ctx, almacen, sincronizador, ventas, puente }) {
     }
   };
   const cambiarPestana = (p) => {
-    setPestana(p);
+    const destino = INICIO[p] || p;
+    setPestana(destino);
     try {
-      ctx.storage.set("pestana", p);
+      ctx.storage.set("pestana", destino);
     } catch {
     }
   };
   const listo = perfil && validarPerfil(perfil, D.personaje).ok;
-  const visibles = useMemo20(() => PESTANAS.filter(([id]) => id === "personaje" || id === "legacy" || listo && (id !== "guia" || guiaCurada(perfil))), [listo, perfil]);
-  const activa = visibles.some(([id]) => id === pestana) ? pestana : "personaje";
-  const Vista = (visibles.find(([id]) => id === activa) || PESTANAS[0])[1];
+  const grupo = pestana === "mercado" ? "mercado" : SUBPESTANAS.otros.includes(pestana) ? "otros" : "personaje";
+  const visibles = SUBPESTANAS[grupo]?.filter((id) => ["perfil", "legacy", "configuracion"].includes(id) || listo && (id !== "guia" || guiaCurada(perfil)));
+  const activa = visibles?.includes(pestana) ? pestana : INICIO[grupo];
+  const Vista = VISTAS2[activa];
   const resumen = listo ? [
     nombre(D.personaje.razas[perfil.raza].n, lang),
     nombre(D.personaje.clases[perfil.clase].n, lang),
     t(lang, "clase.nivel") + " " + perfil.nivel,
     nombre(D.personaje.facciones[perfil.faccion].n, lang)
   ].join(" · ") : t(lang, "perfil.vacio");
+  const cuerpo = /* @__PURE__ */ jsx29("div", { style: S.cuerpo, children: activa === "configuracion" ? /* @__PURE__ */ jsx29(Configuracion, { lang, cambiarLang, reabrir: releer, errorLectura: error }) :
+  error ? /* @__PURE__ */ jsxs29("div", { role: "alert", style: S.aviso, children: [
+    error,
+    " ",
+    /* @__PURE__ */ jsx29(Button13, { variant: "outline", size: "xs", onClick: () => releer().catch((e) => setError(e.message || String(e))), children: t(lang, "reintentar") })
+  ] }) : !estado || !perfil ? /* @__PURE__ */ jsx29("p", { role: "status", style: S.sub, children: t(lang, "cargando") }) : activa === "mercado" && !listo ? /* @__PURE__ */ jsxs29("div", { style: S.tarjeta,
+  children: [
+    /* @__PURE__ */ jsx29("span", { children: t(lang, "mercado.sinPerfil") }),
+    /* @__PURE__ */ jsx29("div", { children: /* @__PURE__ */ jsx29(Button13, { size: "xs", onClick: () => cambiarPestana("personaje"), children: t(lang, "tab.personaje") }) })
+  ] }) : /* @__PURE__ */ jsx29(Contencion, { children: /* @__PURE__ */ jsx29(
+    Vista,
+    {
+      ctx,
+      almacen,
+      sincronizador,
+      ventas,
+      puente,
+      estado,
+      recargar,
+      perfil,
+      guardarPerfil,
+      razaSupuesta,
+      lang,
+      irA: cambiarPestana
+    }
+  ) }) }, activa);
   return /* @__PURE__ */ jsxs29("div", { style: S.pagina, children: [
     /* @__PURE__ */ jsxs29("div", { style: S.cabecera, children: [
       /* @__PURE__ */ jsx29("strong", { children: t(lang, "app") }),
-      /* @__PURE__ */ jsx29("span", { style: { ...S.sub, flex: 1 }, children: resumen }),
-      /* @__PURE__ */ jsx29(SegmentedControl7, { value: lang, onChange: cambiarLang, options: [{ id: "en", label: "EN" }, { id: "es", label: "ES" }] }),
-      /* @__PURE__ */ jsx29(Button13, { variant: "outline", size: "xs", onClick: async () => {
-        await almacen.reset();
-        recargar();
-      }, children: t(lang, "reintentar") })
+      /* @__PURE__ */ jsx29("span", { style: S.sub, children: resumen })
     ] }),
-    /* @__PURE__ */ jsx29("div", { style: { padding: "6px 16px 0" }, children: /* @__PURE__ */ jsx29(Tabs, { value: activa, onValueChange: cambiarPestana, children: /* @__PURE__ */ jsx29(TabsList, { children: visibles.
-    map(([id]) => /* @__PURE__ */ jsx29(TabsTrigger, { value: id, children: t(lang, "tab." + id) }, id)) }) }) }),
-    /* @__PURE__ */ jsx29("div", { style: S.cuerpo, children: error ? /* @__PURE__ */ jsx29("div", { role: "alert", style: S.aviso, children: error }) : !estado || !perfil ? /* @__PURE__ */ jsx29("p",
-    { role: "status", style: S.sub, children: t(lang, "cargando") }) : /* @__PURE__ */ jsx29(Contencion, { children: /* @__PURE__ */ jsx29(
-      Vista,
+    /* @__PURE__ */ jsx29(Navegacion, { ids: GRUPOS, activa: grupo, elegir: cambiarPestana, lang, etiqueta: t(lang, "nav.principal"), children: visibles ? /* @__PURE__ */ jsx29(
+      Navegacion,
       {
-        ctx,
-        almacen,
-        sincronizador,
-        ventas,
-        puente,
-        estado,
-        recargar,
-        perfil,
-        guardarPerfil,
-        razaSupuesta,
+        ids: visibles,
+        activa,
+        elegir: cambiarPestana,
         lang,
-        irA: cambiarPestana
+        etiqueta: t(lang, "nav." + grupo),
+        secundaria: true,
+        children: cuerpo
       }
-    ) }, activa) })
+    ) : cuerpo })
   ] });
 }
 

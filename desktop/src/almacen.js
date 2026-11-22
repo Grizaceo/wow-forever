@@ -111,7 +111,7 @@ export function createStore(ctx) {
   let queue=Promise.resolve(), cached=null, poisoned=false, v2active=false, v2slot=null;
   const serial=fn=>{const out=queue.then(fn);queue=out.catch(()=>{});return out;};
   async function load(){
-    if(poisoned)throw new Error('Guardado sin confirmar; usá Reabrir para releer los datos.');
+    if(poisoned)throw new Error('Guardado sin confirmar; usa Recargar datos en Configuración.');
     if(cached)return cached;
     const build=(await ctx.storage.get('build'))??null;
     if(!validBuild(build))throw new Error('Progreso guardado inválido. No se sobrescribió.');
@@ -203,14 +203,14 @@ export function createStore(ctx) {
     try {
       await ctx.storage.set('market-v2-pointer', pointer)
       if (JSON.stringify(await ctx.storage.get('market-v2-pointer')) !== JSON.stringify(pointer)) throw Error('Lectura del puntero diferente')
-    } catch (e) { poisoned = true; cached = null; throw Error('No se pudo confirmar el conjunto v2; reabrir para recuperar: ' + e.message) }
+    } catch (e) { poisoned = true; cached = null; throw Error('No se pudo confirmar el conjunto v2; usa Recargar datos en Configuración: ' + e.message) }
     v2active = true; v2slot = slot
     cached = { ...s, market:structuredClone(market), history:{store:structuredClone(history),revision}, revision, hrevision:revision, slot, hslot:slot, legacyMarket:false, legacyHistory:false }
     return { ok:true, revision, hrevision:revision }
   }
   return {
     read:()=>serial(async()=>{const s=await load();return structuredClone({build:s.build,market:s.market,history:s.history,revision:s.revision,legacyMarket:s.legacyMarket,legacyHistory:s.legacyHistory});}),
-    // Reabrir: drop the cached snapshot and the poisoned latch, then re-read
+    // Recargar datos: drop the cached snapshot and the poisoned latch, then re-read
     // durable state from disk. Queued like every op, so it cannot race a write.
     reset:()=>serial(async()=>{cached=null;poisoned=false;}),
     build:value=>serial(async()=>{
@@ -223,7 +223,7 @@ export function createStore(ctx) {
     market:value=>serial(async()=>{
       if(!ownKeys(value,['values','revision'])||!int(value.revision)||!validMarket(value.values))throw new Error('Scan inválido o demasiado grande para Hermes (máximo 4 MiB normalizado).');
       const s=await load();
-      if(value.revision!==s.revision)throw new Error('El mercado cambió en otra vista. Usá Reabrir antes de guardar.');
+      if(value.revision!==s.revision)throw new Error('El mercado cambió en otra vista. Usa Recargar datos en Configuración antes de guardar.');
       if(v2active){
         if(value.values.snapshot&&value.values.snapshot.schemaVersion!==2)throw Error('No se puede degradar v2; restaurá el respaldo primero.');
         return persistV2(s,value.values,Object.keys(value.values).length?s.history.store:{v:2,scopes:{}});
@@ -244,7 +244,7 @@ export function createStore(ctx) {
     history:value=>serial(async()=>{
       if(!ownKeys(value,['store','revision'])||!int(value.revision)||!validHistoryStore(value.store))throw new Error('Historial inválido o demasiado grande para Hermes (máximo 4 MiB).');
       const s=await load();
-      if(value.revision!==s.hrevision)throw new Error('El historial cambió en otra vista. Usá Reabrir antes de guardar.');
+      if(value.revision!==s.hrevision)throw new Error('El historial cambió en otra vista. Usa Recargar datos en Configuración antes de guardar.');
       if(v2active){if(value.store.v!==2)throw Error('No se puede degradar historial v2.');return persistV2(s,s.market,value.store);}
       const slot=s.hslot==='a'?'b':'a', revision=s.hrevision+1;
       const body=JSON.stringify({revision,store:value.store});
@@ -312,7 +312,7 @@ export function createStore(ctx) {
       const backup=await readBackupDoc();
       if(!backup?.ok)throw new Error('Falta el respaldo previo a v2; no se escribió.');
       const s=await load();
-      if(p.revision!==s.revision||p.hrevision!==s.hrevision)throw new Error('El mercado cambió en otra vista. Usá Reabrir antes de guardar.');
+      if(p.revision!==s.revision||p.hrevision!==s.hrevision)throw new Error('El mercado cambió en otra vista. Usa Recargar datos en Configuración antes de guardar.');
       return persistV2(s,p.market,p.store);
     }),
     // Rollback explícito: restaura los bytes originales de A/B y los punteros.

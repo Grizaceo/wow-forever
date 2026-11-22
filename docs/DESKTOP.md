@@ -17,7 +17,7 @@ minificar) desde `desktop/src/`. Hermes Desktop lo carga en la barra lateral com
 - Colores solo con las variables del tema (`src/estilos.js`: `C`, `S`, `CALIDAD`,
   `DIFICULTAD`); nunca `#hex` ni `rgb()`. Así la página sigue al tema claro u oscuro.
 - Textos con `t(lang, clave)` (`src/i18n.js`); cada sección agrega los suyos con
-  `agregarTextos(es, en)` desde su propio archivo. Español por defecto, inglés opcional.
+  `agregarTextos(es, en)` desde su propio archivo. Inglés por defecto, español opcional.
 - Nombres del juego con `nombre(n, lang)` (`src/datos.js`); ítems con `<NombreItem id lang />`.
 - Cada dato muestra su origen con `<Origen f=… />` y lo que falta con `<Hueco>`: nunca se
   inventa un dato que no esté en `data/` o en las guías curadas.
@@ -49,6 +49,14 @@ Cada vista recibe las mismas props:
 `estado` es `{ build, market, history, revision }` leído de `almacen.read()` y `recargar()`
 vuelve a leerlo tras guardar.
 
+## Navegación
+
+- **Character** abre **Profile** y agrupa **Route**, **Class** y **Professions**.
+- **Market** queda como segunda sección principal, sin cambios en su navegación interna.
+- **Others and Configuration** agrupa **Dungeons**, **Curated guide** (solo si hay guía para el perfil),
+  **Legacy** y **Settings**. Settings incluye idioma de la interfaz y recarga de datos locales.
+- La preferencia `pestana` guarda la vista concreta, compatible con los identificadores antiguos.
+
 ## Seguimiento automático de Auctionator
 
 - El archivo de precios es `WTF/Account/<cuenta>/SavedVariables/Auctionator.lua`, **no**
@@ -79,8 +87,9 @@ vuelve a leerlo tras guardar.
   para no cortar la pareja a mitad; no emite notificaciones tras `dispose`. No se puede
   cancelar retroactivamente una escritura ya enviada al SDK.
 - El borrado usa dos guardados, no una transacción atómica: si solo se confirmó el vaciado
-  del historial, la UI lo informa expresamente. Ante un guardado incierto indica Reabrir
-  para comprobar el estado, nunca garantiza que todos los datos se conservaron.
+  del historial, la UI lo informa expresamente. Ante un guardado incierto indica
+  **Otros y configuración → Configuración → Recargar datos** para comprobar el estado;
+  nunca garantiza que todos los datos se conservaron.
 - Tras escanear en el juego, `/reload` o cerrar sesión permite que WoW escriba las
   SavedVariables al disco. El plugin no puede leer datos que sigan solo en memoria del juego.
 

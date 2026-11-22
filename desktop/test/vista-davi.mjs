@@ -3,7 +3,7 @@
 // precios, y al confirmar inserta con host.composer.insertText(null, texto, {mode:'block'}).
 // Si no se puede insertar, cae al portapapeles; si eso falla, el texto queda seleccionable.
 //   CHROMIUM_PATH=… node desktop/test/vista-davi.mjs
-import { iniciar, PERFILES } from './arnes.mjs'
+import { abrirVista, iniciar, PERFILES } from './arnes.mjs'
 
 // Mercado mínimo con un ítem (Paño de lino 2589) y su historial de un día.
 const MERCADO = {
@@ -88,7 +88,7 @@ const textoDe = async (panel) => panel.locator('textarea').inputValue()
 /* ---------------------------------------------------------- 2) Profesiones */
 {
   const { p, cerrar } = await a.abrir('claro', { perfil: PERFILES.paladinHorda, ...MERCADO })
-  await p.click('[data-tab="profesiones"]')
+  await abrirVista(p, 'profesiones')
   await p.getByText('Entrenadores').first().waitFor()
   await p.selectOption('#wf-profesion', '129')
   await p.waitForFunction(() => document.body.innerText.includes('Venda de lino'))
@@ -121,7 +121,7 @@ const textoDe = async (panel) => panel.locator('textarea').inputValue()
 /* ------------------------------------------- 3) Profesiones sin mercado */
 {
   const { p, cerrar } = await a.abrir('claro', { perfil: PERFILES.paladinHorda })
-  await p.click('[data-tab="profesiones"]')
+  await abrirVista(p, 'profesiones')
   await p.getByText('Entrenadores').first().waitFor()
   await p.selectOption('#wf-profesion', '129')
   await p.waitForFunction(() => document.body.innerText.includes('Venda de lino'))
@@ -211,7 +211,9 @@ const textoDe = async (panel) => panel.locator('textarea').inputValue()
 /* ------------------------------------------------------------ 6) Inglés */
 {
   const { p, cerrar } = await a.abrir('claro', { perfil: PERFILES.paladinHorda })
+  await abrirVista(p, 'configuracion')
   await p.getByRole('radio', { name: 'EN' }).click()
+  await p.getByRole('tab', { name: 'Character', exact: true }).click()
   await p.getByRole('button', { name: 'Ask DAVI' }).click()
   await p.getByText('Preview').first().waitFor()
   const panel = panelDe(p)

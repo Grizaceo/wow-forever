@@ -2,7 +2,7 @@
 // perfil, skill guardado que cambia las recetas aprendibles, costos con mercado
 // precargado, otra profesión del perfil y ambos temas sin errores.
 //   PLAYWRIGHT_MODULE=… CHROMIUM_PATH=… node desktop/test/vista-profesiones.mjs
-import { iniciar, PERFILES, PREF, TEMAS } from './arnes.mjs'
+import { abrirVista, iniciar, PERFILES, PREF, TEMAS } from './arnes.mjs'
 
 const MERCADO = {
   storage: { 'market-pointer': { slot: 'a', revision: 1 } },
@@ -65,7 +65,7 @@ const cuentaAprendibles = (p) => p.evaluate(() => {
 // 1) Paladín no-muerto (Herrería + Minería) en tema claro con mercado: entrenadores
 //    de la Horda primero (las del perfil encabezan el selector).
 let { p, cerrar } = await a.abrir('claro', { perfil: PERFILES.paladinHorda, ...MERCADO })
-await p.click('[data-tab="profesiones"]')
+await abrirVista(p, 'profesiones')
 await p.getByText('Entrenadores').first().waitFor()
 check('Herrería es la profesión por defecto (primera del perfil)', await p.evaluate(() =>
   document.querySelector('#wf-profesion').value === '164'))
@@ -109,7 +109,7 @@ await cerrar()
 
 // 4) Sin mercado: el plan invita a importar precios y el botón lleva a Mercado.
 ;({ p, cerrar } = await a.abrir('claro', { perfil: PERFILES.paladinHorda }))
-await p.click('[data-tab="profesiones"]')
+await abrirVista(p, 'profesiones')
 await p.getByText('Sin precios de mercado').waitFor()
 await p.getByRole('button', { name: 'Importar precios en Mercado' }).click()
 await p.waitForTimeout(80)
@@ -119,7 +119,7 @@ await cerrar()
 
 // 5) Chamán enano con Alquimia (perfil del arnés): entrenadores de la Alianza.
 ;({ p, cerrar } = await a.abrir('claro', { perfil: PERFILES.chamanAlianza }))
-await p.click('[data-tab="profesiones"]')
+await abrirVista(p, 'profesiones')
 await p.getByText('Entrenadores').first().waitFor()
 check('Alquimia por defecto y entrenadores de la Alianza', await p.evaluate(() =>
   document.querySelector('#wf-profesion').value === '171')
@@ -129,7 +129,7 @@ await cerrar()
 // 6) Temas claro y oscuro: la sección se pinta y el color de dificultad sigue al tema.
 for (const tema of ['claro', 'oscuro']) {
   ;({ p, cerrar } = await a.abrir(tema, { perfil: PERFILES.cazadorHorda }))
-  await p.click('[data-tab="profesiones"]')
+  await abrirVista(p, 'profesiones')
   await p.getByText('Entrenadores').first().waitFor()
   await p.selectOption('#wf-profesion', '129')
   await p.waitForFunction(() => document.body.innerText.includes('naranja'))
@@ -148,7 +148,7 @@ for (const tema of ['claro', 'oscuro']) {
 // 7) Modo «Maxear a 300» (rutaMaxeo): adquisición, cobertura, huecos y SIN DATOS declarados.
 // 7a) Sin mercado: el modo maxear invita a importar precios y declara el trainer SIN DATOS.
 ;({ p, cerrar } = await a.abrir('claro', { perfil: PERFILES.paladinHorda }))
-await p.click('[data-tab="profesiones"]')
+await abrirVista(p, 'profesiones')
 await p.getByRole('button', { name: 'Maxear a 300' }).click()
 await p.getByText('Sin precios de mercado').waitFor()
 check('maxear sin mercado: aviso de importar + nota SIN DATOS del trainer',
@@ -158,7 +158,7 @@ await cerrar()
 
 // 7b) Mercado completo de Herrería: ruta con pasos, adquisiciones pagadas, cobertura y total.
 ;({ p, cerrar } = await a.abrir('claro', { perfil: PERFILES.paladinHorda, ...mercadoHerreria }))
-await p.click('[data-tab="profesiones"]')
+await abrirVista(p, 'profesiones')
 await escribirSkill(p, 164, 1)
 await p.waitForTimeout(80)
 await p.getByRole('button', { name: 'Maxear a 300' }).click()
@@ -178,7 +178,7 @@ await cerrar()
 
 // 7c) Mercado parcial (solo Paño de lino): Primeros auxilios declara cobertura o falta de ruta, honesto.
 ;({ p, cerrar } = await a.abrir('claro', { perfil: PERFILES.chamanAlianza, ...MERCADO }))
-await p.click('[data-tab="profesiones"]')
+await abrirVista(p, 'profesiones')
 await p.selectOption('#wf-profesion', '129')
 await escribirSkill(p, 129, 1)
 await p.waitForTimeout(80)
@@ -193,7 +193,7 @@ await cerrar()
 
 // 7d) El toggle vuelve al plan rápido anterior (intacto).
 ;({ p, cerrar } = await a.abrir('claro', { perfil: PERFILES.paladinHorda, ...mercadoHerreria }))
-await p.click('[data-tab="profesiones"]')
+await abrirVista(p, 'profesiones')
 await p.getByRole('button', { name: 'Maxear a 300' }).click()
 await p.getByText('Adquisición de recetas').first().waitFor()
 await p.getByRole('button', { name: 'Plan rápido' }).click()
@@ -210,7 +210,7 @@ const casillas = (pg) => pg.locator('tbody input[type="checkbox"]:checked').coun
 const filasTabla = (pg) => pg.locator('tbody tr').count()
 
 ;({ p, cerrar } = await a.abrir('claro', { perfil: PERFILES.cazadorHorda }))
-await p.click('[data-tab="profesiones"]')
+await abrirVista(p, 'profesiones')
 await p.selectOption('#wf-profesion', '185')
 await p.getByRole('radio', { name: /^Todas \(/ }).click()
 await p.waitForFunction(() => /TIENES 25/i.test(document.body.innerText))
@@ -231,7 +231,7 @@ check('desmarcar una receta la persiste en ctx.storage (24, con relectura)',
 
 await cerrar()
 ;({ p, cerrar } = await a.abrir('claro', { perfil: PERFILES.cazadorHorda, storage: { 'recetas-propias': guardado } }))
-await p.click('[data-tab="profesiones"]')
+await abrirVista(p, 'profesiones')
 await p.selectOption('#wf-profesion', '185')
 await p.getByRole('radio', { name: /^Todas \(/ }).click()
 await p.waitForFunction(() => !/TIENES 25/i.test(document.body.innerText))
@@ -241,7 +241,7 @@ check('lo guardado manda sobre la semilla al reabrir (24, no vuelve a 25)',
 await cerrar()
 
 ;({ p, cerrar } = await a.abrir('claro', { perfil: PERFILES.cazadorHorda, storage: { 'recetas-propias': { v: 1, spells: [] } } }))
-await p.click('[data-tab="profesiones"]')
+await abrirVista(p, 'profesiones')
 await p.selectOption('#wf-profesion', '185')
 await p.getByRole('radio', { name: /^Todas \(/ }).click()
 await p.waitForTimeout(80)
@@ -251,7 +251,7 @@ check('un estado guardado vacío no siembra nada (ni marca ni ofrece ocultar)',
 await cerrar()
 
 ;({ p, cerrar } = await a.abrir('claro', { perfil: PERFILES.cazadorHorda }))
-await p.click('[data-tab="profesiones"]')
+await abrirVista(p, 'profesiones')
 await p.selectOption('#wf-profesion', '185')
 await p.getByRole('radio', { name: /^Todas \(/ }).click()
 await p.waitForFunction(() => /TIENES 25/i.test(document.body.innerText))
@@ -267,7 +267,7 @@ await cerrar()
 // 9) Nivel de oficio declarado a mano (oficios.js): Pesca arranca en 93, el chip avisa
 //    que no lo leyó el juego y un nivel escrito a mano lo pisa y persiste.
 ;({ p, cerrar } = await a.abrir('claro', { perfil: PERFILES.magoCielonato }))
-await p.click('[data-tab="profesiones"]')
+await abrirVista(p, 'profesiones')
 await p.selectOption('#wf-profesion', '356')
 await p.waitForFunction(() => document.querySelector('#wf-skill-356') !== null)
 check('Pesca arranca con el nivel declarado (93) y lo marca como tal',
@@ -286,7 +286,7 @@ await cerrar()
 // 10) Panel «Qué vender ahora»: cruza tus recetas con los precios, ordena por neto
 //     tras 5% de subasta y reactivos comprados, y declara que son ofertas anunciadas.
 ;({ p, cerrar } = await a.abrir('claro', { perfil: PERFILES.cazadorHorda, ...mercaCocina }))
-await p.click('[data-tab="profesiones"]')
+await abrirVista(p, 'profesiones')
 await p.selectOption('#wf-profesion', '185')
 await p.getByRole('radio', { name: /^Todas \(/ }).click()
 await p.waitForFunction(() => /Qué vender ahora/i.test(document.body.innerText))
