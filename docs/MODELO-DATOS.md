@@ -240,3 +240,26 @@ convierten a este esquema común:
 
 `tipo` puede ser `clase`, `profesion` o `zona`. La página muestra primero lo generado y
 encima lo curado, con su etiqueta.
+
+## Importación del mercado: etiqueta de reino y techos
+
+El snapshot v2 indexa cada pool por `[identityKey, nombre de reino]`. Cuando la identidad no
+está acreditada (todo `UNKNOWN`, `postingChannel: null`), el nombre es una etiqueta del cliente
+y no evidencia de otro pool: Auctionator rotula el mismo servidor como «PvP» o «PvP Horde» según
+la facción del personaje activo.
+
+- Si dos entradas comparten identidad, difieren en el nombre y la identidad es **opaca**,
+  `planImportacion` conserva la del scan nuevo, lo declara en `snapshot.warnings`
+  («Reino unificado: …») y mueve el acumulado del store al nombre nuevo con `mergeRows`, para
+  que la serie no se parta en dos claves.
+- Con identidad acreditada el nombre sigue separando pools: no se colapsa nada.
+
+Presupuesto: el documento completo (`market` + `history`) se escribe con `writeText`, tope 4 MiB.
+El `snapshot` lo valida `almacen` (≤ 4 MiB) y el histórico nunca se recorta por debajo de
+`MIN_STORE_BYTES` (256 KiB): si el snapshot no deja ese hueco, la importación falla con un error
+explícito en vez de guardar un store vacío que simule haber importado.
+
+Parser Lua: `MAX_BYTES` 8 MiB y `ENTRIES_LIMIT` 1.200.000. Un diario del puente guarda ~75.000
+entradas por día (7.368 ítems × 4 campos) y el addon retiene 14 días ⇒ ~1.050.000. Con el techo
+anterior (250.000) el archivo dejaba de leerse en la cuarta jornada y el puente entero quedaba
+sin importar.

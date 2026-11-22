@@ -49,7 +49,12 @@
 
     var MAX_BYTES = 8 * 1024 * 1024;
     var DEPTH_LIMIT = 32;
-    var ENTRIES_LIMIT = 250000;
+    // Un diario real del puente guarda ~75.000 entradas por día (7.368 ítems ×
+    // 4 campos + metadatos) y el addon retiene 14 días: ~1.050.000 entradas.
+    // Con el techo anterior (250.000) el archivo dejaba de leerse en la cuarta
+    // jornada y todo el puente quedaba sin importar. Sigue siendo un guardrail:
+    // MAX_BYTES (8 MiB) acota antes el trabajo real del parser.
+    var ENTRIES_LIMIT = 1200000;
     var DAY_MIN = 0;
     var DAY_MAX = 100000;
     var WARN_CAP = 1000;

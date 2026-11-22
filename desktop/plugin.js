@@ -11509,7 +11509,7 @@ var require_market = __commonJS({
         "use strict";
         var MAX_BYTES3 = 8 * 1024 * 1024;
         var DEPTH_LIMIT = 32;
-        var ENTRIES_LIMIT = 25e4;
+        var ENTRIES_LIMIT = 12e5;
         var DAY_MIN = 0;
         var DAY_MAX2 = 1e5;
         var WARN_CAP = 1e3;
@@ -71865,6 +71865,7 @@ var Farm = import_market_farm.default;
 var PAGE_SIZE = 50;
 var SNAPSHOT_KEEP_DAYS = 5;
 var HISTORY_MAX_BYTES = 4194304 - 4096;
+var MIN_STORE_BYTES = 262144;
 var EPOCH = Date.UTC(2020, 0, 1);
 var DAY_MS = 864e5;
 var hoy = () => Math.floor((Date.now() - EPOCH) / DAY_MS);
@@ -72061,6 +72062,31 @@ function snapshotSinIdentificar(raw) {
     realms: raw.realms.map((r) => ({ ...r, identity: structuredClone(identity) }))
   };
 }
+var identidadOpaca = (r) => {
+  const id = r?.identity;
+  return !!id && id.game === "UNKNOWN" && id.region === "UNKNOWN" && id.ruleset === "UNKNOWN" && id.auctionPool === "UNKNOWN" && id.postingChannel === null;
+};
+function renombrarReinoStore(store, viejo, nuevo) {
+  if (!store || store.v !== 2 || viejo === nuevo || !store.scopes) return store;
+  const out = structuredClone(store);
+  for (const sk of Object.keys(out.scopes)) {
+    const realms = out.scopes[sk]?.realms;
+    if (!realms || !realms[viejo]) continue;
+    const origen = realms[viejo];
+    const destino = realms[nuevo];
+    if (!destino) {
+      realms[nuevo] = origen;
+      delete realms[viejo];
+      continue;
+    }
+    for (const src of Object.keys(origen.items || {})) {
+      const previas = destino.items[src];
+      destino.items[src] = previas ? import_market_history2.default.mergeRows(previas, origen.items[src]) : origen.items[src];
+    }
+    delete realms[viejo];
+  }
+  return import_market_history2.default.validStoreV2(out) ? out : store;
+}
 function planImportacion(raw, { snapshotActual = null, historyStore = null } = {}) {
   const v2 = raw?.schemaVersion === 2 || historyStore?.v === 2 || snapshotActual?.schemaVersion === 2;
   if (v2) {
@@ -72069,11 +72095,49 @@ function planImportacion(raw, { snapshotActual = null, historyStore = null } = {
     const key = (r) => JSON.stringify([import_market_identity2.default.identityKey(r.identity), r.name]);
     const byScope = new Map((snapshotActual?.schemaVersion === 2 ? snapshotActual.realms : []).map((r) => [key(r), r]));
     for (const r of raw.realms) byScope.set(key(r), r);
-    const combined = { ...raw, realms: [...byScope.values()] };
+    const delScan = new Set((raw.realms || []).map(key));
+    const realms = [];
+    const porIdentidad = /* @__PURE__ */ new Map();
+    const renombres = [];
+    for (const r of [...byScope.values()]) {
+      const ik = import_market_identity2.default.identityKey(r.identity);
+      const i = porIdentidad.get(ik);
+      if (i === void 0) {
+        porIdentidad.set(ik, realms.length);
+        realms.push(r);
+        continue;
+      }
+      const previo = realms[i];
+      if (previo.name === r.name) {
+        realms[i] = r;
+        continue;
+      }
+      if (!identidadOpaca(r) || !identidadOpaca(previo)) {
+        realms.push(r);
+        continue;
+      }
+      const rNuevo = delScan.has(key(r)), pNuevo = delScan.has(key(previo));
+      if (rNuevo && !pNuevo) {
+        renombres.push([previo.name, r.name]);
+        realms[i] = r;
+        continue;
+      }
+      if (!rNuevo && pNuevo) continue;
+      realms.push(r);
+    }
+    const combined = { ...raw, realms };
+    if (renombres.length) {
+      const avisos = renombres.map(([v, n]) => `Reino unificado: «${v}» y «${n}» son el mismo pool sin identidad verificada; se conserva «${n}» y el histórico queda en una sola serie.`);
+      combined.warnings = [...Array.isArray(raw.warnings) ? raw.warnings : [], ...avisos];
+    }
     const snapshot2 = import_market_history2.default.trimSnapshotHistory(combined, SNAPSHOT_KEEP_DAYS);
-    const base2 = historyStore && historyStore.v === 2 ? historyStore : historyStore ? import_market_history2.default.migrateStoreV1(historyStore, "local:legacy") : snapshotActual && snapshotActual.schemaVersion ===
+    let base2 = historyStore && historyStore.v === 2 ? historyStore : historyStore ? import_market_history2.default.migrateStoreV1(historyStore, "local:legacy") : snapshotActual && snapshotActual.schemaVersion ===
     2 ? import_market_history2.default.storeV2FromSnapshot(snapshotActual) : import_market_history2.default.emptyStoreV2();
-    const budget = Math.max(256, HISTORY_MAX_BYTES - import_market_history2.default.byteSize(snapshot2));
+    for (const [v, n] of renombres) base2 = renombrarReinoStore(base2, v, n);
+    const budget = HISTORY_MAX_BYTES - import_market_history2.default.byteSize(snapshot2);
+    if (budget < MIN_STORE_BYTES) {
+      throw new Error(`El snapshot del mercado ocupa ${import_market_history2.default.byteSize(snapshot2)} B y no deja espacio al histórico (mínimo ${MIN_STORE_BYTES} B). No se importó.`);
+    }
     const store2 = import_market_history2.default.fitStoreV2(import_market_history2.default.storeV2Merge(base2, raw), budget);
     return { snapshot: snapshot2, store: store2 };
   }

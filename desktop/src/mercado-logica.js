@@ -21,6 +21,9 @@ export const PAGE_SIZE = 50
 // ctx.files, igual que en standalone/market-ui.js.
 export const SNAPSHOT_KEEP_DAYS = 5
 export const HISTORY_MAX_BYTES = 4194304 - 4096
+// Suelo del histórico: por debajo de esto el recorte deja un store casi vacío,
+// y guardarlo daría la falsa impresión de haber importado. Mejor no importar.
+export const MIN_STORE_BYTES = 262144
 export const EPOCH = Date.UTC(2020, 0, 1)
 export const DAY_MS = 86400000
 
@@ -250,6 +253,35 @@ export function snapshotSinIdentificar(raw) {
     observation:{scope:'legacy',fromDay:null,toDay:null,capturedAt:raw.importedAt},
     realms:raw.realms.map(r=>({...r,identity:structuredClone(identity)})) }
 }
+// La identidad deja de distinguir pools cuando todo quedó UNKNOWN: en ese caso
+// el nombre del reino es una etiqueta del cliente, no evidencia de otro pool.
+const identidadOpaca = (r) => {
+  const id = r?.identity
+  return !!id && id.game === 'UNKNOWN' && id.region === 'UNKNOWN' &&
+    id.ruleset === 'UNKNOWN' && id.auctionPool === 'UNKNOWN' && id.postingChannel === null
+}
+
+// Mueve el acumulado de un reino a otro nombre dentro del store v2. El store
+// indexa por nombre, así que sin esto un reino renombrado por el cliente parte
+// el histórico en dos claves y pierde la serie continua.
+function renombrarReinoStore(store, viejo, nuevo) {
+  if (!store || store.v !== 2 || viejo === nuevo || !store.scopes) return store
+  const out = structuredClone(store)
+  for (const sk of Object.keys(out.scopes)) {
+    const realms = out.scopes[sk]?.realms
+    if (!realms || !realms[viejo]) continue
+    const origen = realms[viejo]
+    const destino = realms[nuevo]
+    if (!destino) { realms[nuevo] = origen; delete realms[viejo]; continue }
+    for (const src of Object.keys(origen.items || {})) {
+      const previas = destino.items[src]
+      destino.items[src] = previas ? HunterHistory.mergeRows(previas, origen.items[src]) : origen.items[src]
+    }
+    delete realms[viejo]
+  }
+  return HunterHistory.validStoreV2(out) ? out : store
+}
+
 export function planImportacion(raw, { snapshotActual = null, historyStore = null } = {}) {
   const v2 = raw?.schemaVersion === 2 || historyStore?.v === 2 || snapshotActual?.schemaVersion === 2
   if (v2) {
@@ -260,16 +292,45 @@ export function planImportacion(raw, { snapshotActual = null, historyStore = nul
     const key = r => JSON.stringify([HunterIdentity.identityKey(r.identity), r.name])
     const byScope = new Map((snapshotActual?.schemaVersion === 2 ? snapshotActual.realms : []).map(r => [key(r), r]))
     for (const r of raw.realms) byScope.set(key(r), r)
-    const combined = { ...raw, realms: [...byScope.values()] }
+    // Auctionator rotula el mismo servidor según la facción del personaje
+    // activo ("PvP" vs "PvP Horde"). Si la identidad es opaca, el nombre no
+    // puede separar pools: se colapsa a una sola entrada por identidad (la del
+    // scan nuevo) para no duplicar ítems ni reventar el tope del snapshot.
+    const delScan = new Set((raw.realms || []).map(key))
+    const realms = []
+    const porIdentidad = new Map()
+    const renombres = []
+    for (const r of [...byScope.values()]) {
+      const ik = HunterIdentity.identityKey(r.identity)
+      const i = porIdentidad.get(ik)
+      if (i === undefined) { porIdentidad.set(ik, realms.length); realms.push(r); continue }
+      const previo = realms[i]
+      if (previo.name === r.name) { realms[i] = r; continue }
+      if (!identidadOpaca(r) || !identidadOpaca(previo)) { realms.push(r); continue }
+      const rNuevo = delScan.has(key(r)), pNuevo = delScan.has(key(previo))
+      if (rNuevo && !pNuevo) { renombres.push([previo.name, r.name]); realms[i] = r; continue }
+      if (!rNuevo && pNuevo) continue
+      realms.push(r)
+    }
+    const combined = { ...raw, realms }
+    if (renombres.length) {
+      const avisos = renombres.map(([v, n]) =>
+        `Reino unificado: «${v}» y «${n}» son el mismo pool sin identidad verificada; se conserva «${n}» y el histórico queda en una sola serie.`)
+      combined.warnings = [...(Array.isArray(raw.warnings) ? raw.warnings : []), ...avisos]
+    }
     const snapshot = HunterHistory.trimSnapshotHistory(combined, SNAPSHOT_KEEP_DAYS)
-    const base = historyStore && historyStore.v === 2
+    let base = historyStore && historyStore.v === 2
       ? historyStore
       : (historyStore
         ? HunterHistory.migrateStoreV1(historyStore, 'local:legacy')
         : (snapshotActual && snapshotActual.schemaVersion === 2
           ? HunterHistory.storeV2FromSnapshot(snapshotActual)
           : HunterHistory.emptyStoreV2()))
-    const budget = Math.max(256, HISTORY_MAX_BYTES - HunterHistory.byteSize(snapshot))
+    for (const [v, n] of renombres) base = renombrarReinoStore(base, v, n)
+    const budget = HISTORY_MAX_BYTES - HunterHistory.byteSize(snapshot)
+    if (budget < MIN_STORE_BYTES) {
+      throw new Error(`El snapshot del mercado ocupa ${HunterHistory.byteSize(snapshot)} B y no deja espacio al histórico (mínimo ${MIN_STORE_BYTES} B). No se importó.`)
+    }
     const store = HunterHistory.fitStoreV2(HunterHistory.storeV2Merge(base, raw), budget)
     return { snapshot, store }
   }
