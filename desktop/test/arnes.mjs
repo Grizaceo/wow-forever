@@ -37,6 +37,17 @@ import { createRoot } from 'react-dom/client'
 import plugin from ${JSON.stringify(plugin)}
 window.registrado = []; window.lecturas = []; window.concedidas = []; window.selectorAbierto = 0
 const pref = ${JSON.stringify(PREF)}
+const encoder = new TextEncoder(), fileMax = 4 * 1024 * 1024
+// Los archivos del SDK no ocupan cuota de localStorage en Hermes.
+window.archivosData ||= new Map()
+window.leerMercadoDePrueba = () => {
+  const ptr = JSON.parse(localStorage.getItem(pref + 'market-v2-pointer'))
+  if (!ptr) return null
+  const base = 'market-v2-' + ptr.slot
+  const f = JSON.parse(archivosData.get(base + '.json'))
+  return f.version === 1 ? f : JSON.parse(Array.from({length: f.parts}, (_, i) =>
+    archivosData.get(base + '.part-' + String(i).padStart(3, '0') + '.json')).join(''))
+}
 const carpeta = () => window.carpetaConcedida || { name: 'vacía', files: {} }
 const listar = (rel) => {
   const base = rel ? rel + '/' : '', vistos = new Map()
@@ -59,7 +70,12 @@ const ctx = {
   },
   files: {
     readText: async (f, rel) => {
-      if (f === 'data') { const t = localStorage.getItem('archivo.' + rel); return t === null ? { ok: false, error: 'not-found' } : { ok: true, text: t, size: t.length } }
+      if (f === 'data') {
+        const t = archivosData.get(rel)
+        if (t === undefined) return { ok: false, error: 'not-found' }
+        const size = encoder.encode(t).length
+        return size > fileMax ? { ok: false, error: 'too-large' } : { ok: true, text: t, size }
+      }
       if (!window.concedidas.some((c) => c.id === f)) return { ok: false, error: 'not-granted' }
       window.lecturas.push(rel)
       const t = carpeta().files[rel]
@@ -70,7 +86,9 @@ const ctx = {
     writeText: async (f, rel, text) => {
       if (f !== 'data') return { ok: false, error: 'not-granted' }
       if (window.fallarEscritura || (window.fallarMercado && rel.startsWith('market-'))) return { ok: false, error: 'io-error' }
-      localStorage.setItem('archivo.' + rel, text); return { ok: true }
+      const size = encoder.encode(text).length
+      if (size > fileMax) return { ok: false, error: 'too-large' }
+      archivosData.set(rel, text); return { ok: true, size }
     },
     folders: async () => window.concedidas.slice(),
     requestFolder: async () => {
@@ -87,7 +105,13 @@ const ctx = {
       window.lecturas.push(rel)
       const t = carpeta().files[rel]
       if (t === undefined) return { ok: false, error: 'not-found' }
-      const b64 = typeof t === 'string' ? btoa(String.fromCharCode(...new TextEncoder().encode(t))) : t.b64
+      let b64 = t.b64
+      if (typeof t === 'string') {
+        const bytes = encoder.encode(t)
+        let binary = ''
+        for (let i = 0; i < bytes.length; i += 32768) binary += String.fromCharCode(...bytes.subarray(i, i + 32768))
+        b64 = btoa(binary)
+      }
       return { ok: true, url: 'data:text/plain;base64,' + b64 }
     },
   },
@@ -154,8 +178,10 @@ const reactDomDir = path.dirname(reqDesk.resolve('react-dom/package.json'))
     // Claves CRUDAS (sin el prefijo del SDK): para sembrar las claves heredadas
     // que la 1.0.0 dejó en el localStorage (p.ej. `auction-path`).
     for (const [k, v] of Object.entries(previo.raw || {})) kv[k] = v
-    for (const [k, v] of Object.entries(previo.archivos || {})) kv['archivo.' + k] = v
-    await p.evaluate((x) => { for (const [k, v] of Object.entries(x)) localStorage.setItem(k, v) }, kv)
+    await p.evaluate(({kv, archivos}) => {
+      for (const [k, v] of Object.entries(kv)) localStorage.setItem(k, v)
+      window.archivosData = new Map(Object.entries(archivos))
+    }, {kv, archivos: previo.archivos || {}})
     await p.addScriptTag({ content: codigo })
     await p.locator('[role="tab"]').first().waitFor()
     return { p, cerrar: () => contexto.close() }
@@ -175,6 +201,15 @@ const reactDomDir = path.dirname(reqDesk.resolve('react-dom/package.json'))
   }
 
   return { abrir, check, terminar, estado }
+}
+
+// Estado mínimo para reabrir un plugin en un Chromium limpio.
+export function exportarEstado(p) {
+  return p.evaluate(pref => {
+    const storage = Object.fromEntries(Object.keys(localStorage).filter(k => k.startsWith(pref))
+      .map(k => [k.slice(pref.length), JSON.parse(localStorage.getItem(k))]))
+    return { storage, archivos: Object.fromEntries(archivosData), perfil: storage.perfil }
+  }, PREF)
 }
 
 // Entra por la navegación visible: las vistas secundarias no son tabs globales.

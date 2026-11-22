@@ -26,15 +26,15 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const KEEP_GOING = process.argv.includes('--keep-going');
 
 // Conteos esperados del stack canónico (actualizar a mano si se añaden tests).
-const EXPECT_NODE = 359;
-const EXPECT_PY = 86;
+const EXPECT_NODE = 363;
+const EXPECT_PY = 87;
 const EXPECT_LUA = 180;
 // Tests unitarios del motor en standalone/tests/*.cjs (node:test). Los «real
 // fixture» son stat-only por defecto; WOW_FOREVER_REAL_FIXTURE=1 los hace leer
 // contenido de SavedVariables (solo para diagnóstico manual, nunca en gates).
 const EXPECT_CJS = 78;
 const BROWSER = [
-  ['navegador', process.env.HERMES_SDK_TABS === '1' ? 52 : 51], ['mercado-auto', 11], ['mercado-procedencia', 24],
+  ['navegador', process.env.HERMES_SDK_TABS === '1' ? 52 : 51], ['mercado-auto', 14], ['mercado-procedencia', 24],
   ['tsm', 28], ['vista-mercado', 56], ['vista-davi', 50], ['vista-guia', 28],
   ['vista-profesiones', 41], ['vista-ruta-dungeons', 31], ['bridge', 19],
   ['vista-personaje-simc', 11], ['vista-pawn', 13], ['vista-subasta-pawn', 28],
@@ -153,7 +153,7 @@ console.log(`raíz: ${ROOT}\n`);
   record('bundle-check', 'OK', ok ? 'OK' : 'FALLO', ok, ok ? `${bytes} bytes` : tail(r.out));
 }
 
-// 6) 12 suites navegador headless (Playwright prestado + Chromium propio).
+// 6) Suites navegador headless (Playwright prestado + Chromium propio).
 //    Cada suite imprime una línea JSON {pasadas, red, errores} al final.
 {
   const { pm, ch } = resolveBrowserEnv();

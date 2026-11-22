@@ -16,14 +16,10 @@ export { HunterMarket, HunterHistory, HunterDeals, HunterChart, HunterIdentity, 
 export const Farm = FarmModule
 
 export const PAGE_SIZE = 50
-// El snapshot persistido conserva solo una ventana reciente por ítem (la serie
-// completa vive en el store de historial); margen bajo el límite de 4 MiB de
-// ctx.files, igual que en standalone/market-ui.js.
+// El snapshot persistido conserva solo una ventana reciente por ítem. El
+// histórico tiene un presupuesto propio, independiente de la captura v2.
 export const SNAPSHOT_KEEP_DAYS = 5
 export const HISTORY_MAX_BYTES = 4194304 - 4096
-// Suelo del histórico: por debajo de esto el recorte deja un store casi vacío,
-// y guardarlo daría la falsa impresión de haber importado. Mejor no importar.
-export const MIN_STORE_BYTES = 262144
 export const EPOCH = Date.UTC(2020, 0, 1)
 export const DAY_MS = 86400000
 
@@ -327,11 +323,11 @@ export function planImportacion(raw, { snapshotActual = null, historyStore = nul
           ? HunterHistory.storeV2FromSnapshot(snapshotActual)
           : HunterHistory.emptyStoreV2()))
     for (const [v, n] of renombres) base = renombrarReinoStore(base, v, n)
-    const budget = HISTORY_MAX_BYTES - HunterHistory.byteSize(snapshot)
-    if (budget < MIN_STORE_BYTES) {
-      throw new Error(`El snapshot del mercado ocupa ${HunterHistory.byteSize(snapshot)} B y no deja espacio al histórico (mínimo ${MIN_STORE_BYTES} B). No se importó.`)
+    const merged = HunterHistory.storeV2Merge(base, raw)
+    const store = HunterHistory.fitStoreV2(merged, HISTORY_MAX_BYTES)
+    if (Object.keys(merged.scopes).length && !Object.keys(store.scopes).length) {
+      throw new Error('El histórico no cabe en su presupuesto ni conservando solo el último día. Se conservan los datos anteriores.')
     }
-    const store = HunterHistory.fitStoreV2(HunterHistory.storeV2Merge(base, raw), budget)
     return { snapshot, store }
   }
   const snapshot = HunterHistory.trimSnapshotHistory(raw, SNAPSHOT_KEEP_DAYS)

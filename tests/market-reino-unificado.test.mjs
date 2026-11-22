@@ -2,7 +2,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import H from '../standalone/market-history.js'
 import I from '../standalone/market-identity.js'
-import { planImportacion, HISTORY_MAX_BYTES, MIN_STORE_BYTES } from '../desktop/src/mercado-logica.js'
+import { planImportacion, HISTORY_MAX_BYTES } from '../desktop/src/mercado-logica.js'
 
 // Identidad legacy: la que recibe todo scan v1 de Auctionator (todo UNKNOWN).
 const LEGACY = Object.values(H.migrateStoreV1(H.emptyStore(), 'local:legacy').scopes)[0].identity
@@ -67,18 +67,28 @@ test('una identidad acreditada con nombre distinto NO se colapsa', () => {
   assert.deepEqual(plan.snapshot.warnings, [], 'sin unificación no hay aviso')
 })
 
-test('no se importa cuando el snapshot no deja espacio al histórico', () => {
+test('el tamaño de la captura no consume el presupuesto del histórico', () => {
   const vacio = H.emptyStoreV2()
   const grande = snap('PvE', 100, 2500)
   // sourceKey largo: un snapshot legítimamente enorme (no es un caso de nombres).
   grande.realms[0].items = Array.from({ length: 12000 }, (_, i) => ({
-    sourceKey: 'k'.repeat(300) + i, itemId: i + 1, unitPriceCopper: 100, observedDay: 2500,
+    sourceKey: 'k'.repeat(250) + i, itemId: i + 1, unitPriceCopper: 100, observedDay: 2500,
     available: 2, history: [{ day: 2500, low: 100, high: 100, available: 2 }],
   }))
-  assert.ok(H.byteSize(grande) > HISTORY_MAX_BYTES - MIN_STORE_BYTES, 'el fixture debe superar el umbral')
+  const {snapshot, store} = planImportacion(grande, { snapshotActual: null, historyStore: vacio })
+  assert.ok(H.byteSize(snapshot) > HISTORY_MAX_BYTES, 'la captura supera el antiguo tope de la pareja')
+  assert.equal(snapshot.realms[0].items.length, 12000)
+  assert.ok(H.byteSize(store) <= HISTORY_MAX_BYTES)
+  assert.equal(Object.keys(Object.values(store.scopes)[0].realms.PvE.items).length, 12000)
+})
 
-  assert.throws(
-    () => planImportacion(grande, { snapshotActual: null, historyStore: vacio }),
-    /no deja espacio al histórico/,
-  )
+test('un día que supera el presupuesto histórico no reemplaza el histórico por uno vacío', () => {
+  const previo = snap('PvE', 50, 2499)
+  const grande = snap('PvE', 100, 2500)
+  grande.realms[0].items = Array.from({ length: 16000 }, (_, i) => ({
+    ...grande.realms[0].items[0], sourceKey: 'k'.repeat(280) + i, itemId: i + 1,
+  }))
+  assert.throws(() => planImportacion(grande, {
+    snapshotActual: previo, historyStore: H.storeV2FromSnapshot(previo),
+  }), /histórico.+presupuesto/)
 })

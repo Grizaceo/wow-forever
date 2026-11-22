@@ -14,9 +14,11 @@ Lo que no está en los datos se dice con «SIN DATOS» y el motivo declarado en 
 Uso: python3 consultar.py <orden> [opciones]   (python3 consultar.py --help)
 """
 import argparse
+import hashlib
 import json
 import math
 import os
+import re
 import sys
 import unicodedata
 from pathlib import Path
@@ -537,16 +539,57 @@ def ruta_maxeo(recetas, desde, cap, precios, items, faccion=None):
     return base
 
 
+def leer_documento_mercado(path):
+    """Lee JSON normal o un slot v2 en partes. El llamador elige el slot publicado."""
+    path = Path(path)
+    with path.open(encoding="utf-8") as f:
+        d = json.load(f)
+    slot = re.fullmatch(r"market-v2-([ab])\.json", path.name)
+    if not slot or not isinstance(d, dict) or d.get("version") != 2:
+        return d
+    # Mismo contrato que desktop/src/almacen.js. El manifiesto nunca elige rutas.
+    file_max, part_max, bundle_max = (4 << 20, 3 << 20, 32 << 20)
+    count, size, rev, digest = (d.get(k) for k in ("parts", "bytes", "revision", "sha256"))
+    if (set(d) != {"version", "revision", "parts", "bytes", "sha256"}
+            or type(rev) is not int or not 1 <= rev < 2**53
+            or type(count) is not int or not 2 <= count <= (bundle_max + part_max - 1) // part_max
+            or type(size) is not int or not file_max < size <= bundle_max
+            or not isinstance(digest, str) or not re.fullmatch(r"[0-9a-f]{64}", digest)):
+        raise ErrorConsulta("manifiesto del mercado v2 inválido")
+    body = bytearray()
+    for i in range(count):
+        part = path.with_name(f"{path.stem}.part-{i:03}.json")
+        try:
+            with part.open("rb") as f:
+                chunk = f.read(part_max + 1)
+        except OSError as e:
+            raise ErrorConsulta("conjunto del mercado v2 incompleto") from e
+        if not 0 < len(chunk) <= part_max or len(body) + len(chunk) > size:
+            raise ErrorConsulta("tamaño de parte del mercado v2 inválido")
+        body.extend(chunk)
+    if len(body) != size or hashlib.sha256(body).hexdigest() != digest:
+        raise ErrorConsulta("la integridad del conjunto del mercado v2 no coincide")
+    try:
+        b = json.loads(body.decode("utf-8"))
+    except (UnicodeError, ValueError) as e:
+        raise ErrorConsulta("conjunto del mercado v2 ilegible") from e
+    if (not isinstance(b, dict) or b.get("version") != 1 or b.get("revision") != rev
+            or not isinstance(b.get("market"), dict) or not isinstance(b.get("history"), dict)):
+        raise ErrorConsulta("conjunto del mercado v2 inválido")
+    return b
+
+
 def cargar_precios(path, reino=None):
     """Mapa itemId(str)->cobre(int) desde un fichero de precios. Formatos: canónico
     {valores:{id:cobre},reino,fecha}; plano {id:cobre}; bundle legacy del mercado
-    {values:{snapshot:{realms:[{name,items:[{itemId,unitPriceCopper}]}]}}}; extracción
+    {values:{snapshot:{realms:[{name,items:[{itemId,unitPriceCopper}]}]}}} o v2 con market;
+    extracción
     {precios_por_reino:{name:{id:cobre}}}. Devuelve (dict, meta)."""
-    with open(path, encoding="utf-8") as f:
-        d = json.load(f)
+    d = leer_documento_mercado(path)
     if not isinstance(d, dict):
         raise ErrorConsulta("formato de precios no reconocido (se esperaba un objeto JSON)")
     meta, vals = {}, None
+    market = d.get("market", d.get("values"))
     if isinstance(d.get("valores"), dict):
         vals = d["valores"]
         meta = {k: d[k] for k in ("reino", "fecha", "schemaVersion") if k in d}
@@ -556,12 +599,13 @@ def cargar_precios(path, reino=None):
         if nr not in por:
             raise ErrorConsulta(f"reino «{nr}» no está en el fichero; hay: {', '.join(por)}")
         vals, meta = por[nr], {"reino": nr, **(d.get("meta") or {})}
-    elif isinstance(d.get("values"), dict) and isinstance(d["values"].get("snapshot"), dict):
-        snap = d["values"]["snapshot"]
+    elif isinstance(market, dict) and isinstance(market.get("snapshot"), dict):
+        snap = market["snapshot"]
         realms = snap.get("realms") or []
         r = None
-        if reino:
-            r = next((x for x in realms if str(x.get("name", "")).lower() == str(reino).lower()), None)
+        nr = reino or market.get("realm")
+        if nr:
+            r = next((x for x in realms if str(x.get("name", "")).lower() == str(nr).lower()), None)
         r = r or (realms[0] if realms else None)
         if not r:
             raise ErrorConsulta("el bundle de mercado no tiene realms con ítems")
@@ -762,8 +806,7 @@ def cargar_historico(path, reino=None):
     realms:{<realm>:{items:{...}}}}}) o histórico v2 embebido ({history:{v:2,scopes:{<identidad>:
     {realms:{<realm>:{items:{...}}}}}}}). Reino: el pedido (case-insensitive) o el primero.
     Devuelve (items, meta{reino,v})."""
-    with open(path, encoding="utf-8") as f:
-        d = json.load(f)
+    d = leer_documento_mercado(path)
     if not isinstance(d, dict):
         raise ErrorConsulta("formato de histórico no reconocido (se esperaba un objeto JSON)")
 

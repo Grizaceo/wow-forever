@@ -4,7 +4,10 @@
    leen sin migración. Validación pura; nada fuera de las APIs del SDK. */
 import HunterHistory from '../../standalone/market-history.js'
 import HunterIdentity from '../../standalone/market-identity.js'
-const MAX_MARKET=4*1024*1024, MAX_BUILD=128*1024, MAX_HISTORY=4*1024*1024;
+const FILE_MAX_BYTES = 4 * 1024 * 1024, PART_BYTES = 3 * 1024 * 1024
+const BUNDLE_MAX_BYTES = 32 * 1024 * 1024
+const MAX_MARKET=FILE_MAX_BYTES, MAX_BUILD=128*1024, MAX_HISTORY=FILE_MAX_BYTES;
+const encoder = new TextEncoder()
 const ownKeys=(o,allowed)=>o&&typeof o==='object'&&!Array.isArray(o)&&Object.keys(o).every(k=>allowed.includes(k));
 const int=(n,min=0,max=Number.MAX_SAFE_INTEGER)=>Number.isSafeInteger(n)&&n>=min&&n<=max;
 const text=(s,max=300)=>typeof s==='string'&&s.length<=max;
@@ -44,17 +47,18 @@ export function validHistoryStore(s){
   return true;
 }
 export function validMarket(m){
-  if(!ownKeys(m,['snapshot','realm','bundledScan'])||JSON.stringify(m).length>MAX_MARKET)return false;
+  if(!ownKeys(m,['snapshot','realm','bundledScan']))return false;
   if(m.realm!==undefined&&!text(m.realm))return false;
   if(m.bundledScan!==undefined&&!/^[a-f0-9]{64}$/.test(m.bundledScan))return false;
   const s=m.snapshot;
   if(s===undefined)return m.realm===undefined;
-  const v2=s.schemaVersion===2;
+  const v2=s?.schemaVersion===2;
   const allowed=v2
     ? ['schemaVersion','sourceVersion','importedAt','realms','warnings','observation','cutoffDay']
     : ['schemaVersion','sourceVersion','importedAt','realms','warnings'];
   if(!ownKeys(s,allowed))return false;
-  if(!v2&&s.schemaVersion!==1||s.sourceVersion!==8)return false;
+  if((!v2&&s.schemaVersion!==1)||s.sourceVersion!==8)return false;
+  if(!v2&&JSON.stringify(m).length>MAX_MARKET)return false;
   if(!text(s.importedAt,60)||!Number.isFinite(Date.parse(s.importedAt)))return false;
   if(!Array.isArray(s.warnings)||s.warnings.length>1000||!s.warnings.every(w=>text(w,1000)))return false;
   if(v2){
@@ -90,22 +94,25 @@ export function validBuild(b){
 // Un respaldo A/B completo puede superar ese tope (caso real: 5,27 MiB): se parte
 // en trozos ≤3 MiB con manifiesto y el documento lógico se reensambla al leer.
 // Los dobles de test DEBEN replicar el tope real o una suite verde miente.
-const BACKUP_CHUNK_BYTES = 3 * 1024 * 1024
 const BACKUP_PART_RE = /^pre-v2-backup\.part-\d{3}\.json$/
-function backupParts(body) {
+function textParts(body) {
   const parts = []
   let start = 0, bytes = 0, i = 0
   while (i < body.length) {
     const cp = body.codePointAt(i)
     const units = cp > 0xffff ? 2 : 1
     const w = cp <= 0x7f ? 1 : cp <= 0x7ff ? 2 : cp <= 0xffff ? 3 : 4
-    if (bytes + w > BACKUP_CHUNK_BYTES && i > start) { parts.push(body.slice(start, i)); start = i; bytes = 0 }
+    if (bytes + w > PART_BYTES) { parts.push(body.slice(start, i)); start = i; bytes = 0 }
     bytes += w
     i += units
   }
   parts.push(body.slice(start))
   return parts
 }
+
+const bundlePath = slot => `market-v2-${slot}.json`
+const partPath = (slot, i) => `market-v2-${slot}.part-${String(i).padStart(3, '0')}.json`
+const sha256 = async bytes => Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', bytes)), b => b.toString(16).padStart(2, '0')).join('')
 
 export function createStore(ctx) {
   let queue=Promise.resolve(), cached=null, poisoned=false, v2active=false, v2slot=null;
@@ -118,9 +125,7 @@ export function createStore(ctx) {
     const paired=await ctx.storage.get('market-v2-pointer');
     if(paired!==null&&paired!==undefined&&paired!==''){
       if(!ownKeys(paired,['slot','revision'])||!['a','b'].includes(paired.slot)||!int(paired.revision,1))throw Error('Índice v2 inválido.');
-      const f=await ctx.files.readText('data',`market-v2-${paired.slot}.json`);
-      let b;try{b=f?.ok&&JSON.parse(f.text)}catch{throw Error('Conjunto v2 ilegible.')}
-      if(!validBundle(b)||b.revision!==paired.revision)throw Error('Conjunto v2 inválido.');
+      const b=await readBundle(paired);
       v2active=true;v2slot=paired.slot;
       return cached={build,market:b.market,history:{store:b.history,revision:b.revision},revision:b.revision,
         hrevision:b.revision,slot:paired.slot,hslot:paired.slot,legacyMarket:false,legacyHistory:false};
@@ -160,6 +165,35 @@ export function createStore(ctx) {
       validMarket(b.market) && (!b.market.snapshot || b.market.snapshot.schemaVersion===2) &&
       validHistoryStore(b.history) && b.history.v===2;
   }
+  async function readBundle({slot, revision}) {
+    const f = await ctx.files.readText('data', bundlePath(slot))
+    let b
+    try { b = f?.ok && JSON.parse(f.text) } catch { throw Error('Conjunto v2 ilegible.') }
+    if (b?.version === 2) {
+      // No aceptar rutas de un manifiesto: solo nombres fijos del slot activo.
+      if (!ownKeys(b, ['version','revision','parts','bytes','sha256']) || b.revision !== revision ||
+          !int(b.parts, 2, Math.ceil(BUNDLE_MAX_BYTES / PART_BYTES)) ||
+          !int(b.bytes, FILE_MAX_BYTES + 1, BUNDLE_MAX_BYTES) ||
+          typeof b.sha256 !== 'string' || !/^[a-f0-9]{64}$/.test(b.sha256)) {
+        throw Error('Manifiesto v2 inválido.')
+      }
+      const parts = []
+      let total = 0
+      for (let i = 0; i < b.parts; i++) {
+        const p = await ctx.files.readText('data', partPath(slot, i))
+        if (!p?.ok || typeof p.text !== 'string') throw Error('Conjunto v2 incompleto; no se sobrescribió.')
+        const n = encoder.encode(p.text).length
+        total += n
+        if (n === 0 || n > PART_BYTES || total > b.bytes) throw Error('Tamaño de parte v2 inválido.')
+        parts.push(p.text)
+      }
+      const body = parts.join('')
+      if (total !== b.bytes || await sha256(encoder.encode(body)) !== b.sha256) throw Error('La integridad del conjunto v2 no coincide.')
+      try { b = JSON.parse(body) } catch { throw Error('Conjunto v2 ilegible.') }
+    }
+    if (!validBundle(b) || b.revision !== revision) throw Error('Conjunto v2 inválido.')
+    return b
+  }
   function validBackup(b) {
     const pointer=p=>p===null||(ownKeys(p,['slot','revision'])&&['a','b'].includes(p.slot)&&int(p.revision,1));
     return ownKeys(b,['format','createdAt','pointers','slots'])&&b.format==='wow-forever/pre-v2'&&
@@ -193,12 +227,21 @@ export function createStore(ctx) {
     const revision = Math.max(s.revision, s.hrevision) + 1
     const bundle = { version: 1, revision, market, history }
     if (!validBundle(bundle)) throw Error('Conjunto v2 inválido')
-    const path = `market-v2-${slot}.json`, text = JSON.stringify(bundle)
-    if (new TextEncoder().encode(text).length > 4 * 1024 * 1024) throw Error('Conjunto v2 demasiado grande')
-    const w = await ctx.files.writeText('data', path, text)
-    if (!w?.ok) throw Error('No se pudo guardar el conjunto v2')
-    const check = await ctx.files.readText('data', path)
-    if (!check?.ok || check.text !== text) throw Error('El conjunto v2 no pasó lectura de confirmación')
+    const path = bundlePath(slot), text = JSON.stringify(bundle), bytes = encoder.encode(text)
+    if (bytes.length > BUNDLE_MAX_BYTES) throw Error('Conjunto v2 supera el máximo de 32 MiB. Se conserva el anterior.')
+    const confirm = async (path, text) => {
+      const w = await ctx.files.writeText('data', path, text)
+      if (!w?.ok) throw Error('No se pudo guardar el conjunto v2' + (w?.error ? ` [${w.error}]` : ''))
+      const check = await ctx.files.readText('data', path)
+      if (!check?.ok || check.text !== text) throw Error('El conjunto v2 no pasó lectura de confirmación')
+    }
+    if (bytes.length <= FILE_MAX_BYTES) await confirm(path, text)
+    else {
+      const parts = textParts(text)
+      const manifest = {version:2, revision, parts:parts.length, bytes:bytes.length, sha256:await sha256(bytes)}
+      for (let i = 0; i < parts.length; i++) await confirm(partPath(slot, i), parts[i])
+      await confirm(path, JSON.stringify(manifest))
+    }
     const pointer = {slot,revision}
     try {
       await ctx.storage.set('market-v2-pointer', pointer)
@@ -221,7 +264,7 @@ export function createStore(ctx) {
       s.build=value;return true;
     }),
     market:value=>serial(async()=>{
-      if(!ownKeys(value,['values','revision'])||!int(value.revision)||!validMarket(value.values))throw new Error('Scan inválido o demasiado grande para Hermes (máximo 4 MiB normalizado).');
+      if(!ownKeys(value,['values','revision'])||!int(value.revision)||!validMarket(value.values))throw new Error('Scan inválido o demasiado grande.');
       const s=await load();
       if(value.revision!==s.revision)throw new Error('El mercado cambió en otra vista. Usa Recargar datos en Configuración antes de guardar.');
       if(v2active){
@@ -286,13 +329,13 @@ export function createStore(ctx) {
         const r=await ctx.files.readText('data',name);
         if(!r?.ok||r.text!==text)throw new Error('No se confirmó el respaldo previo a v2. No se escribió.');
       };
-      if(new TextEncoder().encode(body).length<=BACKUP_CHUNK_BYTES){
+      if(encoder.encode(body).length<=PART_BYTES){
         await confirm('pre-v2-backup.json',body);
         return {ok:true,alreadyBackedUp:false};
       }
       // Respaldo >4 MiB: trozos confirmados primero, manifiesto al final (el
       // manifiesto es el punto de commit; sin él, el próximo intento rehace todo).
-      const parts=backupParts(body),names=[];
+      const parts=textParts(body),names=[];
       for(let i=0;i<parts.length;i++){
         const name=`pre-v2-backup.part-${String(i).padStart(3,'0')}.json`;
         await confirm(name,parts[i]);names.push(name);

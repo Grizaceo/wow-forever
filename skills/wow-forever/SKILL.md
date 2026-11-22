@@ -146,8 +146,10 @@ tres fuentes locales: **Auctionator** (precios anunciados), la **contabilidad TS
   «PvP Horde» según la facción del personaje activo. Con identidad opaca (todo `UNKNOWN`) el
   nombre no separa pools, y la fusión duplicaba los ítems hasta pasar los 4 MiB de `writeText`.
   El plan conserva la etiqueta del scan nuevo, lo declara en `snapshot.warnings` y mueve el
-  histórico al nombre nuevo con `mergeRows`. No recortar el store por debajo de
-  `MIN_STORE_BYTES` (256 KiB): mejor fallar explícito que guardar un histórico vacío.
+  histórico al nombre nuevo con `mergeRows`. El tope del SDK es 4 MiB por archivo:
+  los conjuntos v2 grandes se parten y se verifican antes de publicar el puntero.
+  El histórico tiene presupuesto propio; si ni el último día cabe, se conserva
+  la pareja anterior y se muestra el error.
 - Si el panel dice **«Bridge: too many entries (offset N)»**, el límite es del parser Lua, no del
   validador del plugin: el diario guarda ~75.000 entradas por día y la retención por defecto
   (14 días) pide ~1.050.000. Techo actual `ENTRIES_LIMIT` 1.200.000 con `MAX_BYTES` 8 MiB.
@@ -157,8 +159,9 @@ tres fuentes locales: **Auctionator** (precios anunciados), la **contabilidad TS
   tiene la cosecha: `grep -c pawnCatalogo .../Interface/AddOns/WoWForeverBridge/Pawn.lua`. El
   repo puede estar al día y el juego correr una copia vieja; copiar `addon/WoWForeverBridge/*`
   y pedir `/reload`.
-- Verificar el arreglo en disco, no en la UI: `market-v2-{a,b}.json` debe avanzar de revisión cada
-  30 s, con un solo reino y `history` conservando la serie de 14 días.
+- Verificar el puntero `market-v2-pointer` y el conjunto activo: reconstruir el
+  manifiesto con `consultar.py` y cotejar `revision`, precios e histórico. Los 30 s
+  son el intervalo de sondeo, no una promesa de nueva revisión sin datos nuevos.
 - Si el usuario te pega números de la página: `m` es el último mínimo unitario observado, en
   cobre (1 oro = 10000), no una venta. Oro por hora, ROI y ofertas son **estimaciones** con
   drops de Classic 1.12 y sin datos de población.

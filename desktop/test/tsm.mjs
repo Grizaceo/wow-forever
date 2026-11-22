@@ -1,5 +1,5 @@
 // Chromium + actual generated plugin, synthetic TSM data only. No game files.
-import { iniciar, PERFILES, PREF } from './arnes.mjs'
+import { iniciar, exportarEstado, PERFILES, PREF } from './arnes.mjs'
 const tx='itemString,stackSize,quantity,price,otherPlayer,player,time,source'
 const ex='itemString,stackSize,quantity,player,time'
 const fix=(qty=40)=>`TradeSkillMasterDB={ ["r@Prueba@internalData@csvSales"]=${JSON.stringify(tx+'\ni:2589,20,'+qty+',120,PRIVATE_BUYER,PRIVATE_PLAYER,1794800000,Auction')},["r@Prueba@internalData@csvBuys"]=${JSON.stringify(tx+'\ni:2589,10,10,80,PRIVATE_SELLER,PRIVATE_PLAYER,1794700000,Auction')},["r@Prueba@internalData@csvExpired"]=${JSON.stringify(ex+'\ni:2589,20,60,PRIVATE_PLAYER,1794900000')} }`
@@ -20,7 +20,7 @@ for(const theme of ['claro','oscuro']){
   await p.getByRole('button',{name:'Leer Auctionator.lua',exact:true}).click()
   await panel.getByText('1p 40c',{exact:true}).waitFor()
   check(theme+': comparación de precio mismo reino',true)
-  const before=await p.evaluate(()=>localStorage.getItem('archivo.tsm-a.json')||localStorage.getItem('archivo.tsm-b.json'))
+  const before=await p.evaluate(()=>archivosData.get('tsm-a.json')||archivosData.get('tsm-b.json'))
   check(theme+': datos persistidos sin nombres',! /PRIVATE/.test(before))
   await panel.getByRole('button',{name:'Leer TradeSkillMaster.lua',exact:true}).click()
   await panel.getByText('TSM sin cambios',{exact:true}).waitFor()
@@ -28,7 +28,7 @@ for(const theme of ['claro','oscuro']){
   // Update source while a different tab is mounted; timer is plugin-scoped.
   await p.click('[data-tab="personaje"]')
   await p.evaluate(tsm=>{window.carpetaConcedida.files['TradeSkillMaster.lua']=tsm;window.sondeos.forEach(t=>t.fn())},fix(60))
-  await p.waitForFunction(()=>[...Array(localStorage.length)].some((_,i)=>{const k=localStorage.key(i);return k.startsWith('archivo.tsm-') && /"quantity":60,"unitPriceCopper":120/.test(localStorage.getItem(k))}))
+  await p.waitForFunction(()=>[...archivosData].some(([k,v])=>k.startsWith('tsm-') && /"quantity":60,"unitPriceCopper":120/.test(v)))
   await p.click('[data-tab="mercado"]')
   await panel.getByText('60',{exact:true}).first().waitFor()
   check(theme+': seguimiento sigue fuera de Mercado',true)
@@ -38,7 +38,7 @@ for(const theme of ['claro','oscuro']){
   await p.evaluate(tsm=>{window.carpetaConcedida.files['TradeSkillMaster.lua']=tsm},fix(60))
   await panel.getByRole('button',{name:'Reabrir TSM',exact:true}).click()
   await panel.locator('tbody tr').first().waitFor()
-  if(theme==='claro') saved=await p.evaluate(()=>Object.fromEntries([...Array(localStorage.length)].map((_,i)=>{const k=localStorage.key(i);return [k,localStorage.getItem(k)]})))
+  if(theme==='claro') saved=await exportarEstado(p)
   // Simulate write failure: explicit error, not a success toast.
   await p.evaluate(()=>window.fallarEscritura=true)
   await panel.getByRole('button',{name:'Borrar historial TSM',exact:true}).click()
@@ -52,9 +52,7 @@ for(const theme of ['claro','oscuro']){
   check(theme+': borrado confirmado pausa solo TSM',true)
   await cerrar()
 }
-const previo={storage:{},archivos:{},perfil:PERFILES.cazadorHorda}
-for(const [k,v]of Object.entries(saved)){if(k.startsWith('archivo.'))previo.archivos[k.slice(8)]=v;else if(k.startsWith(PREF))previo.storage[k.slice(PREF.length)]=JSON.parse(v)}
-const {p,cerrar}=await a.abrir('claro',previo)
+const {p,cerrar}=await a.abrir('claro',saved)
 await p.click('[data-tab="mercado"]');await p.locator('[data-testid="tsm-panel"] tbody tr').first().waitFor()
 check('sesión nueva restaura TSM desde su archivo separado',await p.locator('[data-testid="tsm-panel"] tbody tr').count()===1)
 await cerrar()

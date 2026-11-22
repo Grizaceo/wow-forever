@@ -336,10 +336,14 @@ DESKTOP_PLUGIN=$PWD/desktop/plugin.js node desktop/test/vista-subasta-pawn.mjs
 
 ## Almacenamiento v2 y respaldo pre-v2
 
-Mercado e historial viven en un **bundle v2** (`market-v2-a/b.json`,
-`price-history-v2-a/b.json`) con `schemaVersion: 2` / `history.v: 2` y un único
-puntero `market-v2-pointer` `{slot, revision}`. Escritura de siempre: slot
-inactivo → read-back byte a byte → mover puntero.
+Mercado e historial viven en un **conjunto v2** (`market-v2-a.json` o
+`market-v2-b.json`) con un único puntero `market-v2-pointer` `{slot, revision}`.
+Cada slot es un envoltorio `{version: 1, revision, market, history}` o, si supera
+4 MiB UTF-8, un manifiesto `{version: 2, revision, parts, bytes, sha256}` seguido
+de `market-v2-<slot>.part-NNN.json` (≤3 MiB por parte, hasta 32 MiB por conjunto).
+Se escribe en el slot inactivo, se reconstruye y verifica el contenido antes de
+publicar el puntero. El lector CLI `consultar.py` acepta ambos formatos; se debe
+elegir el slot por puntero, nunca por `mtime`.
 
 - **v1 legacy** (`market-a/b.json`, `price-history-a/b.json`, punteros
   `market-pointer` / `price-history-pointer`) se **retiene** tras la migración:

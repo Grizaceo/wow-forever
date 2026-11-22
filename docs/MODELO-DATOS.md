@@ -254,10 +254,12 @@ la facción del personaje activo.
   que la serie no se parta en dos claves.
 - Con identidad acreditada el nombre sigue separando pools: no se colapsa nada.
 
-Presupuesto: el documento completo (`market` + `history`) se escribe con `writeText`, tope 4 MiB.
-El `snapshot` lo valida `almacen` (≤ 4 MiB) y el histórico nunca se recorta por debajo de
-`MIN_STORE_BYTES` (256 KiB): si el snapshot no deja ese hueco, la importación falla con un error
-explícito en vez de guardar un store vacío que simule haber importado.
+Presupuesto: 4 MiB UTF-8 es el tope **por archivo** de `writeText`, no el de los
+precios más el histórico. El conjunto A/B admite hasta 32 MiB fragmentados. El
+snapshot conserva los precios corrientes y una ventana reciente por ítem; el
+histórico tiene su propio presupuesto de casi 4 MiB. Si ni el último día del
+histórico cabe o el conjunto supera el tope, no se publica y se conserva la
+pareja anterior. Un sondeo sin bytes nuevos no es una actualización.
 
 Parser Lua: `MAX_BYTES` 8 MiB y `ENTRIES_LIMIT` 1.200.000. Un diario del puente guarda ~75.000
 entradas por día (7.368 ítems × 4 campos) y el addon retiene 14 días ⇒ ~1.050.000. Con el techo

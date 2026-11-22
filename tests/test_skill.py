@@ -22,7 +22,8 @@ sys.path.insert(0, os.path.dirname(SCRIPT))
 sys.dont_write_bytecode = True  # nada de __pycache__ dentro de la skill
 import consultar  # noqa: E402
 
-PERMITIDOS = {'argparse', 'json', 'math', 'os', 'sys', 'unicodedata', 'pathlib'}
+# re y hashlib validan los nombres y la integridad del bundle multipartes.
+PERMITIDOS = {'argparse', 'hashlib', 'json', 'math', 'os', 'pathlib', 're', 'sys', 'unicodedata'}
 
 
 def correr(*args):
