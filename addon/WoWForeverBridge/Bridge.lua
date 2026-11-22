@@ -25,20 +25,11 @@ local function chat(msg)
   DEFAULT_CHAT_FRAME:AddMessage('|cFF00FF00WoW Forever|r ' .. msg)
 end
 
--- Reino actual: clave GetRealmName(); si no está (reinos conectados), única
--- entrada de reino que sea tabla plana version 2 (las demás son blobs CBOR).
+-- Reino actual: la resolución vive en Logic.currentRealm (compartida con la
+-- cosecha de stats de Pawn.lua): clave GetRealmName(); si no está (reinos
+-- conectados), única entrada de reino que sea tabla plana version 2.
 local function currentRealm(db)
-  local name = GetRealmName()
-  local realm = db[name]
-  if type(realm) == 'table' and realm.version == 2 then return realm, name end
-  local found, foundName = nil, nil
-  for k, v in pairs(db) do
-    if k ~= '__dbversion' and type(v) == 'table' and v.version == 2 then
-      if found then return nil, nil end -- ambiguo: no adivinar
-      found, foundName = v, k
-    end
-  end
-  return found, foundName
+  return Logic.currentRealm(db, GetRealmName())
 end
 
 local function capture(force)
