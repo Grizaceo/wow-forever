@@ -3,7 +3,7 @@
 // gráfico SVG y recomendador de farmeo. Port de standalone/market-ui.js a
 // React reutilizando los módulos puros de standalone/ sin copiarlos.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Button, Checkbox, SearchField, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@hermes/plugin-sdk'
+import { Button, Checkbox, SearchField, SegmentedControl, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@hermes/plugin-sdk'
 import { classifyAcquisition, leerAuctionator, verifiedExporter } from '../auctionator.js'
 import { createMarketSync } from '../mercado-auto.js'
 import { D, GUIAS, guiaCurada, nombre } from '../datos.js'
@@ -22,9 +22,11 @@ import { DetalleItem } from './mercado/detalle.jsx'
 import { Farmeo } from './mercado/farmeo.jsx'
 import { PreguntarDavi } from './preguntar-davi.jsx'
 import { MisVentas } from './mercado/mis-ventas.jsx'
+import { VistaSubastaPawn } from './subasta-pawn.jsx'
 
 agregarTextos({
   'mercado.scan.titulo': 'Escaneo de Auctionator',
+  'mercado.sub.ofertas': 'Ofertas',
   'mercado.leer': 'Leer Auctionator.lua',
   'mercado.otra': 'Elegir otra carpeta',
   'mercado.archivo': 'Importar archivo .lua',
@@ -213,6 +215,7 @@ agregarTextos({
   'mercado.farm.estimaciones': 'Estimaciones aproximadas: drop rates de referencia Classic 1.12 (CMaNGOS), no observados en Forever. Sin datos de población: la competencia es tu selección + heurísticas. Ningún número es una venta ni un ingreso garantizado.',
 }, {
   'mercado.scan.titulo': 'Auctionator scan',
+  'mercado.sub.ofertas': 'Offers',
   'mercado.leer': 'Read Auctionator.lua',
   'mercado.otra': 'Pick another folder',
   'mercado.archivo': 'Import .lua file',
@@ -569,6 +572,8 @@ export function VistaMercado({ ctx, almacen, sincronizador, ventas, puente, esta
   const [soloFarmable, setSoloFarmable] = useState(false)
   const [soloOfertas, setSoloOfertas] = useState(false)
   const [orden, setOrden] = useState('precio')
+  // Sub-pestaña de Mercado: 'ofertas' (lo de siempre) o 'subasta' (Subasta × Pawn).
+  const [sub, setSub] = useState('ofertas')
   const [pagina, setPagina] = useState(0)
   const [detalleKey, setDetalleKey] = useState(null)
   const [farmGuardado, setFarmGuardado] = useState(null)
@@ -902,6 +907,27 @@ export function VistaMercado({ ctx, almacen, sincronizador, ventas, puente, esta
   }
 
   /* ------------------------------------------------------------- render */
+  // Barra de sub-pestañas: "Ofertas" es la vista de siempre (por defecto) y
+  // "Subasta × Pawn" añade el ranking por pesos del personaje.
+  const barraSub = (
+    <div style={{ padding: '6px 0' }} data-testid="mercado-sub">
+      <SegmentedControl value={sub} onChange={setSub} options={[
+        { id: 'ofertas', label: t(lang, 'mercado.sub.ofertas') },
+        { id: 'subasta', label: t(lang, 'subasta.titulo') },
+      ]} />
+    </div>
+  )
+
+  if (sub === 'subasta') {
+    return (
+      <div style={S.pagina}>
+        <div style={S.cuerpo}>
+          {barraSub}
+          <VistaSubastaPawn ctx={ctx} mercado={mercado} historial={historial} perfil={perfil} lang={lang} />
+        </div>
+      </div>
+    )
+  }
   const fuenteResumen = (item) => {
     const cat = Number.isSafeInteger(item?.itemId) && item.itemId > 0 ? CATALOGO.items[String(item.itemId)] : null
     const sources = cat?.sources || []
@@ -982,6 +1008,7 @@ export function VistaMercado({ ctx, almacen, sincronizador, ventas, puente, esta
   return (
     <div style={S.pagina}>
       <div style={S.cuerpo}>
+        {barraSub}
         <Tarjeta titulo={t(lang, 'mercado.scan.titulo')} extra={<span style={S.chip}>{t(lang, 'mercado.tusDatos')}</span>}>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
             <Button onClick={() => leerCarpeta(false)} disabled={importando}>{t(lang, 'mercado.leer')}</Button>

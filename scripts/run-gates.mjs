@@ -26,9 +26,9 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const KEEP_GOING = process.argv.includes('--keep-going');
 
 // Conteos esperados del stack canónico (actualizar a mano si se añaden tests).
-const EXPECT_NODE = 325;
+const EXPECT_NODE = 353;
 const EXPECT_PY = 86;
-const EXPECT_LUA = 113;
+const EXPECT_LUA = 180;
 // Tests unitarios del motor en standalone/tests/*.cjs (node:test). Los «real
 // fixture» son stat-only por defecto; WOW_FOREVER_REAL_FIXTURE=1 los hace leer
 // contenido de SavedVariables (solo para diagnóstico manual, nunca en gates).
@@ -37,9 +37,9 @@ const BROWSER = [
   ['navegador', 37], ['mercado-auto', 11], ['mercado-procedencia', 24],
   ['tsm', 28], ['vista-mercado', 56], ['vista-davi', 50], ['vista-guia', 28],
   ['vista-profesiones', 41], ['vista-ruta-dungeons', 31], ['bridge', 19],
-  ['vista-personaje-simc', 11], ['vista-pawn', 13],
+  ['vista-personaje-simc', 11], ['vista-pawn', 13], ['vista-subasta-pawn', 28],
 ];
-const EXPECT_BROWSER_TOTAL = BROWSER.reduce((n, [, c]) => n + c, 0); // 349
+const EXPECT_BROWSER_TOTAL = BROWSER.reduce((n, [, c]) => n + c, 0); // 377
 
 function sh(cmd, args, cwd = ROOT, env = process.env) {
   const r = spawnSync(cmd, args, { cwd, env, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
