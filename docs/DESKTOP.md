@@ -34,6 +34,9 @@ minificar) desde `desktop/src/`. Hermes Desktop lo carga en la barra lateral com
 | `src/mercado-auto.js` | sondeo automático de Auctionator cada 30 s (cola, revisión, puntero) |
 | `src/tsm.js` / `src/tsm-sync.js` | contabilidad personal TSM (CSV como datos) y su sondeo cada 30 s |
 | `src/bridge-sync.js` | sondeo del diario WoWForeverBridge cada 30 s (una entrada por día) |
+| `src/item-stats.js` | catálogo de stats por ítem (`pawn-stats`) y equipo puesto por slot; normaliza y persiste |
+| `src/subasta-pawn.js` | puntuador puro Subasta × Pawn (score, delta, plata por punto, exclusiones) |
+| `src/vistas/subasta-pawn.jsx` | sub-pestaña Subasta × Pawn dentro de Mercado |
 | `src/datos.js` | `data/*.json`, `drop-data`, guías curadas y ayudas |
 | `src/ui.jsx`, `src/estilos.js`, `src/i18n.js` | piezas, estilos y textos comunes |
 | `src/davi.js`, `src/davi-transporte.js` | «Preguntar a DAVI»: contexto puro (allowlist, acotes) y transporte insert → portapapeles → manual |
@@ -275,6 +278,51 @@ Pruebas específicas:
 node --test tests/pawn.test.mjs
 lua addon/tests/test_bridge.lua
 DESKTOP_PLUGIN=$PWD/desktop/plugin.js node desktop/test/vista-pawn.mjs
+```
+
+## Subasta × Pawn (catálogo de stats de ítems y ranking)
+
+La sub-pestaña **Subasta × Pawn** (dentro de Mercado) responde «¿cuánto vale esta
+oferta *para este personaje*?» sin inventar nada: el ranking lo produce una
+fórmula declarada, no un modelo.
+
+**Cadena de datos.** `addon/WoWForeverBridge/Pawn.lua` cosecha el catálogo de
+stats de los ítems que aparecen en la subasta importada
+(`C_Item.GetItemStats("item:<id>")` dentro de `pcall`, copiando
+`LootFilter.lua:482-486`) y lo escribe en `WoWForeverBridgeDB.pawnCatalogo`
+(`i`=ilvl, `l`=equipLoc, `c`/`s`=class/subclass, `k`=stats crudos, `t`=truncado)
+junto al conteo `resolvidos`/`pendentes` y el cursor del ciclo. La cosecha avanza
+en `OnUpdate` (`MAX_TICK` ids por frame), no bloquea y repite cada
+`INTERVALO_CATALOGO`. `/wfbpawn catalogo` la fuerza.
+
+- `desktop/src/bridge.js` — `parseBridge` expone `pawnCatalogo` (el parser
+  descarta campos no declarados: cualquier campo nuevo del puente se añade aquí).
+- `desktop/src/item-stats.js` (puro) — `recItem` idempotente, `MAPA_STATS`
+  (crudo → clave Pawn) con `CLAVES_PAWN` para que **re-normalizar no degrade**,
+  `slotDeEquipLoc`, `parseEquipado` (acepta `id` o `itemID`), `estadoPawnStats` y
+  `sincronizarPawnStats`. Storage: clave **`pawn-stats`** (no confundir con
+  `pawn-catalogo`, que son las escalas Pawn).
+- `desktop/src/subasta-pawn.js` (puro) — `rankear({ofertas, escala, equipado,
+  catalogo})`:
+  `score = Σ stats × pesos`, `delta = score(ítem) − score(equipado del slot)`,
+  `plata/punto = (precio_cobre ÷ 100) ÷ delta` (`null` si `delta ≤ 0`), orden
+  `delta` DESC y empate `itemID` ASC. `precioPorItem` toma el mínimo **solo de
+  precios > 0** y agrega por `itemID`.
+- `desktop/src/vistas/subasta-pawn.jsx` — presentación: aviso de que no es
+  recomendación ni DPS, fórmula visible, tabla, exclusiones con motivo y
+  procedencia (escala + fecha, catálogo + fecha, reino + snapshot).
+
+**Límites que la vista declara en vez de disimular:** sin captura Pawn
+(`/wfbpawn`), sin catálogo (`/wfbp catalogo` + `/reload`) o sin ofertas
+importadas, cada estado nace `SIN DATOS` con su siguiente paso. Un ítem sin
+stats, con slot desconocido, con el slot equipado sin stats («a ciegas») o sin
+ninguna oferta con precio válido se excluye con motivo contado, no se puntúa a 0.
+
+Pruebas específicas:
+
+```sh
+node --test tests/item-stats.test.mjs tests/subasta-pawn.test.mjs
+DESKTOP_PLUGIN=$PWD/desktop/plugin.js node desktop/test/vista-subasta-pawn.mjs
 ```
 
 ## Almacenamiento v2 y respaldo pre-v2
