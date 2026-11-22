@@ -67,6 +67,23 @@ sin sobrescribir su código, configuración, skills ni estado local.
 Verificar hashes y ejecutar suites contra `DESKTOP_PLUGIN` instalado.
 No instalar addons en el juego ni tocar cuentas, mercado guardado o grants.
 
+### Resultado del despliegue verificado
+
+- Commit del bundle: `bbb8958ab01e993912c72df65515633a6f5c1b21`.
+- Renderer y artefactos del clon agente alineados con HEAD; SHA256 común:
+  `5f2ef49f33a6cdf5f67feb613818e1198ba5b83f973e17ed5f42d589da39599f`.
+- Respaldo de ambos destinos antes de copiar:
+  `~/.hermes/cache/scratch/wow-farm-deploy.qkc5a9we/before/`.
+- `hermes plugins show wow-forever`: **enabled**.
+- `hermes plugins doctor wow-forever`: manifest, import y registro **OK**.
+- Las **14 suites Chromium contra el archivo instalado**, usando
+  `DESKTOP_PLUGIN=~/.hermes/desktop-plugins/wow-forever/plugin.js` y
+  `HERMES_SDK_TABS=1`, dieron **407 checks**, **red 0**, **errores JS 0**.
+  Incluyen navegación con teclado del SDK real, persistencia de importaciones
+  grandes, Subasta × Pawn y explicación de ruta. Se verificó otra vez el hash
+  instalado después de todas las suites, sin cambio.
+- El worktree de entrega queda comprometido y limpio; sin push.
+
 La validación no mide drops, ventas, competencia, trayectos o ingresos reales.
 La densidad es una cota de spawns/respawn del dataset, no distancia física.
 El caso Air/Dust es un escenario de regresión, no una preferencia universal.
