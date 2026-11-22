@@ -20,6 +20,7 @@ import {
 } from '../mercado-logica.js'
 import { DetalleItem } from './mercado/detalle.jsx'
 import { Farmeo } from './mercado/farmeo.jsx'
+import { RutaFarmeo } from './mercado/ruta-farmeo.jsx'
 import { PreguntarDavi } from './preguntar-davi.jsx'
 import { MisVentas } from './mercado/mis-ventas.jsx'
 import { VistaSubastaPawn } from './subasta-pawn.jsx'
@@ -74,7 +75,7 @@ agregarTextos({
   'mercado.orden.nombre': 'Nombre',
   'mercado.orden.precio': 'Precio',
   'mercado.orden.ofertas': 'Mejores ofertas',
-  'mercado.orden.roi': 'ROI estimado',
+  'mercado.orden.roi': 'Margen frente al oro/h objetivo',
   'mercado.orden.gph': 'Oro/hora estimado',
   'mercado.col.item': 'Ítem / clave',
   'mercado.col.min': 'Último mínimo por unidad',
@@ -86,7 +87,7 @@ agregarTextos({
   'mercado.ordenTxt.precio': 'precio descendente',
   'mercado.ordenTxt.nombre': 'nombre',
   'mercado.ordenTxt.ofertas': 'mejores ofertas vs mediana histórica (approx)',
-  'mercado.ordenTxt.roi': 'orden por ROI estimado (approx)',
+  'mercado.ordenTxt.roi': 'orden por margen frente al oro/h objetivo (estimado)',
   'mercado.ordenTxt.gph': 'orden por oro/hora estimado (approx)',
   'mercado.vacio.scan': 'Todavía no importaste precios. Elige tu Auctionator.lua para empezar.',
   'mercado.restaurado': 'Precios importados restaurados. Son ofertas anunciadas, no ventas.',
@@ -113,8 +114,8 @@ agregarTextos({
   'mercado.farmeo.noFar': 'No farmeable con tu ficha',
   'mercado.farmeo.sinElegible': 'sin fuente elegible',
   'mercado.farmeo.farmeable': 'farmeable',
-  'mercado.farmeo.dudoso': 'precio dudoso (≤2 ofertas, tope 50× vendedor)',
-  'mercado.farmeo.dudosoPre': 'precio dudoso (≤2 ofertas, tope 50× vendedor) para estimar farmeo',
+  'mercado.farmeo.dudoso': 'precio de referencia limitado (≤2 ofertas, tope 50× vendedor)',
+  'mercado.farmeo.dudosoPre': 'precio de referencia limitado (≤2 ofertas, tope 50× vendedor) para estimar farmeo',
   'mercado.cerrar': 'Cerrar',
   'mercado.sinHistorial': 'Sin historial fechado para este ítem.',
   'mercado.grafico': 'Historial del precio mínimo diario (approx)',
@@ -124,7 +125,7 @@ agregarTextos({
   'mercado.tend.pocos': 'pocos datos',
   'mercado.det.ultimo': 'Último mínimo anunciado',
   'mercado.det.aviso': 'No es mediana ni precio de venta. La fecha corresponde al último día de precio registrado, no a esta importación.',
-  'mercado.det.dudoso': 'Precio dudoso (≤2 ofertas, tope 50× vendedor para estimar farmeo).',
+  'mercado.det.dudoso': 'Precio de referencia limitado (≤2 ofertas, tope 50× vendedor para estimar farmeo).',
   'mercado.det.variante': 'Variante sin ID simple: se muestra aparte, no se mezcla con la base.',
   'mercado.det.historial': 'Historial acumulado (approx, sobre el mínimo diario)',
   'mercado.det.minimo': 'mínimo',
@@ -159,6 +160,15 @@ agregarTextos({
   'mercado.farm.gphRef': 'Oro/h de ref.',
   'mercado.farm.ciclo': 'Ciclo de farmeo',
   'mercado.farm.zonasExtra': 'Zonas extra',
+  'mercado.farm.campMode': 'Campamentos',
+  'mercado.farm.campSingle': 'Un sitio a la vez',
+  'mercado.farm.campRotation': 'Rotación (pesos declarados)',
+  'mercado.farm.campPesos': 'Pesos de tiempo (1.º/2.º/3.º)',
+  'mercado.farm.liqSinDatos': 'Oferta SIN DATOS',
+  'mercado.farm.heuristico': 'Heurístico, sin calibrar',
+  'mercado.farm.bonusUtiles': 'Bonus útiles',
+  'mercado.farm.rareAprox': 'Rareza 0,2/h aprox.',
+  'mercado.farm.notaMetodo': 'Nota de método: un campamento a la vez; riesgo y competencia son heurísticos (sin datos de población); el viaje es aproximado; L mide profundidad de oferta, no ventas; el margen compara el oro/h con el objetivo, no mide retorno de capital; el freno ×50 al precio es conservador, no prueba de error.',
   'mercado.farm.grupo': 'Grupo',
   'mercado.farm.pvp': 'PvP',
   'mercado.farm.prof.skin': 'Desuello',
@@ -190,7 +200,7 @@ agregarTextos({
   'mercado.farm.utiles': 'útiles',
   'mercado.farm.itemsScan': 'Ítems de tu scan',
   'mercado.farm.zona': 'zona',
-  'mercado.farm.dudoso': 'precio dudoso',
+  'mercado.farm.dudoso': 'precio de referencia limitado',
   'mercado.farm.mediana': 'med',
   'mercado.farm.hoy': 'hoy',
   'mercado.farm.utilesVos': 'Útiles para vos',
@@ -263,7 +273,7 @@ agregarTextos({
   'mercado.orden.nombre': 'Name',
   'mercado.orden.precio': 'Price',
   'mercado.orden.ofertas': 'Best deals',
-  'mercado.orden.roi': 'Estimated ROI',
+  'mercado.orden.roi': 'Margin vs target gold/h',
   'mercado.orden.gph': 'Estimated gold/hour',
   'mercado.col.item': 'Item / key',
   'mercado.col.min': 'Last unit minimum',
@@ -275,7 +285,7 @@ agregarTextos({
   'mercado.ordenTxt.precio': 'price descending',
   'mercado.ordenTxt.nombre': 'name',
   'mercado.ordenTxt.ofertas': 'best deals vs historical median (approx)',
-  'mercado.ordenTxt.roi': 'sorted by estimated ROI (approx)',
+  'mercado.ordenTxt.roi': 'sorted by margin vs target gold/h (estimate)',
   'mercado.ordenTxt.gph': 'sorted by estimated gold/hour (approx)',
   'mercado.vacio.scan': 'No prices imported yet. Pick your Auctionator.lua to start.',
   'mercado.restaurado': 'Imported prices restored. They are listed offers, not sales.',
@@ -302,8 +312,8 @@ agregarTextos({
   'mercado.farmeo.noFar': 'Not farmable with your profile',
   'mercado.farmeo.sinElegible': 'no eligible source',
   'mercado.farmeo.farmeable': 'farmable',
-  'mercado.farmeo.dudoso': 'doubtful price (≤2 offers, 50× vendor cap)',
-  'mercado.farmeo.dudosoPre': 'doubtful price (≤2 offers, 50× vendor cap) for farming estimate',
+  'mercado.farmeo.dudoso': 'capped reference price (≤2 offers, 50× vendor cap)',
+  'mercado.farmeo.dudosoPre': 'capped reference price (≤2 offers, 50× vendor cap) for farming estimate',
   'mercado.cerrar': 'Close',
   'mercado.sinHistorial': 'No dated history for this item.',
   'mercado.grafico': 'Daily minimum price history (approx)',
@@ -313,7 +323,7 @@ agregarTextos({
   'mercado.tend.pocos': 'little data',
   'mercado.det.ultimo': 'Last announced minimum',
   'mercado.det.aviso': 'Not a median or sale price. The date is the last recorded price day, not this import.',
-  'mercado.det.dudoso': 'Doubtful price (≤2 offers, 50× vendor cap for farming estimate).',
+  'mercado.det.dudoso': 'Capped reference price (≤2 offers, 50× vendor cap for farming estimate).',
   'mercado.det.variante': 'Variant without simple ID: shown separately, not merged with the base.',
   'mercado.det.historial': 'Accumulated history (approx, on daily minimum)',
   'mercado.det.minimo': 'minimum',
@@ -348,6 +358,15 @@ agregarTextos({
   'mercado.farm.gphRef': 'Ref. gold/h',
   'mercado.farm.ciclo': 'Farming cycle',
   'mercado.farm.zonasExtra': 'Extra zones',
+  'mercado.farm.campMode': 'Camps',
+  'mercado.farm.campSingle': 'One site at a time',
+  'mercado.farm.campRotation': 'Rotation (declared weights)',
+  'mercado.farm.campPesos': 'Time weights (1st/2nd/3rd)',
+  'mercado.farm.liqSinDatos': 'Liquidity NO DATA',
+  'mercado.farm.heuristico': 'Heuristic, uncalibrated',
+  'mercado.farm.bonusUtiles': 'Useful-item bonus',
+  'mercado.farm.rareAprox': 'Rare 0.2/h approx.',
+  'mercado.farm.notaMetodo': 'Method note: one camp at a time; risk and competition are heuristics (no population data); travel is approximate; L measures depth of listed supply, not sales; margin compares gold/h with the target, not return on capital; the ×50 price clamp is conservative, not proof of error.',
   'mercado.farm.grupo': 'Group',
   'mercado.farm.pvp': 'PvP',
   'mercado.farm.prof.skin': 'Skinning',
@@ -379,7 +398,7 @@ agregarTextos({
   'mercado.farm.utiles': 'useful',
   'mercado.farm.itemsScan': 'Items from your scan',
   'mercado.farm.zona': 'zone',
-  'mercado.farm.dudoso': 'doubtful price',
+  'mercado.farm.dudoso': 'capped reference price',
   'mercado.farm.mediana': 'med',
   'mercado.farm.hoy': 'today',
   'mercado.farm.utilesVos': 'Useful for you',
@@ -632,8 +651,9 @@ export function VistaMercado({ ctx, almacen, sincronizador, ventas, puente, esta
   }, [perfil, guia, nivel])
   const settings = useMemo(() => ajustesFarm(perfil, farmGuardado), [perfil, farmGuardado])
   const guardarFarm = async (nuevo) => {
-    setFarmGuardado(nuevo)
-    try { await ctx?.storage?.set?.('farm-settings', nuevo) } catch { /* queda en memoria */ }
+    const normalizado = ajustesFarm(perfil, nuevo)
+    setFarmGuardado(normalizado)
+    try { await ctx?.storage?.set?.('farm-settings', normalizado) } catch { /* queda en memoria */ }
   }
 
   // Cachés de métricas/deals por clave de ítem, invalidadas al cambiar de
@@ -950,8 +970,8 @@ export function VistaMercado({ ctx, almacen, sincronizador, ventas, puente, esta
         : s.kind === 'object' ? `${s.objKind || 'objeto'}: ` : s.kind === 'rare-obs' ? 'Rareza observada: ' : s.kind === 'chest-obs' ? 'Cofre observado: ' : ''
       const lvl = s.lvlMin != null || s.lvlMax != null ? `nv ${s.lvlMin ?? '?'}–${s.lvlMax ?? '?'} ` : ''
       const rank = { normal: 'normal', elite: 'élite', rareelite: 'élite rara', rare: 'rara', boss: 'jefe' }[s.rank] || ''
-      const roi = m.roi == null ? '' : ` · ROI ${m.roi >= 0 ? '+' : ''}${Math.round(m.roi * 100)}%`
-      return <>{kind}{s.name} · {fmt.zoneName(s.zoneKey)} · {lvl}{rank ? rank + ' · ' : ''}{fmt.pct(s.chance)} · ~{fmt.gph(m.gph)}/h{roi}{doubt} <Chip color={C.verde}>{t(lang, 'mercado.farmeo.farmeable')}</Chip></>
+      const margin = m.marginPct == null ? '' : ` · ${t(lang, 'mercado.orden.roi')} ${m.marginPct >= 0 ? '+' : ''}${Math.round(m.marginPct * 100)}%`
+      return <>{kind}{s.name} · {fmt.zoneName(s.zoneKey)} · {lvl}{rank ? rank + ' · ' : ''}{fmt.pct(s.chance)} · ~{fmt.gph(m.gph)}/h{margin}{doubt} <Chip color={C.verde}>{t(lang, 'mercado.farmeo.farmeable')}</Chip><RutaFarmeo fuente={s} fmt={fmt} lang={lang} /></>
     }
     if (m.sources.length) {
       const inel = m.sources.filter((s) => !s.eligible).sort((a, b) => (b.gph || 0) - (a.gph || 0))[0] || m.sources[0]

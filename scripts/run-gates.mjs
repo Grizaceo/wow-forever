@@ -26,18 +26,19 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const KEEP_GOING = process.argv.includes('--keep-going');
 
 // Conteos esperados del stack canónico (actualizar a mano si se añaden tests).
-const EXPECT_NODE = 363;
-const EXPECT_PY = 87;
+const EXPECT_NODE = 372;
+const EXPECT_PY = 98;
 const EXPECT_LUA = 180;
 // Tests unitarios del motor en standalone/tests/*.cjs (node:test). Los «real
 // fixture» son stat-only por defecto; WOW_FOREVER_REAL_FIXTURE=1 los hace leer
 // contenido de SavedVariables (solo para diagnóstico manual, nunca en gates).
-const EXPECT_CJS = 78;
+const EXPECT_CJS = 123;
 const BROWSER = [
   ['navegador', process.env.HERMES_SDK_TABS === '1' ? 52 : 51], ['mercado-auto', 14], ['mercado-procedencia', 24],
-  ['tsm', 28], ['vista-mercado', 56], ['vista-davi', 50], ['vista-guia', 28],
+  ['tsm', 28], ['vista-mercado', 57], ['vista-davi', 50], ['vista-guia', 28],
   ['vista-profesiones', 41], ['vista-ruta-dungeons', 31], ['bridge', 19],
   ['vista-personaje-simc', 11], ['vista-pawn', 13], ['vista-subasta-pawn', 28],
+  ['farm-routing', 11],
 ];
 const EXPECT_BROWSER_TOTAL = BROWSER.reduce((n, [, c]) => n + c, 0);
 
@@ -116,7 +117,8 @@ console.log(`raíz: ${ROOT}\n`);
 {
   const r = sh('node', ['--test',
     'standalone/tests/market.cjs', 'standalone/tests/market-history.cjs',
-    'standalone/tests/market-deals.cjs', 'standalone/tests/market-chart.cjs']);
+    'standalone/tests/market-deals.cjs', 'standalone/tests/market-chart.cjs',
+    'standalone/tests/market-farm.cjs', 'standalone/tests/market-farm-routing.cjs']);
   const pass = num(/(?:ℹ|#)\s+pass (\d+)/, r.out);
   const fail = num(/(?:ℹ|#)\s+fail (\d+)/, r.out);
   const ok = r.code === 0 && fail === 0 && pass === EXPECT_CJS;

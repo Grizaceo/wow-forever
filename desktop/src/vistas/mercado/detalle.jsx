@@ -9,6 +9,7 @@ import { t } from '../../i18n.js'
 import { Dinero, Hueco, Origen, Tarjeta } from '../../ui.jsx'
 import { HunterHistory, Farm, fuentesItem, fuentesDropData, nombreItem, fmtDia } from '../../mercado-logica.js'
 import { GraficoPrecios } from './grafico.jsx'
+import { RutaFarmeo } from './ruta-farmeo.jsx'
 
 const TENDENCIA = { sube: 'mercado.tend.sube', baja: 'mercado.tend.baja', estable: 'mercado.tend.estable', 'sin-datos': 'mercado.tend.pocos' }
 const KIND_DROP = { mob: '', skin: 'Piel: ', pick: 'Pillosidad: ', object: 'Objeto: ' }
@@ -152,8 +153,9 @@ export function DetalleItem({ item, lang, catalogo, metrica, deal, onCerrar }) {
                 {fmt.srcLabel ? fmt.srcLabel(s) : `${s.name || '#' + s.id}`}
                 {s.zoneKey != null && fmt.zoneName ? ` · ${fmt.zoneName(s.zoneKey)}` : ''}
                 {s.eligible
-                  ? ` · ${fmt.pct ? fmt.pct(s.chance) : fmtPct(s.chance)} · ~${fmt.gph ? fmt.gph(s.gph) : s.gph}/h${s.roi != null ? ` · ROI ${s.roi >= 0 ? '+' : ''}${Math.round(s.roi * 100)}%` : ''}`
+                  ? ` · ${fmt.pct ? fmt.pct(s.chance) : fmtPct(s.chance)} · ~${fmt.gph ? fmt.gph(s.gph) : s.gph}/h${s.roi != null ? ` · ${lang === 'en' ? 'Margin vs target gold/h' : 'Margen frente al oro/h objetivo'} ${s.roi >= 0 ? '+' : ''}${Math.round(s.roi * 100)}%` : ''}`
                   : ` — ${s.reason || t(lang, 'mercado.det.noElegible')}`}
+                <RutaFarmeo fuente={s} fmt={fmt} lang={lang} />
               </li>
             ))}
           </ul>

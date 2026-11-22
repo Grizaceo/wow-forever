@@ -12239,9 +12239,15 @@ var require_market_deals = __commonJS({
       var HIGH_DAYS = 7;
       var MID_DAYS = 4;
       var THIN_AVAIL = 2;
-      var CONF_W = { alta: 1, media: 0.8, baja: 0.55 };
-      var TREND_W = { sube: 1.15, baja: 0.9, estable: 1, "sin-datos": 1 };
-      var CONF_NAME = { 0: "baja", 1: "media", 2: "alta" };
+      var CONF_W = Object.freeze({ alta: 1, media: 0.8, baja: 0.55 });
+      var TREND_W = Object.freeze({ sube: 1.15, baja: 0.9, estable: 1, plana: 1, "sin-datos": 1 });
+      var CONF_NAME = Object.freeze({ 0: "baja", 1: "media", 2: "alta" });
+      var TREND_ALIAS = Object.freeze({ plana: "estable" });
+      function normalizarTendencia(t2) {
+        if (typeof t2 !== "string") return "sin-datos";
+        if (Object.prototype.hasOwnProperty.call(TREND_ALIAS, t2)) return TREND_ALIAS[t2];
+        return Object.prototype.hasOwnProperty.call(TREND_W, t2) ? t2 : "sin-datos";
+      }
       function histLib() {
         if (typeof module === "object" && module && module.exports) {
           try {
@@ -12295,7 +12301,8 @@ var require_market_deals = __commonJS({
           minLow: null,
           available: null,
           ratio: null,
-          reasons: []
+          reasons: [],
+          ranking: null
         };
       }
       function dealInfo(item3, opts) {
@@ -12321,10 +12328,11 @@ var require_market_deals = __commonJS({
         var ratio = cur / st.medianaLow;
         var discount = (st.medianaLow - cur) / st.medianaLow;
         var EPS = 1e-9;
-        var base = days >= HIGH_DAYS ? 2 : days >= MID_DAYS ? 1 : 0;
-        var liq = avail !== null && avail <= THIN_AVAIL ? -1 : 0;
-        var lvl = Math.max(0, Math.min(2, base + liq));
+        var lvl = days >= HIGH_DAYS ? 2 : days >= MID_DAYS ? 1 : 0;
         var confidence = CONF_NAME[lvl];
+        var tendencia = normalizarTendencia(st.tendencia);
+        var confWeight = CONF_W[confidence];
+        var trendWeight = TREND_W[tendencia];
         var out = {
           kind: "estable",
           score: null,
@@ -12335,7 +12343,16 @@ var require_market_deals = __commonJS({
           minLow: st.minLow,
           available: avail,
           ratio,
-          reasons: []
+          reasons: [],
+          // Ranking heurístico: se exponen los pesos aplicados para poder rotular
+          // la cifra; no es probabilidad, no está calibrado con ventas.
+          ranking: {
+            formula: "discount*confWeight*trendWeight",
+            heuristic: true,
+            confWeight,
+            trendWeight,
+            trend: tendencia
+          }
         };
         var pct2 = Math.round(Math.abs(discount) * 100);
         if (discount >= offerPct - EPS) {
@@ -12348,9 +12365,13 @@ var require_market_deals = __commonJS({
           out.reasons.push("Precio cercano a la mediana histórica (approx).");
         }
         if (confidence !== "alta") {
-          out.reasons.push("Confianza " + confidence + " (" + days + " día" + (days === 1 ? "" : "s") + " de muestra" + (avail !== null && avail <= THIN_AVAIL ? ", pocas ofertas ese día" : "") + ").");
+          out.reasons.push("Confianza " + confidence + " (" + days + " día" + (days === 1 ? "" : "s") + " de muestra).");
         }
-        out.score = discount * (CONF_W[confidence] || 0.55) * (TREND_W[st.tendencia] || 1);
+        if (avail !== null && avail <= THIN_AVAIL) {
+          out.reasons.push("Dato de liquidez: pocas ofertas anunciadas ese día (" + avail + ") — conteo de ofertas, no ventas ni confianza estadística.");
+        }
+        out.reasons.push("Ranking heurístico: pesos elegidos a mano, sin calibración externa ni ventas verificadas.");
+        out.score = discount * confWeight * trendWeight;
         return out;
       }
       var HunterDeals2 = {
@@ -12360,7 +12381,10 @@ var require_market_deals = __commonJS({
         HIGH_DAYS,
         MID_DAYS,
         THIN_AVAIL,
-        dealInfo
+        CONF_W,
+        TREND_W,
+        dealInfo,
+        normalizarTendencia
       };
       var root = typeof globalThis !== "undefined" ? globalThis : typeof self !== "undefined" ? self : this;
       if (typeof module === "object" && module && module.exports) module.exports = HunterDeals2;
@@ -12576,6 +12600,104 @@ var require_market_farm = __commonJS({
         return g ? `${g}g ${s}s` : `${s}s ${c % 100}c`;
       };
       const pctF = (c) => c >= 0.095 ? `${Math.round(c * 100)}%` : `${(c * 100).toFixed(1).replace(/\.0$/, "")}%`;
+      const MODEL = {
+        risk: { heuristic: true, basis: "facción + PvP; sin datos de población" },
+        competition: { heuristic: true, basis: "selección manual + hub/horario pico; sin datos de población" },
+        travel: { heuristic: true, basis: "flight paths Classic 1.12 aproximados + duración de sesión" },
+        liquidity: { heuristic: true, basis: "proxy de profundidad de oferta anunciada; no mide volumen vendido" },
+        outlier: { heuristic: true, basis: `freno conservador: ≤${OUTLIER_MAX_AVAIL} ofertas y >${OUTLIER_VENDOR_MULT}× vendedor; legitimidad no verificable offline` },
+        usefulBonus: { heuristic: true, basis: "conteo de ítems útiles, aplicado sólo a AH; sin valoración marginal" },
+        rare: { heuristic: true, basis: "RARE_K=0,2/h sólo si falta respawn; con dato se usa la cota física" },
+        roi: { heuristic: false, basis: "retorno/coste unitario con coste imputado por tiempo; NO ROI sobre capital" },
+        itemMetrics: { liquidityApplied: false, basis: "métricas por ítem no integran L" },
+        zoneEntry: { liquidityApplied: true, basis: "L se aplica en la vía de zona; SIN DATOS = sin ajuste" }
+      };
+      function validCampWeights(w) {
+        return Array.isArray(w) && w.length === 3 && w.every((x) => Number.isFinite(x) && x >= 0) && w.reduce((a, b) => a + b, 0) <= 1 + 1e-9;
+      }
+      function campAggregate(values, mode, weights) {
+        const v = (Array.isArray(values) ? values : []).filter((x) => Number.isFinite(x) && x > 0).sort((a, b) => b - a);
+        if (!v.length) return 0;
+        if (mode !== "rotation") return v[0];
+        const ok = validCampWeights(weights);
+        return ok ? weights.reduce((s, w, i) => s + w * (v[i] || 0), 0) : v[0];
+      }
+      function clampOutlier(price, sell, available) {
+        const p = Number.isFinite(price) ? price : 0, s = Number.isFinite(sell) ? sell : 0;
+        if (Number.isFinite(available) && available >= 0 && available <= OUTLIER_MAX_AVAIL && s > 0 && p > OUTLIER_VENDOR_MULT * s)
+          return { price: OUTLIER_VENDOR_MULT * s, doubtful: true, clamped: true, rule: `≤${OUTLIER_MAX_AVAIL} ofertas y >${OUTLIER_VENDOR_MULT}× precio vendedor — freno conservador` };
+        return { price: p, doubtful: false, clamped: false, rule: "sin clamp" };
+      }
+      function liquidityInfo(item3, day) {
+        const h = Array.isArray(item3?.history) ? item3.history.find((x) => x.day === item3.observedDay) : null;
+        const has = !!h && h.available != null, available = has ? h.available : null;
+        const recent = item3?.observedDay != null && item3.observedDay <= day && day - item3.observedDay <= 3;
+        if (!has) return { factor: null, available: null, recent, label: "SIN DATOS", basis: MODEL.liquidity.basis };
+        let f = Math.min(1, Math.max(0.15, Math.log10(1 + available) / Math.log10(21)));
+        if (!recent) f *= 0.5;
+        return { factor: f, available, recent, label: "proxy-ofertas", basis: MODEL.liquidity.basis };
+      }
+      function rareRate(src) {
+        const known = Number.isFinite(src?.respawnSec) && src.respawnSec > 0;
+        const cap = (src?.spawns || 0) * 3600 / (known ? src.respawnSec : 60);
+        return known ? { rate: cap, spawnCap: cap, approx: false, basis: "spawn-cap" } : { rate: RARE_K, spawnCap: cap, approx: true, basis: "RARE_K-heuristic" };
+      }
+      function rateInfo(src, level) {
+        const known = Number.isFinite(src?.respawnSec) && src.respawnSec > 0;
+        const resp = known ? src.respawnSec : 60, spawns = src?.spawns || 0;
+        const spawnCap = spawns * 3600 / resp;
+        const basis = known ? "spawn-cap" : "respawn-fallback-60s";
+        if (isRareKind(src)) {
+          const rr = rareRate(src);
+          return { rate: rr.rate, cycleRate: null, spawnCap: rr.spawnCap, respawnKnown: known, approx: rr.approx, basis: rr.basis };
+        }
+        if (src?.kind === "object" || src?.kind === "chest-obs") {
+          if (src.objKind === "chest" || src.kind === "chest-obs") {
+            const rate2 = Math.min(CHEST_ZONE_MAX, CHEST_OPEN_RATE * spawns);
+            return { rate: rate2, cycleRate: null, spawnCap: rate2, respawnKnown: known, approx: true, basis: "chest-proxy" };
+          }
+          const cycleRate2 = 3600 / (GATHER_SEC + TRAVEL_SEC.object);
+          return { rate: Math.min(cycleRate2, spawnCap), cycleRate: cycleRate2, spawnCap, respawnKnown: known, approx: !known, basis };
+        }
+        const rank2 = src?.rank || "normal";
+        const lmin = src?.lvlMin == null ? level : src.lvlMin, lmax = src?.lvlMax == null ? level : src.lvlMax, mobAvg = (lmin + lmax) / 2;
+        const base = KILL_SEC[rank2] || KILL_SEC.normal;
+        const ks = base * (1 + 0.08 * Math.max(0, mobAvg - level)) * Math.max(0.5, 1 - 0.03 * Math.max(0, level - mobAvg));
+        const cycleRate = 3600 / (ks + TRAVEL_SEC.mob);
+        return { rate: Math.min(cycleRate, spawnCap), cycleRate, spawnCap, respawnKnown: known, approx: !known, basis };
+      }
+      function usefulBonusFor(n) {
+        const count = Number.isFinite(n) && n > 0 ? n : 0;
+        return { factor: Math.min(0.2, 0.02 * count), count, basis: "conteo-de-items-utiles", appliesTo: "ah-only", heuristic: true };
+      }
+      function marginInfo(net, cost) {
+        const n = Number.isFinite(net) ? net : 0, c = Number.isFinite(cost) && cost > 0 ? cost : null;
+        return {
+          net: c == null ? null : n - c,
+          netOverCost: c == null ? null : (n - c) / c,
+          returnOverCost: c == null ? null : n / c,
+          label: "retorno/coste",
+          note: "retorno sobre coste imputado por tiempo; no es ROI sobre capital",
+          heuristic: false
+        };
+      }
+      function riskInfo(zfac, profileFac, settings) {
+        const own = profileFac === "alliance" ? "alliance" : "horde";
+        let level = "baja", mult = 1, note = "";
+        if (zfac === "instance") level = "baja";
+        else if (zfac === own) level = "baja";
+        else if (zfac === "contested") {
+          level = "media";
+          mult = 0.85;
+          note = "Zona disputada: posible encuentro con la facción rival";
+        } else if (zfac === "alliance" || zfac === "horde") {
+          level = "alta";
+          mult = 0.6;
+          note = "Territorio de la facción rival: riesgo alto";
+        }
+        if (settings?.pvp === false) mult = 1;
+        return { level, mult, note, heuristic: true, basis: MODEL.risk.basis };
+      }
       const normTxt = (s) => String(s || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]/g, "");
       const normWords = (s) => String(s || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").split(/[^a-z0-9]+/).filter(Boolean);
       const ZONE_TOKENS = {
@@ -12663,7 +12785,7 @@ barrow"]);
         "Teldrassil": { h: [55, 0], a: [8, 1] },
         "Thousand Needles": { h: [18, 0], a: [20, 0] },
         "Stonetalon Mountains": { h: [20, 0], a: [22, 0] },
-        "Desolace": { h: [22, 0], a: [25, 0] },
+        "Desolace": { h: [22, 1], a: [25, 1] },
         "Feralas": { h: [25, 0], a: [25, 0] },
         "Dustwallow Marsh": { h: [40, 0], a: [15, 1] },
         "Tanaris": { h: [30, 0], a: [30, 0] },
@@ -12677,11 +12799,11 @@ barrow"]);
       };
       function travelFor(zname, fac, hubZones, sessionH) {
         const t2 = TRAVEL[zname];
-        if (!t2) return { min: 0, fp: true, hub: false, factor: 1 };
+        if (!t2) return { min: 0, fp: true, hub: false, factor: 1, approx: true, basis: MODEL.travel.basis };
         const side = fac === "alliance" ? "a" : "h", [min, fp] = t2[side] || [0, 1];
         const hub = zoneInHub(zname, hubZones), eff = Math.round(min * (hub ? 0.5 : 1));
         const hrs = Number(sessionH) || 2, factor = eff > 0 ? hrs / (hrs + eff / 60) : 1;
-        return { min: eff, fp: !!fp, hub, factor };
+        return { min: eff, fp: !!fp, hub, factor, approx: true, basis: MODEL.travel.basis };
       }
       let IX = null;
       function zoneSpawnPairs(main, others) {
@@ -12817,12 +12939,8 @@ ah", chance: s[2] / 100, avgCount: (s[3] + s[4]) / 2, objKind: o[1], origin: "cm
           const iid = String(it.itemId);
           if (scan.has(iid)) continue;
           scan.set(iid, it);
-          const h = Array.isArray(it.history) ? it.history.find((x) => x.day === it.observedDay) : null;
-          const avail = h && h.available != null ? h.available : 0;
-          let L = Math.min(1, Math.max(0.15, Math.log10(1 + avail) / Math.log10(21)));
-          const recent = it.observedDay != null && it.observedDay <= t2 && t2 - it.observedDay <= 3;
-          if (!recent) L *= 0.5;
-          liq.set(iid, L);
+          const liqInfo = liquidityInfo(it, t2);
+          liq.set(iid, liqInfo.factor);
           const dd = IX.items[iid], cat = ENV.HunterMarketCatalog?.items?.[iid];
           info.set(iid, { name: cat?.name || dd?.[0] || `Ítem #${it.itemId}`, quality: dd ? dd[1] : 0, icls: dd ? dd[2] : -1, sub: dd ? dd[3] : -1, req: dd ? dd[5] : 0, allow: dd ? dd[8] : -1 });
         }
@@ -12883,7 +13001,10 @@ ah", chance: s[2] / 100, avgCount: (s[3] + s[4]) / 2, objKind: o[1], origin: "cm
           group: !!s.group,
           pvp: s.pvp !== false,
           n: Number.isInteger(n) && n >= 3 && n <= 8 ? n : 5,
-          session: [1, 2, 4].includes(+s.session) ? +s.session : 2
+          session: [1, 2, 4].includes(+s.session) ? +s.session : 2,
+          // H2: por defecto un sitio a la vez; rotación sólo con pesos explícitos.
+          campMode: s.campMode === "rotation" ? "rotation" : "single",
+          campWeights: Array.isArray(s.campWeights) && s.campWeights.length === 3 ? s.campWeights.map(Number) : null
         };
       }
       function eligible(src, profile, settings) {
@@ -12907,43 +13028,57 @@ ah", chance: s[2] / 100, avgCount: (s[3] + s[4]) / 2, objKind: o[1], origin: "cm
         return { ok: true, reason: "" };
       }
       function rate(src, level) {
-        if (isRareKind(src)) return RARE_K;
-        if (src.kind === "object" || src.kind === "chest-obs") {
-          if (src.objKind === "chest" || src.kind === "chest-obs") return Math.min(CHEST_ZONE_MAX, CHEST_OPEN_RATE * (src.spawns || 0));
-          return Math.min(3600 / (GATHER_SEC + TRAVEL_SEC.object), (src.spawns || 0) * 3600 / Math.max(src.respawnSec || 60, 60));
-        }
-        const rank2 = src.rank || "normal";
-        const lmin = src.lvlMin == null ? level : src.lvlMin, lmax = src.lvlMax == null ? level : src.lvlMax, mobAvg = (lmin + lmax) / 2;
-        const base = KILL_SEC[rank2] || KILL_SEC.normal;
-        const ks = base * (1 + 0.08 * Math.max(0, mobAvg - level)) * Math.max(0.5, 1 - 0.03 * Math.max(0, level - mobAvg));
-        return Math.min(3600 / (ks + TRAVEL_SEC.mob), (src.spawns || 0) * 3600 / Math.max(src.respawnSec || 60, 60));
+        return rateInfo(src, level).rate;
       }
       function refPrice(it) {
         const h = Array.isArray(it?.history) ? it.history.find((x) => x.day === it.observedDay) : null;
-        const avail = h && h.available != null ? h.available : 0;
-        const sell = IX.items[String(it?.itemId)]?.[9] || 0, price = it?.unitPriceCopper || 0;
-        if (avail <= OUTLIER_MAX_AVAIL && sell > 0 && price > OUTLIER_VENDOR_MULT * sell) return { price: OUTLIER_VENDOR_MULT * sell, doubtful: true };
-        return { price, doubtful: false };
+        const avail = h?.available ?? null;
+        const sell = it?.sellPriceCopper || IX.items[String(it?.itemId)]?.[9] || 0, price = it?.unitPriceCopper || 0;
+        const c = clampOutlier(price, sell, avail);
+        return { price: c.price, sell, doubtful: c.doubtful, clamped: c.clamped, rule: c.rule, vendorFloor: c.price <= 0 && sell > 0 };
       }
       function metrics(src, it, settings, level) {
-        const K = rate(src, level), u = src.chance * (src.avgCount || 1);
-        const rp = refPrice(it), sell0 = IX.items[String(it?.itemId)]?.[9] || 0;
-        const vendorFloor = rp.price <= 0 && sell0 > 0;
-        const net = vendorFloor ? sell0 : Math.floor(rp.price * (1 - AH_CUT));
+        const ri = rateInfo(src, level), K = ri.rate, u = src.chance * (src.avgCount || 1);
+        const rp = refPrice(it);
+        const vendorFloor = rp.vendorFloor;
+        const net = vendorFloor ? rp.sell : Math.floor(rp.price * (1 - AH_CUT));
         const gph = K * u * net, denom = K * u;
         const farmCost = denom > 0 ? (settings.gph || 5) * 1e4 / denom : Infinity;
         const margin = net - farmCost;
         const roi = farmCost > 0 && isFinite(farmCost) ? margin / farmCost : null;
-        return { K, u, net, gph, farmCostPerUnit: farmCost, margin, roi, doubtful: rp.doubtful, vendorFloor };
+        const mi = marginInfo(net, farmCost);
+        return {
+          K,
+          u,
+          net,
+          gph,
+          denom,
+          farmCostPerUnit: farmCost,
+          margin,
+          roi,
+          marginPct: mi.netOverCost,
+          returnOverCost: mi.returnOverCost,
+          roiLabel: mi.label,
+          roiNote: mi.note,
+          rateApprox: ri.approx,
+          rateBasis: ri.basis,
+          respawnKnown: ri.respawnKnown,
+          spawnCap: ri.spawnCap,
+          doubtful: rp.doubtful,
+          clamped: rp.clamped,
+          clampRule: rp.rule,
+          vendorFloor,
+          liquidityApplied: MODEL.itemMetrics.liquidityApplied,
+          model: MODEL.roi
+        };
       }
-      function vendorGph(zk, level, profile, settings, sess) {
+      function vendorCamps(zk, level, profile, settings, sess) {
         const key = [zk, level, profile.fac || "", settings.prof.skin ? 1 : 0, settings.prof.herb ? 1 : 0, settings.prof.mine ? 1 : 0, settings.group ? 1 : 0].join("|");
         const hit = sess.vendorCache.get(key);
-        if (hit != null) return hit;
-        const vals = [];
+        if (hit) return hit;
+        const out = /* @__PURE__ */ new Map();
         const addEnt = (id, isObj) => {
           const per = /* @__PURE__ */ new Map();
-          let anySrc = null;
           for (const iid of (isObj ? IX.objItems[id] : IX.mobItems[id]) || []) {
             if (sess.scan.has(iid)) continue;
             const sell = IX.items[iid]?.[9] || 0;
@@ -12951,33 +13086,27 @@ ah", chance: s[2] / 100, avgCount: (s[3] + s[4]) / 2, objKind: o[1], origin: "cm
             for (const s of normSources(iid)) {
               const ok = isObj ? s.kind === "object" && s.id === id && s.zoneKey === zk : s.id === id && s.zoneKey === zk && (s.kind === "mob" || s.kind === "skin" || s.kind === "pick");
               if (!ok || !eligible(s, profile, settings).ok) continue;
-              const ch = s.chance * (s.avgCount || 1);
-              if (ch <= 0) continue;
-              const k = s.kind + "|" + iid, cur = per.get(k);
-              if (cur) {
-                if (ch > cur.ch) cur.ch = ch;
-                continue;
-              }
-              per.set(k, { ch, sell });
-              if (!anySrc || s.chance > anySrc.chance) anySrc = s;
+              const ev2 = s.chance * (s.avgCount || 1) * sell;
+              if (ev2 <= 0) continue;
+              const k = s.kind + "|" + iid;
+              if (ev2 > (per.get(k)?.ev || 0)) per.set(k, { ev: ev2, gph: rate(s, level) * ev2 });
             }
           }
-          if (!anySrc || !per.size) return;
-          const r = rate(anySrc, level);
-          let v2 = 0;
-          for (const p of per.values()) v2 += r * p.ch * p.sell;
-          if (v2 > 0) vals.push(v2);
+          let ev = 0, gph = 0;
+          for (const p of per.values()) {
+            ev += p.ev;
+            gph += p.gph;
+          }
+          if (ev > 0) out.set(`${isObj ? "object" : "mob"}:${id}`, { ev, gph });
         };
         for (const mid of IX.byZoneM[zk] || []) addEnt(mid, false);
         for (const oid of IX.byZoneO[zk] || []) addEnt(oid, true);
-        vals.sort((a, b) => b - a);
-        const v = Math.round((vals[0] || 0) + 0.5 * (vals[1] || 0) + 0.25 * (vals[2] || 0));
-        sess.vendorCache.set(key, v);
-        return v;
+        sess.vendorCache.set(key, out);
+        return out;
       }
       const PROF_KINDS = { skin: "Piel", herb: "Hierbas", mine: "Minería" };
       function profGph(zk, kind, level, profile, settings, sess) {
-        const key = "pf|" + [zk, kind, level, profile.fac || "", settings.group ? 1 : 0].join("|");
+        const key = "pf|" + [zk, kind, level, profile.fac || "", settings.group ? 1 : 0, settings.campMode || "single", (settings.campWeights || []).join(",")].join("|");
         const hit = sess.profCache.get(key);
         if (hit != null) return hit;
         const wantObj = kind === "herb" ? "herb" : kind === "mine" ? "ore" : null;
@@ -13025,7 +13154,7 @@ ah", chance: s[2] / 100, avgCount: (s[3] + s[4]) / 2, objKind: o[1], origin: "cm
           if (o && o[1] === wantObj) addEnt(oid, true);
         }
         vals.sort((a, b) => b - a);
-        const gph = Math.round((vals[0] || 0) + 0.5 * (vals[1] || 0) + 0.25 * (vals[2] || 0));
+        const gph = Math.round(campAggregate(vals, settings.campMode, settings.campWeights));
         const items = [...itemVal.entries()].sort((a, b) => b[1] - a[1]).slice(0, 3).map(([iid]) => IX.items[iid]?.[0] || `#${iid}`);
         const res = { gph, items };
         sess.profCache.set(key, res);
@@ -13132,24 +13261,94 @@ un'goro crater", "dustwallow": "dustwallow marsh" };
         });
       }
       function itemMetrics(scanItem, profile, settings) {
-        const out = { best: null, gph: 0, roi: null, margin: null, farmable: false, sources: [] };
+        const out = {
+          best: null,
+          gph: 0,
+          roi: null,
+          margin: null,
+          farmable: false,
+          sources: [],
+          roiLabel: "retorno/coste",
+          roiNote: MODEL.roi.basis,
+          liquidityApplied: false,
+          model: MODEL.roi
+        };
         index();
         const id = scanItem && scanItem.itemId;
         if (!Number.isSafeInteger(id) || id <= 0 || !IX.hasData) return out;
         out.doubtful = refPrice(scanItem).doubtful;
-        const level = profile && profile.level || 12, st = normalizeSettings(settings);
+        profile = profile || {};
+        const level = profile.level || 12, st = normalizeSettings(settings);
+        const targetCopper = st.gph * 1e4;
         const all = normSources(String(id)).map((src) => {
-          const e = eligible(src, profile || {}, st);
-          return { ...src, eligible: e.ok, reason: e.reason, ...metrics(src, scanItem, st, level) };
+          const e = eligible(src, profile, st), camp = metrics(src, scanItem, st, level);
+          const z = IX.zones[src.zoneKey];
+          const travel = travelFor(z?.[0], profile.fac, profile.hubZones, st.session);
+          const risk = riskFor(z?.[2], profile, st);
+          const comp = compFor(src.zoneKey, z?.[0], st, profile);
+          const routeFactor = travel.factor * risk.mult * COMP[comp.comp];
+          const denom = camp.denom * routeFactor, gph = camp.gph * routeFactor;
+          const farmCost = denom > 0 ? targetCopper / denom : Infinity;
+          const margin = camp.net - farmCost;
+          const roi = farmCost > 0 && isFinite(farmCost) ? margin / farmCost : null;
+          const mi = marginInfo(camp.net, farmCost);
+          return {
+            ...src,
+            eligible: e.ok,
+            reason: e.reason,
+            ...camp,
+            campGph: camp.gph,
+            campDenom: camp.denom,
+            campFarmCostPerUnit: camp.farmCostPerUnit,
+            campRoi: camp.roi,
+            travel,
+            risk,
+            comp,
+            routeFactor,
+            denom,
+            gph,
+            farmCostPerUnit: farmCost,
+            margin,
+            roi,
+            marginPct: mi.netOverCost,
+            returnOverCost: mi.returnOverCost,
+            roiLabel: mi.label,
+            roiNote: mi.note
+          };
         });
-        const elig = all.filter((s) => s.eligible).sort((a, b) => b.gph - a.gph);
-        out.sources = all;
+        const porZona = /* @__PURE__ */ new Map();
+        for (const s of all) if (s.eligible) {
+          if (!porZona.has(s.zoneKey)) porZona.set(s.zoneKey, []);
+          porZona.get(s.zoneKey).push(s);
+        }
+        for (const camps of porZona.values()) {
+          camps.sort((a, b) => b.gph - a.gph || b.campGph - a.campGph || (b.spawns || 0) - (a.spawns || 0));
+          const routeCamps = camps.map((s) => ({
+            id: s.id,
+            name: s.name,
+            kind: s.kind,
+            zoneKey: s.zoneKey,
+            spawns: s.spawns,
+            chance: s.chance,
+            gph: s.gph,
+            campGph: s.campGph
+          }));
+          const spawnTotal = camps.reduce((sum, s) => sum + (Number.isFinite(s.spawns) ? s.spawns : 0), 0);
+          for (const s of camps) Object.assign(s, { routeCamps, alternativeCamps: camps.length - 1, spawnTotal });
+        }
+        const compare = (a, b) => Number(b.eligible) - Number(a.eligible) || b.gph - a.gph || b.campGph - a.campGph || (b.spawnTotal || 0) - (a.spawnTotal || 0) || String(a.id).localeCompare(String(b.
+        id));
+        out.sources = all.sort(compare);
+        const elig = all.filter((s) => s.eligible);
         out.farmable = elig.length > 0;
         if (elig.length) {
           out.best = elig[0];
           out.gph = elig[0].gph;
           out.roi = elig[0].roi;
           out.margin = elig[0].margin;
+          out.roiLabel = elig[0].roiLabel;
+          out.roiNote = elig[0].roiNote;
+          out.marginPct = elig[0].marginPct;
         }
         return out;
       }
@@ -13190,31 +13389,15 @@ un'goro crater", "dustwallow": "dustwallow marsh" };
       }
       function compFor(zk, zname, settings, profile) {
         const ov = settings.zoneComp[zk];
-        if (ov) return { comp: ov, why: "manual para esta zona" };
-        if (settings.comp !== "auto") return { comp: settings.comp, why: "manual global" };
+        if (ov) return { comp: ov, why: "manual para esta zona", heuristic: true, basis: MODEL.competition.basis };
+        if (settings.comp !== "auto") return { comp: settings.comp, why: "manual global", heuristic: true, basis: MODEL.competition.basis };
         const hour = (/* @__PURE__ */ new Date()).getHours(), hub = zoneInHub(zname, profile.hubZones), peak = hour >= 18 && hour <= 23;
         const comp = COMP_ORDER2[Math.min(2, 1 + (hub ? 1 : 0) + (peak ? 1 : 0))];
         const why = "auto" + (hub && peak ? " (hub de tu guía + horario pico)" : hub ? " (hub de tu guía)" : peak ? " (horario pico)" : "");
-        return { comp, why };
+        return { comp, why, heuristic: true, basis: MODEL.competition.basis };
       }
       function riskFor(zfac, profile, settings) {
-        const own = profile.fac === "alliance" ? "alliance" : "horde";
-        let level = "baja", mult = 1, note = "";
-        if (zfac === "instance") {
-          level = "baja";
-        } else if (zfac === own) {
-          level = "baja";
-        } else if (zfac === "contested") {
-          level = "media";
-          mult = 0.85;
-          note = "Zona disputada: posible encuentro con la facción rival";
-        } else if (zfac === "alliance" || zfac === "horde") {
-          level = "alta";
-          mult = 0.6;
-          note = "Territorio de la facción rival: riesgo alto";
-        }
-        if (settings.pvp === false) mult = 1;
-        return { level, mult, note };
+        return riskInfo(zfac, profile?.fac, settings);
       }
       function usefulGear(inf, cls, level, pref) {
         const ws = WEAPON_SETS[cls];
@@ -13239,6 +13422,7 @@ un'goro crater", "dustwallow": "dustwallow marsh" };
         if (!z) return null;
         const [zname, , zfac, zmin, zmax] = z;
         const camps = [], itemZone = /* @__PURE__ */ new Map(), rares = /* @__PURE__ */ new Map(), chests = /* @__PURE__ */ new Map();
+        const vendor = vendorCamps(zk, level, profile, settings, sess);
         let chestSpots = 0;
         const mobSp = (mid, fb) => {
           const zm = IX.mobZoneSpawns[mid];
@@ -13249,14 +13433,21 @@ un'goro crater", "dustwallow": "dustwallow marsh" };
           return zm && zm[zk] != null ? zm[zk] : fb;
         };
         const processDrops = (drops) => {
-          let cv = 0, ev = 0;
+          let cv = 0, ev = 0, vendorCv = 0, vendorEv = 0, liqUnknown2 = 0;
           for (const d of drops) {
             for (const src of d.srcs) {
               const e = eligible(src, profile, settings);
               if (!e.ok) continue;
-              const m = metrics(src, d.it, settings, level), base = m.u * m.net * sess.liq.get(d.iid), v = m.K * base;
-              cv += v;
-              ev += base;
+              const m = metrics(src, d.it, settings, level), lq = sess.liq.get(d.iid);
+              if (!m.vendorFloor && lq == null) liqUnknown2++;
+              const base = m.u * m.net * (m.vendorFloor || lq == null ? 1 : lq), v = m.K * base;
+              if (m.vendorFloor) {
+                vendorCv += v;
+                vendorEv += base;
+              } else {
+                cv += v;
+                ev += base;
+              }
               let a = itemZone.get(d.iid);
               if (!a) {
                 a = { v: 0, src: null };
@@ -13266,72 +13457,95 @@ un'goro crater", "dustwallow": "dustwallow marsh" };
               if (!a.src || v > a.src.v) a.src = { v, src };
             }
           }
-          return { cv, ev };
+          return { cv, ev, vendorCv, vendorEv, liqUnknown: liqUnknown2 };
         };
+        let liqUnknown = 0;
         for (const mid of IX.byZoneM[zk] || []) {
           const mob = IX.mobs[mid];
           if (!mob) continue;
           const drops = mobDrops(mid, zk, sess), r = processDrops(drops);
+          liqUnknown += r.liqUnknown;
+          const v = vendor.get(`mob:${mid}`);
           if (mob[3] === "rare" || mob[3] === "rareelite") {
             const rep = { kind: "mob", id: mid, name: mob[0], zoneKey: zk, lvlMin: mob[1], lvlMax: mob[2], rank: mob[3], spawns: mobSp(mid, mob[5]), respawnSec: mob[6], sides: mob[7] || "ah", chance: 0,
             avgCount: 1, objKind: null };
-            const e0 = eligible(rep, profile, settings).ok, cur = rares.get(mid) || { name: mob[0], ev: 0, scan: false, elig: false };
+            const e0 = eligible(rep, profile, settings).ok, cur = rares.get(mid) || { name: mob[0], ev: 0, vendorEv: 0, scan: false, elig: false };
             cur.ev += r.ev;
+            cur.vendorEv += r.vendorEv + (v?.ev || 0);
             cur.scan = cur.scan || drops.length > 0;
             cur.elig = cur.elig || e0;
+            cur.respawnSec = rep.respawnSec;
+            cur.spawns = rep.spawns;
             rares.set(mid, cur);
-          } else camps.push({ id: mid, name: mob[0], kind: "mob", value: r.cv, lvlMin: mob[1], lvlMax: mob[2], spawns: mobSp(mid, mob[5]), rank: mob[3] });
+          } else camps.push({ id: mid, name: mob[0], kind: "mob", ah: r.cv, vendor: r.vendorCv + (v?.gph || 0), lvlMin: mob[1], lvlMax: mob[2], spawns: mobSp(mid, mob[5]), rank: mob[3] });
         }
         for (const oid of IX.byZoneO[zk] || []) {
           const obj = IX.objects[oid];
           if (!obj) continue;
           const isChest = obj[1] === "chest";
           const r = processDrops(objDrops(oid, zk, sess));
+          liqUnknown += r.liqUnknown;
+          const v = vendor.get(`object:${oid}`);
           if (isChest) {
             const spots = objSp(oid, obj[3] || 0);
             chestSpots += spots;
-            const c = chests.get("o" + oid) || { name: obj[0], ev: 0, spots: 0 };
+            const c = chests.get("o" + oid) || { name: obj[0], ev: 0, vendorEv: 0, spots: 0 };
             c.ev += r.ev;
+            c.vendorEv += r.vendorEv + (v?.ev || 0);
             c.spots += spots;
             chests.set("o" + oid, c);
-          } else camps.push({ id: oid, name: obj[0], kind: "object", value: r.cv, lvlMin: null, lvlMax: null, spawns: objSp(oid, obj[3] || 0), objKind: obj[1] });
+          } else camps.push({ id: oid, name: obj[0], kind: "object", ah: r.cv, vendor: r.vendorCv + (v?.gph || 0), lvlMin: null, lvlMax: null, spawns: objSp(oid, obj[3] || 0), objKind: obj[1] });
         }
         for (const ent of IX.privRaresByZone[zk] || []) {
           const drops = entDrops(ent, sess), r = processDrops(drops);
+          liqUnknown += r.liqUnknown;
           const rep = ent.srcs[0]?.src, e0 = rep ? eligible(rep, profile, settings).ok : false;
-          const cur = rares.get(ent.npcId) || { name: ent.name, ev: 0, scan: false, elig: false };
+          const cur = rares.get(ent.npcId) || { name: ent.name, ev: 0, vendorEv: 0, scan: false, elig: false };
           cur.ev += r.ev;
+          cur.vendorEv += r.vendorEv;
           cur.scan = cur.scan || drops.length > 0;
           cur.elig = cur.elig || e0;
+          if (!(cur.respawnSec > 0)) {
+            cur.respawnSec = rep?.respawnSec ?? null;
+            cur.spawns = rep?.spawns ?? cur.spawns ?? 1;
+          }
           rares.set(ent.npcId, cur);
         }
         for (const ent of IX.privChestsByZone[zk] || []) {
           const r = processDrops(entDrops(ent, sess));
+          liqUnknown += r.liqUnknown;
           chestSpots += ent.spots || 0;
-          const c = chests.get("c" + ent.objId) || { name: ent.name, ev: 0, spots: 0 };
+          const c = chests.get("c" + ent.objId) || { name: ent.name, ev: 0, vendorEv: 0, spots: 0 };
           c.ev += r.ev;
+          c.vendorEv += r.vendorEv;
           c.spots += ent.spots || 0;
           chests.set("c" + ent.objId, c);
         }
-        camps.sort((a, b) => b.value - a.value);
-        const cvals = camps.map((c) => c.value);
-        const zoneBase = (cvals[0] || 0) + 0.5 * (cvals[1] || 0) + 0.25 * (cvals[2] || 0);
-        const eligRares = [...rares.values()].filter((r) => r.elig);
-        let rareValue = 0, rareEVmax = 0;
-        if (eligRares.length) {
-          const mean = eligRares.reduce((s, r) => s + r.ev, 0) / eligRares.length;
-          rareValue = Math.min(RARE_ZONE_MAX, RARE_K * eligRares.length) * mean;
-          for (const r of eligRares) if (r.ev > rareEVmax) rareEVmax = r.ev;
+        let rareValue = 0, rareVendor = 0, rareEVmax = 0, rareRateSum = 0, rareApprox = false;
+        for (const r of rares.values()) if (r.elig) {
+          const rr = rareRate(r);
+          rareRateSum += rr.rate;
+          rareApprox = rareApprox || rr.approx;
+          rareValue += rr.rate * r.ev;
+          rareVendor += rr.rate * r.vendorEv;
+          rareEVmax = Math.max(rareEVmax, r.ev);
         }
-        let chestValue = 0, chestEVmean = 0;
+        if (rareRateSum > RARE_ZONE_MAX) {
+          const scale = RARE_ZONE_MAX / rareRateSum;
+          rareValue *= scale;
+          rareVendor *= scale;
+        }
+        let chestValue = 0, chestVendor = 0, chestEVmean = 0;
         if (chestSpots > 0) {
-          let w = 0, we = 0;
+          let we = 0, wv = 0;
           for (const c of chests.values()) {
-            w += c.spots;
             we += c.ev * c.spots;
+            wv += c.vendorEv * c.spots;
           }
           chestEVmean = we / chestSpots;
-          chestValue = Math.min(CHEST_ZONE_MAX, CHEST_OPEN_RATE * chestSpots) * chestEVmean;
+          const k = Math.min(CHEST_ZONE_MAX, CHEST_OPEN_RATE * chestSpots);
+          chestValue = k * chestEVmean;
+          chestVendor = k * wv / chestSpots;
         }
         const rareScan = [...rares.values()].filter((r) => r.scan).length;
         const useful = [];
@@ -13355,13 +13569,21 @@ un'goro crater", "dustwallow": "dustwallow marsh" };
           iid)?.history || [], price: sess.scan.get(iid)?.unitPriceCopper });
         }
         useful.sort((a, b) => b.v - a.v || Number(b.isRare) - Number(a.isRare) || a.name.localeCompare(b.name));
-        const usefulBonus = Math.min(0.2, 0.02 * useful.length);
+        const ub = usefulBonusFor(useful.length), usefulBonus = ub.factor;
+        for (const c of camps) c.value = c.ah + c.vendor;
+        camps.sort((a, b) => b.value - a.value);
+        const weights = settings.campMode === "rotation" && validCampWeights(settings.campWeights) ? settings.campWeights : [1, 0, 0];
+        let zoneBase = 0, vendorValue = rareVendor + chestVendor;
+        for (let i = 0; i < weights.length && i < camps.length; i++) {
+          zoneBase += weights[i] * camps[i].ah;
+          vendorValue += weights[i] * camps[i].vendor;
+        }
         const ahTotal = zoneBase + rareValue + chestValue;
-        const vendorValue = vendorGph(zk, level, profile, settings, sess);
         const total = ahTotal + vendorValue;
         const risk = riskFor(zfac, profile, settings), comp = compFor(zk, zname, settings, profile);
         const travel = travelFor(zname, profile.fac, profile.hubZones, settings.session);
         const score = (ahTotal * (1 + usefulBonus) + vendorValue) * risk.mult * COMP[comp.comp] * travel.factor;
+        const scoreNoBonus = total * risk.mult * COMP[comp.comp] * travel.factor;
         if (!(score > 0) || !isFinite(score)) return null;
         const topItems = [...itemZone.entries()].filter(([, a]) => a.v > 0).sort((a, b) => b[1].v - a[1].v).slice(0, 3).map(([iid, a]) => {
           const inf = sess.info.get(iid), scanIt = sess.scan.get(iid);
@@ -13371,17 +13593,23 @@ un'goro crater", "dustwallow": "dustwallow marsh" };
         const reasons = [];
         const topCamp = camps.find((c) => c.value > 0);
         if (topCamp) reasons.push(`Camp principal: ${topCamp.name} nv ${topCamp.lvlMin ?? "?"}–${topCamp.lvlMax ?? "?"} · ${topCamp.spawns} spawns · ~${gphF(topCamp.value)}/h approx`);
-        if (rares.size) reasons.push(`${rares.size} rareza${rares.size > 1 ? "s" : ""} en zona (${rareScan} con ítems de tu scan)`);
+        reasons.push(`Campamentos: ${settings.campMode === "rotation" && validCampWeights(settings.campWeights) ? "rotación con pesos de tiempo declarados" : "un sitio a la vez = max(camp)"} — sin si\
+multaneidad asumida`);
+        if (rares.size) reasons.push(`${rares.size} rareza${rares.size > 1 ? "s" : ""} en zona (${rareScan} con ítems de tu scan)${rareApprox ? " — tasa 0,2/h aproximada sin respawn" : ""}`);
         if (chestSpots) reasons.push(`${chestSpots} puntos de cofre conocidos (no simultáneos)`);
-        if (useful.length) reasons.push(`${useful.length} ítem${useful.length > 1 ? "s" : ""} útil${useful.length > 1 ? "es" : ""} para ${clsName}`);
+        if (useful.length) reasons.push(`${useful.length} ítem${useful.length > 1 ? "s" : ""} útil${useful.length > 1 ? "es" : ""} para ${clsName} · bonus +${pctF(usefulBonus)} heurístico (conteo, \
+sólo AH)`);
+        if (liqUnknown) reasons.push(`Liquidez SIN DATOS en ${liqUnknown} drops: sin ajuste; available es oferta, no venta`);
         reasons.push(risk.note || (isInst ? "Riesgo bajo: instancia" : "Riesgo bajo: territorio propio"));
-        reasons.push(`Competencia ${COMP_LABEL2[comp.comp]} — ${comp.why}`);
-        if (travel.min) reasons.push(`Traslado ~${travel.min} min ida y vuelta${travel.hub ? " (tu ruta de nivel pasa por la zona)" : ""}${travel.fp ? "" : " — la facción no tiene vuelo propio acá"}`);
+        reasons.push(`Riesgo y competencia: heurísticos, sin datos de población (${risk.level}, ${COMP_LABEL2[comp.comp]}) — ${comp.why}`);
+        if (travel.min) reasons.push(`Traslado ~${travel.min} min ida y vuelta${travel.hub ? " (tu ruta de nivel pasa por la zona)" : ""}${travel.fp ? "" : " — la facción no tiene vuelo propio acá"}\
+ (aprox.)`);
         if (isInst) reasons.push("Requiere grupo");
         return {
           zoneKey: zk,
           name: zname,
           score,
+          scoreNoBonus,
           gph: total,
           zoneBase,
           rareValue,
@@ -13391,6 +13619,14 @@ un'goro crater", "dustwallow": "dustwallow marsh" };
           vendorGph: vendorValue,
           travel,
           levels: [zmin, zmax],
+          campMode: settings.campMode,
+          campWeights: settings.campWeights,
+          liqUnknown,
+          rareRateSum,
+          rareApprox,
+          usefulBonus,
+          usefulBonusInfo: ub,
+          heuristics: MODEL,
           topItems,
           camps: camps.filter((c) => c.value > 0).slice(0, 3).map((c) => ({ id: c.id, name: c.name, gph: c.value, lvlMin: c.lvlMin, lvlMax: c.lvlMax, spawns: c.spawns, kind: c.kind, objKind: c.objKind })),
           rareCount: rares.size,
@@ -13653,6 +13889,19 @@ i>`;
         profRecommendations,
         trafficZones,
         spotCoords,
+        MODEL,
+        campAggregate,
+        rateInfo,
+        liquidityInfo,
+        referencePrice: refPrice,
+        clampOutlier,
+        rareRate,
+        rate,
+        usefulBonusFor,
+        marginInfo,
+        riskInfo,
+        compFor,
+        riskFor,
         fmt: { gph: gphF, pct: pctF, money, esc, zoneName, srcLabel }
       };
     })();
@@ -72327,7 +72576,9 @@ function ajustesBase(perfil) {
     group: false,
     pvp: true,
     n: 5,
-    session: 2
+    session: 2,
+    campMode: "single",
+    campWeights: null
   };
 }
 var COMP_ORDER = ["low", "med", "high"];
@@ -72338,6 +72589,9 @@ function normalizarAjustes(s) {
     for (const k of Object.keys(s.zoneComp)) if (COMP_ORDER.includes(s.zoneComp[k])) zc[k] = s.zoneComp[k];
   }
   const p = s.prof || {}, n = Number(s.n);
+  const campMode = s.campMode === "rotation" ? "rotation" : "single";
+  const weights = Array.isArray(s.campWeights) ? s.campWeights : [];
+  const valid = weights.length === 3 && weights.every((w) => Number.isFinite(w) && w >= 0) && weights.reduce((sum, w) => sum + w, 0) <= 1 + 1e-9;
   return {
     comp: COMP_ORDER.includes(s.comp) ? s.comp : "auto",
     zoneComp: zc,
@@ -72346,7 +72600,10 @@ function normalizarAjustes(s) {
     group: !!s.group,
     pvp: s.pvp !== false,
     n: Number.isInteger(n) && n >= 3 && n <= 8 ? n : 5,
-    session: [1, 2, 4].includes(+s.session) ? +s.session : 2
+    session: [1, 2, 4].includes(+s.session) ? +s.session : 2,
+    // H2: rotación sólo con pesos de tiempo declarados (canonicalizado en el motor).
+    campMode,
+    campWeights: valid ? [...weights] : campMode === "rotation" ? [0.5, 0.3, 0.2] : null
   };
 }
 function ajustesFarm(perfil, guardado) {
@@ -72519,6 +72776,9 @@ function precioDe(precios, itemId) {
   const v = precios instanceof Map ? precios.get(itemId) : precios[itemId] ?? precios[String(itemId)];
   return Number.isFinite(v) && v > 0 ? v : null;
 }
+var TENDENCIA_ROBUSTA = Object.freeze({ minPuntos: 4, umbralPct: 5 });
+var PROB_SUBIDA_AVISO = "probSubida es una interpolación lineal aproximada de Classic 1.12, NO verificada contra la fórmula del servidor (SkillGainChance). crafteos = Σ(1/p) por punto suponiendo inten\
+tos independientes: es una esperanza, no un número garantizado; no se estima varianza.";
 function dificultad(rango, skill) {
   const s = Number(skill);
   if (!rango || typeof rango !== "object" || !Number.isFinite(s)) return "desconocida";
@@ -72703,7 +72963,9 @@ function rutaMaxeo(recetas, desde, cap, precios, items, opts = {}) {
     adquisiciones: [],
     adquisicionesSinDato: [],
     sinPrecio: [],
-    avisoEntrenamiento
+    avisoEntrenamiento,
+    avisoProbabilidad: PROB_SUBIDA_AVISO,
+    recetasConAdquisicionConocida: 0
   };
   if (!Array.isArray(recetas) || !Number.isFinite(d0) || !Number.isFinite(h) || h <= d0) return base;
   const fin = Math.min(h, d0 + MAX_PUNTOS);
@@ -72715,6 +72977,7 @@ function rutaMaxeo(recetas, desde, cap, precios, items, opts = {}) {
     cum: puntosEsperadosAcum(r.rango, fin)
   }));
   const conAcq = infos.filter((i) => i.acq.cobre !== null);
+  base.recetasConAdquisicionConocida = conAcq.length;
   base.adquisicionesSinDato = infos.filter((i) => i.acq.cobre === null).map((i) => ({ spell: i.r.spell, item: i.acq.item, como: i.r.como }));
   const pagadas = /* @__PURE__ */ new Set();
   const sinPrecioMap = /* @__PURE__ */ new Map();
@@ -72763,7 +73026,7 @@ function rutaMaxeo(recetas, desde, cap, precios, items, opts = {}) {
     }
     totalMat += mat;
     puntosCubiertos += j - s;
-    pasos.push({ desde: s, hasta: j, spell, crafteos: Math.round(crafteos), costo: Math.round(mat) });
+    pasos.push({ desde: s, hasta: j, spell, crafteos: Math.round(crafteos), crafteosExactos: crafteos, costo: Math.round(mat) });
     s = j;
   }
   base.pasos = pasos;
@@ -76258,6 +76521,8 @@ agregarTextos({
 n con la fórmula aproximada de Classic; no garantiza nada en Forever.",
   "prof.max.avisoEntrenamiento": "El coste de entrenar los tramos con el trainer no está en los datos (SIN DATOS): no se incluye en el total.",
   "prof.max.cobertura": "{pct}% del tramo cubierto por la ruta con precio.",
+  "prof.max.cobertura.nota": "Cobertura = puntos sobre recetas con adquisición conocida (no una cota inferior del coste ni prueba de mínimo global).",
+  "prof.max.crafts.nota": "Crafts esperados (∑1/p, fraccionales) suponiendo intentos independientes con la fórmula aproximada de Classic: esperanza, no garantía; sin varianza estimada.",
   "prof.max.adquisicion": "Adquisición de recetas",
   "prof.max.adquisicion.nota": "Se paga una sola vez. Fuente: gratis (entrenador/automática), vendedor de tu facción o subasta.",
   "prof.max.materiales": "Materiales",
@@ -76288,6 +76553,8 @@ n con la fórmula aproximada de Classic; no garantiza nada en Forever.",
 Classic formula; not guaranteed on Forever.",
   "prof.max.avisoEntrenamiento": "The cost of training tiers with the trainer is not in the data (NO DATA): it is not included in the total.",
   "prof.max.cobertura": "{pct}% of the range covered by the priced route.",
+  "prof.max.cobertura.nota": "Coverage = points over recipes with known acquisition (not a lower bound on cost nor proof of a global minimum).",
+  "prof.max.crafts.nota": "Expected crafts (∑1/p, fractional) assuming independent attempts with the approximate Classic formula: an expectation, not a guarantee; no variance estimate.",
   "prof.max.adquisicion": "Recipe acquisition",
   "prof.max.adquisicion.nota": "Paid once. Source: free (trainer/automatic), a vendor of your faction or the auction house.",
   "prof.max.materiales": "Materials",
@@ -76359,6 +76626,8 @@ function PlanSubida({ prof, skill, trainers, precios, items, lang, irA, faccion 
         ] }) : null
       ] }) : /* @__PURE__ */ jsxs11(Fragment11, { children: [
         /* @__PURE__ */ jsx11("div", { style: { ...S.sub, marginTop: 6 }, children: t(lang, "prof.max.cobertura", { pct: pct1(ruta.cobertura) }) }),
+        /* @__PURE__ */ jsx11("div", { style: S.sub, children: t(lang, "prof.max.cobertura.nota") }),
+        /* @__PURE__ */ jsx11("div", { style: S.sub, children: t(lang, "prof.max.crafts.nota") }),
         /* @__PURE__ */ jsx11("div", { style: { maxHeight: 320, overflowY: "auto", marginTop: 6 }, children: pasos.map((p, i) => {
           const r = porSpell.get(p.spell);
           return /* @__PURE__ */ jsxs11("div", { style: S.fila, children: [
@@ -77469,8 +77738,60 @@ function Sparkline({ history }) {
   ] });
 }
 
+// src/vistas/mercado/ruta-farmeo.jsx
+import { jsxs as jsxs17 } from "react/jsx-runtime";
+function RutaFarmeo({ fuente: s, fmt: fmt2, lang }) {
+  if (!s?.eligible || !s.travel) return null;
+  const en = lang === "en";
+  const camps = s.routeCamps || [];
+  return /* @__PURE__ */ jsxs17("div", { "data-farm-route": true, style: { ...S.etiqueta, whiteSpace: "normal", overflowWrap: "anywhere" }, children: [
+    en ? "Route estimate" : "Estimación de ruta",
+    ": ~",
+    fmt2.gph(s.campGph),
+    "/h ",
+    en ? "at camp" : "en campamento",
+    " × ",
+    fmt2.pct(s.routeFactor),
+    " = ~",
+    fmt2.gph(s.gph),
+    "/h ",
+    en ? "effective" : "efectivo",
+    ".",
+    " ",
+    en ? "Round trip" : "Viaje ida/vuelta",
+    " ~",
+    s.travel.min,
+    " min",
+    s.travel.fp ? en ? " · flight path in zone (unlock not verified)" : " · vuelo en zona (desbloqueo no verificado)" : en ? " · no faction flight path" : " · sin vuelo de la facción",
+    ".",
+    " ",
+    en ? "Risk" : "Riesgo",
+    " ×",
+    s.risk.mult,
+    "; ",
+    en ? "competition" : "competencia",
+    " ",
+    s.comp.comp,
+    ".",
+    " ",
+    s.alternativeCamps || 0,
+    " ",
+    en ? "alternative camps" : "campamentos alternativos",
+    " · ",
+    s.spawns || 0,
+    " spawns ",
+    en ? "at selected camp" : "del campamento elegido",
+    s.spawnTotal != null ? ` · ${s.spawnTotal} ${en ? "across alternatives" : "entre alternativas"}` : "",
+    ".",
+    camps.length > 1 ? ` ${en ? "Alternatives" : "Alternativas"}: ${camps.map((c) => c.name).join(", ")}.` : "",
+    " ",
+    en ? "One camp at a time; no parallel drops. Travel, risk and competition are uncalibrated assumptions, not measured sales." : "Un campamento a la vez; sin drops paralelos. Viaje, riesgo y compete\
+ncia son supuestos sin calibrar, no ventas medidas."
+  ] });
+}
+
 // src/vistas/mercado/detalle.jsx
-import { jsx as jsx17, jsxs as jsxs17 } from "react/jsx-runtime";
+import { jsx as jsx17, jsxs as jsxs18 } from "react/jsx-runtime";
 var TENDENCIA = { sube: "mercado.tend.sube", baja: "mercado.tend.baja", estable: "mercado.tend.estable", "sin-datos": "mercado.tend.pocos" };
 var KIND_DROP = { mob: "", skin: "Piel: ", pick: "Pillosidad: ", object: "Objeto: " };
 function fmtPct(v) {
@@ -77490,13 +77811,13 @@ function DetalleItem({ item: item3, lang, catalogo, metrica, deal, onCerrar }) {
   const dealKind = deal?.kind;
   const verdict = dealKind === "oferta" ? t(lang, "mercado.deal.oferta") : dealKind === "sobreprecio" ? t(lang, "mercado.deal.sobreprecio") : dealKind === "estable" ? t(lang, "mercado.deal.estable") :
   null;
-  return /* @__PURE__ */ jsxs17(
+  return /* @__PURE__ */ jsxs18(
     Tarjeta,
     {
       titulo: `${nombreVisible} · ${item3.sourceKey}`,
       extra: onCerrar ? /* @__PURE__ */ jsx17("button", { type: "button", onClick: onCerrar, style: { ...S.etiqueta, cursor: "pointer" }, children: t(lang, "mercado.cerrar") }) : null,
       children: [
-        /* @__PURE__ */ jsxs17("p", { style: S.sub, children: [
+        /* @__PURE__ */ jsxs18("p", { style: S.sub, children: [
           t(lang, "mercado.det.ultimo"),
           ": ",
           /* @__PURE__ */ jsx17(Dinero, { cobre: item3.unitPriceCopper }),
@@ -77505,7 +77826,7 @@ function DetalleItem({ item: item3, lang, catalogo, metrica, deal, onCerrar }) {
           metrica?.doubtful ? ` ${t(lang, "mercado.det.dudoso")}` : "",
           esVariante ? ` ${t(lang, "mercado.det.variante")}` : ""
         ] }),
-        stats?.diasMuestra > 0 && /* @__PURE__ */ jsxs17("p", { style: S.sub, children: [
+        stats?.diasMuestra > 0 && /* @__PURE__ */ jsxs18("p", { style: S.sub, children: [
           t(lang, "mercado.det.historial"),
           ": ",
           stats.diasMuestra,
@@ -77528,7 +77849,7 @@ function DetalleItem({ item: item3, lang, catalogo, metrica, deal, onCerrar }) {
           " ",
           t(lang, TENDENCIA[stats.tendencia] || "mercado.tend.pocos")
         ] }),
-        verdict && /* @__PURE__ */ jsxs17("p", { style: S.sub, children: [
+        verdict && /* @__PURE__ */ jsxs18("p", { style: S.sub, children: [
           t(lang, "mercado.det.analisis"),
           ": ",
           /* @__PURE__ */ jsx17("b", { children: verdict }),
@@ -77539,21 +77860,21 @@ function DetalleItem({ item: item3, lang, catalogo, metrica, deal, onCerrar }) {
           ".",
           (deal?.reasons || []).length ? ` ${deal.reasons.join(" ")}` : ""
         ] }),
-        /* @__PURE__ */ jsxs17("div", { children: [
+        /* @__PURE__ */ jsxs18("div", { children: [
           /* @__PURE__ */ jsx17("h4", { style: { ...S.titulo, fontSize: 12, margin: "4px 0" }, children: t(lang, "mercado.det.grafico") }),
           /* @__PURE__ */ jsx17(GraficoPrecios, { history: item3.history, actual: item3.unitPriceCopper, lang }),
           /* @__PURE__ */ jsx17("p", { style: S.sub, children: t(lang, "mercado.det.graficoNota") })
         ] }),
-        /* @__PURE__ */ jsxs17("div", { children: [
+        /* @__PURE__ */ jsxs18("div", { children: [
           /* @__PURE__ */ jsx17("h4", { style: { ...S.titulo, fontSize: 12, margin: "4px 0" }, children: t(lang, "mercado.det.diario") }),
-          /* @__PURE__ */ jsx17("div", { style: { overflowX: "auto" }, children: /* @__PURE__ */ jsxs17("table", { style: S.tabla, children: [
-            /* @__PURE__ */ jsx17("thead", { children: /* @__PURE__ */ jsxs17("tr", { children: [
+          /* @__PURE__ */ jsx17("div", { style: { overflowX: "auto" }, children: /* @__PURE__ */ jsxs18("table", { style: S.tabla, children: [
+            /* @__PURE__ */ jsx17("thead", { children: /* @__PURE__ */ jsxs18("tr", { children: [
               /* @__PURE__ */ jsx17("th", { style: S.th, children: t(lang, "mercado.det.dia") }),
               /* @__PURE__ */ jsx17("th", { style: S.th, children: t(lang, "mercado.det.minDiario") }),
               /* @__PURE__ */ jsx17("th", { style: S.th, children: t(lang, "mercado.det.maxMin") }),
               /* @__PURE__ */ jsx17("th", { style: S.th, children: t(lang, "mercado.det.maxOferta") })
             ] }) }),
-            /* @__PURE__ */ jsx17("tbody", { children: historial.length ? historial.map((h) => /* @__PURE__ */ jsxs17("tr", { children: [
+            /* @__PURE__ */ jsx17("tbody", { children: historial.length ? historial.map((h) => /* @__PURE__ */ jsxs18("tr", { children: [
               /* @__PURE__ */ jsx17("td", { style: S.td, children: fmtDia(h.day) }),
               /* @__PURE__ */ jsx17("td", { style: S.td, children: /* @__PURE__ */ jsx17(Dinero, { cobre: h.low }) }),
               /* @__PURE__ */ jsx17("td", { style: S.td, children: /* @__PURE__ */ jsx17(Dinero, { cobre: h.high }) }),
@@ -77561,12 +77882,12 @@ function DetalleItem({ item: item3, lang, catalogo, metrica, deal, onCerrar }) {
             ] }, h.day)) : /* @__PURE__ */ jsx17("tr", { children: /* @__PURE__ */ jsx17("td", { style: S.td, colSpan: 4, children: t(lang, "mercado.det.sinHistorialFila") }) }) })
           ] }) })
         ] }),
-        /* @__PURE__ */ jsxs17("div", { children: [
-          /* @__PURE__ */ jsxs17("h4", { style: { ...S.titulo, fontSize: 12, margin: "4px 0", display: "flex", gap: 8, alignItems: "center" }, children: [
+        /* @__PURE__ */ jsxs18("div", { children: [
+          /* @__PURE__ */ jsxs18("h4", { style: { ...S.titulo, fontSize: 12, margin: "4px 0", display: "flex", gap: 8, alignItems: "center" }, children: [
             t(lang, "mercado.det.fuentes"),
             /* @__PURE__ */ jsx17(Origen, { f: ["cmangos-1.12", "cliente-forever"], lang })
           ] }),
-          fuentes.length ? /* @__PURE__ */ jsx17("ul", { style: { margin: 0, paddingLeft: 18, fontSize: 12 }, children: fuentes.map((s, i) => /* @__PURE__ */ jsxs17("li", { children: [
+          fuentes.length ? /* @__PURE__ */ jsx17("ul", { style: { margin: 0, paddingLeft: 18, fontSize: 12 }, children: fuentes.map((s, i) => /* @__PURE__ */ jsxs18("li", { children: [
             nombre(s.bossN || { es: s.boss, en: s.boss }, lang) || s.boss,
             " · ",
             nombre(s.dungeonN || { es: s.dungeon, en: s.dungeon }, lang) || s.dungeon,
@@ -77576,43 +77897,44 @@ function DetalleItem({ item: item3, lang, catalogo, metrica, deal, onCerrar }) {
           ] }, i)) }) : /* @__PURE__ */ jsx17(Hueco, { lang, children: t(lang, "mercado.det.sinFuente") }),
           /* @__PURE__ */ jsx17("p", { style: S.sub, children: t(lang, "mercado.det.fuentesNota") })
         ] }),
-        /* @__PURE__ */ jsxs17("div", { children: [
-          /* @__PURE__ */ jsxs17("h4", { style: { ...S.titulo, fontSize: 12, margin: "4px 0", display: "flex", gap: 8, alignItems: "center" }, children: [
+        /* @__PURE__ */ jsxs18("div", { children: [
+          /* @__PURE__ */ jsxs18("h4", { style: { ...S.titulo, fontSize: 12, margin: "4px 0", display: "flex", gap: 8, alignItems: "center" }, children: [
             t(lang, "mercado.det.drops"),
             /* @__PURE__ */ jsx17(Origen, { f: "cmangos-1.12", lang })
           ] }),
-          drops.length ? /* @__PURE__ */ jsxs17("ul", { style: { margin: 0, paddingLeft: 18, fontSize: 12 }, children: [
-            drops.slice(0, 20).map((s, i) => /* @__PURE__ */ jsxs17("li", { children: [
+          drops.length ? /* @__PURE__ */ jsxs18("ul", { style: { margin: 0, paddingLeft: 18, fontSize: 12 }, children: [
+            drops.slice(0, 20).map((s, i) => /* @__PURE__ */ jsxs18("li", { children: [
               KIND_DROP[s.kind || (s.tipo === "o" ? "object" : "mob")] || "",
               s.nombre || `#${s.id}`,
               s.objKind ? ` (${s.objKind})` : "",
               s.nivelMin != null ? ` · nv ${s.nivelMin}${s.nivelMax != null && s.nivelMax !== s.nivelMin ? `–${s.nivelMax}` : ""}` : "",
               s.chance != null ? ` · ${fmtPct(s.chance / 100)} ${t(lang, "mercado.det.cadaMuerte")}` : "",
               s.minC != null && s.maxC != null && s.maxC !== s.minC ? ` · ${s.minC}–${s.maxC}` : "",
-              s.zonas.length ? /* @__PURE__ */ jsxs17("div", { style: S.etiqueta, children: [
+              s.zonas.length ? /* @__PURE__ */ jsxs18("div", { style: S.etiqueta, children: [
                 s.zonas.slice(0, 4).map((z) => z.nombre).join(" · "),
                 s.zonas.length > 4 ? ` +${s.zonas.length - 4}` : ""
               ] }) : null
             ] }, i)),
-            drops.length > 20 ? /* @__PURE__ */ jsxs17("li", { style: S.etiqueta, children: [
+            drops.length > 20 ? /* @__PURE__ */ jsxs18("li", { style: S.etiqueta, children: [
               "+",
               drops.length - 20
             ] }) : null
           ] }) : /* @__PURE__ */ jsx17(Hueco, { lang, children: t(lang, "mercado.det.sinDrops") })
         ] }),
-        fss.length > 0 && /* @__PURE__ */ jsxs17("div", { children: [
-          /* @__PURE__ */ jsxs17("h4", { style: { ...S.titulo, fontSize: 12, margin: "4px 0", display: "flex", gap: 8, alignItems: "center" }, children: [
+        fss.length > 0 && /* @__PURE__ */ jsxs18("div", { children: [
+          /* @__PURE__ */ jsxs18("h4", { style: { ...S.titulo, fontSize: 12, margin: "4px 0", display: "flex", gap: 8, alignItems: "center" }, children: [
             t(lang, "mercado.det.farmeo"),
             /* @__PURE__ */ jsx17(Origen, { f: "cmangos-1.12", lang })
           ] }),
-          /* @__PURE__ */ jsx17("ul", { style: { margin: 0, paddingLeft: 18, fontSize: 12 }, children: fss.map((s, i) => /* @__PURE__ */ jsxs17("li", { children: [
+          /* @__PURE__ */ jsx17("ul", { style: { margin: 0, paddingLeft: 18, fontSize: 12 }, children: fss.map((s, i) => /* @__PURE__ */ jsxs18("li", { children: [
             fmt2.srcLabel ? fmt2.srcLabel(s) : `${s.name || "#" + s.id}`,
             s.zoneKey != null && fmt2.zoneName ? ` · ${fmt2.zoneName(s.zoneKey)}` : "",
-            s.eligible ? ` · ${fmt2.pct ? fmt2.pct(s.chance) : fmtPct(s.chance)} · ~${fmt2.gph ? fmt2.gph(s.gph) : s.gph}/h${s.roi != null ? ` · ROI ${s.roi >= 0 ? "+" : ""}${Math.round(s.roi * 100)}\
-%` : ""}` : ` — ${s.reason || t(lang, "mercado.det.noElegible")}`
+            s.eligible ? ` · ${fmt2.pct ? fmt2.pct(s.chance) : fmtPct(s.chance)} · ~${fmt2.gph ? fmt2.gph(s.gph) : s.gph}/h${s.roi != null ? ` · ${lang === "en" ? "Margin vs target gold/h" : "Marge\
+n frente al oro/h objetivo"} ${s.roi >= 0 ? "+" : ""}${Math.round(s.roi * 100)}%` : ""}` : ` — ${s.reason || t(lang, "mercado.det.noElegible")}`,
+            /* @__PURE__ */ jsx17(RutaFarmeo, { fuente: s, fmt: fmt2, lang })
           ] }, i)) })
         ] }),
-        /* @__PURE__ */ jsxs17("p", { style: S.sub, children: [
+        /* @__PURE__ */ jsxs18("p", { style: S.sub, children: [
           t(lang, "mercado.det.cobertura", { addon: catalogo?.source?.addon || t(lang, "mercado.det.sinCatalogo") }),
           " ",
           catalogo?.source?.coverage || ""
@@ -77625,7 +77947,7 @@ function DetalleItem({ item: item3, lang, catalogo, metrica, deal, onCerrar }) {
 // src/vistas/mercado/farmeo.jsx
 import { useMemo as useMemo15 } from "react";
 import { Button as Button8, Checkbox as Checkbox7, Input as Input4, Select as Select3, SelectContent as SelectContent3, SelectItem as SelectItem3, SelectTrigger as SelectTrigger3, SelectValue as SelectValue3 } from "@hermes/plugin-sdk";
-import { Fragment as Fragment14, jsx as jsx18, jsxs as jsxs18 } from "react/jsx-runtime";
+import { Fragment as Fragment14, jsx as jsx18, jsxs as jsxs19 } from "react/jsx-runtime";
 var COMP_LABEL = { auto: "Auto", low: "Baja", med: "Media", high: "Alta" };
 var RIESGO = { baja: "mercado.farm.riesgo.baja", media: "mercado.farm.riesgo.media", alta: "mercado.farm.riesgo.alta" };
 var PROF_NOMBRE = { skin: "mercado.farm.prof.skin", herb: "mercado.farm.prof.herb", mine: "mercado.farm.prof.mine" };
@@ -77634,42 +77956,54 @@ function Chip({ children, color }) {
 }
 function BadgeZona({ e, lang, fmt: fmt2 }) {
   const bits = [];
-  bits.push(/* @__PURE__ */ jsxs18(Chip, { color: e.risk?.level === "alta" ? C.rojo : e.risk?.level === "media" ? C.amarillo : C.verde, children: [
+  bits.push(/* @__PURE__ */ jsxs19(Chip, { color: e.risk?.level === "alta" ? C.rojo : e.risk?.level === "media" ? C.amarillo : C.verde, children: [
     t(lang, "mercado.farm.riesgo"),
     ": ",
     t(lang, RIESGO[e.risk?.level] || RIESGO.baja)
   ] }, "r"));
-  bits.push(/* @__PURE__ */ jsxs18(Chip, { children: [
+  bits.push(/* @__PURE__ */ jsxs19(Chip, { children: [
     t(lang, "mercado.farm.comp"),
     ": ",
     COMP_LABEL[e.comp?.comp] || e.comp?.comp
   ] }, "c"));
-  if (e.travel?.min) bits.push(/* @__PURE__ */ jsxs18(Chip, { children: [
+  if (e.travel?.min) bits.push(/* @__PURE__ */ jsxs19(Chip, { children: [
     t(lang, "mercado.farm.viaje", { min: e.travel.min }),
     e.travel.fp ? "" : ` · ${t(lang, "mercado.farm.sinVuelo")}`,
     e.travel.hub ? ` · ${t(lang, "mercado.farm.tuRuta")}` : ""
   ] }, "v"));
-  if (e.vendorGph) bits.push(/* @__PURE__ */ jsxs18(Chip, { children: [
+  if (e.vendorGph) bits.push(/* @__PURE__ */ jsxs19(Chip, { children: [
     "≈",
     fmt2.gph(e.vendorGph),
     "/h ",
     t(lang, "mercado.farm.vendedor")
   ] }, "g"));
+  if (e.liqUnknown > 0) bits.push(/* @__PURE__ */ jsxs19(Chip, { color: C.amarillo, children: [
+    t(lang, "mercado.farm.liqSinDatos"),
+    ": ",
+    e.liqUnknown
+  ] }, "liq"));
+  if (e.usefulBonus > 0) bits.push(/* @__PURE__ */ jsxs19(Chip, { color: C.azul, children: [
+    t(lang, "mercado.farm.bonusUtiles"),
+    " +",
+    fmt2.pct ? fmt2.pct(e.usefulBonus) : e.usefulBonus
+  ] }, "ub"));
+  if (e.rareApprox) bits.push(/* @__PURE__ */ jsx18(Chip, { color: C.amarillo, children: t(lang, "mercado.farm.rareAprox") }, "ra"));
+  bits.push(/* @__PURE__ */ jsx18(Chip, { color: C.texto2, children: t(lang, "mercado.farm.heuristico") }, "h"));
   return /* @__PURE__ */ jsx18("div", { style: { display: "flex", gap: 4, flexWrap: "wrap" }, children: bits });
 }
 function PrecioItem({ hist, price, lang }) {
   const st = useMemo15(() => hist?.length ? FarmHistPriceStats(hist) : null, [hist]);
   if (!st) return null;
   const tend = { sube: "mercado.tend.sube", baja: "mercado.tend.baja", estable: "mercado.tend.estable", "sin-datos": "mercado.tend.pocos" }[st.tendencia] || "mercado.tend.pocos";
-  return /* @__PURE__ */ jsxs18("span", { style: { display: "inline-flex", gap: 6, alignItems: "center", marginLeft: 6 }, children: [
+  return /* @__PURE__ */ jsxs19("span", { style: { display: "inline-flex", gap: 6, alignItems: "center", marginLeft: 6 }, children: [
     /* @__PURE__ */ jsx18(Sparkline, { history: hist }),
-    st.diasMuestra >= 2 && /* @__PURE__ */ jsxs18(Chip, { color: st.tendencia === "sube" ? C.verde : st.tendencia === "baja" ? C.rojo : void 0, children: [
+    st.diasMuestra >= 2 && /* @__PURE__ */ jsxs19(Chip, { color: st.tendencia === "sube" ? C.verde : st.tendencia === "baja" ? C.rojo : void 0, children: [
       t(lang, tend),
       " · ",
       st.diasMuestra,
       "d"
     ] }),
-    st.medianaLow != null && /* @__PURE__ */ jsxs18("span", { style: S.etiqueta, children: [
+    st.medianaLow != null && /* @__PURE__ */ jsxs19("span", { style: S.etiqueta, children: [
       t(lang, "mercado.farm.mediana"),
       " ",
       fmtMoney(st.medianaLow),
@@ -77686,21 +78020,21 @@ function fmtMoney(c) {
 function TarjetaZona({ e, rank, profile, settings, lang, onComp, onCopada }) {
   const fmt2 = Farm.fmt || {};
   const cur = settings.zoneComp?.[e.zoneKey] || "auto";
-  return /* @__PURE__ */ jsxs18("div", { style: { ...S.tarjeta, borderLeft: rank === "A" ? `3px solid ${C.acento}` : void 0 }, children: [
-    /* @__PURE__ */ jsxs18("div", { style: { display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }, children: [
-      /* @__PURE__ */ jsxs18("b", { children: [
+  return /* @__PURE__ */ jsxs19("div", { style: { ...S.tarjeta, borderLeft: rank === "A" ? `3px solid ${C.acento}` : void 0 }, children: [
+    /* @__PURE__ */ jsxs19("div", { style: { display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }, children: [
+      /* @__PURE__ */ jsxs19("b", { children: [
         rank,
         " · ",
         e.name
       ] }),
       /* @__PURE__ */ jsx18(BadgeZona, { e, lang, fmt: fmt2 })
     ] }),
-    /* @__PURE__ */ jsxs18("p", { style: S.sub, children: [
+    /* @__PURE__ */ jsxs19("p", { style: S.sub, children: [
       t(lang, "mercado.farm.niveles", { min: e.levels?.[0] ?? "?", max: e.levels?.[1] ?? "?" }),
       " · ",
       t(lang, "mercado.farm.nivelVos", { nivel: profile.level || 12 })
     ] }),
-    /* @__PURE__ */ jsxs18("p", { style: S.sub, children: [
+    /* @__PURE__ */ jsxs19("p", { style: S.sub, children: [
       "~",
       fmt2.gph ? fmt2.gph(e.gph) : e.gph,
       "/h ",
@@ -77722,9 +78056,9 @@ function TarjetaZona({ e, rank, profile, settings, lang, onComp, onCopada }) {
       " ",
       t(lang, "mercado.farm.utiles")
     ] }),
-    e.topItems?.length > 0 && /* @__PURE__ */ jsxs18("div", { children: [
+    e.topItems?.length > 0 && /* @__PURE__ */ jsxs19("div", { children: [
       /* @__PURE__ */ jsx18("div", { style: S.etiqueta, children: t(lang, "mercado.farm.itemsScan") }),
-      /* @__PURE__ */ jsx18("ul", { style: { margin: 0, paddingLeft: 18, fontSize: 12 }, children: e.topItems.map((it, i) => /* @__PURE__ */ jsxs18("li", { children: [
+      /* @__PURE__ */ jsx18("ul", { style: { margin: 0, paddingLeft: 18, fontSize: 12 }, children: e.topItems.map((it, i) => /* @__PURE__ */ jsxs19("li", { children: [
         it.name,
         " · ",
         fmt2.srcLabel ? fmt2.srcLabel(it.source) : it.source?.name,
@@ -77734,36 +78068,36 @@ function TarjetaZona({ e, rank, profile, settings, lang, onComp, onCopada }) {
         fmt2.zoneName ? fmt2.zoneName(it.source?.zoneKey) : it.source?.zoneKey,
         " · ",
         fmt2.pct ? fmt2.pct(it.chance) : it.chance,
-        it.doubtful ? /* @__PURE__ */ jsxs18(Fragment14, { children: [
+        it.doubtful ? /* @__PURE__ */ jsxs19(Fragment14, { children: [
           " ",
           /* @__PURE__ */ jsx18(Chip, { color: C.amarillo, children: t(lang, "mercado.farm.dudoso") })
         ] }) : null,
         /* @__PURE__ */ jsx18(PrecioItem, { hist: it.hist, price: it.price, lang })
       ] }, i)) })
     ] }),
-    e.useful?.length > 0 && /* @__PURE__ */ jsxs18("div", { children: [
+    e.useful?.length > 0 && /* @__PURE__ */ jsxs19("div", { children: [
       /* @__PURE__ */ jsx18("div", { style: S.etiqueta, children: t(lang, "mercado.farm.utilesVos") }),
-      /* @__PURE__ */ jsx18("ul", { style: { margin: 0, paddingLeft: 18, fontSize: 12 }, children: e.useful.map((u, i) => /* @__PURE__ */ jsxs18("li", { children: [
+      /* @__PURE__ */ jsx18("ul", { style: { margin: 0, paddingLeft: 18, fontSize: 12 }, children: e.useful.map((u, i) => /* @__PURE__ */ jsxs19("li", { children: [
         u.name,
         " ",
-        /* @__PURE__ */ jsxs18("span", { style: S.etiqueta, children: [
+        /* @__PURE__ */ jsxs19("span", { style: S.etiqueta, children: [
           "· ",
           u.srcName || ""
         ] }),
-        u.preferred ? /* @__PURE__ */ jsxs18(Fragment14, { children: [
+        u.preferred ? /* @__PURE__ */ jsxs19(Fragment14, { children: [
           " ",
           /* @__PURE__ */ jsx18(Chip, { color: C.azul, children: t(lang, "mercado.farm.preferida") })
         ] }) : null,
-        u.isRare ? /* @__PURE__ */ jsxs18(Fragment14, { children: [
+        u.isRare ? /* @__PURE__ */ jsxs19(Fragment14, { children: [
           " ",
           /* @__PURE__ */ jsx18(Chip, { color: C.amarillo, children: t(lang, "mercado.farm.rareza") })
         ] }) : null,
         /* @__PURE__ */ jsx18(PrecioItem, { hist: u.hist, price: u.price, lang })
       ] }, i)) })
     ] }),
-    e.camps?.length > 0 && /* @__PURE__ */ jsxs18("div", { children: [
+    e.camps?.length > 0 && /* @__PURE__ */ jsxs19("div", { children: [
       /* @__PURE__ */ jsx18("div", { style: S.etiqueta, children: t(lang, "mercado.farm.camps") }),
-      /* @__PURE__ */ jsx18("ul", { style: { margin: 0, paddingLeft: 18, fontSize: 12 }, children: e.camps.map((c, i) => /* @__PURE__ */ jsxs18("li", { children: [
+      /* @__PURE__ */ jsx18("ul", { style: { margin: 0, paddingLeft: 18, fontSize: 12 }, children: e.camps.map((c, i) => /* @__PURE__ */ jsxs19("li", { children: [
         c.name,
         " · ",
         c.kind === "object" ? t(lang, "mercado.farm.recoleccion") : "mob",
@@ -77774,12 +78108,12 @@ function TarjetaZona({ e, rank, profile, settings, lang, onComp, onCopada }) {
       ] }, i)) })
     ] }),
     e.risk?.note && /* @__PURE__ */ jsx18("div", { style: S.aviso, children: e.risk.note }),
-    /* @__PURE__ */ jsxs18("div", { style: { display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }, children: [
-      /* @__PURE__ */ jsxs18("label", { style: { ...S.campo, minWidth: 140 }, children: [
+    /* @__PURE__ */ jsxs19("div", { style: { display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }, children: [
+      /* @__PURE__ */ jsxs19("label", { style: { ...S.campo, minWidth: 140 }, children: [
         /* @__PURE__ */ jsx18("span", { style: S.etiqueta, children: t(lang, "mercado.farm.compZona") }),
-        /* @__PURE__ */ jsxs18(Select3, { value: cur, onValueChange: (v) => onComp(e.zoneKey, v), children: [
+        /* @__PURE__ */ jsxs19(Select3, { value: cur, onValueChange: (v) => onComp(e.zoneKey, v), children: [
           /* @__PURE__ */ jsx18(SelectTrigger3, { "aria-label": t(lang, "mercado.farm.compZona"), children: /* @__PURE__ */ jsx18(SelectValue3, {}) }),
-          /* @__PURE__ */ jsxs18(SelectContent3, { children: [
+          /* @__PURE__ */ jsxs19(SelectContent3, { children: [
             /* @__PURE__ */ jsx18(SelectItem3, { value: "auto", children: t(lang, "mercado.farm.compAuto") }),
             /* @__PURE__ */ jsx18(SelectItem3, { value: "low", children: t(lang, "mercado.farm.compLow") }),
             /* @__PURE__ */ jsx18(SelectItem3, { value: "med", children: t(lang, "mercado.farm.compMed") }),
@@ -77823,13 +78157,13 @@ function Farmeo({ items, perfil, settings, onSettings, lang }) {
   }, [items, profile, settings]);
   const sinAjusteClase = ![1, 3, 7].includes(perfil?.clase);
   return /* @__PURE__ */ jsx18(Tarjeta, { titulo: t(lang, "mercado.farm.titulo"), extra: /* @__PURE__ */ jsx18("span", { style: S.etiqueta, children: t(lang, "mercado.farm.subtitulo") }), children: !items?.
-  length ? /* @__PURE__ */ jsx18("p", { style: S.sub, children: t(lang, "mercado.farm.sinScan") }) : /* @__PURE__ */ jsxs18(Fragment14, { children: [
-    /* @__PURE__ */ jsxs18("div", { style: { display: "flex", gap: 12, flexWrap: "wrap", alignItems: "flex-end" }, children: [
-      /* @__PURE__ */ jsxs18("label", { style: S.campo, children: [
+  length ? /* @__PURE__ */ jsx18("p", { style: S.sub, children: t(lang, "mercado.farm.sinScan") }) : /* @__PURE__ */ jsxs19(Fragment14, { children: [
+    /* @__PURE__ */ jsxs19("div", { style: { display: "flex", gap: 12, flexWrap: "wrap", alignItems: "flex-end" }, children: [
+      /* @__PURE__ */ jsxs19("label", { style: S.campo, children: [
         /* @__PURE__ */ jsx18("span", { style: S.etiqueta, children: t(lang, "mercado.farm.compGlobal") }),
-        /* @__PURE__ */ jsxs18(Select3, { value: settings.comp, onValueChange: (v) => cambiar({ comp: v }), children: [
+        /* @__PURE__ */ jsxs19(Select3, { value: settings.comp, onValueChange: (v) => cambiar({ comp: v }), children: [
           /* @__PURE__ */ jsx18(SelectTrigger3, { "aria-label": t(lang, "mercado.farm.compGlobal"), children: /* @__PURE__ */ jsx18(SelectValue3, {}) }),
-          /* @__PURE__ */ jsxs18(SelectContent3, { children: [
+          /* @__PURE__ */ jsxs19(SelectContent3, { children: [
             /* @__PURE__ */ jsx18(SelectItem3, { value: "auto", children: t(lang, "mercado.farm.compAuto") }),
             /* @__PURE__ */ jsx18(SelectItem3, { value: "low", children: t(lang, "mercado.farm.compLow") }),
             /* @__PURE__ */ jsx18(SelectItem3, { value: "med", children: t(lang, "mercado.farm.compMed") }),
@@ -77837,7 +78171,7 @@ function Farmeo({ items, perfil, settings, onSettings, lang }) {
           ] })
         ] })
       ] }),
-      /* @__PURE__ */ jsxs18("label", { style: S.campo, children: [
+      /* @__PURE__ */ jsxs19("label", { style: S.campo, children: [
         /* @__PURE__ */ jsx18("span", { style: S.etiqueta, children: t(lang, "mercado.farm.gphRef") }),
         /* @__PURE__ */ jsx18(
           Input4,
@@ -77854,29 +78188,59 @@ function Farmeo({ items, perfil, settings, onSettings, lang }) {
           }
         )
       ] }),
-      /* @__PURE__ */ jsxs18("label", { style: S.campo, children: [
+      /* @__PURE__ */ jsxs19("label", { style: S.campo, children: [
         /* @__PURE__ */ jsx18("span", { style: S.etiqueta, children: t(lang, "mercado.farm.ciclo") }),
-        /* @__PURE__ */ jsxs18(Select3, { value: String(settings.session), onValueChange: (v) => cambiar({ session: [1, 2, 4].includes(+v) ? +v : 2 }), children: [
+        /* @__PURE__ */ jsxs19(Select3, { value: String(settings.session), onValueChange: (v) => cambiar({ session: [1, 2, 4].includes(+v) ? +v : 2 }), children: [
           /* @__PURE__ */ jsx18(SelectTrigger3, { "aria-label": t(lang, "mercado.farm.ciclo"), children: /* @__PURE__ */ jsx18(SelectValue3, {}) }),
-          /* @__PURE__ */ jsxs18(SelectContent3, { children: [
+          /* @__PURE__ */ jsxs19(SelectContent3, { children: [
             /* @__PURE__ */ jsx18(SelectItem3, { value: "1", children: "1 h" }),
             /* @__PURE__ */ jsx18(SelectItem3, { value: "2", children: "2 h" }),
             /* @__PURE__ */ jsx18(SelectItem3, { value: "4", children: "4 h" })
           ] })
         ] })
       ] }),
-      /* @__PURE__ */ jsxs18("label", { style: S.campo, children: [
+      /* @__PURE__ */ jsxs19("label", { style: S.campo, children: [
         /* @__PURE__ */ jsx18("span", { style: S.etiqueta, children: t(lang, "mercado.farm.zonasExtra") }),
-        /* @__PURE__ */ jsxs18(Select3, { value: String(settings.n), onValueChange: (v) => {
+        /* @__PURE__ */ jsxs19(Select3, { value: String(settings.n), onValueChange: (v) => {
           const n = +v;
           cambiar({ n: n >= 3 && n <= 8 ? n : 5 });
         }, children: [
           /* @__PURE__ */ jsx18(SelectTrigger3, { "aria-label": t(lang, "mercado.farm.zonasExtra"), children: /* @__PURE__ */ jsx18(SelectValue3, {}) }),
           /* @__PURE__ */ jsx18(SelectContent3, { children: [3, 4, 5, 6, 7, 8].map((n) => /* @__PURE__ */ jsx18(SelectItem3, { value: String(n), children: n }, n)) })
         ] })
+      ] }),
+      /* @__PURE__ */ jsxs19("label", { style: S.campo, children: [
+        /* @__PURE__ */ jsx18("span", { style: S.etiqueta, children: t(lang, "mercado.farm.campMode") }),
+        /* @__PURE__ */ jsxs19(Select3, { value: settings.campMode || "single", onValueChange: (v) => cambiar({ campMode: v === "rotation" ? "rotation" : "single" }), children: [
+          /* @__PURE__ */ jsx18(SelectTrigger3, { "aria-label": t(lang, "mercado.farm.campMode"), children: /* @__PURE__ */ jsx18(SelectValue3, {}) }),
+          /* @__PURE__ */ jsxs19(SelectContent3, { children: [
+            /* @__PURE__ */ jsx18(SelectItem3, { value: "single", children: t(lang, "mercado.farm.campSingle") }),
+            /* @__PURE__ */ jsx18(SelectItem3, { value: "rotation", children: t(lang, "mercado.farm.campRotation") })
+          ] })
+        ] })
+      ] }),
+      settings.campMode === "rotation" && /* @__PURE__ */ jsxs19("label", { style: S.campo, children: [
+        /* @__PURE__ */ jsx18("span", { style: S.etiqueta, children: t(lang, "mercado.farm.campPesos") }),
+        /* @__PURE__ */ jsx18("div", { style: { display: "flex", gap: 4 }, children: settings.campWeights.map((w, i) => /* @__PURE__ */ jsx18(
+          Input4,
+          {
+            type: "number",
+            min: "0",
+            max: "1",
+            step: "0.05",
+            value: w,
+            onChange: (e) => {
+              const next = [...settings.campWeights];
+              const presupuesto = 1 - next.reduce((s, x, j) => s + (j === i ? 0 : x), 0);
+              next[i] = Math.max(0, Math.min(presupuesto, +e.target.value || 0));
+              cambiar({ campWeights: next });
+            }
+          },
+          i
+        )) })
       ] })
     ] }),
-    /* @__PURE__ */ jsxs18("div", { style: { display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center" }, children: [
+    /* @__PURE__ */ jsxs19("div", { style: { display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center" }, children: [
       /* @__PURE__ */ jsx18(Checkbox7, { checked: !!settings.prof.skin, onCheckedChange: (v) => cambiarProf("skin", !!v) }),
       /* @__PURE__ */ jsx18("span", { style: { fontSize: 12 }, children: t(lang, PROF_NOMBRE.skin) }),
       /* @__PURE__ */ jsx18(Checkbox7, { checked: !!settings.prof.herb, onCheckedChange: (v) => cambiarProf("herb", !!v) }),
@@ -77889,8 +78253,8 @@ function Farmeo({ items, perfil, settings, onSettings, lang }) {
       /* @__PURE__ */ jsx18("span", { style: { fontSize: 12 }, children: t(lang, "mercado.farm.pvp") })
     ] }),
     sinAjusteClase && /* @__PURE__ */ jsx18("p", { style: S.sub, children: t(lang, "mercado.farm.sinEquipoClase") }),
-    !calculo ? /* @__PURE__ */ jsx18("p", { style: S.sub, children: t(lang, "mercado.farm.sinZonas") }) : /* @__PURE__ */ jsxs18(Fragment14, { children: [
-      calculo.rank.A ? /* @__PURE__ */ jsxs18("div", { style: { display: "flex", flexDirection: "column", gap: 10 }, children: [
+    !calculo ? /* @__PURE__ */ jsx18("p", { style: S.sub, children: t(lang, "mercado.farm.sinZonas") }) : /* @__PURE__ */ jsxs19(Fragment14, { children: [
+      calculo.rank.A ? /* @__PURE__ */ jsxs19("div", { style: { display: "flex", flexDirection: "column", gap: 10 }, children: [
         /* @__PURE__ */ jsx18(
           TarjetaZona,
           {
@@ -77917,11 +78281,11 @@ function Farmeo({ items, perfil, settings, onSettings, lang }) {
           b.zoneKey
         ))
       ] }) : /* @__PURE__ */ jsx18("p", { style: S.sub, children: t(lang, "mercado.farm.sinZonas") }),
-      calculo.profs?.length > 0 && /* @__PURE__ */ jsxs18("div", { children: [
+      calculo.profs?.length > 0 && /* @__PURE__ */ jsxs19("div", { children: [
         /* @__PURE__ */ jsx18("div", { style: S.etiqueta, children: t(lang, "mercado.farm.porProfesion") }),
-        calculo.profs.map((p) => /* @__PURE__ */ jsxs18("div", { style: { marginTop: 6 }, children: [
+        calculo.profs.map((p) => /* @__PURE__ */ jsxs19("div", { style: { marginTop: 6 }, children: [
           /* @__PURE__ */ jsx18("b", { style: { fontSize: 12 }, children: p.name }),
-          /* @__PURE__ */ jsx18("ul", { style: { margin: 0, paddingLeft: 18, fontSize: 12 }, children: p.zones.map((z) => /* @__PURE__ */ jsxs18("li", { children: [
+          /* @__PURE__ */ jsx18("ul", { style: { margin: 0, paddingLeft: 18, fontSize: 12 }, children: p.zones.map((z) => /* @__PURE__ */ jsxs19("li", { children: [
             z.name,
             " · ~",
             fmt2.gph ? fmt2.gph(z.gph) : z.gph,
@@ -77929,9 +78293,9 @@ function Farmeo({ items, perfil, settings, onSettings, lang }) {
             t(lang, "mercado.farm.enMateriales"),
             z.items?.length ? ` · ${z.items.join(" · ")}` : ""
           ] }, z.zoneKey)) }),
-          p.along?.length > 0 && /* @__PURE__ */ jsxs18("div", { style: { marginTop: 4 }, children: [
+          p.along?.length > 0 && /* @__PURE__ */ jsxs19("div", { style: { marginTop: 4 }, children: [
             /* @__PURE__ */ jsx18("div", { style: S.etiqueta, children: t(lang, "mercado.farm.skinAlong") }),
-            /* @__PURE__ */ jsx18("ul", { style: { margin: 0, paddingLeft: 18, fontSize: 12 }, children: p.along.map((z) => /* @__PURE__ */ jsxs18("li", { children: [
+            /* @__PURE__ */ jsx18("ul", { style: { margin: 0, paddingLeft: 18, fontSize: 12 }, children: p.along.map((z) => /* @__PURE__ */ jsxs19("li", { children: [
               z.name,
               " · ~",
               fmt2.gph ? fmt2.gph(z.gph) : z.gph,
@@ -77944,12 +78308,12 @@ function Farmeo({ items, perfil, settings, onSettings, lang }) {
         ] }, p.kind)),
         /* @__PURE__ */ jsx18("p", { style: S.sub, children: t(lang, "mercado.farm.porProfesionNota") })
       ] }),
-      calculo.prog?.length > 0 && /* @__PURE__ */ jsxs18("div", { children: [
+      calculo.prog?.length > 0 && /* @__PURE__ */ jsxs19("div", { children: [
         /* @__PURE__ */ jsx18("div", { style: S.etiqueta, children: t(lang, "mercado.farm.progresion") }),
         /* @__PURE__ */ jsx18("ul", { style: { margin: 0, paddingLeft: 18, fontSize: 12 }, children: calculo.prog.map((p, i, arr) => {
           const prev = i > 0 ? arr[i - 1] : null;
           const same = prev && p.zoneKey === prev.zoneKey;
-          return /* @__PURE__ */ jsxs18("li", { children: [
+          return /* @__PURE__ */ jsxs19("li", { children: [
             t(lang, "mercado.farm.progLinea", { nivel: p.level }),
             " ",
             same ? t(lang, "mercado.farm.progSeguimos", { zona: p.name }) : t(lang, "mercado.farm.progMover", { zona: p.name }),
@@ -77957,13 +78321,14 @@ function Farmeo({ items, perfil, settings, onSettings, lang }) {
           ] }, p.level);
         }) })
       ] }),
-      /* @__PURE__ */ jsxs18("div", { children: [
+      /* @__PURE__ */ jsxs19("div", { children: [
         /* @__PURE__ */ jsx18("div", { style: S.etiqueta, children: t(lang, "mercado.farm.cobertura") }),
-        /* @__PURE__ */ jsxs18("p", { style: S.sub, children: [
+        /* @__PURE__ */ jsxs19("p", { style: S.sub, children: [
           calculo.stats ? t(lang, "mercado.farm.coberturaLinea", { matched: calculo.stats.matched, total: calculo.stats.total, pct: calculo.stats.pct }) : "",
           " ",
           t(lang, "mercado.farm.estimaciones")
-        ] })
+        ] }),
+        /* @__PURE__ */ jsx18("p", { style: S.sub, children: t(lang, "mercado.farm.notaMetodo") })
       ] })
     ] })
   ] }) });
@@ -78068,7 +78433,7 @@ function resumenTsm(snapshot, realmName) {
 }
 
 // src/vistas/mercado/mis-ventas.jsx
-import { Fragment as Fragment15, jsx as jsx19, jsxs as jsxs19 } from "react/jsx-runtime";
+import { Fragment as Fragment15, jsx as jsx19, jsxs as jsxs20 } from "react/jsx-runtime";
 function MisVentas({ ventas, auctionSnapshot, perfil, lang }) {
   const [state, setState] = useState11(() => ventas?.getState() || { status: "unavailable", enabled: false, snapshot: null });
   const [busy, setBusy] = useState11(false), [confirm, setConfirm] = useState11(false);
@@ -78119,9 +78484,9 @@ ed automatically."),
     error: tr("No se pudo completar la operación TSM.", "Could not complete the TSM operation."),
     idle: tr("TSM listo", "TSM ready")
   };
-  return /* @__PURE__ */ jsx19("div", { "data-testid": "tsm-panel", children: /* @__PURE__ */ jsxs19(Tarjeta, { titulo: tr("Mis ventas · TradeSkillMaster", "My sales · TradeSkillMaster"), extra: /* @__PURE__ */ jsx19(
+  return /* @__PURE__ */ jsx19("div", { "data-testid": "tsm-panel", children: /* @__PURE__ */ jsxs20(Tarjeta, { titulo: tr("Mis ventas · TradeSkillMaster", "My sales · TradeSkillMaster"), extra: /* @__PURE__ */ jsx19(
   "span", { style: S.chip, children: tr("Operaciones registradas · local", "Recorded transactions · local") }), children: [
-    /* @__PURE__ */ jsxs19("div", { style: { display: "flex", flexWrap: "wrap", gap: 8 }, children: [
+    /* @__PURE__ */ jsxs20("div", { style: { display: "flex", flexWrap: "wrap", gap: 8 }, children: [
       /* @__PURE__ */ jsx19(Button9, { disabled: busy || !ventas, onClick: () => run(() => ventas.read()), children: tr("Leer TradeSkillMaster.lua", "Read TradeSkillMaster.lua") }),
       /* @__PURE__ */ jsx19(Button9, { variant: "outline", disabled: busy || !ventas, onClick: () => run(() => ventas.read({ pick: true })), children: tr("Elegir carpeta TSM", "Choose TSM folder") }),
       /* @__PURE__ */ jsx19(Button9, { variant: "outline", disabled: busy || !ventas, onClick: () => run(() => ventas.restore()), children: tr("Reabrir TSM", "Reopen TSM") }),
@@ -78129,14 +78494,14 @@ ed automatically."),
 borrado TSM", "Confirm clear TSM") : tr("Borrar historial TSM", "Clear TSM history") }),
       confirm && /* @__PURE__ */ jsx19(Button9, { variant: "outline", onClick: () => setConfirm(false), children: tr("Cancelar", "Cancel") })
     ] }),
-    /* @__PURE__ */ jsxs19("label", { style: S.sub, children: [
+    /* @__PURE__ */ jsxs20("label", { style: S.sub, children: [
       /* @__PURE__ */ jsx19(Checkbox8, { checked: state.enabled, disabled: busy || !ventas, onCheckedChange: () => run(async () => {
         await ventas.setEnabled(!state.enabled);
         if (!state.enabled) await ventas.poll();
       }) }),
       tr(" Seguimiento TSM · cada 30 s", " TSM tracking · every 30 s")
     ] }),
-    /* @__PURE__ */ jsxs19("p", { style: { ...S.sub, margin: 0 }, role: "status", "aria-live": "polite", children: [
+    /* @__PURE__ */ jsxs20("p", { style: { ...S.sub, margin: 0 }, role: "status", "aria-live": "polite", children: [
       statuses[state.status] || state.status,
       state.message ? ` · ${state.message}` : ""
     ] }),
@@ -78144,67 +78509,67 @@ borrado TSM", "Confirm clear TSM") : tr("Borrar historial TSM", "Clear TSM histo
 permiso, autoriza una vez la carpeta del juego o WTF (no Interface/AddOns). Con varias cuentas se requiere escoger una. TSM guarda al usar /reload o cerrar sesión; el seguimiento continúa entre pestañ\
 as. No se guardan nombres de jugadores.", "TSM is discovered automatically within authorized folders, reusing Auctionator’s permission. No file selection is needed. If access is missing, authorize the\
  game or WTF folder once (not Interface/AddOns). Multiple accounts require choosing one. TSM saves after /reload or logout; tracking continues across tabs. Player names are not stored.") }),
-    !snap ? /* @__PURE__ */ jsx19("p", { children: tr("Sin operaciones importadas", "No imported transactions") }) : /* @__PURE__ */ jsxs19(Fragment15, { children: [
-      /* @__PURE__ */ jsxs19("div", { style: { display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center" }, children: [
-        /* @__PURE__ */ jsxs19("label", { children: [
+    !snap ? /* @__PURE__ */ jsx19("p", { children: tr("Sin operaciones importadas", "No imported transactions") }) : /* @__PURE__ */ jsxs20(Fragment15, { children: [
+      /* @__PURE__ */ jsxs20("div", { style: { display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center" }, children: [
+        /* @__PURE__ */ jsxs20("label", { children: [
           tr("Reino TSM", "TSM realm"),
           " ",
           /* @__PURE__ */ jsx19("select", { "aria-label": tr("Reino TSM", "TSM realm"), value: realm, onChange: (e) => setSelected(e.target.value), children: realms.map((r) => /* @__PURE__ */ jsx19("o\
 ption", { value: r.name, children: r.name }, r.name)) })
         ] }),
-        /* @__PURE__ */ jsxs19("label", { children: [
+        /* @__PURE__ */ jsxs20("label", { children: [
           tr("Buscar operaciones", "Search transactions"),
           " ",
           /* @__PURE__ */ jsx19("input", { type: "text", "aria-label": tr("Buscar operaciones", "Search transactions"), value: search, onChange: (e) => setSearch(e.target.value) })
         ] })
       ] }),
-      /* @__PURE__ */ jsxs19("div", { style: S.sub, children: [
+      /* @__PURE__ */ jsxs20("div", { style: S.sub, children: [
         tr("Importado: ", "Imported: "),
         new Date(snap.importedAt).toLocaleString(en ? "en" : "es"),
         range ? ` · ${tr("Operaciones entre", "Transactions between")} ${date(range[0])} — ${date(range[1])}` : "",
         ` · ${filtered.length} ${tr("objetos", "items")}`
       ] }),
-      /* @__PURE__ */ jsx19("div", { style: { overflowX: "auto" }, children: /* @__PURE__ */ jsxs19("table", { style: S.tabla, "aria-label": tr("Resumen de operaciones TSM", "TSM transaction summary"),
+      /* @__PURE__ */ jsx19("div", { style: { overflowX: "auto" }, children: /* @__PURE__ */ jsxs20("table", { style: S.tabla, "aria-label": tr("Resumen de operaciones TSM", "TSM transaction summary"),
       children: [
         /* @__PURE__ */ jsx19("thead", { children: /* @__PURE__ */ jsx19("tr", { children: headings.map((h) => /* @__PURE__ */ jsx19("th", { scope: "col", style: S.th, children: h }, h)) }) }),
-        /* @__PURE__ */ jsxs19("tbody", { children: [
+        /* @__PURE__ */ jsxs20("tbody", { children: [
           filtered.slice(safePage * 25, (safePage + 1) * 25).map((r) => {
             const price = /^i:\d+$/.test(r.itemString) ? prices.get(r.itemId) : null;
-            return /* @__PURE__ */ jsxs19("tr", { children: [
-              /* @__PURE__ */ jsxs19("td", { style: S.td, children: [
+            return /* @__PURE__ */ jsxs20("tr", { children: [
+              /* @__PURE__ */ jsxs20("td", { style: S.td, children: [
                 /* @__PURE__ */ jsx19(NombreItem, { id: r.itemId, lang }),
-                /* @__PURE__ */ jsxs19("div", { style: S.etiqueta, children: [
+                /* @__PURE__ */ jsxs20("div", { style: S.etiqueta, children: [
                   r.itemString,
                   " · ",
                   r.sources.join(", ")
                 ] })
               ] }),
-              /* @__PURE__ */ jsxs19("td", { style: S.td, children: [
+              /* @__PURE__ */ jsxs20("td", { style: S.td, children: [
                 /* @__PURE__ */ jsx19("b", { children: r.sold }),
                 " · ",
                 r.avgSale === null ? "—" : /* @__PURE__ */ jsx19(Dinero, { cobre: Math.round(r.avgSale) })
               ] }),
-              /* @__PURE__ */ jsxs19("td", { style: S.td, children: [
+              /* @__PURE__ */ jsxs20("td", { style: S.td, children: [
                 r.bought,
                 " · ",
                 r.avgBuy === null ? "—" : /* @__PURE__ */ jsx19(Dinero, { cobre: Math.round(r.avgBuy) })
               ] }),
-              /* @__PURE__ */ jsxs19("td", { style: S.td, children: [
+              /* @__PURE__ */ jsxs20("td", { style: S.td, children: [
                 r.expired,
                 " / ",
                 r.cancelled
               ] }),
-              /* @__PURE__ */ jsxs19("td", { style: S.td, children: [
+              /* @__PURE__ */ jsxs20("td", { style: S.td, children: [
                 /* @__PURE__ */ jsx19(Dinero, { cobre: r.saleCopper }),
-                /* @__PURE__ */ jsxs19("div", { style: S.etiqueta, children: [
+                /* @__PURE__ */ jsxs20("div", { style: S.etiqueta, children: [
                   tr("Compras: ", "Purchases: "),
                   /* @__PURE__ */ jsx19(Dinero, { cobre: r.buyCopper })
                 ] })
               ] }),
               /* @__PURE__ */ jsx19("td", { style: S.td, children: r.lastSale ? date(r.lastSale) : "—" }),
-              /* @__PURE__ */ jsx19("td", { style: S.td, children: price ? /* @__PURE__ */ jsxs19(Fragment15, { children: [
+              /* @__PURE__ */ jsx19("td", { style: S.td, children: price ? /* @__PURE__ */ jsxs20(Fragment15, { children: [
                 /* @__PURE__ */ jsx19(Dinero, { cobre: price.unitPriceCopper }),
-                /* @__PURE__ */ jsxs19("div", { style: S.etiqueta, children: [
+                /* @__PURE__ */ jsxs20("div", { style: S.etiqueta, children: [
                   tr("Observación día Auctionator: ", "Auctionator observation day: "),
                   fechaDe(price.observedDay) ?? "—"
                 ] })
@@ -78215,9 +78580,9 @@ ption", { value: r.name, children: r.name }, r.name)) })
 this selection.") }) })
         ] })
       ] }) }),
-      filtered.length > 25 && /* @__PURE__ */ jsxs19("div", { style: { display: "flex", gap: 8 }, children: [
+      filtered.length > 25 && /* @__PURE__ */ jsxs20("div", { style: { display: "flex", gap: 8 }, children: [
         /* @__PURE__ */ jsx19(Button9, { variant: "outline", disabled: safePage === 0, onClick: () => setPage(safePage - 1), children: tr("Anterior", "Previous") }),
-        /* @__PURE__ */ jsxs19("span", { children: [
+        /* @__PURE__ */ jsxs20("span", { children: [
           safePage + 1,
           " / ",
           Math.ceil(filtered.length / 25)
@@ -78406,7 +78771,7 @@ function rankear({ ofertas, escala, equipado, catalogo } = {}) {
 }
 
 // src/vistas/subasta-pawn.jsx
-import { jsx as jsx20, jsxs as jsxs20 } from "react/jsx-runtime";
+import { jsx as jsx20, jsxs as jsxs21 } from "react/jsx-runtime";
 agregarTextos({
   "subasta.titulo": "Subasta × Pawn",
   "subasta.aviso": "Ranking por fórmula con tus pesos Pawn. No es una recomendación, no es DPS y no predice precios.",
@@ -78530,10 +78895,10 @@ function VistaSubastaPawn({ ctx, mercado, historial, perfil, lang }) {
   }, [stats]);
   const nombre2 = (id) => nombreItem({ itemId: id, sourceKey: String(id) }, D.items, CATALOGO, lang) || "#" + id;
   const porMotivo = r.estado === "listo" ? r.resumen.porMotivo || {} : {};
-  return /* @__PURE__ */ jsxs20("div", { style: { display: "flex", flexDirection: "column", gap: 10 }, children: [
+  return /* @__PURE__ */ jsxs21("div", { style: { display: "flex", flexDirection: "column", gap: 10 }, children: [
     /* @__PURE__ */ jsx20(Aviso, { children: t(lang, "subasta.aviso") }),
     /* @__PURE__ */ jsx20("div", { style: S.sub, children: t(lang, "subasta.formula") }),
-    reinos.length > 1 ? /* @__PURE__ */ jsxs20("label", { style: S.campo, children: [
+    reinos.length > 1 ? /* @__PURE__ */ jsxs21("label", { style: S.campo, children: [
       /* @__PURE__ */ jsx20("span", { style: S.sub, children: t(lang, "subasta.reino") }),
       /* @__PURE__ */ jsx20("select", { "aria-label": t(lang, "subasta.reino"), value: realm?.name || "", onChange: (e) => setReino(e.target.value), children: reinos.map((x) => /* @__PURE__ */ jsx20("\
 option", { value: x.name, children: x.name }, x.name)) })
@@ -78542,14 +78907,14 @@ option", { value: x.name, children: x.name }, x.name)) })
     !leyendo && r.estado !== "listo" ? /* @__PURE__ */ jsx20(Tarjeta, { titulo: t(lang, "subasta." + (r.motivo === MOTIVOS.SIN_ESCALA ? "sin-escala" : r.motivo === MOTIVOS.SIN_CATALOGO ? "sin-catalogo" :
     "sin-ofertas")), children: /* @__PURE__ */ jsx20("p", { style: S.sub, children: t(lang, "subasta." + (r.motivo === MOTIVOS.SIN_ESCALA ? "sin-escala" : r.motivo === MOTIVOS.SIN_CATALOGO ? "sin-cata\
 logo" : "sin-ofertas") + ".ayuda") }) }) : null,
-    !leyendo && r.estado === "listo" ? /* @__PURE__ */ jsxs20(
+    !leyendo && r.estado === "listo" ? /* @__PURE__ */ jsxs21(
       Tarjeta,
       {
         titulo: `${t(lang, "subasta.titulo")} · ${realm?.name || "—"}`,
         extra: /* @__PURE__ */ jsx20("span", { style: S.sub, children: t(lang, "subasta.resumen", r.resumen) }),
         children: [
-          /* @__PURE__ */ jsx20("div", { style: { overflowX: "auto" }, children: /* @__PURE__ */ jsxs20("table", { style: S.tabla, children: [
-            /* @__PURE__ */ jsx20("thead", { children: /* @__PURE__ */ jsxs20("tr", { children: [
+          /* @__PURE__ */ jsx20("div", { style: { overflowX: "auto" }, children: /* @__PURE__ */ jsxs21("table", { style: S.tabla, children: [
+            /* @__PURE__ */ jsx20("thead", { children: /* @__PURE__ */ jsxs21("tr", { children: [
               /* @__PURE__ */ jsx20("th", { style: S.th, children: t(lang, "subasta.col.item") }),
               /* @__PURE__ */ jsx20("th", { style: S.th, children: t(lang, "subasta.col.slot") }),
               /* @__PURE__ */ jsx20("th", { style: S.th, children: t(lang, "subasta.col.ilvl") }),
@@ -78558,9 +78923,9 @@ logo" : "sin-ofertas") + ".ayuda") }) }) : null,
               /* @__PURE__ */ jsx20("th", { style: S.th, children: t(lang, "subasta.col.delta") }),
               /* @__PURE__ */ jsx20("th", { style: S.th, children: t(lang, "subasta.col.punto") })
             ] }) }),
-            /* @__PURE__ */ jsx20("tbody", { children: r.filas.map((f) => /* @__PURE__ */ jsxs20("tr", { "data-item": f.itemID, children: [
-              /* @__PURE__ */ jsxs20("td", { style: S.td, children: [
-                /* @__PURE__ */ jsxs20("span", { style: { display: "inline-flex", gap: 6, alignItems: "center" }, children: [
+            /* @__PURE__ */ jsx20("tbody", { children: r.filas.map((f) => /* @__PURE__ */ jsxs21("tr", { "data-item": f.itemID, children: [
+              /* @__PURE__ */ jsxs21("td", { style: S.td, children: [
+                /* @__PURE__ */ jsxs21("span", { style: { display: "inline-flex", gap: 6, alignItems: "center" }, children: [
                   /* @__PURE__ */ jsx20(IconoItem, { id: f.itemID, size: 20, titulo: nombre2(f.itemID) }),
                   /* @__PURE__ */ jsx20("span", { children: nombre2(f.itemID) })
                 ] }),
@@ -78571,7 +78936,7 @@ logo" : "sin-ofertas") + ".ayuda") }) }) : null,
               /* @__PURE__ */ jsx20("td", { style: S.td, children: f.ilvl ?? "—" }),
               /* @__PURE__ */ jsx20("td", { style: S.td, children: /* @__PURE__ */ jsx20(Dinero, { cobre: f.precio }) }),
               /* @__PURE__ */ jsx20("td", { style: S.td, children: f.score }),
-              /* @__PURE__ */ jsxs20("td", { style: S.td, title: t(lang, "subasta.base." + (f.baseTipo === "equipado" ? "equipado" : "vacio"), { id: f.baseItemID, slot: f.baseSlot }), children: [
+              /* @__PURE__ */ jsxs21("td", { style: S.td, title: t(lang, "subasta.base." + (f.baseTipo === "equipado" ? "equipado" : "vacio"), { id: f.baseItemID, slot: f.baseSlot }), children: [
                 f.delta > 0 ? "+" : "",
                 f.delta
               ] }),
@@ -78582,12 +78947,12 @@ logo" : "sin-ofertas") + ".ayuda") }) }) : null,
         ]
       }
     ) : null,
-    !leyendo && r.estado === "listo" && r.excluidos.length ? /* @__PURE__ */ jsxs20("details", { children: [
+    !leyendo && r.estado === "listo" && r.excluidos.length ? /* @__PURE__ */ jsxs21("details", { children: [
       /* @__PURE__ */ jsx20("summary", { style: { cursor: "pointer", ...S.sub }, children: t(lang, "subasta.excluidas", { n: r.excluidos.length }) }),
       /* @__PURE__ */ jsx20("ul", { style: S.sub, children: Object.entries(porMotivo).map(([m, n]) => /* @__PURE__ */ jsx20("li", { children: t(lang, "subasta.excluidas.por", { n, motivo: t(lang, MOTIVO_TEXTO[m] ||
       m) }) }, m)) })
     ] }) : null,
-    !leyendo ? /* @__PURE__ */ jsxs20(Tarjeta, { titulo: t(lang, "subasta.procedencia"), children: [
+    !leyendo ? /* @__PURE__ */ jsxs21(Tarjeta, { titulo: t(lang, "subasta.procedencia"), children: [
       /* @__PURE__ */ jsx20("div", { style: S.sub, children: captura && captura.pesos && Object.keys(captura.pesos).length ? t(lang, "subasta.proc.escala", { nome: captura.localized || captura.escala ||
       "—", fecha: dia(captura.capturado) }) : t(lang, "subasta.proc.sin-escala") }),
       /* @__PURE__ */ jsx20("div", { style: S.sub, children: ficha.colhido ? t(lang, "subasta.proc.stats", { n: Object.keys(ficha.itens || {}).length, fecha: dia(ficha.colhido) }) : t(lang, "subasta.p\
@@ -78602,7 +78967,7 @@ roc.sin-stats") }),
 }
 
 // src/vistas/mercado.jsx
-import { Fragment as Fragment16, jsx as jsx21, jsxs as jsxs21 } from "react/jsx-runtime";
+import { Fragment as Fragment16, jsx as jsx21, jsxs as jsxs22 } from "react/jsx-runtime";
 agregarTextos({
   "mercado.scan.titulo": "Escaneo de Auctionator",
   "mercado.sub.ofertas": "Ofertas",
@@ -78656,7 +79021,7 @@ tes en el catálogo local; las variantes se conservan sin mezclarlas.",
   "mercado.orden.nombre": "Nombre",
   "mercado.orden.precio": "Precio",
   "mercado.orden.ofertas": "Mejores ofertas",
-  "mercado.orden.roi": "ROI estimado",
+  "mercado.orden.roi": "Margen frente al oro/h objetivo",
   "mercado.orden.gph": "Oro/hora estimado",
   "mercado.col.item": "Ítem / clave",
   "mercado.col.min": "Último mínimo por unidad",
@@ -78668,7 +79033,7 @@ tes en el catálogo local; las variantes se conservan sin mezclarlas.",
   "mercado.ordenTxt.precio": "precio descendente",
   "mercado.ordenTxt.nombre": "nombre",
   "mercado.ordenTxt.ofertas": "mejores ofertas vs mediana histórica (approx)",
-  "mercado.ordenTxt.roi": "orden por ROI estimado (approx)",
+  "mercado.ordenTxt.roi": "orden por margen frente al oro/h objetivo (estimado)",
   "mercado.ordenTxt.gph": "orden por oro/hora estimado (approx)",
   "mercado.vacio.scan": "Todavía no importaste precios. Elige tu Auctionator.lua para empezar.",
   "mercado.restaurado": "Precios importados restaurados. Son ofertas anunciadas, no ventas.",
@@ -78695,8 +79060,8 @@ tes en el catálogo local; las variantes se conservan sin mezclarlas.",
   "mercado.farmeo.noFar": "No farmeable con tu ficha",
   "mercado.farmeo.sinElegible": "sin fuente elegible",
   "mercado.farmeo.farmeable": "farmeable",
-  "mercado.farmeo.dudoso": "precio dudoso (≤2 ofertas, tope 50× vendedor)",
-  "mercado.farmeo.dudosoPre": "precio dudoso (≤2 ofertas, tope 50× vendedor) para estimar farmeo",
+  "mercado.farmeo.dudoso": "precio de referencia limitado (≤2 ofertas, tope 50× vendedor)",
+  "mercado.farmeo.dudosoPre": "precio de referencia limitado (≤2 ofertas, tope 50× vendedor) para estimar farmeo",
   "mercado.cerrar": "Cerrar",
   "mercado.sinHistorial": "Sin historial fechado para este ítem.",
   "mercado.grafico": "Historial del precio mínimo diario (approx)",
@@ -78706,7 +79071,7 @@ tes en el catálogo local; las variantes se conservan sin mezclarlas.",
   "mercado.tend.pocos": "pocos datos",
   "mercado.det.ultimo": "Último mínimo anunciado",
   "mercado.det.aviso": "No es mediana ni precio de venta. La fecha corresponde al último día de precio registrado, no a esta importación.",
-  "mercado.det.dudoso": "Precio dudoso (≤2 ofertas, tope 50× vendedor para estimar farmeo).",
+  "mercado.det.dudoso": "Precio de referencia limitado (≤2 ofertas, tope 50× vendedor para estimar farmeo).",
   "mercado.det.variante": "Variante sin ID simple: se muestra aparte, no se mezcla con la base.",
   "mercado.det.historial": "Historial acumulado (approx, sobre el mínimo diario)",
   "mercado.det.minimo": "mínimo",
@@ -78741,6 +79106,16 @@ tes en el catálogo local; las variantes se conservan sin mezclarlas.",
   "mercado.farm.gphRef": "Oro/h de ref.",
   "mercado.farm.ciclo": "Ciclo de farmeo",
   "mercado.farm.zonasExtra": "Zonas extra",
+  "mercado.farm.campMode": "Campamentos",
+  "mercado.farm.campSingle": "Un sitio a la vez",
+  "mercado.farm.campRotation": "Rotación (pesos declarados)",
+  "mercado.farm.campPesos": "Pesos de tiempo (1.º/2.º/3.º)",
+  "mercado.farm.liqSinDatos": "Oferta SIN DATOS",
+  "mercado.farm.heuristico": "Heurístico, sin calibrar",
+  "mercado.farm.bonusUtiles": "Bonus útiles",
+  "mercado.farm.rareAprox": "Rareza 0,2/h aprox.",
+  "mercado.farm.notaMetodo": "Nota de método: un campamento a la vez; riesgo y competencia son heurísticos (sin datos de población); el viaje es aproximado; L mide profundidad de oferta, no ventas; el\
+ margen compara el oro/h con el objetivo, no mide retorno de capital; el freno ×50 al precio es conservador, no prueba de error.",
   "mercado.farm.grupo": "Grupo",
   "mercado.farm.pvp": "PvP",
   "mercado.farm.prof.skin": "Desuello",
@@ -78772,7 +79147,7 @@ tes en el catálogo local; las variantes se conservan sin mezclarlas.",
   "mercado.farm.utiles": "útiles",
   "mercado.farm.itemsScan": "Ítems de tu scan",
   "mercado.farm.zona": "zona",
-  "mercado.farm.dudoso": "precio dudoso",
+  "mercado.farm.dudoso": "precio de referencia limitado",
   "mercado.farm.mediana": "med",
   "mercado.farm.hoy": "hoy",
   "mercado.farm.utilesVos": "Útiles para vos",
@@ -78848,7 +79223,7 @@ han 3 days; each item keeps its own date even if imported today. The DB does not
   "mercado.orden.nombre": "Name",
   "mercado.orden.precio": "Price",
   "mercado.orden.ofertas": "Best deals",
-  "mercado.orden.roi": "Estimated ROI",
+  "mercado.orden.roi": "Margin vs target gold/h",
   "mercado.orden.gph": "Estimated gold/hour",
   "mercado.col.item": "Item / key",
   "mercado.col.min": "Last unit minimum",
@@ -78860,7 +79235,7 @@ han 3 days; each item keeps its own date even if imported today. The DB does not
   "mercado.ordenTxt.precio": "price descending",
   "mercado.ordenTxt.nombre": "name",
   "mercado.ordenTxt.ofertas": "best deals vs historical median (approx)",
-  "mercado.ordenTxt.roi": "sorted by estimated ROI (approx)",
+  "mercado.ordenTxt.roi": "sorted by margin vs target gold/h (estimate)",
   "mercado.ordenTxt.gph": "sorted by estimated gold/hour (approx)",
   "mercado.vacio.scan": "No prices imported yet. Pick your Auctionator.lua to start.",
   "mercado.restaurado": "Imported prices restored. They are listed offers, not sales.",
@@ -78887,8 +79262,8 @@ han 3 days; each item keeps its own date even if imported today. The DB does not
   "mercado.farmeo.noFar": "Not farmable with your profile",
   "mercado.farmeo.sinElegible": "no eligible source",
   "mercado.farmeo.farmeable": "farmable",
-  "mercado.farmeo.dudoso": "doubtful price (≤2 offers, 50× vendor cap)",
-  "mercado.farmeo.dudosoPre": "doubtful price (≤2 offers, 50× vendor cap) for farming estimate",
+  "mercado.farmeo.dudoso": "capped reference price (≤2 offers, 50× vendor cap)",
+  "mercado.farmeo.dudosoPre": "capped reference price (≤2 offers, 50× vendor cap) for farming estimate",
   "mercado.cerrar": "Close",
   "mercado.sinHistorial": "No dated history for this item.",
   "mercado.grafico": "Daily minimum price history (approx)",
@@ -78898,7 +79273,7 @@ han 3 days; each item keeps its own date even if imported today. The DB does not
   "mercado.tend.pocos": "little data",
   "mercado.det.ultimo": "Last announced minimum",
   "mercado.det.aviso": "Not a median or sale price. The date is the last recorded price day, not this import.",
-  "mercado.det.dudoso": "Doubtful price (≤2 offers, 50× vendor cap for farming estimate).",
+  "mercado.det.dudoso": "Capped reference price (≤2 offers, 50× vendor cap for farming estimate).",
   "mercado.det.variante": "Variant without simple ID: shown separately, not merged with the base.",
   "mercado.det.historial": "Accumulated history (approx, on daily minimum)",
   "mercado.det.minimo": "minimum",
@@ -78933,6 +79308,16 @@ han 3 days; each item keeps its own date even if imported today. The DB does not
   "mercado.farm.gphRef": "Ref. gold/h",
   "mercado.farm.ciclo": "Farming cycle",
   "mercado.farm.zonasExtra": "Extra zones",
+  "mercado.farm.campMode": "Camps",
+  "mercado.farm.campSingle": "One site at a time",
+  "mercado.farm.campRotation": "Rotation (declared weights)",
+  "mercado.farm.campPesos": "Time weights (1st/2nd/3rd)",
+  "mercado.farm.liqSinDatos": "Liquidity NO DATA",
+  "mercado.farm.heuristico": "Heuristic, uncalibrated",
+  "mercado.farm.bonusUtiles": "Useful-item bonus",
+  "mercado.farm.rareAprox": "Rare 0.2/h approx.",
+  "mercado.farm.notaMetodo": "Method note: one camp at a time; risk and competition are heuristics (no population data); travel is approximate; L measures depth of listed supply, not sales; margin com\
+pares gold/h with the target, not return on capital; the ×50 price clamp is conservative, not proof of error.",
   "mercado.farm.grupo": "Group",
   "mercado.farm.pvp": "PvP",
   "mercado.farm.prof.skin": "Skinning",
@@ -78964,7 +79349,7 @@ han 3 days; each item keeps its own date even if imported today. The DB does not
   "mercado.farm.utiles": "useful",
   "mercado.farm.itemsScan": "Items from your scan",
   "mercado.farm.zona": "zone",
-  "mercado.farm.dudoso": "doubtful price",
+  "mercado.farm.dudoso": "capped reference price",
   "mercado.farm.mediana": "med",
   "mercado.farm.hoy": "today",
   "mercado.farm.utilesVos": "Useful for you",
@@ -79109,12 +79494,12 @@ function PuenteEstado({ puente, lang }) {
     } catch {
     }
   };
-  return /* @__PURE__ */ jsxs21("div", { "data-testid": "bridge-panel", style: { marginTop: 6 }, children: [
-    /* @__PURE__ */ jsxs21("label", { style: S.sub, children: [
+  return /* @__PURE__ */ jsxs22("div", { "data-testid": "bridge-panel", style: { marginTop: 6 }, children: [
+    /* @__PURE__ */ jsxs22("label", { style: S.sub, children: [
       /* @__PURE__ */ jsx21(Checkbox9, { checked: st.enabled, onCheckedChange: cambiar }),
       lang === "en" ? " Scan bridge (WoWForeverBridge addon) · keeps every scan in a daily journal" : " Puente de escaneos (addon WoWForeverBridge) · guarda cada escaneo en un diario por día"
     ] }),
-    /* @__PURE__ */ jsxs21("p", { "data-testid": "bridge-status", style: S.sub, children: [
+    /* @__PURE__ */ jsxs22("p", { "data-testid": "bridge-status", style: S.sub, children: [
       lang === "en" ? "Bridge: " : "Puente: ",
       st.status,
       st.entries ? ` · ${st.entries} ${lang === "en" ? "day(s)" : "día(s)"} · ${st.items} ${lang === "en" ? "observations" : "observaciones"}` : "",
@@ -79208,9 +79593,10 @@ function VistaMercado({ ctx, almacen, sincronizador, ventas, puente, estado, rec
   }, [perfil, guia, nivel]);
   const settings = useMemo18(() => ajustesFarm(perfil, farmGuardado), [perfil, farmGuardado]);
   const guardarFarm = async (nuevo) => {
-    setFarmGuardado(nuevo);
+    const normalizado = ajustesFarm(perfil, nuevo);
+    setFarmGuardado(normalizado);
     try {
-      await ctx?.storage?.set?.("farm-settings", nuevo);
+      await ctx?.storage?.set?.("farm-settings", normalizado);
     } catch {
     }
   };
@@ -79532,7 +79918,7 @@ rcado.errorCarpeta", { msg: r?.message ? ` (${r.message})` : "" }));
     { id: "subasta", label: t(lang, "subasta.titulo") }
   ] }) });
   if (sub === "subasta") {
-    return /* @__PURE__ */ jsx21("div", { style: S.pagina, children: /* @__PURE__ */ jsxs21("div", { style: S.cuerpo, children: [
+    return /* @__PURE__ */ jsx21("div", { style: S.pagina, children: /* @__PURE__ */ jsxs22("div", { style: S.cuerpo, children: [
       barraSub,
       /* @__PURE__ */ jsx21(VistaSubastaPawn, { ctx, mercado, historial, perfil, lang })
     ] }) });
@@ -79559,8 +79945,8 @@ a")}`;
 rvada: " : s.kind === "chest-obs" ? "Cofre observado: " : "";
       const lvl = s.lvlMin != null || s.lvlMax != null ? `nv ${s.lvlMin ?? "?"}–${s.lvlMax ?? "?"} ` : "";
       const rank = { normal: "normal", elite: "élite", rareelite: "élite rara", rare: "rara", boss: "jefe" }[s.rank] || "";
-      const roi = m.roi == null ? "" : ` · ROI ${m.roi >= 0 ? "+" : ""}${Math.round(m.roi * 100)}%`;
-      return /* @__PURE__ */ jsxs21(Fragment16, { children: [
+      const margin = m.marginPct == null ? "" : ` · ${t(lang, "mercado.orden.roi")} ${m.marginPct >= 0 ? "+" : ""}${Math.round(m.marginPct * 100)}%`;
+      return /* @__PURE__ */ jsxs22(Fragment16, { children: [
         kind,
         s.name,
         " · ",
@@ -79572,15 +79958,16 @@ rvada: " : s.kind === "chest-obs" ? "Cofre observado: " : "";
         " · ~",
         fmt.gph(m.gph),
         "/h",
-        roi,
+        margin,
         doubt,
         " ",
-        /* @__PURE__ */ jsx21(Chip2, { color: C.verde, children: t(lang, "mercado.farmeo.farmeable") })
+        /* @__PURE__ */ jsx21(Chip2, { color: C.verde, children: t(lang, "mercado.farmeo.farmeable") }),
+        /* @__PURE__ */ jsx21(RutaFarmeo, { fuente: s, fmt, lang })
       ] });
     }
     if (m.sources.length) {
       const inel = m.sources.filter((s) => !s.eligible).sort((a, b) => (b.gph || 0) - (a.gph || 0))[0] || m.sources[0];
-      return /* @__PURE__ */ jsxs21(Fragment16, { children: [
+      return /* @__PURE__ */ jsxs22(Fragment16, { children: [
         t(lang, "mercado.farmeo.noFar"),
         " (",
         inel.reason || t(lang, "mercado.farmeo.sinElegible"),
@@ -79634,10 +80021,10 @@ rvada: " : s.kind === "chest-obs" ? "Cofre observado: " : "";
       setExportandoCli(false);
     }
   };
-  return /* @__PURE__ */ jsx21("div", { style: S.pagina, children: /* @__PURE__ */ jsxs21("div", { style: S.cuerpo, children: [
+  return /* @__PURE__ */ jsx21("div", { style: S.pagina, children: /* @__PURE__ */ jsxs22("div", { style: S.cuerpo, children: [
     barraSub,
-    /* @__PURE__ */ jsxs21(Tarjeta, { titulo: t(lang, "mercado.scan.titulo"), extra: /* @__PURE__ */ jsx21("span", { style: S.chip, children: t(lang, "mercado.tusDatos") }), children: [
-      /* @__PURE__ */ jsxs21("div", { style: { display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }, children: [
+    /* @__PURE__ */ jsxs22(Tarjeta, { titulo: t(lang, "mercado.scan.titulo"), extra: /* @__PURE__ */ jsx21("span", { style: S.chip, children: t(lang, "mercado.tusDatos") }), children: [
+      /* @__PURE__ */ jsxs22("div", { style: { display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }, children: [
         /* @__PURE__ */ jsx21(Button10, { onClick: () => leerCarpeta(false), disabled: importando, children: t(lang, "mercado.leer") }),
         /* @__PURE__ */ jsx21(Button10, { variant: "outline", onClick: () => leerCarpeta(true), disabled: importando, children: t(lang, "mercado.otra") }),
         /* @__PURE__ */ jsx21(Button10, { variant: "outline", onClick: () => fileRef.current?.click(), disabled: importando, children: t(lang, "mercado.archivo") }),
@@ -79654,11 +80041,11 @@ rvada: " : s.kind === "chest-obs" ? "Cofre observado: " : "";
           }
         )
       ] }),
-      /* @__PURE__ */ jsxs21("label", { style: S.sub, children: [
+      /* @__PURE__ */ jsxs22("label", { style: S.sub, children: [
         /* @__PURE__ */ jsx21(Checkbox9, { checked: auto.enabled, onCheckedChange: cambiarAuto, disabled: importando }),
         lang === "en" ? " Automatic tracking · every 30 s while Hermes is open" : " Seguimiento automático · cada 30 s con Hermes abierto"
       ] }),
-      /* @__PURE__ */ jsxs21("p", { "data-testid": "auctionator-auto-status", style: S.sub, children: [
+      /* @__PURE__ */ jsxs22("p", { "data-testid": "auctionator-auto-status", style: S.sub, children: [
         lang === "en" ? "Automatic status: " : "Estado automático: ",
         auto.status,
         auto.checkedAt ? ` · ${fmtFecha(auto.checkedAt)}` : "",
@@ -79671,13 +80058,13 @@ rvada: " : s.kind === "chest-obs" ? "Cofre observado: " : "";
 Ons. After an in-game scan, use /reload or log out to write prices to disk. Changing tabs does not stop tracking." : "Autoriza una vez WTF/Account/<cuenta>/SavedVariables (una carpeta superior solo si\
  la búsqueda acotada puede completarse). No Interface/AddOns. Tras escanear en el juego, usa /reload o cierra sesión para guardar los precios en disco. Cambiar de pestaña no detiene el seguimiento." }),
       /* @__PURE__ */ jsx21("p", { role: "status", "aria-live": "polite", style: { ...S.sub, margin: 0 }, children: mensaje || (snapshot ? t(lang, "mercado.restaurado") : t(lang, "mercado.vacio.scan")) }),
-      snapshot && fres && /* @__PURE__ */ jsxs21("div", { style: { display: "flex", gap: 10, flexWrap: "wrap", fontSize: 12, color: C.texto2 }, children: [
-        /* @__PURE__ */ jsxs21("span", { children: [
+      snapshot && fres && /* @__PURE__ */ jsxs22("div", { style: { display: "flex", gap: 10, flexWrap: "wrap", fontSize: 12, color: C.texto2 }, children: [
+        /* @__PURE__ */ jsxs22("span", { children: [
           t(lang, "mercado.frescura.importado"),
           ": ",
           fmtFecha(fres.importedAt)
         ] }),
-        /* @__PURE__ */ jsxs21("span", { children: [
+        /* @__PURE__ */ jsxs22("span", { children: [
           t(lang, "mercado.frescura.max"),
           ": ",
           fres.fechaMax || "—",
@@ -79685,9 +80072,9 @@ Ons. After an in-game scan, use /reload or log out to write prices to disk. Chan
         ] }),
         histInfo.days > 0 && /* @__PURE__ */ jsx21("span", { children: t(lang, "mercado.frescura.hist", { dias: histInfo.days, entradas: histInfo.entries }) })
       ] }),
-      exportCli && /* @__PURE__ */ jsx21("div", { "data-testid": "export-cli-estado", role: "status", "aria-live": "polite", style: { ...S.sub, marginTop: 8 }, children: exportCli.ok ? /* @__PURE__ */ jsxs21(
+      exportCli && /* @__PURE__ */ jsx21("div", { "data-testid": "export-cli-estado", role: "status", "aria-live": "polite", style: { ...S.sub, marginTop: 8 }, children: exportCli.ok ? /* @__PURE__ */ jsxs22(
       Fragment16, { children: [
-        /* @__PURE__ */ jsxs21("span", { style: { color: C.verde }, children: [
+        /* @__PURE__ */ jsxs22("span", { style: { color: C.verde }, children: [
           "✓ ",
           cp(
             lang,
@@ -79695,7 +80082,7 @@ Ons. After an in-game scan, use /reload or log out to write prices to disk. Chan
             `Exported precios-cli.json · realm ${exportCli.reino} · ${exportCli.n} priced items.`
           )
         ] }),
-        /* @__PURE__ */ jsxs21("div", { style: { display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginTop: 4 }, children: [
+        /* @__PURE__ */ jsxs22("div", { style: { display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginTop: 4 }, children: [
           /* @__PURE__ */ jsx21("code", { style: { fontSize: 11, color: C.texto2 }, children: exportCli.cmd }),
           /* @__PURE__ */ jsx21(
             Button10,
@@ -79715,17 +80102,17 @@ Ons. After an in-game scan, use /reload or log out to write prices to disk. Chan
           "Queda en la carpeta de datos del plugin (Ajustes → Plugins → revelar carpeta). Formato canónico {valores, reino, fecha} que lee consultar.py maxeo --precios.",
           "Lands in the plugin data folder (Settings → Plugins → reveal folder). Canonical {valores, reino, fecha} format read by consultar.py maxeo --precios."
         ) })
-      ] }) : /* @__PURE__ */ jsxs21("span", { style: { color: C.rojo }, children: [
+      ] }) : /* @__PURE__ */ jsxs22("span", { style: { color: C.rojo }, children: [
         "✗ ",
         cp(lang, "No se exportó: ", "Export failed: "),
         exportCli.error
       ] }) }),
       fres?.aviso && /* @__PURE__ */ jsx21(Aviso, { children: t(lang, "mercado.frescura.aviso") }),
-      (snapshot?.warnings || []).map((w, i) => /* @__PURE__ */ jsxs21("p", { style: S.sub, children: [
+      (snapshot?.warnings || []).map((w, i) => /* @__PURE__ */ jsxs22("p", { style: S.sub, children: [
         "⚠ ",
         w
       ] }, i)),
-      esLegacy || snapshot && !scopes.length ? /* @__PURE__ */ jsxs21("div", { role: "status", "data-testid": "procedencia-desconocida", style: { ...S.aviso, marginTop: 10 }, children: [
+      esLegacy || snapshot && !scopes.length ? /* @__PURE__ */ jsxs22("div", { role: "status", "data-testid": "procedencia-desconocida", style: { ...S.aviso, marginTop: 10 }, children: [
         /* @__PURE__ */ jsx21("strong", { children: cp(lang, "Procedencia DESCONOCIDA (UNKNOWN)", "UNKNOWN provenance") }),
         " — ",
         cp(
@@ -79735,22 +80122,22 @@ Ons. After an in-game scan, use /reload or log out to write prices to disk. Chan
           "These prices come from Auctionator with no verified exporter: region, ruleset, house and posting channel are unknown. They cannot be compared with another house or used to recommend sales."
         )
       ] }) : null,
-      /* @__PURE__ */ jsxs21("details", { style: { fontSize: 12 }, children: [
+      /* @__PURE__ */ jsxs22("details", { style: { fontSize: 12 }, children: [
         /* @__PURE__ */ jsx21("summary", { style: { cursor: "pointer", color: C.texto3 }, children: t(lang, "mercado.privacidad.titulo") }),
         /* @__PURE__ */ jsx21("p", { style: S.sub, children: t(lang, "mercado.privacidad.texto") })
       ] })
     ] }),
     /* @__PURE__ */ jsx21(Tarjeta, { titulo: t(lang, "mercado.aviso.titulo"), children: /* @__PURE__ */ jsx21("p", { style: { ...S.sub, margin: 0 }, children: t(lang, "mercado.aviso.texto") }) }),
-    /* @__PURE__ */ jsxs21(
+    /* @__PURE__ */ jsxs22(
       Tarjeta,
       {
         titulo: t(lang, "mercado.tabla.titulo"),
         extra: /* @__PURE__ */ jsx21(Origen, { f: ["cliente-forever", "cmangos-1.12"], lang }),
         children: [
-          /* @__PURE__ */ jsxs21("div", { style: { display: "flex", gap: 12, flexWrap: "wrap", alignItems: "flex-end" }, children: [
-            /* @__PURE__ */ jsxs21("label", { style: S.campo, children: [
+          /* @__PURE__ */ jsxs22("div", { style: { display: "flex", gap: 12, flexWrap: "wrap", alignItems: "flex-end" }, children: [
+            /* @__PURE__ */ jsxs22("label", { style: S.campo, children: [
               /* @__PURE__ */ jsx21("span", { style: S.etiqueta, children: t(lang, "mercado.realm") }),
-              /* @__PURE__ */ jsxs21(Select4, { value: realm ? realmId(realm) : realmName, onValueChange: (v) => {
+              /* @__PURE__ */ jsxs22(Select4, { value: realm ? realmId(realm) : realmName, onValueChange: (v) => {
                 const r = snapshot.realms.find((r2) => realmId(r2) === v);
                 setRealmChoice(v);
                 setRealmName(r?.name || "");
@@ -79758,22 +80145,22 @@ Ons. After an in-game scan, use /reload or log out to write prices to disk. Chan
                 setDetalleKey(null);
               }, disabled: !snapshot, children: [
                 /* @__PURE__ */ jsx21(SelectTrigger4, { "aria-label": t(lang, "mercado.realm"), children: /* @__PURE__ */ jsx21(SelectValue4, { placeholder: "—" }) }),
-                /* @__PURE__ */ jsx21(SelectContent4, { children: (snapshot?.realms || []).map((r) => /* @__PURE__ */ jsxs21(SelectItem4, { value: realmId(r), children: [
+                /* @__PURE__ */ jsx21(SelectContent4, { children: (snapshot?.realms || []).map((r) => /* @__PURE__ */ jsxs22(SelectItem4, { value: realmId(r), children: [
                   r.name,
                   snapshot.realms.filter((x) => x.name === r.name).length > 1 ? ` · ${r.identity?.auctionPool || "UNKNOWN"} · ${r.identity?.postingChannel || "—"}` : ""
                 ] }, realmId(r))) })
               ] })
             ] }),
-            /* @__PURE__ */ jsxs21("label", { style: { ...S.campo, flex: 1, minWidth: 220 }, children: [
+            /* @__PURE__ */ jsxs22("label", { style: { ...S.campo, flex: 1, minWidth: 220 }, children: [
               /* @__PURE__ */ jsx21("span", { style: S.etiqueta, children: t(lang, "mercado.buscar") }),
               /* @__PURE__ */ jsx21(SearchField2, { value: busqueda, onChange: (v) => {
                 setBusqueda(v);
                 setPagina(0);
               }, placeholder: t(lang, "mercado.buscar.ph") })
             ] }),
-            /* @__PURE__ */ jsxs21("label", { style: S.campo, children: [
+            /* @__PURE__ */ jsxs22("label", { style: S.campo, children: [
               /* @__PURE__ */ jsx21("span", { style: S.etiqueta, children: t(lang, "mercado.orden") }),
-              /* @__PURE__ */ jsxs21(Select4, { value: orden, onValueChange: (v) => {
+              /* @__PURE__ */ jsxs22(Select4, { value: orden, onValueChange: (v) => {
                 setOrden(v);
                 setPagina(0);
               }, children: [
@@ -79782,7 +80169,7 @@ Ons. After an in-game scan, use /reload or log out to write prices to disk. Chan
               ] })
             ] })
           ] }),
-          /* @__PURE__ */ jsxs21("div", { style: { display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center" }, children: [
+          /* @__PURE__ */ jsxs22("div", { style: { display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center" }, children: [
             /* @__PURE__ */ jsx21(Checkbox9, { checked: soloRecientes, onCheckedChange: (v) => {
               setSoloRecientes(!!v);
               setPagina(0);
@@ -79792,7 +80179,7 @@ Ons. After an in-game scan, use /reload or log out to write prices to disk. Chan
               setConFuente(!!v);
               setPagina(0);
             } }),
-            /* @__PURE__ */ jsxs21("span", { style: { fontSize: 12 }, children: [
+            /* @__PURE__ */ jsxs22("span", { style: { fontSize: 12 }, children: [
               t(lang, "mercado.f.conFuente"),
               " (",
               nivel,
@@ -79809,11 +80196,11 @@ Ons. After an in-game scan, use /reload or log out to write prices to disk. Chan
             } }),
             /* @__PURE__ */ jsx21("span", { style: { fontSize: 12 }, children: t(lang, "mercado.f.ofertas") })
           ] }),
-          /* @__PURE__ */ jsxs21("details", { style: { fontSize: 12 }, children: [
+          /* @__PURE__ */ jsxs22("details", { style: { fontSize: 12 }, children: [
             /* @__PURE__ */ jsx21("summary", { style: { cursor: "pointer", color: C.texto3 }, children: t(lang, "mercado.filtros.titulo") }),
             /* @__PURE__ */ jsx21("p", { style: S.sub, children: t(lang, "mercado.filtros.texto") })
           ] }),
-          snapshot && fres && /* @__PURE__ */ jsxs21("p", { style: S.sub, children: [
+          snapshot && fres && /* @__PURE__ */ jsxs22("p", { style: S.sub, children: [
             t(lang, "mercado.frescura.importado"),
             ": ",
             fmtFecha(fres.importedAt),
@@ -79823,8 +80210,8 @@ Ons. After an in-game scan, use /reload or log out to write prices to disk. Chan
           ] }),
           /* @__PURE__ */ jsx21("p", { role: "status", style: S.etiqueta, children: snapshot ? t(lang, "mercado.contador", { visibles: visibles.length, total: items.length, ordenTxt, pag: paginaSegura +
           1, paginas }) : t(lang, "mercado.vacio.scan") }),
-          /* @__PURE__ */ jsx21("div", { style: { overflowX: "auto" }, children: /* @__PURE__ */ jsxs21("table", { style: S.tabla, children: [
-            /* @__PURE__ */ jsx21("thead", { children: /* @__PURE__ */ jsxs21("tr", { children: [
+          /* @__PURE__ */ jsx21("div", { style: { overflowX: "auto" }, children: /* @__PURE__ */ jsxs22("table", { style: S.tabla, children: [
+            /* @__PURE__ */ jsx21("thead", { children: /* @__PURE__ */ jsxs22("tr", { children: [
               /* @__PURE__ */ jsx21("th", { style: S.th, children: t(lang, "mercado.col.item") }),
               /* @__PURE__ */ jsx21("th", { style: S.th, children: t(lang, "mercado.col.min") }),
               /* @__PURE__ */ jsx21("th", { style: S.th, children: t(lang, "mercado.col.dia") }),
@@ -79837,10 +80224,10 @@ Ons. After an in-game scan, use /reload or log out to write prices to disk. Chan
               const daily = i.history.find((h) => h.day === i.observedDay);
               const nombreVisible = nombreItem(i, D.items, CATALOGO2, lang) || i.sourceKey;
               const fuente = fuenteResumen(i);
-              return /* @__PURE__ */ jsxs21("tr", { children: [
-                /* @__PURE__ */ jsx21("td", { style: S.td, children: /* @__PURE__ */ jsxs21("div", { style: { display: "flex", gap: 6, alignItems: "flex-start", minWidth: 0 }, children: [
+              return /* @__PURE__ */ jsxs22("tr", { children: [
+                /* @__PURE__ */ jsx21("td", { style: S.td, children: /* @__PURE__ */ jsxs22("div", { style: { display: "flex", gap: 6, alignItems: "flex-start", minWidth: 0 }, children: [
                   /* @__PURE__ */ jsx21(IconoItem, { id: i.itemId, size: 28, titulo: nombreVisible }),
-                  /* @__PURE__ */ jsxs21("div", { style: { minWidth: 0 }, children: [
+                  /* @__PURE__ */ jsxs22("div", { style: { minWidth: 0 }, children: [
                     /* @__PURE__ */ jsx21(
                       "button",
                       {
@@ -79850,11 +80237,11 @@ Ons. After an in-game scan, use /reload or log out to write prices to disk. Chan
                         children: nombreVisible
                       }
                     ),
-                    i.itemId == null ? /* @__PURE__ */ jsxs21("div", { style: S.etiqueta, children: [
+                    i.itemId == null ? /* @__PURE__ */ jsxs22("div", { style: S.etiqueta, children: [
                       t(lang, "mercado.variante"),
                       " · ",
                       i.sourceKey
-                    ] }) : /* @__PURE__ */ jsxs21("div", { style: S.etiqueta, title: t(lang, "mercado.clave") + " " + i.sourceKey, children: [
+                    ] }) : /* @__PURE__ */ jsxs22("div", { style: S.etiqueta, title: t(lang, "mercado.clave") + " " + i.sourceKey, children: [
                       "#",
                       i.itemId
                     ] }),
@@ -79862,7 +80249,7 @@ Ons. After an in-game scan, use /reload or log out to write prices to disk. Chan
                   ] })
                 ] }) }),
                 /* @__PURE__ */ jsx21("td", { style: S.td, children: /* @__PURE__ */ jsx21(Dinero, { cobre: i.unitPriceCopper }) }),
-                /* @__PURE__ */ jsxs21("td", { style: S.td, children: [
+                /* @__PURE__ */ jsxs22("td", { style: S.td, children: [
                   fechaDe(i.observedDay) || "—",
                   /* @__PURE__ */ jsx21("div", { style: S.etiqueta, children: edadTexto(i) })
                 ] }),
@@ -79873,11 +80260,11 @@ nowrap" }, children: fuente }) }),
               ] }, i.sourceKey);
             }) })
           ] }) }),
-          snapshot && paginas > 1 && /* @__PURE__ */ jsxs21("div", { style: { display: "flex", gap: 8, alignItems: "center" }, children: [
+          snapshot && paginas > 1 && /* @__PURE__ */ jsxs22("div", { style: { display: "flex", gap: 8, alignItems: "center" }, children: [
             /* @__PURE__ */ jsx21(Button10, { variant: "outline", size: "xs", disabled: paginaSegura === 0, onClick: () => setPagina(paginaSegura - 1), children: t(lang, "mercado.anterior") }),
             /* @__PURE__ */ jsx21(Button10, { variant: "outline", size: "xs", disabled: paginaSegura + 1 >= paginas, onClick: () => setPagina(paginaSegura + 1), children: t(lang, "mercado.siguiente") })
           ] }),
-          /* @__PURE__ */ jsxs21("p", { style: S.sub, children: [
+          /* @__PURE__ */ jsxs22("p", { style: S.sub, children: [
             t(lang, "mercado.det.cobertura", { addon: CATALOGO2?.source?.addon || t(lang, "mercado.det.sinCatalogo") }),
             " ",
             CATALOGO2?.source?.coverage || ""
@@ -79886,22 +80273,22 @@ nowrap" }, children: fuente }) }),
       }
     ),
     /* @__PURE__ */ jsx21(MisVentas, { ventas, auctionSnapshot: snapshot, perfil, lang }),
-    /* @__PURE__ */ jsxs21(Tarjeta, { titulo: cp(lang, "Procedencia y ámbitos aislados", "Provenance and isolated scopes"), children: [
+    /* @__PURE__ */ jsxs22(Tarjeta, { titulo: cp(lang, "Procedencia y ámbitos aislados", "Provenance and isolated scopes"), children: [
       /* @__PURE__ */ jsx21("p", { style: S.sub, children: cp(
         lang,
         "Sin exportador verificado: las etiquetas son declaradas por quien entregó el archivo y validadas por esquema. No prueban la economía del juego, pueden ser sintéticas y nunca se presentan como\
  importación acreditada.",
         "No verified exporter: labels are declared by the file provider and schema-validated. They do not prove the game economy, may be synthetic and are never presented as an accredited import."
       ) }),
-      /* @__PURE__ */ jsxs21("p", { style: S.sub, children: [
+      /* @__PURE__ */ jsxs22("p", { style: S.sub, children: [
         cp(lang, "Exportador", "Exporter"),
         ": ",
         verifiedExporter() || cp(lang, "sin exportador verificado", "no verified exporter"),
         " · ",
         classifyAcquisition({ status: "ok" }).warnings.map((w) => motivo(w, lang)).join(" · ")
       ] }),
-      /* @__PURE__ */ jsxs21("div", { style: { display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginTop: 8 }, children: [
-        /* @__PURE__ */ jsxs21("label", { style: { ...S.campo, minWidth: 240 }, children: [
+      /* @__PURE__ */ jsxs22("div", { style: { display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginTop: 8 }, children: [
+        /* @__PURE__ */ jsxs22("label", { style: { ...S.campo, minWidth: 240 }, children: [
           /* @__PURE__ */ jsx21("span", { style: S.etiqueta, children: cp(lang, "Observación aislada (archivo .json)", "Isolated observation (.json file)") }),
           /* @__PURE__ */ jsx21(
             "input",
@@ -79921,7 +80308,7 @@ re") : cp(lang, "Restaurar respaldo previo a v2", "Restore pre-v2 backup") }) : 
       ] }),
       errorFuente ? /* @__PURE__ */ jsx21("p", { role: "status", "data-testid": "error-fuente", style: { ...S.aviso, marginTop: 8 }, children: errorFuente }) : null,
       bloqueoV2 ? /* @__PURE__ */ jsx21("p", { role: "status", "data-testid": "fuente-bloqueada", style: { ...S.aviso, marginTop: 8 }, children: bloqueoV2 }) : null,
-      scopes.length ? /* @__PURE__ */ jsx21("ul", { "data-testid": "identidades-fuente", style: { ...S.sub, marginTop: 8, paddingLeft: 18 }, children: scopes.map((s) => /* @__PURE__ */ jsxs21("li", { style: {
+      scopes.length ? /* @__PURE__ */ jsx21("ul", { "data-testid": "identidades-fuente", style: { ...S.sub, marginTop: 8, paddingLeft: 18 }, children: scopes.map((s) => /* @__PURE__ */ jsxs22("li", { style: {
       marginBottom: 4 }, children: [
         /* @__PURE__ */ jsx21(Chip2, { color: C.azul, children: etiquetaCorta(s, lang) }),
         " — ",
@@ -79933,17 +80320,17 @@ re") : cp(lang, "Restaurar respaldo previo a v2", "Restore pre-v2 backup") }) : 
       ] }, s.key)) }) : /* @__PURE__ */ jsx21("p", { "data-testid": "identidades-fuente", style: S.sub, children: cp(lang, "Sin ámbitos verificados: la comparación permanece bloqueada.", "No verifie\
 d scopes: comparison stays blocked.") })
     ] }),
-    /* @__PURE__ */ jsx21("div", { "data-testid": "comparacion-card", children: /* @__PURE__ */ jsxs21(Tarjeta, { titulo: cp(lang, "Comparación capital / neutral (escenario)", "Capital / neutral comp\
+    /* @__PURE__ */ jsx21("div", { "data-testid": "comparacion-card", children: /* @__PURE__ */ jsxs22(Tarjeta, { titulo: cp(lang, "Comparación capital / neutral (escenario)", "Capital / neutral comp\
 arison (scenario)"), children: [
       /* @__PURE__ */ jsx21("p", { style: S.sub, children: cp(
         lang,
         "Solo entre fuentes aisladas verificadas. El resultado no promete venta ni ganancia: es un escenario de precios observados.",
         "Only between verified isolated sources. The result promises no sale or profit: it is a scenario of observed prices."
       ) }),
-      /* @__PURE__ */ jsx21("div", { style: { display: "flex", gap: 12, flexWrap: "wrap" }, children: [["A", scopeA, setScopeA], ["B", scopeB, setScopeB]].map(([lado, valor, setValor]) => /* @__PURE__ */ jsxs21(
+      /* @__PURE__ */ jsx21("div", { style: { display: "flex", gap: 12, flexWrap: "wrap" }, children: [["A", scopeA, setScopeA], ["B", scopeB, setScopeB]].map(([lado, valor, setValor]) => /* @__PURE__ */ jsxs22(
       "label", { style: { ...S.campo, flex: 1, minWidth: 220 }, children: [
         /* @__PURE__ */ jsx21("span", { style: S.etiqueta, children: cp(lang, `Ámbito ${lado} (origen aislado)`, `Scope ${lado} (isolated source)`) }),
-        /* @__PURE__ */ jsxs21(Select4, { value: valor, onValueChange: setValor, disabled: scopes.length < 2, children: [
+        /* @__PURE__ */ jsxs22(Select4, { value: valor, onValueChange: setValor, disabled: scopes.length < 2, children: [
           /* @__PURE__ */ jsx21(
             SelectTrigger4,
             {
@@ -79952,7 +80339,7 @@ arison (scenario)"), children: [
               children: /* @__PURE__ */ jsx21(SelectValue4, {})
             }
           ),
-          /* @__PURE__ */ jsxs21(SelectContent4, { children: [
+          /* @__PURE__ */ jsxs22(SelectContent4, { children: [
             /* @__PURE__ */ jsx21(SelectItem4, { value: "__none__", children: "—" }),
             scopes.map((s) => /* @__PURE__ */ jsx21(SelectItem4, { value: s.key, children: etiquetaCorta(s, lang) }, s.key))
           ] })
@@ -79963,7 +80350,7 @@ arison (scenario)"), children: [
         "Comisión: solo si la tasa está verificada y fechada. En blanco, el neto se muestra como escenario; no se asume ningún porcentaje.",
         "Commission: only when the rate is verified and dated. If blank, net is shown as a scenario; no percentage is assumed."
       ) }),
-      ["capital", "neutral"].map((lado) => /* @__PURE__ */ jsxs21("div", { style: { display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center", marginTop: 4 }, children: [
+      ["capital", "neutral"].map((lado) => /* @__PURE__ */ jsxs22("div", { style: { display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center", marginTop: 4 }, children: [
         /* @__PURE__ */ jsx21("span", { style: { ...S.etiqueta, minWidth: 64 }, children: lado }),
         /* @__PURE__ */ jsx21(
           "input",
@@ -80023,7 +80410,7 @@ arison (scenario)"), children: [
         "Una sola serie de precios: los canales son la misma piscina, no dos fuentes. Sin delta entre ellos.",
         "A single price series: the channels are the same pool, not two sources. No delta between them."
       ) }) : null,
-      resultadoCmp.status === "blocked" ? /* @__PURE__ */ jsxs21("div", { role: "status", "data-testid": "comparacion-bloqueada", style: { ...S.aviso, marginTop: 10 }, children: [
+      resultadoCmp.status === "blocked" ? /* @__PURE__ */ jsxs22("div", { role: "status", "data-testid": "comparacion-bloqueada", style: { ...S.aviso, marginTop: 10 }, children: [
         /* @__PURE__ */ jsx21("strong", { children: cp(lang, "Comparación bloqueada", "Comparison blocked") }),
         /* @__PURE__ */ jsx21("ul", { style: { margin: "6px 0 0", paddingLeft: 18 }, children: (resultadoCmp.reasons || []).map((r, i) => /* @__PURE__ */ jsx21("li", { children: motivo(r, lang) }, i)) }),
         esLegacy ? /* @__PURE__ */ jsx21("p", { style: { margin: "6px 0 0" }, children: cp(
@@ -80032,8 +80419,8 @@ arison (scenario)"), children: [
           "Imported real Auctionator prices have UNKNOWN provenance: they are not used as either side."
         ) }) : null,
         /* @__PURE__ */ jsx21("p", { style: { margin: "6px 0 0" }, children: cp(lang, "No se recomienda dónde vender.", "No sell recommendation.") })
-      ] }) : /* @__PURE__ */ jsxs21("div", { style: { overflowX: "auto", marginTop: 10 }, children: [
-        /* @__PURE__ */ jsxs21("table", { style: S.tabla, children: [
+      ] }) : /* @__PURE__ */ jsxs22("div", { style: { overflowX: "auto", marginTop: 10 }, children: [
+        /* @__PURE__ */ jsxs22("table", { style: S.tabla, children: [
           /* @__PURE__ */ jsx21("thead", { children: /* @__PURE__ */ jsx21("tr", { children: (esSerieUnica ? [
             cp(lang, "Ítem", "Item"),
             cp(lang, "Canales de una sola serie", "Channels of one series"),
@@ -80051,49 +80438,49 @@ arison (scenario)"), children: [
           /* @__PURE__ */ jsx21("tbody", { "data-testid": "comparacion-filas", children: resultadoCmp.rows.slice(0, 50).map((f, i) => {
             const d = f.deltaCopper;
             const delta = Number.isSafeInteger(d) ? `Δ ${d > 0 ? "+" : d < 0 ? "−" : ""}${fmtCobre(Math.abs(d))}` : "—";
-            return /* @__PURE__ */ jsxs21("tr", { children: [
-              /* @__PURE__ */ jsxs21("td", { style: S.td, children: [
+            return /* @__PURE__ */ jsxs22("tr", { children: [
+              /* @__PURE__ */ jsxs22("td", { style: S.td, children: [
                 nombreItem({ sourceKey: f.sourceKey, itemId: f.itemId }, D.items, CATALOGO2, lang),
                 /* @__PURE__ */ jsx21("div", { style: { fontSize: 10, color: C.texto3 }, children: f.itemId == null ? f.sourceKey : `id ${f.itemId}` })
               ] }),
-              esSerieUnica ? (f.channels || []).map((ch, j) => /* @__PURE__ */ jsxs21("td", { style: S.td, "data-testid": "cmp-canal", children: [
-                /* @__PURE__ */ jsxs21("div", { children: [
+              esSerieUnica ? (f.channels || []).map((ch, j) => /* @__PURE__ */ jsxs22("td", { style: S.td, "data-testid": "cmp-canal", children: [
+                /* @__PURE__ */ jsxs22("div", { children: [
                   cp(lang, "Canal", "Channel"),
                   ": ",
                   ch.channel
                 ] }),
-                /* @__PURE__ */ jsxs21("div", { children: [
+                /* @__PURE__ */ jsxs22("div", { children: [
                   cp(lang, "Bruto", "Gross"),
                   ": ",
                   /* @__PURE__ */ jsx21(Dinero, { cobre: ch.grossCopper })
                 ] }),
-                /* @__PURE__ */ jsx21("div", { children: ch.netCopper == null ? cp(lang, "Neto: escenario", "Net: scenario") : /* @__PURE__ */ jsxs21(Fragment16, { children: [
+                /* @__PURE__ */ jsx21("div", { children: ch.netCopper == null ? cp(lang, "Neto: escenario", "Net: scenario") : /* @__PURE__ */ jsxs22(Fragment16, { children: [
                   cp(lang, "Neto", "Net"),
                   ": ",
                   /* @__PURE__ */ jsx21(Dinero, { cobre: ch.netCopper })
                 ] }) })
-              ] }, j)) : /* @__PURE__ */ jsxs21(Fragment16, { children: [
+              ] }, j)) : /* @__PURE__ */ jsxs22(Fragment16, { children: [
                 /* @__PURE__ */ jsx21("td", { style: S.td, "data-testid": "cmp-capital", children: !f.a ? /* @__PURE__ */ jsx21(Chip2, { color: C.rojo, children: cp(lang, "Ausente en capital (falta de\
- datos, no precio 0)", "Missing in capital (no data, not price 0)") }) : /* @__PURE__ */ jsxs21(Fragment16, { children: [
-                  /* @__PURE__ */ jsxs21("div", { children: [
+ datos, no precio 0)", "Missing in capital (no data, not price 0)") }) : /* @__PURE__ */ jsxs22(Fragment16, { children: [
+                  /* @__PURE__ */ jsxs22("div", { children: [
                     cp(lang, "Bruto", "Gross"),
                     ": ",
                     /* @__PURE__ */ jsx21(Dinero, { cobre: f.a.grossCopper })
                   ] }),
-                  /* @__PURE__ */ jsx21("div", { children: f.netScenario ? cp(lang, "Neto: escenario (comisión no verificada)", "Net: scenario (unverified commission)") : /* @__PURE__ */ jsxs21(Fragment16,
+                  /* @__PURE__ */ jsx21("div", { children: f.netScenario ? cp(lang, "Neto: escenario (comisión no verificada)", "Net: scenario (unverified commission)") : /* @__PURE__ */ jsxs22(Fragment16,
                   { children: [
                     cp(lang, "Neto", "Net"),
                     ": ",
                     /* @__PURE__ */ jsx21(Dinero, { cobre: f.a.netCopper })
                   ] }) })
                 ] }) }),
-                /* @__PURE__ */ jsx21("td", { style: S.td, "data-testid": "cmp-neutral", children: f.b ? /* @__PURE__ */ jsxs21(Fragment16, { children: [
-                  /* @__PURE__ */ jsxs21("div", { children: [
+                /* @__PURE__ */ jsx21("td", { style: S.td, "data-testid": "cmp-neutral", children: f.b ? /* @__PURE__ */ jsxs22(Fragment16, { children: [
+                  /* @__PURE__ */ jsxs22("div", { children: [
                     cp(lang, "Bruto", "Gross"),
                     ": ",
                     /* @__PURE__ */ jsx21(Dinero, { cobre: f.b.grossCopper })
                   ] }),
-                  /* @__PURE__ */ jsx21("div", { children: f.netScenario ? cp(lang, "Neto: escenario", "Net: scenario") : /* @__PURE__ */ jsxs21(Fragment16, { children: [
+                  /* @__PURE__ */ jsx21("div", { children: f.netScenario ? cp(lang, "Neto: escenario", "Net: scenario") : /* @__PURE__ */ jsxs22(Fragment16, { children: [
                     cp(lang, "Neto", "Net"),
                     ": ",
                     /* @__PURE__ */ jsx21(Dinero, { cobre: f.b.netCopper })
@@ -80101,25 +80488,25 @@ arison (scenario)"), children: [
                 ] }) : /* @__PURE__ */ jsx21(Chip2, { color: C.rojo, children: cp(lang, "Ausente en neutral (falta de datos, no precio 0)", "Missing in neutral (no data, not price 0)") }) })
               ] }),
               /* @__PURE__ */ jsx21("td", { style: S.td, "data-testid": "cmp-delta", children: esSerieUnica ? "—" : delta }),
-              /* @__PURE__ */ jsxs21("td", { style: S.td, "data-testid": "cmp-fecha", children: [
-                /* @__PURE__ */ jsxs21("div", { children: [
+              /* @__PURE__ */ jsxs22("td", { style: S.td, "data-testid": "cmp-fecha", children: [
+                /* @__PURE__ */ jsxs22("div", { children: [
                   fechaDe(f.a?.observedDay) || "—",
                   f.b ? ` / ${fechaDe(f.b.observedDay) || "—"}` : ""
                 ] }),
-                /* @__PURE__ */ jsxs21("div", { style: { fontSize: 10, color: C.texto3 }, children: [
+                /* @__PURE__ */ jsxs22("div", { style: { fontSize: 10, color: C.texto3 }, children: [
                   f.a?.observedDay != null ? `${cp(lang, "hace", "ago")} ${hoy() - f.a.observedDay} ${cp(lang, "días", "d")}` : "—",
                   f.a?.stale || f.b?.stale ? /* @__PURE__ */ jsx21(Chip2, { color: C.naranja, children: cp(lang, " antiguo", " stale") }) : null
                 ] })
               ] }),
-              /* @__PURE__ */ jsxs21("td", { style: S.td, "data-testid": "cmp-cobertura", children: [
+              /* @__PURE__ */ jsxs22("td", { style: S.td, "data-testid": "cmp-cobertura", children: [
                 cp(lang, "filas", "rows"),
                 ": ",
                 f.coverage?.a?.itemRows ?? "—",
                 " / ",
                 f.coverage?.b?.itemRows ?? "—"
               ] }),
-              /* @__PURE__ */ jsxs21("td", { style: S.td, "data-testid": "cmp-motivos", children: [
-                (f.reasons || []).length ? (f.reasons || []).map((r, j) => /* @__PURE__ */ jsxs21("span", { children: [
+              /* @__PURE__ */ jsxs22("td", { style: S.td, "data-testid": "cmp-motivos", children: [
+                (f.reasons || []).length ? (f.reasons || []).map((r, j) => /* @__PURE__ */ jsxs22("span", { children: [
                   motivo(r, lang),
                   j < f.reasons.length - 1 ? ", " : ""
                 ] }, j)) : "—",
@@ -80132,7 +80519,7 @@ dation") }) : null
         resultadoCmp.rows.length > 50 ? /* @__PURE__ */ jsx21("p", { style: S.sub, children: cp(lang, `Mostradas 50 de ${resultadoCmp.rows.length}.`, `Showing 50 of ${resultadoCmp.rows.length}.`) }) :
         null
       ] }),
-      /* @__PURE__ */ jsx21("div", { "data-testid": "cmp-limites", style: { ...S.sub, marginTop: 10 }, children: (ctxCmp.limites || []).map((x, i) => /* @__PURE__ */ jsxs21("p", { style: { margin: "2p\
+      /* @__PURE__ */ jsx21("div", { "data-testid": "cmp-limites", style: { ...S.sub, marginTop: 10 }, children: (ctxCmp.limites || []).map((x, i) => /* @__PURE__ */ jsxs22("p", { style: { margin: "2p\
 x 0" }, children: [
         "• ",
         x
@@ -80576,7 +80963,7 @@ var SIMC_GUIA = { warrior: "warrior", hunter: "hunter", shaman: "shaman" };
 
 // src/vistas/guia/piezas.jsx
 import { useState as useState14 } from "react";
-import { Fragment as Fragment17, jsx as jsx22, jsxs as jsxs22 } from "react/jsx-runtime";
+import { Fragment as Fragment17, jsx as jsx22, jsxs as jsxs23 } from "react/jsx-runtime";
 agregarTextos({
   "guia.ficha.retrato": "Retrato de {clase}",
   "guia.ficha.nivel": "nivel",
@@ -80960,50 +81347,50 @@ var P = {
   foldBody: { padding: "3px 0 7px" }
 };
 var ICONOS2 = {
-  bow: /* @__PURE__ */ jsxs22(Fragment17, { children: [
+  bow: /* @__PURE__ */ jsxs23(Fragment17, { children: [
     /* @__PURE__ */ jsx22("path", { d: "M7 3v18" }),
     /* @__PURE__ */ jsx22("path", { d: "M7 3c9 3 13 6 13 9s-4 6-13 9" }),
     /* @__PURE__ */ jsx22("path", { d: "M3.5 12H19M15.5 8.5L19 12l-3.5 3.5" })
   ] }),
-  pin: /* @__PURE__ */ jsxs22(Fragment17, { children: [
+  pin: /* @__PURE__ */ jsxs23(Fragment17, { children: [
     /* @__PURE__ */ jsx22("path", { d: "M12 21s-6.5-5.2-6.5-10.4a6.5 6.5 0 1 1 13 0C18.5 15.8 12 21 12 21z" }),
     /* @__PURE__ */ jsx22("circle", { cx: "12", cy: "10.4", r: "2.3" })
   ] }),
   gate: /* @__PURE__ */ jsx22(Fragment17, { children: /* @__PURE__ */ jsx22("path", { d: "M4 21V9l8-6 8 6v12M4 21h16M9 21v-7h6v7" }) }),
   star: /* @__PURE__ */ jsx22("path", { d: "M12 3.5l2.5 5.2 5.7.8-4.1 4 1 5.7-5.1-2.7-5.1 2.7 1-5.7-4.1-4 5.7-.8z" }),
-  scroll: /* @__PURE__ */ jsxs22(Fragment17, { children: [
+  scroll: /* @__PURE__ */ jsxs23(Fragment17, { children: [
     /* @__PURE__ */ jsx22("path", { d: "M7 3h11v18l-3-1.8L12 21l-3-1.8L6 21z" }),
     /* @__PURE__ */ jsx22("path", { d: "M9.5 8h6M9.5 12h6" })
   ] }),
-  coin: /* @__PURE__ */ jsxs22(Fragment17, { children: [
+  coin: /* @__PURE__ */ jsxs23(Fragment17, { children: [
     /* @__PURE__ */ jsx22("circle", { cx: "12", cy: "12", r: "8.5" }),
     /* @__PURE__ */ jsx22("path", { d: "M12 7.5v9M9 9.5h6" })
   ] }),
-  alert: /* @__PURE__ */ jsxs22(Fragment17, { children: [
+  alert: /* @__PURE__ */ jsxs23(Fragment17, { children: [
     /* @__PURE__ */ jsx22("path", { d: "M12 3.5L22 20H2z" }),
     /* @__PURE__ */ jsx22("path", { d: "M12 10v4.5M12 17.5v.01" })
   ] }),
   check: /* @__PURE__ */ jsx22("path", { d: "M4.5 12.5l4.5 4.5L19.5 7" }),
   route: /* @__PURE__ */ jsx22(Fragment17, { children: /* @__PURE__ */ jsx22("path", { d: "M5 5.5h3.5l2 4H19M5 5.5v13m0 0h4M19 9.5v4l-3.5 2-4-2M15.5 15.5l-2-4" }) }),
-  skull: /* @__PURE__ */ jsxs22(Fragment17, { children: [
+  skull: /* @__PURE__ */ jsxs23(Fragment17, { children: [
     /* @__PURE__ */ jsx22("path", { d: "M12 3a7 7 0 0 0-7 7c0 2.5 1.3 4.3 3 5.4V19a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2v-3.6c1.7-1.1 3-2.9 3-5.4a7 7 0 0 0-7-7z" }),
     /* @__PURE__ */ jsx22("path", { d: "M9 10.5h.01M15 10.5h.01M10.5 18v-2M13.5 18v-2" })
   ] }),
-  copy: /* @__PURE__ */ jsxs22(Fragment17, { children: [
+  copy: /* @__PURE__ */ jsxs23(Fragment17, { children: [
     /* @__PURE__ */ jsx22("rect", { x: "8.5", y: "8.5", width: "11", height: "11", rx: "2" }),
     /* @__PURE__ */ jsx22("path", { d: "M15.5 8.5V6a1.5 1.5 0 0 0-1.5-1.5H6A1.5 1.5 0 0 0 4.5 6v8A1.5 1.5 0 0 0 6 15.5h2.5" })
   ] }),
-  kbd: /* @__PURE__ */ jsxs22(Fragment17, { children: [
+  kbd: /* @__PURE__ */ jsxs23(Fragment17, { children: [
     /* @__PURE__ */ jsx22("rect", { x: "2.5", y: "6", width: "19", height: "12", rx: "2" }),
     /* @__PURE__ */ jsx22("path", { d: "M6 10h.01M10 10h.01M14 10h.01M18 10h.01M7 14h10" })
   ] }),
-  sword: /* @__PURE__ */ jsxs22(Fragment17, { children: [
+  sword: /* @__PURE__ */ jsxs23(Fragment17, { children: [
     /* @__PURE__ */ jsx22("path", { d: "M14.5 17.5L4 7V4h3l10.5 10.5" }),
     /* @__PURE__ */ jsx22("path", { d: "M13 19l6-6" }),
     /* @__PURE__ */ jsx22("path", { d: "M16 16l3 3" }),
     /* @__PURE__ */ jsx22("path", { d: "M19 13l2 2" })
   ] }),
-  staff: /* @__PURE__ */ jsxs22(Fragment17, { children: [
+  staff: /* @__PURE__ */ jsxs23(Fragment17, { children: [
     /* @__PURE__ */ jsx22("path", { d: "M12 3v18" }),
     /* @__PURE__ */ jsx22("path", { d: "M12 3l-2.5 3M12 3l2.5 3" }),
     /* @__PURE__ */ jsx22("circle", { cx: "12", cy: "8", r: "1.6" })
@@ -81027,14 +81414,14 @@ function Icono({ n, size = 16, color }) {
 }
 function Detalle({ titulo, meta, extra, children, abierto, estilo, resumenExtra }) {
   const [open, setOpen] = useState14(!!abierto);
-  return /* @__PURE__ */ jsxs22(
+  return /* @__PURE__ */ jsxs23(
     "details",
     {
       open,
       onToggle: (e) => setOpen(e.currentTarget.open),
       style: { ...P.dung, ...open ? { borderColor: C.borde2 } : {}, ...estilo },
       children: [
-        /* @__PURE__ */ jsxs22("summary", { style: P.resumen, children: [
+        /* @__PURE__ */ jsxs23("summary", { style: P.resumen, children: [
           /* @__PURE__ */ jsx22("span", { style: { ...P.flecha, transform: open ? "rotate(90deg)" : "none" }, children: "▶" }),
           titulo != null ? /* @__PURE__ */ jsx22("span", { style: P.dname, children: titulo }) : null,
           meta != null ? /* @__PURE__ */ jsx22("span", { style: P.dmeta, children: meta }) : null,
@@ -81060,28 +81447,28 @@ function NombreCalidad({ q, children, estilo }) {
 }
 function Wline({ w, lvl, dps, tipos, lang, ultimo }) {
   const diff = w.lvl - lvl, dlt = dps ? (w.dps - dps).toFixed(1) : null;
-  return /* @__PURE__ */ jsxs22("div", { className: "weapline", style: { ...P.weapline, ...ultimo ? P.weaplineUlt : {} }, children: [
-    /* @__PURE__ */ jsxs22("div", { children: [
+  return /* @__PURE__ */ jsxs23("div", { className: "weapline", style: { ...P.weapline, ...ultimo ? P.weaplineUlt : {} }, children: [
+    /* @__PURE__ */ jsxs23("div", { children: [
       /* @__PURE__ */ jsx22(NombreCalidad, { q: w.q, estilo: P.weapname, children: w.n }),
       " ",
       /* @__PURE__ */ jsx22(Placa, { tono: "plain", estilo: { marginLeft: 0 }, children: tipos && (tipos[w.t] || w.t) }),
       diff <= 0 ? /* @__PURE__ */ jsx22(Placa, { tono: "now", estilo: { marginLeft: 4 }, children: t(lang, "guia.rec.yaPodes") }) : /* @__PURE__ */ jsx22(Placa, { tono: "soon", estilo: { marginLeft: 4 },
       children: diff <= 1 ? t(lang, "guia.rec.enNivel", { n: diff }) : t(lang, "guia.rec.enNiveles", { n: diff }) }),
-      /* @__PURE__ */ jsxs22("div", { style: P.weapsrc, children: [
+      /* @__PURE__ */ jsxs23("div", { style: P.weapsrc, children: [
         w.src,
-        w.note ? /* @__PURE__ */ jsxs22(Fragment17, { children: [
+        w.note ? /* @__PURE__ */ jsxs23(Fragment17, { children: [
           " · ",
           /* @__PURE__ */ jsx22("i", { children: w.note })
         ] }) : null
       ] })
     ] }),
-    /* @__PURE__ */ jsxs22("div", { style: { textAlign: "right", flexShrink: 0 }, children: [
+    /* @__PURE__ */ jsxs23("div", { style: { textAlign: "right", flexShrink: 0 }, children: [
       /* @__PURE__ */ jsx22("b", { children: fmtDps(w) }),
-      /* @__PURE__ */ jsxs22("div", { style: P.weapsrc, children: [
+      /* @__PURE__ */ jsxs23("div", { style: P.weapsrc, children: [
         "dps · req ",
         w.lvl
       ] }),
-      dlt != null ? /* @__PURE__ */ jsxs22("div", { style: dlt > 0 ? P.delta : P.deltaNeg, children: [
+      dlt != null ? /* @__PURE__ */ jsxs23("div", { style: dlt > 0 ? P.delta : P.deltaNeg, children: [
         "+",
         dlt,
         " vs actual"
@@ -81091,7 +81478,7 @@ function Wline({ w, lvl, dps, tipos, lang, ultimo }) {
 }
 function facEscudo(fac, letra) {
   const col = fac === "alliance" ? C.azul : C.rojo;
-  return /* @__PURE__ */ jsxs22("svg", { viewBox: "0 0 24 24", "aria-hidden": "true", style: { width: 24, height: 24, display: "block" }, children: [
+  return /* @__PURE__ */ jsxs23("svg", { viewBox: "0 0 24 24", "aria-hidden": "true", style: { width: 24, height: 24, display: "block" }, children: [
     /* @__PURE__ */ jsx22("path", { d: "M12 1.8l8 3.4v6.2c0 5.2-3.4 9.2-8 11-4.6-1.8-8-5.8-8-11V5.2z", fill: col, stroke: C.amarillo, strokeWidth: "1.4" }),
     /* @__PURE__ */ jsx22("text", { x: "12", y: "16.6", textAnchor: "middle", fontFamily: "Georgia,serif", fontSize: "11", fontWeight: "700", fill: C.texto, children: letra })
   ] });
@@ -81112,26 +81499,26 @@ block" } });
   const armor = { hunter: C.naranja, warrior: C.texto3, shaman: C.morado }[G.id] || C.naranja;
   const armorD = { hunter: C.texto4, warrior: C.texto4, shaman: C.texto4 }[G.id] || C.texto4;
   const gear = {
-    hunter: /* @__PURE__ */ jsxs22(Fragment17, { children: [
+    hunter: /* @__PURE__ */ jsxs23(Fragment17, { children: [
       /* @__PURE__ */ jsx22("path", { d: "M32 52 C26 18 44 2 60 2 C77 2 94 19 88 52 L83 60 C76 47 44 47 37 60 Z", fill: C.texto4 }),
       /* @__PURE__ */ jsx22("path", { d: "M38 50 C36 26 46 12 60 12 C74 12 84 26 82 50", fill: "none", stroke: C.texto3, strokeWidth: "2", opacity: ".55" })
     ] }),
-    warrior: /* @__PURE__ */ jsxs22(Fragment17, { children: [
+    warrior: /* @__PURE__ */ jsxs23(Fragment17, { children: [
       /* @__PURE__ */ jsx22("path", { d: "M37 46 C37 18 46 8 60 8 C74 8 83 18 83 46 L41 46 Z", fill: armor }),
       /* @__PURE__ */ jsx22("path", { d: "M37 46 C37 18 46 8 60 8 C74 8 83 18 83 46", fill: "none", stroke: armorD, strokeWidth: "2" }),
       /* @__PURE__ */ jsx22("path", { d: "M40 34 C30 26 24 14 27 4 C36 8 42 18 43 30 Z", fill: skin }),
       /* @__PURE__ */ jsx22("path", { d: "M80 34 C90 26 96 14 93 4 C84 8 78 18 77 30 Z", fill: skin })
     ] }),
-    shaman: /* @__PURE__ */ jsxs22(Fragment17, { children: [
+    shaman: /* @__PURE__ */ jsxs23(Fragment17, { children: [
       /* @__PURE__ */ jsx22("path", { d: "M36 40 Q60 31 84 40 L84 47 Q60 38 36 47 Z", fill: C.amarillo }),
       /* @__PURE__ */ jsx22("path", { d: "M44 36 C38 26 36 16 40 6 M50 34 C48 22 50 12 56 4", stroke: skin, strokeWidth: "3.4", fill: "none", strokeLinecap: "round" }),
       /* @__PURE__ */ jsx22("path", { d: "M76 36 C82 26 84 16 80 6 M70 34 C72 22 70 12 64 4", stroke: skin, strokeWidth: "3.4", fill: "none", strokeLinecap: "round" }),
       /* @__PURE__ */ jsx22("rect", { x: "56", y: "30", width: "8", height: "10", rx: "2", fill: skin, opacity: ".85" })
     ] })
   }[G.id] || /* @__PURE__ */ jsx22("path", { d: "M36 48 C34 24 46 12 60 12 C74 12 86 24 84 48 L78 44 C76 32 68 28 60 28 C52 28 44 32 42 44 Z", fill: C.texto4 });
-  return /* @__PURE__ */ jsxs22("svg", { viewBox: "0 0 120 150", preserveAspectRatio: "xMidYMid slice", role: "img", "aria-label": t(lang, "guia.ficha.retrato", { clase: nombreClaseGuia(G, lang) }), style: {
+  return /* @__PURE__ */ jsxs23("svg", { viewBox: "0 0 120 150", preserveAspectRatio: "xMidYMid slice", role: "img", "aria-label": t(lang, "guia.ficha.retrato", { clase: nombreClaseGuia(G, lang) }), style: {
   width: "100%", height: "100%", display: "block" }, children: [
-    /* @__PURE__ */ jsx22("defs", { children: /* @__PURE__ */ jsxs22("linearGradient", { id: "pbg-" + G.id, x1: "0", y1: "0", x2: "0", y2: "1", children: [
+    /* @__PURE__ */ jsx22("defs", { children: /* @__PURE__ */ jsxs23("linearGradient", { id: "pbg-" + G.id, x1: "0", y1: "0", x2: "0", y2: "1", children: [
       /* @__PURE__ */ jsx22("stop", { offset: "0", stopColor: acc, stopOpacity: ".18" }),
       /* @__PURE__ */ jsx22("stop", { offset: "1", stopColor: C.fondo3 })
     ] }) }),
@@ -81154,7 +81541,7 @@ block" } });
   ] });
 }
 function Vital({ label, valor, barra, ultimo }) {
-  return /* @__PURE__ */ jsxs22("div", { style: { ...P.fv, ...ultimo ? P.fvUlt : {} }, children: [
+  return /* @__PURE__ */ jsxs23("div", { style: { ...P.fv, ...ultimo ? P.fvUlt : {} }, children: [
     /* @__PURE__ */ jsx22("span", { style: P.fl, children: label }),
     /* @__PURE__ */ jsx22("b", { style: P.fvV, children: valor }),
     barra != null ? /* @__PURE__ */ jsx22("i", { style: P.fbar, children: /* @__PURE__ */ jsx22("span", { style: { ...P.fbarU, width: Math.max(0, Math.min(100, barra * 100)).toFixed(1) + "%" } }) }) :
@@ -81194,9 +81581,9 @@ function Ficha({ v, lang }) {
     return it;
   })() : [];
   const dpsTxt = dps ? dps.toFixed(1) + (wCur && wCur.approx ? "~" : "") : "—";
-  return /* @__PURE__ */ jsxs22("div", { className: "ficha", style: P.ficha, children: [
-    /* @__PURE__ */ jsxs22("div", { style: P.fichaEmb, children: [
-      /* @__PURE__ */ jsxs22("div", { style: P.fichaPortrait, children: [
+  return /* @__PURE__ */ jsxs23("div", { className: "ficha", style: P.ficha, children: [
+    /* @__PURE__ */ jsxs23("div", { style: P.fichaEmb, children: [
+      /* @__PURE__ */ jsxs23("div", { style: P.fichaPortrait, children: [
         charRetrato({ G, fac, simcRace: build.simc && build.simc.race, avatar: build.avatar, lang }),
         /* @__PURE__ */ jsx22("span", { style: {
           position: "absolute",
@@ -81214,48 +81601,48 @@ function Ficha({ v, lang }) {
         }, children: /* @__PURE__ */ jsx22(Icono, { n: G.icon, size: 15 }) })
       ] }),
       /* @__PURE__ */ jsx22("div", { style: P.fichaCls, children: nombreClaseGuia(G, lang) }),
-      /* @__PURE__ */ jsxs22("div", { className: "ficha-lvl", style: P.fichaLvl, children: [
+      /* @__PURE__ */ jsxs23("div", { className: "ficha-lvl", style: P.fichaLvl, children: [
         /* @__PURE__ */ jsx22("b", { style: P.fichaLvlB, children: lvl }),
         /* @__PURE__ */ jsx22("span", { style: P.fichaLvlS, children: t(lang, "guia.ficha.nivel") })
       ] }),
       /* @__PURE__ */ jsx22("div", { title: facLabel, style: { lineHeight: 0 }, children: facEscudo(fac, facLabel.charAt(0).toUpperCase()) }),
-      /* @__PURE__ */ jsxs22("div", { style: P.fichaAvbtns, children: [
+      /* @__PURE__ */ jsxs23("div", { style: P.fichaAvbtns, children: [
         /* @__PURE__ */ jsx22("button", { type: "button", style: P.btnMini, onClick: onAvatar, title: t(lang, "guia.ficha.capturaAyuda"), children: t(lang, "guia.ficha.captura") }),
         build.avatar ? /* @__PURE__ */ jsx22("button", { type: "button", style: P.btnMini, onClick: onAvatarDel, title: t(lang, "guia.ficha.quitarAyuda"), children: t(lang, "guia.ficha.quitar") }) : null
       ] })
     ] }),
-    /* @__PURE__ */ jsxs22("div", { style: { minWidth: 0 }, children: [
+    /* @__PURE__ */ jsxs23("div", { style: { minWidth: 0 }, children: [
       /* @__PURE__ */ jsx22("div", { children: /* @__PURE__ */ jsx22("span", { style: { ...P.fichaName, ...build.name ? {} : P.fichaNameNon }, children: build.name || t(lang, "guia.ficha.personaje") }) }),
-      /* @__PURE__ */ jsxs22("div", { style: P.fichaSub, children: [
+      /* @__PURE__ */ jsxs23("div", { style: P.fichaSub, children: [
         /* @__PURE__ */ jsx22(TextoRico, { html: G.title }),
         " · ",
         facLabel
       ] }),
-      /* @__PURE__ */ jsxs22("div", { style: P.fichaVitals, children: [
+      /* @__PURE__ */ jsxs23("div", { style: P.fichaVitals, children: [
         /* @__PURE__ */ jsx22(Vital, { label: t(lang, "guia.ficha.dps"), valor: dpsTxt, ultimo: false }),
         /* @__PURE__ */ jsx22(Vital, { label: t(lang, "guia.ficha.armas"), valor: `${wOwn}/${wTot}`, barra: wTot ? wOwn / wTot : null }),
         /* @__PURE__ */ jsx22(Vital, { label: t(lang, "guia.ficha.loot"), valor: lootN, barra: lootTot ? lootN / lootTot : null }),
         /* @__PURE__ */ jsx22(Vital, { label: t(lang, "guia.ficha.ruta"), valor: `${mileN}/${mileTot}`, barra: mileTot ? mileN / mileTot : null, ultimo: true })
       ] }),
-      vit && realChips.length ? /* @__PURE__ */ jsxs22("div", { style: P.fichaReal, children: [
+      vit && realChips.length ? /* @__PURE__ */ jsxs23("div", { style: P.fichaReal, children: [
         /* @__PURE__ */ jsx22("span", { style: P.fl, children: t(lang, "guia.ficha.real") }),
-        /* @__PURE__ */ jsx22("span", { style: P.frItems, children: realChips.map(([l, val], i) => /* @__PURE__ */ jsxs22("span", { children: [
+        /* @__PURE__ */ jsx22("span", { style: P.frItems, children: realChips.map(([l, val], i) => /* @__PURE__ */ jsxs23("span", { children: [
           l,
           " ",
           /* @__PURE__ */ jsx22("b", { style: P.fichaRealB, children: val })
         ] }, i)) })
       ] }) : null,
-      /* @__PURE__ */ jsx22("div", { style: P.fichaAttrs, children: attrs.map(([l, val]) => /* @__PURE__ */ jsxs22("div", { style: P.fa, children: [
+      /* @__PURE__ */ jsx22("div", { style: P.fichaAttrs, children: attrs.map(([l, val]) => /* @__PURE__ */ jsxs23("div", { style: P.fa, children: [
         /* @__PURE__ */ jsx22("span", { style: P.fl, children: l }),
         /* @__PURE__ */ jsx22("b", { style: P.faB, children: val })
       ] }, l)) }),
-      /* @__PURE__ */ jsxs22("div", { style: P.fichaWeap, children: [
-        /* @__PURE__ */ jsxs22("div", { style: P.fw, children: [
+      /* @__PURE__ */ jsxs23("div", { style: P.fichaWeap, children: [
+        /* @__PURE__ */ jsxs23("div", { style: P.fw, children: [
           /* @__PURE__ */ jsx22("span", { style: P.fl, children: t(lang, "guia.ficha.equipada") }),
           /* @__PURE__ */ jsx22("b", { style: P.faB, children: wName }),
           /* @__PURE__ */ jsx22("i", { style: P.fwI, children: dps ? dps.toFixed(1) + " dps" : "—" })
         ] }),
-        /* @__PURE__ */ jsxs22("div", { style: P.fw, children: [
+        /* @__PURE__ */ jsxs23("div", { style: P.fw, children: [
           /* @__PURE__ */ jsx22("span", { style: P.fl, children: avail.length ? t(lang, "guia.ficha.mejorAhora") : t(lang, "guia.ficha.siguiente") }),
           /* @__PURE__ */ jsx22("b", { style: P.faB, children: pick ? pick.n : "—" }),
           /* @__PURE__ */ jsx22("i", { style: P.fwI, children: pick ? `${fmtDps(pick)} dps · ${pick.lvl <= lvl ? t(lang, "guia.rec.yaPodes") : t(lang, "guia.rec.req", { lvl: pick.lvl })}` : t(lang, "\
@@ -81269,7 +81656,7 @@ function SimcCard({ simc, G, lang }) {
   if (!simc || typeof simc !== "object") return null;
   const st = simc.stats || {};
   const helpers = simcHelpers(st);
-  const row = (label, val) => val == null || val === "" ? null : /* @__PURE__ */ jsxs22("div", { style: P.st, children: [
+  const row = (label, val) => val == null || val === "" ? null : /* @__PURE__ */ jsxs23("div", { style: P.st, children: [
     /* @__PURE__ */ jsx22("span", { style: P.muted, children: label }),
     /* @__PURE__ */ jsx22("b", { style: P.stB, children: val })
   ] }, label);
@@ -81301,13 +81688,13 @@ function SimcCard({ simc, G, lang }) {
   return /* @__PURE__ */ jsx22(
     Detalle,
     {
-      titulo: /* @__PURE__ */ jsxs22("span", { style: { display: "inline-flex", alignItems: "center", gap: 8 }, children: [
+      titulo: /* @__PURE__ */ jsxs23("span", { style: { display: "inline-flex", alignItems: "center", gap: 8 }, children: [
         /* @__PURE__ */ jsx22(Icono, { n: "scroll", size: 14 }),
         t(lang, "guia.simc.tuPersonaje")
       ] }),
       meta: /* @__PURE__ */ jsx22("span", { style: P.dmeta, children: sum }),
-      children: /* @__PURE__ */ jsxs22("div", { style: { paddingTop: 4 }, children: [
-        vit ? /* @__PURE__ */ jsxs22(Fragment17, { children: [
+      children: /* @__PURE__ */ jsxs23("div", { style: { paddingTop: 4 }, children: [
+        vit ? /* @__PURE__ */ jsxs23(Fragment17, { children: [
           (() => {
             const vrows = [];
             if (vit.hp != null) vrows.push([t(lang, "guia.ficha.vida"), vit.hp]);
@@ -81319,15 +81706,15 @@ function SimcCard({ simc, G, lang }) {
 utos") }) }) : null,
           vit.attrs.length ? /* @__PURE__ */ jsx22("div", { style: P.statgrid, children: vit.attrs.map((r) => row(r[0], r[1])) }) : null
         ] }) : null,
-        slots.length ? /* @__PURE__ */ jsxs22(Fragment17, { children: [
+        slots.length ? /* @__PURE__ */ jsxs23(Fragment17, { children: [
           /* @__PURE__ */ jsx22("div", { style: { ...P.muted, marginTop: 8 }, children: /* @__PURE__ */ jsx22("b", { style: { color: C.amarillo }, children: t(lang, "guia.simc.danoSwing") }) }),
-          /* @__PURE__ */ jsx22("div", { style: P.statgrid, children: slots.map(([l, ww]) => /* @__PURE__ */ jsxs22("div", { style: P.st, children: [
-            /* @__PURE__ */ jsxs22("span", { style: P.muted, children: [
+          /* @__PURE__ */ jsx22("div", { style: P.statgrid, children: slots.map(([l, ww]) => /* @__PURE__ */ jsxs23("div", { style: P.st, children: [
+            /* @__PURE__ */ jsxs23("span", { style: P.muted, children: [
               l,
               " — ",
               ww.name || "?"
             ] }),
-            /* @__PURE__ */ jsxs22("b", { style: P.stB, children: [
+            /* @__PURE__ */ jsxs23("b", { style: P.stB, children: [
               ww.range.min.toFixed(1),
               "–",
               ww.range.mx.toFixed(1),
@@ -81338,10 +81725,10 @@ utos") }) }) : null,
             ] })
           ] }, l)) })
         ] }) : null,
-        w ? /* @__PURE__ */ jsxs22("div", { style: { ...P.statgrid, marginTop: 8 }, children: [
-          /* @__PURE__ */ jsxs22("div", { style: { ...P.st, gridColumn: "1/-1" }, children: [
+        w ? /* @__PURE__ */ jsxs23("div", { style: { ...P.statgrid, marginTop: 8 }, children: [
+          /* @__PURE__ */ jsxs23("div", { style: { ...P.st, gridColumn: "1/-1" }, children: [
             /* @__PURE__ */ jsx22("span", { style: P.muted, children: t(lang, "guia.simc.armaEquipada") }),
-            /* @__PURE__ */ jsxs22("b", { style: { ...P.stB, color: C.verde }, children: [
+            /* @__PURE__ */ jsxs23("b", { style: { ...P.stB, color: C.verde }, children: [
               w.name || "arma",
               " · ",
               real != null ? real.toFixed(1) + " dps" : "?"
@@ -81354,8 +81741,8 @@ utos") }) }) : null,
         ] }) : null,
         rows.filter((r) => r[1] != null && r[1] !== "").length ? /* @__PURE__ */ jsx22("div", { style: P.statgrid, children: rows.filter((r) => r[1] != null && r[1] !== "").map((r) => row(r[0], r[1])) }) :
         null,
-        G.simc && G.simc.pet && (p.pet_family || p.pet_happiness) ? /* @__PURE__ */ jsxs22("div", { style: { ...P.muted, marginTop: 8 }, children: [
-          /* @__PURE__ */ jsxs22("b", { style: { color: C.verde }, children: [
+        G.simc && G.simc.pet && (p.pet_family || p.pet_happiness) ? /* @__PURE__ */ jsxs23("div", { style: { ...P.muted, marginTop: 8 }, children: [
+          /* @__PURE__ */ jsxs23("b", { style: { color: C.verde }, children: [
             t(lang, "guia.simc.pet"),
             ":"
           ] }),
@@ -81371,7 +81758,7 @@ utos") }) }) : null,
         ] }) : null,
         meta.length ? /* @__PURE__ */ jsx22("div", { style: { ...P.chipln, marginTop: 8 }, children: meta.map((x) => /* @__PURE__ */ jsx22(Placa, { tono: "plain", estilo: { marginLeft: 0 }, children: x },
         x)) }) : null,
-        simc.professions && simc.professions.length ? /* @__PURE__ */ jsx22("div", { style: { ...P.chipln, marginTop: 4 }, children: simc.professions.map((pp, i) => /* @__PURE__ */ jsxs22(Placa, { tono: "\
+        simc.professions && simc.professions.length ? /* @__PURE__ */ jsx22("div", { style: { ...P.chipln, marginTop: 4 }, children: simc.professions.map((pp, i) => /* @__PURE__ */ jsxs23(Placa, { tono: "\
 plain", estilo: { marginLeft: 0 }, children: [
           pp[0],
           pp[1] != null ? " " + pp[1] : ""
@@ -81383,7 +81770,7 @@ plain", estilo: { marginLeft: 0 }, children: [
 }
 
 // src/vistas/guia/recomendador.jsx
-import { Fragment as Fragment18, jsx as jsx23, jsxs as jsxs23 } from "react/jsx-runtime";
+import { Fragment as Fragment18, jsx as jsx23, jsxs as jsxs24 } from "react/jsx-runtime";
 agregarTextos({
   "guia.rec.donde": "Dónde levelear ahora",
   "guia.rec.rango": "rango {min}-{max} · {realm}",
@@ -81469,7 +81856,7 @@ function VistaRec({ v, lang }) {
   const nextFold = availL.length ? nextL : nextL.slice(3);
   const foldLabel = availL.length ? t(lang, "guia.rec.mejoras") : t(lang, "guia.rec.mas", { n: nextFold.length });
   const wline = (w, ultimo) => /* @__PURE__ */ jsx23(Wline, { w, lvl, dps, tipos, lang, ultimo }, w.id);
-  return /* @__PURE__ */ jsxs23(Fragment18, { children: [
+  return /* @__PURE__ */ jsxs24(Fragment18, { children: [
     /* @__PURE__ */ jsx23(Tarjeta, { titulo: t(lang, "guia.ficha.personaje"), extra: /* @__PURE__ */ jsx23(Origen, { f: "curado", lang }), children: /* @__PURE__ */ jsx23(Ficha, { v, lang }) }),
     ownedBetter ? /* @__PURE__ */ jsx23(
       Tarjeta,
@@ -81477,7 +81864,7 @@ function VistaRec({ v, lang }) {
         titulo: t(lang, "guia.rec.warnMejor"),
         estilo: { borderLeft: `3px solid ${C.amarillo}` },
         extra: /* @__PURE__ */ jsx23(Origen, { f: "curado", lang }),
-        children: /* @__PURE__ */ jsxs23("div", { children: [
+        children: /* @__PURE__ */ jsxs24("div", { children: [
           /* @__PURE__ */ jsx23(NombreCalidad, { q: ownedBetter.q, children: ownedBetter.n }),
           " (",
           fmtDps(ownedBetter),
@@ -81488,25 +81875,25 @@ function VistaRec({ v, lang }) {
     ) : null,
     recHtml ? /* @__PURE__ */ jsx23(Tarjeta, { titulo: t(lang, "guia.rec.recomendaciones"), extra: /* @__PURE__ */ jsx23(Origen, { f: "curado", lang }), children: /* @__PURE__ */ jsx23(TextoRico, { html: recHtml }) }) :
     null,
-    band ? /* @__PURE__ */ jsxs23(Tarjeta, { estilo: { borderLeft: `3px solid ${C.acento}` }, titulo: t(lang, "guia.rec.donde"), extra: /* @__PURE__ */ jsx23(Origen, { f: "curado", lang }), children: [
+    band ? /* @__PURE__ */ jsxs24(Tarjeta, { estilo: { borderLeft: `3px solid ${C.acento}` }, titulo: t(lang, "guia.rec.donde"), extra: /* @__PURE__ */ jsx23(Origen, { f: "curado", lang }), children: [
       /* @__PURE__ */ jsx23("div", { style: S.sub, children: t(lang, "guia.rec.rango", { min: band.min, max: band.max, realm: realmLabel }) }),
       /* @__PURE__ */ jsx23("div", { style: P.zonaBig, children: band.zones }),
       band.notes ? /* @__PURE__ */ jsx23("div", { style: { ...P.tip, marginTop: 6 }, children: /* @__PURE__ */ jsx23(TextoRico, { html: band.notes }) }) : null,
-      band.dung ? /* @__PURE__ */ jsxs23("div", { style: { ...P.tip, marginTop: 4 }, children: [
+      band.dung ? /* @__PURE__ */ jsxs24("div", { style: { ...P.tip, marginTop: 4 }, children: [
         /* @__PURE__ */ jsx23("b", { style: { color: C.amarillo }, children: t(lang, "guia.rec.dungeonsLbl") }),
         " ",
         /* @__PURE__ */ jsx23(TextoRico, { html: band.dung })
       ] }) : null,
-      nextBand ? /* @__PURE__ */ jsxs23("div", { style: { ...P.tip, marginTop: 6 }, children: [
+      nextBand ? /* @__PURE__ */ jsxs24("div", { style: { ...P.tip, marginTop: 6 }, children: [
         t(lang, "guia.rec.despues", { min: nextBand.min }),
         " ",
         /* @__PURE__ */ jsx23("b", { children: nextBand.zones })
       ] }) : null
     ] }) : null,
-    /* @__PURE__ */ jsx23(Tarjeta, { estilo: { borderLeft: `3px solid ${C.amarillo}` }, titulo: t(lang, "guia.rec.proximas"), extra: /* @__PURE__ */ jsxs23(Fragment18, { children: [
+    /* @__PURE__ */ jsx23(Tarjeta, { estilo: { borderLeft: `3px solid ${C.amarillo}` }, titulo: t(lang, "guia.rec.proximas"), extra: /* @__PURE__ */ jsxs24(Fragment18, { children: [
       /* @__PURE__ */ jsx23("span", { style: { ...P.muted, textTransform: "none", letterSpacing: 0, fontWeight: 400 }, children: subArmas }),
       /* @__PURE__ */ jsx23(Origen, { f: "curado", lang })
-    ] }), children: !cands.length ? /* @__PURE__ */ jsx23("div", { style: P.muted, children: dps >= 29 ? t(lang, "guia.rec.nadaPre") : t(lang, "guia.rec.nadaSub") }) : /* @__PURE__ */ jsxs23(Fragment18,
+    ] }), children: !cands.length ? /* @__PURE__ */ jsx23("div", { style: P.muted, children: dps >= 29 ? t(lang, "guia.rec.nadaPre") : t(lang, "guia.rec.nadaSub") }) : /* @__PURE__ */ jsxs24(Fragment18,
     { children: [
       availShow.length ? /* @__PURE__ */ jsx23("div", { style: { ...P.muted, marginBottom: 2 }, children: t(lang, "guia.rec.disponibles") }) : null,
       availShow.map((w, i) => wline(w, i === availShow.length - 1 && !nextShow.length && !nextFold.length)),
@@ -81514,10 +81901,10 @@ function VistaRec({ v, lang }) {
       nextShow.map((w, i) => wline(w, i === nextShow.length - 1)),
       nextFold.length ? /* @__PURE__ */ jsx23(Detalle, { titulo: foldLabel, meta: `(${nextFold.length})`, abierto: false, children: nextFold.map((w, i) => wline(w, i === nextFold.length - 1)) }) : null
     ] }) }),
-    dungs.length ? /* @__PURE__ */ jsxs23(Fragment18, { children: [
-      /* @__PURE__ */ jsxs23("div", { style: P.bandhead, children: [
+    dungs.length ? /* @__PURE__ */ jsxs24(Fragment18, { children: [
+      /* @__PURE__ */ jsxs24("div", { style: P.bandhead, children: [
         /* @__PURE__ */ jsx23("span", { children: t(lang, "guia.rec.dgnRango") }),
-        /* @__PURE__ */ jsxs23("span", { style: P.bandheadZn, children: [
+        /* @__PURE__ */ jsxs24("span", { style: P.bandheadZn, children: [
           dungs.length,
           " · ",
           t(lang, "guia.rec.abrirLoot")
@@ -81526,14 +81913,14 @@ function VistaRec({ v, lang }) {
       dungs.map((d) => {
         const soon = lvl < d.r[0], late = lvl > d.r[1], inR = !soon && !late;
         const diff = d.r[0] - lvl;
-        return /* @__PURE__ */ jsxs23(
+        return /* @__PURE__ */ jsxs24(
           Detalle,
           {
             abierto: false,
             estilo: inR ? { borderLeft: `3px solid ${C.verde}` } : {},
             titulo: d.n,
             meta: `${d.loc} · ${d.r[0]}-${d.r[1]}`,
-            extra: /* @__PURE__ */ jsxs23(Fragment18, { children: [
+            extra: /* @__PURE__ */ jsxs24(Fragment18, { children: [
               locPlaca(d.cont, lang),
               d.key ? /* @__PURE__ */ jsx23(Placa, { tono: "now", children: t(lang, "guia.rec.clave") }) : null,
               soon ? /* @__PURE__ */ jsx23(Placa, { tono: "soon", children: diff <= 1 ? t(lang, "guia.rec.enNivel", { n: diff }) : t(lang, "guia.rec.enNiveles", { n: diff }) }) : late ? /* @__PURE__ */ jsx23(
@@ -81543,10 +81930,10 @@ function VistaRec({ v, lang }) {
             ] }),
             children: [
               d.note ? /* @__PURE__ */ jsx23("div", { style: { ...P.muted, marginBottom: 6 }, children: /* @__PURE__ */ jsx23(TextoRico, { html: d.note }) }) : null,
-              (d.loot || []).map((l, i) => /* @__PURE__ */ jsx23("div", { style: { ...P.loot, ...i === (d.loot || []).length - 1 ? P.lootSinBorde : {} }, children: /* @__PURE__ */ jsxs23("span", { children: [
+              (d.loot || []).map((l, i) => /* @__PURE__ */ jsx23("div", { style: { ...P.loot, ...i === (d.loot || []).length - 1 ? P.lootSinBorde : {} }, children: /* @__PURE__ */ jsxs24("span", { children: [
                 /* @__PURE__ */ jsx23(NombreCalidad, { q: "rare", children: l[0] }),
                 " ",
-                /* @__PURE__ */ jsxs23("span", { style: P.muted, children: [
+                /* @__PURE__ */ jsxs24("span", { style: P.muted, children: [
                   "— ",
                   /* @__PURE__ */ jsx23(TextoRico, { html: l[1] })
                 ] })
@@ -81560,7 +81947,7 @@ function VistaRec({ v, lang }) {
     miles.length ? /* @__PURE__ */ jsx23(
       Detalle,
       {
-        titulo: /* @__PURE__ */ jsxs23("span", { style: { display: "inline-flex", alignItems: "center", gap: 8 }, children: [
+        titulo: /* @__PURE__ */ jsxs24("span", { style: { display: "inline-flex", alignItems: "center", gap: 8 }, children: [
           /* @__PURE__ */ jsx23(Icono, { n: "route", size: 14 }),
           t(lang, "guia.rec.hitos")
         ] }),
@@ -81568,9 +81955,9 @@ function VistaRec({ v, lang }) {
         extra: /* @__PURE__ */ jsx23(Origen, { f: "curado", lang }),
         children: miles.map(({ m, i }) => {
           const k = m.lvl + "|" + i, done = ss.has(k);
-          return /* @__PURE__ */ jsxs23("div", { style: { ...P.mst, ...i === miles.length - 1 ? P.mstUlt : {}, ...done ? { opacity: 0.45 } : {} }, children: [
+          return /* @__PURE__ */ jsxs24("div", { style: { ...P.mst, ...i === miles.length - 1 ? P.mstUlt : {}, ...done ? { opacity: 0.45 } : {} }, children: [
             /* @__PURE__ */ jsx23("span", { style: P.mstLvl, children: m.lvl }),
-            /* @__PURE__ */ jsxs23("span", { style: P.mstTxt, children: [
+            /* @__PURE__ */ jsxs24("span", { style: P.mstTxt, children: [
               /* @__PURE__ */ jsx23(Placa, { tono: "cat", estilo: { marginLeft: 0 }, children: m.cat }),
               " ",
               m.loc ? locPlaca(m.loc, lang) : null,
@@ -81587,7 +81974,7 @@ function VistaRec({ v, lang }) {
 
 // src/vistas/guia/armas.jsx
 import { Checkbox as Checkbox10 } from "@hermes/plugin-sdk";
-import { jsx as jsx24, jsxs as jsxs24 } from "react/jsx-runtime";
+import { jsx as jsx24, jsxs as jsxs25 } from "react/jsx-runtime";
 agregarTextos({
   "guia.armas.arma": "Arma",
   "guia.armas.tipo": "Tipo",
@@ -81627,8 +82014,8 @@ function VistaArmas({ v, lang }) {
     const r = setWeaponOwnedEstado(b, w.id, checked, { weapons, dungeons: G.dungeons || [] });
     return { ...b, owned: r.owned, gear: r.gear };
   });
-  return /* @__PURE__ */ jsxs24(Tarjeta, { extra: /* @__PURE__ */ jsx24(Origen, { f: "curado", lang }), children: [
-    /* @__PURE__ */ jsxs24("div", { style: { display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }, children: [
+  return /* @__PURE__ */ jsxs25(Tarjeta, { extra: /* @__PURE__ */ jsx24(Origen, { f: "curado", lang }), children: [
+    /* @__PURE__ */ jsxs25("div", { style: { display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }, children: [
       (G.typeFilters || []).map((f) => /* @__PURE__ */ jsx24(
         "button",
         {
@@ -81639,23 +82026,23 @@ function VistaArmas({ v, lang }) {
         },
         f[0]
       )),
-      /* @__PURE__ */ jsxs24("label", { style: { display: "flex", gap: 6, alignItems: "center", marginLeft: 8, cursor: "pointer", fontSize: 12, color: C.texto2 }, children: [
+      /* @__PURE__ */ jsxs25("label", { style: { display: "flex", gap: 6, alignItems: "center", marginLeft: 8, cursor: "pointer", fontSize: 12, color: C.texto2 }, children: [
         /* @__PURE__ */ jsx24(Checkbox10, { checked: !!build.who, onCheckedChange: (val) => guardar((b) => ({ ...b, who: !!val })) }),
         t(lang, "guia.armas.ocultar")
       ] }),
-      /* @__PURE__ */ jsxs24("span", { style: { ...P.muted, marginLeft: "auto" }, children: [
+      /* @__PURE__ */ jsxs25("span", { style: { ...P.muted, marginLeft: "auto" }, children: [
         t(lang, "guia.armas.obtenidas"),
         " ",
-        /* @__PURE__ */ jsxs24("b", { children: [
+        /* @__PURE__ */ jsxs25("b", { children: [
           cnt,
           "/",
           weapons.length
         ] })
       ] })
     ] }),
-    /* @__PURE__ */ jsxs24("div", { style: P.tablaScroll, children: [
-      /* @__PURE__ */ jsxs24("table", { style: S.tabla, children: [
-        /* @__PURE__ */ jsx24("thead", { children: /* @__PURE__ */ jsxs24("tr", { children: [
+    /* @__PURE__ */ jsxs25("div", { style: P.tablaScroll, children: [
+      /* @__PURE__ */ jsxs25("table", { style: S.tabla, children: [
+        /* @__PURE__ */ jsx24("thead", { children: /* @__PURE__ */ jsxs25("tr", { children: [
           /* @__PURE__ */ jsx24("th", { style: S.th }),
           /* @__PURE__ */ jsx24("th", { style: S.th, children: t(lang, "guia.armas.arma") }),
           /* @__PURE__ */ jsx24("th", { style: S.th, children: t(lang, "guia.armas.tipo") }),
@@ -81666,14 +82053,14 @@ function VistaArmas({ v, lang }) {
         ] }) }),
         /* @__PURE__ */ jsx24("tbody", { children: list.map((w) => {
           const own = os.has(w.id), eq = build.cur === w.id, dlt = w.dps - dps;
-          return /* @__PURE__ */ jsxs24("tr", { className: (own ? "owned " : "") + (eq ? "equipped" : ""), style: { ...own ? P.trOwned : {}, ...eq ? P.trEq : {} }, children: [
+          return /* @__PURE__ */ jsxs25("tr", { className: (own ? "owned " : "") + (eq ? "equipped" : ""), style: { ...own ? P.trOwned : {}, ...eq ? P.trEq : {} }, children: [
             /* @__PURE__ */ jsx24("td", { style: S.td, children: /* @__PURE__ */ jsx24(Checkbox10, { "data-wid": w.id, checked: own, onCheckedChange: (val) => toggleW(w, val) }) }),
-            /* @__PURE__ */ jsxs24("td", { style: S.td, children: [
+            /* @__PURE__ */ jsxs25("td", { style: S.td, children: [
               /* @__PURE__ */ jsx24(NombreCalidad, { q: w.q, children: /* @__PURE__ */ jsx24("b", { children: w.n }) }),
               eq ? /* @__PURE__ */ jsx24(Placa, { tono: "eq", children: t(lang, "guia.armas.equipada") }) : null,
               w.note ? /* @__PURE__ */ jsx24("div", { style: { ...P.muted, fontSize: 11 }, children: /* @__PURE__ */ jsx24("i", { children: /* @__PURE__ */ jsx24(TextoRico, { html: w.note }) }) }) : null
             ] }),
-            /* @__PURE__ */ jsxs24("td", { style: S.td, children: [
+            /* @__PURE__ */ jsxs25("td", { style: S.td, children: [
               tipos[w.t] || w.t,
               w.eng ? /* @__PURE__ */ jsx24(Placa, { tono: "eng", estilo: { marginLeft: 4 }, children: "ENG" }) : null
             ] }),
@@ -81693,7 +82080,7 @@ function VistaArmas({ v, lang }) {
 // src/vistas/guia/macros.jsx
 import { useEffect as useEffect8, useRef as useRef3, useState as useState15 } from "react";
 import { Button as Button11, SearchField as SearchField3, SegmentedControl as SegmentedControl5 } from "@hermes/plugin-sdk";
-import { Fragment as Fragment19, jsx as jsx25, jsxs as jsxs25 } from "react/jsx-runtime";
+import { Fragment as Fragment19, jsx as jsx25, jsxs as jsxs26 } from "react/jsx-runtime";
 agregarTextos({
   "guia.mac.titulo": "Macros meta — WoW: Forever",
   "guia.mac.usables": "{u} de {t} usables a tu nivel",
@@ -81814,7 +82201,7 @@ var MROW_ESTADO = {
 function Tecla({ b, sctx, onJump, lang }) {
   const v = slotView(b, sctx);
   const est = KC_ESTADO[v.cls] || {};
-  const inner = /* @__PURE__ */ jsxs25(Fragment19, { children: [
+  const inner = /* @__PURE__ */ jsxs26(Fragment19, { children: [
     /* @__PURE__ */ jsx25("span", { style: P.kk, children: b.k }),
     v.mods && v.mods.length ? /* @__PURE__ */ jsx25("span", { style: P.km, children: v.mods.join(" ") }) : null,
     /* @__PURE__ */ jsx25("span", { style: P.kn, children: v.t }),
@@ -81826,7 +82213,7 @@ function Tecla({ b, sctx, onJump, lang }) {
 }
 function Raton({ b, sctx, onJump, lang }) {
   const v = slotView(b, sctx);
-  const inner = /* @__PURE__ */ jsxs25(Fragment19, { children: [
+  const inner = /* @__PURE__ */ jsxs26(Fragment19, { children: [
     /* @__PURE__ */ jsx25("span", { style: P.mrowMk, children: b.k }),
     /* @__PURE__ */ jsx25("span", { style: { flex: 1, minWidth: 0 }, children: v.t }),
     /* @__PURE__ */ jsx25("span", { style: P.mrowKs, children: subBarra(v, lang) })
@@ -81843,15 +82230,15 @@ function VistaBarra({ v, lang, onJump }) {
   const unit = "((100% - 36px)/7 + 6px)";
   const sctx = { mdg: !!build.mdg, spec: build.spec, lvl, macros: G.macros || [] };
   const specN = (G.specs || {})[build.spec] || build.spec;
-  return /* @__PURE__ */ jsxs25(Tarjeta, { titulo: /* @__PURE__ */ jsxs25("span", { style: { display: "inline-flex", alignItems: "center", gap: 8, flexWrap: "wrap" }, children: [
+  return /* @__PURE__ */ jsxs26(Tarjeta, { titulo: /* @__PURE__ */ jsxs26("span", { style: { display: "inline-flex", alignItems: "center", gap: 8, flexWrap: "wrap" }, children: [
     /* @__PURE__ */ jsx25(Icono, { n: "kbd", size: 14 }),
     t(lang, "guia.bar.titulo", { lvl }),
-    /* @__PURE__ */ jsxs25("span", { style: P.muted, children: [
+    /* @__PURE__ */ jsxs26("span", { style: P.muted, children: [
       specN,
       " · ",
       build.mdg ? t(lang, "guia.bar.dungeon") : t(lang, "guia.bar.solo")
     ] })
-  ] }), extra: /* @__PURE__ */ jsxs25(Fragment19, { children: [
+  ] }), extra: /* @__PURE__ */ jsxs26(Fragment19, { children: [
     /* @__PURE__ */ jsx25(
       SegmentedControl5,
       {
@@ -81863,52 +82250,52 @@ function VistaBarra({ v, lang, onJump }) {
     /* @__PURE__ */ jsx25(Origen, { f: "curado", lang })
   ] }), children: [
     N.intro ? /* @__PURE__ */ jsx25("div", { style: P.tip, children: /* @__PURE__ */ jsx25(TextoRico, { html: N.intro }) }) : null,
-    /* @__PURE__ */ jsxs25("div", { style: P.kbwrap, children: [
-      /* @__PURE__ */ jsx25("div", { style: P.kb, children: (B.rows || []).map((r, i) => /* @__PURE__ */ jsxs25("div", { style: P.kbrow, children: [
+    /* @__PURE__ */ jsxs26("div", { style: P.kbwrap, children: [
+      /* @__PURE__ */ jsx25("div", { style: P.kb, children: (B.rows || []).map((r, i) => /* @__PURE__ */ jsxs26("div", { style: P.kbrow, children: [
         (B.offset || [])[i] ? /* @__PURE__ */ jsx25("span", { style: { ...P.kcoff, width: `calc(${unit} * ${(B.offset || [])[i]} - 6px)` } }) : null,
         r.map((k) => {
           const b = byK[k];
           return b ? /* @__PURE__ */ jsx25(Tecla, { b, sctx, onJump, lang }, k) : null;
         })
       ] }, i)) }),
-      /* @__PURE__ */ jsxs25("div", { style: P.mouse, children: [
+      /* @__PURE__ */ jsxs26("div", { style: P.mouse, children: [
         /* @__PURE__ */ jsx25("div", { style: P.mt, children: lang === "en" ? "Mouse" : "Mouse" }),
         (B.mouse || []).map((b, i) => /* @__PURE__ */ jsx25(Raton, { b, sctx, onJump, lang }, i))
       ] })
     ] }),
-    /* @__PURE__ */ jsxs25("div", { style: P.legend, children: [
-      /* @__PURE__ */ jsxs25("span", { children: [
+    /* @__PURE__ */ jsxs26("div", { style: P.legend, children: [
+      /* @__PURE__ */ jsxs26("span", { children: [
         /* @__PURE__ */ jsx25("i", { style: { ...P.legendI, background: C.fondo3, borderColor: C.verde } }),
         t(lang, "guia.bar.leyenda1")
       ] }),
-      /* @__PURE__ */ jsxs25("span", { children: [
+      /* @__PURE__ */ jsxs26("span", { children: [
         /* @__PURE__ */ jsx25("i", { style: { ...P.legendI, borderColor: C.amarillo } }),
         t(lang, "guia.bar.leyenda2")
       ] }),
-      /* @__PURE__ */ jsxs25("span", { children: [
+      /* @__PURE__ */ jsxs26("span", { children: [
         /* @__PURE__ */ jsx25("i", { style: { ...P.legendI, border: `1px dashed ${C.amarillo}`, borderColor: "transparent" } }),
         t(lang, "guia.bar.leyenda3")
       ] }),
-      /* @__PURE__ */ jsxs25("span", { children: [
+      /* @__PURE__ */ jsxs26("span", { children: [
         /* @__PURE__ */ jsx25("i", { style: { ...P.legendI, borderColor: C.borde2, opacity: 0.4 } }),
         t(lang, "guia.bar.leyenda4")
       ] })
     ] }),
-    (B.click || []).length ? /* @__PURE__ */ jsxs25("div", { style: P.chipln, children: [
+    (B.click || []).length ? /* @__PURE__ */ jsxs26("div", { style: P.chipln, children: [
       /* @__PURE__ */ jsx25("b", { style: { color: C.texto }, children: t(lang, "guia.bar.sinTecla") }),
       " ",
       (B.click || []).map((n) => /* @__PURE__ */ jsx25(MacroChip, { n, v, lang, onJump }, n))
     ] }) : null,
-    (B.alt1 || []).length ? /* @__PURE__ */ jsxs25("div", { style: P.chipln, children: [
+    (B.alt1 || []).length ? /* @__PURE__ */ jsxs26("div", { style: P.chipln, children: [
       /* @__PURE__ */ jsx25("b", { style: { color: C.texto }, children: t(lang, "guia.bar.alt1") }),
       " ",
       (B.alt1 || []).map((n) => /* @__PURE__ */ jsx25(MacroChip, { n, v, lang, onJump }, n)),
-      N.altNote ? /* @__PURE__ */ jsxs25("span", { children: [
+      N.altNote ? /* @__PURE__ */ jsxs26("span", { children: [
         "— ",
         /* @__PURE__ */ jsx25(TextoRico, { html: N.altNote })
       ] }) : null
     ] }) : null,
-    N.before ? /* @__PURE__ */ jsxs25("div", { style: { ...P.tip, marginTop: 10 }, children: [
+    N.before ? /* @__PURE__ */ jsxs26("div", { style: { ...P.tip, marginTop: 10 }, children: [
       /* @__PURE__ */ jsx25("b", { children: t(lang, "guia.bar.antes") }),
       " ",
       /* @__PURE__ */ jsx25(TextoRico, { html: N.before }),
@@ -81921,7 +82308,7 @@ function MacroChip({ n, v, lang, onJump }) {
   if (!m) return null;
   const i = v.G.macros.indexOf(m);
   const ok = usableFor(m, v.lvl, v.build.spec);
-  return /* @__PURE__ */ jsxs25(
+  return /* @__PURE__ */ jsxs26(
     "button",
     {
       type: "button",
@@ -81956,7 +82343,7 @@ function MacroCard({ m, i, v, lang, onJump, flash, registerRef }) {
   const badgeEstado = ok ? /* @__PURE__ */ jsx25(Placa, { tono: "now", children: t(lang, "guia.mac.usableYa") }) : m.lvl > v.lvl ? /* @__PURE__ */ jsx25(Placa, { tono: "soon", children: m.lvl - v.lvl <=
   1 ? t(lang, "guia.rec.enNivel", { n: m.lvl - v.lvl }) : t(lang, "guia.rec.enNiveles", { n: m.lvl - v.lvl }) }) : /* @__PURE__ */ jsx25(Placa, { tono: "soon", children: t(lang, "guia.mac.otraSpecBadg\
 e") });
-  return /* @__PURE__ */ jsxs25(
+  return /* @__PURE__ */ jsxs26(
     "div",
     {
       ref: registerRef,
@@ -81964,21 +82351,21 @@ e") });
       className: "mac",
       style: { ...S.tarjeta, ...flash === i ? { boxShadow: `0 0 0 2px ${C.amarillo}` } : {} },
       children: [
-        /* @__PURE__ */ jsxs25("div", { style: { display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }, children: [
+        /* @__PURE__ */ jsxs26("div", { style: { display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }, children: [
           /* @__PURE__ */ jsx25("b", { style: { fontSize: 13 }, children: m.n }),
           /* @__PURE__ */ jsx25(Placa, { tono: "cat", estilo: { marginLeft: "auto" }, children: m.cat }),
           /* @__PURE__ */ jsx25(Placa, { tono: "plain", children: t(lang, "guia.mac.lvlN", { n: m.lvl }) }),
           badgeEstado,
-          m.tal ? /* @__PURE__ */ jsxs25(Placa, { tono: talOk ? "tal" : "talOff", title: talOk ? t(lang, "guia.mac.talento", { spec: m.tal.toUpperCase() }) : specN + t(lang, "guia.mac.otraSpecTag"), children: [
+          m.tal ? /* @__PURE__ */ jsxs26(Placa, { tono: talOk ? "tal" : "talOff", title: talOk ? t(lang, "guia.mac.talento", { spec: m.tal.toUpperCase() }) : specN + t(lang, "guia.mac.otraSpecTag"), children: [
             t(lang, "guia.mac.talento", { spec: m.tal.toUpperCase() }),
             talOk ? "" : t(lang, "guia.mac.otraSpecTag")
           ] }) : null,
           key ? /* @__PURE__ */ jsx25(Placa, { tono: "key", title: t(lang, "guia.mac.tecla", { k: key }), children: t(lang, "guia.mac.tecla", { k: key }) }) : null,
-          /* @__PURE__ */ jsxs25("span", { title: t(lang, "guia.mac.caracteres"), style: { ...P.mlen, ...len > 255 ? P.mlenOver : {} }, children: [
+          /* @__PURE__ */ jsxs26("span", { title: t(lang, "guia.mac.caracteres"), style: { ...P.mlen, ...len > 255 ? P.mlenOver : {} }, children: [
             len,
             "/255"
           ] }),
-          /* @__PURE__ */ jsx25(Button11, { size: "xs", variant: "outline", onClick: copiar, title: t(lang, "guia.mac.caracteres"), children: /* @__PURE__ */ jsxs25("span", { style: { display: "inline\
+          /* @__PURE__ */ jsx25(Button11, { size: "xs", variant: "outline", onClick: copiar, title: t(lang, "guia.mac.caracteres"), children: /* @__PURE__ */ jsxs26("span", { style: { display: "inline\
 -flex", gap: 4, alignItems: "center" }, children: [
             /* @__PURE__ */ jsx25(Icono, { n: "copy", size: 12 }),
             cop === "copiado" ? t(lang, "guia.mac.copiado") : cop === "ctrlc" ? t(lang, "guia.mac.ctrlc") : t(lang, "guia.mac.copiar")
@@ -82037,8 +82424,8 @@ function VistaMacros({ v, lang }) {
   }, [pendingJump, mq, build.mf]);
   const listaVacia = !pool.length;
   const nadaTexto = t(lang, "guia.mac.nada") + (q ? ` con "${mq.trim()}"` : "") + (mf !== "all" ? ` en ${mf}` : "") + ".";
-  return /* @__PURE__ */ jsxs25(Fragment19, { children: [
-    /* @__PURE__ */ jsxs25(Tarjeta, { titulo: /* @__PURE__ */ jsxs25("span", { style: { display: "inline-flex", alignItems: "center", gap: 8 }, children: [
+  return /* @__PURE__ */ jsxs26(Fragment19, { children: [
+    /* @__PURE__ */ jsxs26(Tarjeta, { titulo: /* @__PURE__ */ jsxs26("span", { style: { display: "inline-flex", alignItems: "center", gap: 8 }, children: [
       /* @__PURE__ */ jsx25(Icono, { n: "scroll", size: 14 }),
       t(lang, "guia.mac.titulo"),
       /* @__PURE__ */ jsx25("span", { style: P.muted, children: t(lang, "guia.mac.usables", { u: usableN, t: mcr.length }) })
@@ -82051,7 +82438,7 @@ ditTexto") }) }) })
     G.macroRules ? /* @__PURE__ */ jsx25(
       Detalle,
       {
-        titulo: /* @__PURE__ */ jsxs25("span", { style: { display: "inline-flex", alignItems: "center", gap: 8 }, children: [
+        titulo: /* @__PURE__ */ jsxs26("span", { style: { display: "inline-flex", alignItems: "center", gap: 8 }, children: [
           /* @__PURE__ */ jsx25(Icono, { n: "alert", size: 14 }),
           t(lang, "guia.mac.reglas")
         ] }),
@@ -82060,12 +82447,12 @@ ditTexto") }) }) })
         children: /* @__PURE__ */ jsx25(TextoRico, { html: G.macroRules })
       }
     ) : null,
-    /* @__PURE__ */ jsxs25(Tarjeta, { extra: /* @__PURE__ */ jsx25(Origen, { f: "curado", lang }), children: [
+    /* @__PURE__ */ jsxs26(Tarjeta, { extra: /* @__PURE__ */ jsx25(Origen, { f: "curado", lang }), children: [
       /* @__PURE__ */ jsx25(SearchField3, { placeholder: t(lang, "guia.mac.buscar"), value: mq, onChange: setMq }),
       /* @__PURE__ */ jsx25("div", { style: { display: "flex", gap: 6, flexWrap: "wrap", marginTop: 8 }, children: [["all", t(lang, "guia.mac.todas")], ...cats.map((c) => [c, c])].map(([f, label]) => {
         const n = mcr.filter((m) => (f === "all" || m.cat === f) && usableFor(m, v.lvl, build.spec)).length;
         const activo = mf === f;
-        return /* @__PURE__ */ jsxs25(
+        return /* @__PURE__ */ jsxs26(
           "button",
           {
             type: "button",
@@ -82082,16 +82469,16 @@ ditTexto") }) }) })
         );
       }) })
     ] }),
-    listaVacia ? /* @__PURE__ */ jsx25(Tarjeta, { children: /* @__PURE__ */ jsxs25("div", { style: P.muted, children: [
+    listaVacia ? /* @__PURE__ */ jsx25(Tarjeta, { children: /* @__PURE__ */ jsxs26("div", { style: P.muted, children: [
       nadaTexto,
       " ",
       /* @__PURE__ */ jsx25(Button11, { size: "xs", variant: "ghost", onClick: () => {
         setMq("");
         guardar((b) => ({ ...b, mf: "all" }));
       }, children: t(lang, "guia.mac.limpiar") })
-    ] }) }) : /* @__PURE__ */ jsxs25(Fragment19, { children: [
-      now.length ? /* @__PURE__ */ jsxs25(Fragment19, { children: [
-        /* @__PURE__ */ jsxs25("div", { style: P.bandhead, children: [
+    ] }) }) : /* @__PURE__ */ jsxs26(Fragment19, { children: [
+      now.length ? /* @__PURE__ */ jsxs26(Fragment19, { children: [
+        /* @__PURE__ */ jsxs26("div", { style: P.bandhead, children: [
           /* @__PURE__ */ jsx25("span", { children: t(lang, "guia.mac.disponibles") }),
           /* @__PURE__ */ jsx25("span", { style: P.bandheadZn, children: t(lang, "guia.mac.nMacros", { n: now.length }) })
         ] }),
@@ -82106,7 +82493,7 @@ ditTexto") }) }) })
 }
 
 // src/vistas/guia/extras.jsx
-import { Fragment as Fragment20, jsx as jsx26, jsxs as jsxs26 } from "react/jsx-runtime";
+import { Fragment as Fragment20, jsx as jsx26, jsxs as jsxs27 } from "react/jsx-runtime";
 agregarTextos({
   "guia.extras.tipsN": "{n} tips",
   "guia.extras.servidor": 'Sobre el servidor "Forever"',
@@ -82121,19 +82508,19 @@ function VistaExtras({ v, lang }) {
   const X = G.extras || {};
   const ah = G.ahList || [];
   const tips = X.tips || [];
-  return /* @__PURE__ */ jsxs26(Fragment20, { children: [
-    /* @__PURE__ */ jsxs26("div", { style: { display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(340px,1fr))", gap: 12, alignItems: "start" }, children: [
-      /* @__PURE__ */ jsxs26(
+  return /* @__PURE__ */ jsxs27(Fragment20, { children: [
+    /* @__PURE__ */ jsxs27("div", { style: { display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(340px,1fr))", gap: 12, alignItems: "start" }, children: [
+      /* @__PURE__ */ jsxs27(
         Tarjeta,
         {
-          titulo: /* @__PURE__ */ jsxs26("span", { style: { display: "inline-flex", alignItems: "center", gap: 8 }, children: [
+          titulo: /* @__PURE__ */ jsxs27("span", { style: { display: "inline-flex", alignItems: "center", gap: 8 }, children: [
             /* @__PURE__ */ jsx26(Icono, { n: "coin", size: 14 }),
             X.ahTitle || t(lang, "tab.mercado")
           ] }),
           extra: /* @__PURE__ */ jsx26(Origen, { f: "curado", lang }),
           children: [
-            ah.map((a, i) => /* @__PURE__ */ jsxs26("div", { style: { ...P.loot, ...i === ah.length - 1 ? P.lootSinBorde : {} }, children: [
-              /* @__PURE__ */ jsxs26("span", { children: [
+            ah.map((a, i) => /* @__PURE__ */ jsxs27("div", { style: { ...P.loot, ...i === ah.length - 1 ? P.lootSinBorde : {} }, children: [
+              /* @__PURE__ */ jsxs27("span", { children: [
                 /* @__PURE__ */ jsx26(NombreCalidad, { q: "rare", children: /* @__PURE__ */ jsx26("b", { children: a[0] }) }),
                 " ",
                 /* @__PURE__ */ jsx26("span", { style: P.muted, children: /* @__PURE__ */ jsx26(TextoRico, { html: a[1] }) })
@@ -82147,15 +82534,15 @@ function VistaExtras({ v, lang }) {
       /* @__PURE__ */ jsx26(
         Detalle,
         {
-          titulo: /* @__PURE__ */ jsxs26("span", { style: { display: "inline-flex", alignItems: "center", gap: 8 }, children: [
+          titulo: /* @__PURE__ */ jsxs27("span", { style: { display: "inline-flex", alignItems: "center", gap: 8 }, children: [
             /* @__PURE__ */ jsx26(Icono, { n: "scroll", size: 14 }),
             X.tipsTitle || ""
           ] }),
           meta: t(lang, "guia.extras.tipsN", { n: tips.length }),
           extra: /* @__PURE__ */ jsx26(Origen, { f: "curado", lang }),
-          children: tips.map((tip, i) => /* @__PURE__ */ jsxs26("div", { style: { ...P.mst, ...i === tips.length - 1 ? P.mstUlt : {} }, children: [
+          children: tips.map((tip, i) => /* @__PURE__ */ jsxs27("div", { style: { ...P.mst, ...i === tips.length - 1 ? P.mstUlt : {} }, children: [
             /* @__PURE__ */ jsx26("span", { style: P.tdot }),
-            /* @__PURE__ */ jsxs26("span", { style: P.mstTxt, children: [
+            /* @__PURE__ */ jsxs27("span", { style: P.mstTxt, children: [
               /* @__PURE__ */ jsx26("b", { children: /* @__PURE__ */ jsx26(TextoRico, { html: tip[0] }) }),
               " ",
               /* @__PURE__ */ jsx26(TextoRico, { html: tip[1] })
@@ -82167,7 +82554,7 @@ function VistaExtras({ v, lang }) {
     /* @__PURE__ */ jsx26(
       Detalle,
       {
-        titulo: /* @__PURE__ */ jsxs26("span", { style: { display: "inline-flex", alignItems: "center", gap: 8 }, children: [
+        titulo: /* @__PURE__ */ jsxs27("span", { style: { display: "inline-flex", alignItems: "center", gap: 8 }, children: [
           /* @__PURE__ */ jsx26(Icono, { n: "alert", size: 14 }),
           t(lang, "guia.extras.servidor")
         ] }),
@@ -82180,7 +82567,7 @@ function VistaExtras({ v, lang }) {
 }
 
 // src/vistas/guia.jsx
-import { Fragment as Fragment21, jsx as jsx27, jsxs as jsxs27 } from "react/jsx-runtime";
+import { Fragment as Fragment21, jsx as jsx27, jsxs as jsxs28 } from "react/jsx-runtime";
 agregarTextos({
   "guia.sinGuiaClase": "Todavía no hay guía curada para esta clase en WoW: Forever.",
   "guia.sinGuiaFac": "La guía curada de {clase} solo cubre la Horda por ahora; tu facción queda para una actualización futura.",
@@ -82425,11 +82812,11 @@ function GuiaPrincipal({ ctx, almacen, estado, recargar, perfil, guardarPerfil, 
     onAvatarDel: () => guardar((b) => ({ ...b, avatar: null }))
   };
   const Vista = VISTAS[sub] || VistaRec;
-  return /* @__PURE__ */ jsxs27(Fragment21, { children: [
+  return /* @__PURE__ */ jsxs28(Fragment21, { children: [
     /* @__PURE__ */ jsx27("input", { ref: avatarRef, type: "file", accept: "image/*", style: { display: "none" }, onChange: onAvatarFile }),
-    /* @__PURE__ */ jsxs27(Tarjeta, { titulo: t(lang, "guia.build.titulo"), extra: /* @__PURE__ */ jsx27(Origen, { f: "curado", lang }), children: [
-      /* @__PURE__ */ jsxs27("div", { style: { display: "flex", flexWrap: "wrap", gap: "12px 22px", alignItems: "flex-end" }, children: [
-        /* @__PURE__ */ jsxs27("div", { style: S.campo, children: [
+    /* @__PURE__ */ jsxs28(Tarjeta, { titulo: t(lang, "guia.build.titulo"), extra: /* @__PURE__ */ jsx27(Origen, { f: "curado", lang }), children: [
+      /* @__PURE__ */ jsxs28("div", { style: { display: "flex", flexWrap: "wrap", gap: "12px 22px", alignItems: "flex-end" }, children: [
+        /* @__PURE__ */ jsxs28("div", { style: S.campo, children: [
           /* @__PURE__ */ jsx27("span", { style: S.etiqueta, children: t(lang, "guia.build.spec") }),
           /* @__PURE__ */ jsx27(
             SegmentedControl6,
@@ -82441,7 +82828,7 @@ function GuiaPrincipal({ ctx, almacen, estado, recargar, perfil, guardarPerfil, 
           ),
           G.specNote ? /* @__PURE__ */ jsx27("span", { style: S.sub, children: G.specNote }) : null
         ] }),
-        /* @__PURE__ */ jsxs27("div", { style: S.campo, children: [
+        /* @__PURE__ */ jsxs28("div", { style: S.campo, children: [
           /* @__PURE__ */ jsx27("span", { style: S.etiqueta, children: t(lang, "guia.build.pref") }),
           /* @__PURE__ */ jsx27(
             SegmentedControl6,
@@ -82453,7 +82840,7 @@ function GuiaPrincipal({ ctx, almacen, estado, recargar, perfil, guardarPerfil, 
           ),
           G.prefNote ? /* @__PURE__ */ jsx27("span", { style: S.sub, children: G.prefNote }) : null
         ] }),
-        /* @__PURE__ */ jsxs27("div", { style: S.campo, children: [
+        /* @__PURE__ */ jsxs28("div", { style: S.campo, children: [
           /* @__PURE__ */ jsx27("span", { style: S.etiqueta, children: t(lang, "guia.build.continente") }),
           /* @__PURE__ */ jsx27(
             SegmentedControl6,
@@ -82464,18 +82851,18 @@ function GuiaPrincipal({ ctx, almacen, estado, recargar, perfil, guardarPerfil, 
             }
           )
         ] }),
-        G.useEng ? /* @__PURE__ */ jsxs27("label", { style: { display: "flex", gap: 6, alignItems: "center", paddingBottom: 5, cursor: "pointer" }, children: [
+        G.useEng ? /* @__PURE__ */ jsxs28("label", { style: { display: "flex", gap: 6, alignItems: "center", paddingBottom: 5, cursor: "pointer" }, children: [
           /* @__PURE__ */ jsx27(Checkbox11, { checked: !!build.eng, onCheckedChange: (val) => guardar((b) => ({ ...b, eng: !!val })) }),
           /* @__PURE__ */ jsx27("span", { style: { fontSize: 12 }, children: t(lang, "guia.build.ing") })
         ] }) : null,
-        /* @__PURE__ */ jsxs27("div", { style: S.campo, children: [
+        /* @__PURE__ */ jsxs28("div", { style: S.campo, children: [
           /* @__PURE__ */ jsx27("span", { style: S.etiqueta, children: t(lang, "guia.build.arma") }),
-          /* @__PURE__ */ jsxs27(Select5, { value: build.cur, onValueChange: (val) => guardar((b) => ({ ...b, cur: val, weaponDps: null })), children: [
+          /* @__PURE__ */ jsxs28(Select5, { value: build.cur, onValueChange: (val) => guardar((b) => ({ ...b, cur: val, weaponDps: null })), children: [
             /* @__PURE__ */ jsx27(SelectTrigger5, { "aria-label": t(lang, "guia.build.arma"), children: /* @__PURE__ */ jsx27(SelectValue5, {}) }),
             /* @__PURE__ */ jsx27(SelectContent5, { children: armaOps.map((o) => /* @__PURE__ */ jsx27(SelectItem5, { value: o.value, children: o.label }, o.value || "none")) })
           ] })
         ] }),
-        build.cur === "other" ? /* @__PURE__ */ jsxs27("div", { style: S.campo, children: [
+        build.cur === "other" ? /* @__PURE__ */ jsxs28("div", { style: S.campo, children: [
           /* @__PURE__ */ jsx27("span", { style: S.etiqueta, children: t(lang, "guia.build.dpsArma") }),
           /* @__PURE__ */ jsx27(
             Input5,
@@ -82494,7 +82881,7 @@ function GuiaPrincipal({ ctx, almacen, estado, recargar, perfil, guardarPerfil, 
             }
           )
         ] }) : null,
-        /* @__PURE__ */ jsxs27("div", { style: S.campo, children: [
+        /* @__PURE__ */ jsxs28("div", { style: S.campo, children: [
           /* @__PURE__ */ jsx27("span", { style: S.etiqueta, children: t(lang, "guia.build.nombre") }),
           /* @__PURE__ */ jsx27(
             Input5,
@@ -82510,15 +82897,15 @@ function GuiaPrincipal({ ctx, almacen, estado, recargar, perfil, guardarPerfil, 
       ] }),
       errorG ? /* @__PURE__ */ jsx27("div", { role: "alert", style: S.aviso, children: errorG }) : null
     ] }),
-    /* @__PURE__ */ jsxs27(Tarjeta, { titulo: t(lang, "guia.datos.titulo"), extra: /* @__PURE__ */ jsx27(Origen, { f: "curado", lang }), children: [
+    /* @__PURE__ */ jsxs28(Tarjeta, { titulo: t(lang, "guia.datos.titulo"), extra: /* @__PURE__ */ jsx27(Origen, { f: "curado", lang }), children: [
       build.simc ? /* @__PURE__ */ jsx27(SimcCard, { simc: build.simc, G, lang }) : null,
-      /* @__PURE__ */ jsxs27("div", { style: { display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }, children: [
+      /* @__PURE__ */ jsxs28("div", { style: { display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }, children: [
         /* @__PURE__ */ jsx27(Button12, { variant: build.simc ? "outline" : "default", size: "xs", onClick: () => setSimcOpen((o) => !o), children: build.simc ? t(lang, "guia.simc.importarOtro") : t(lang,
         "guia.simc.boton") }),
         build.simc ? /* @__PURE__ */ jsx27(Button12, { variant: "ghost", size: "xs", onClick: () => guardar((b) => ({ ...b, simc: null })), children: t(lang, "guia.simc.quitar") }) : /* @__PURE__ */ jsx27(
         "span", { style: S.sub, children: t(lang, "guia.simc.ayuda") })
       ] }),
-      simcOpen ? /* @__PURE__ */ jsxs27("div", { style: { marginTop: 10 }, children: [
+      simcOpen ? /* @__PURE__ */ jsxs28("div", { style: { marginTop: 10 }, children: [
         /* @__PURE__ */ jsx27("p", { style: { ...S.sub, margin: "0 0 6px" }, children: t(lang, "guia.simc.instrucciones") }),
         /* @__PURE__ */ jsx27(
           "textarea",
@@ -82543,7 +82930,7 @@ function GuiaPrincipal({ ctx, almacen, estado, recargar, perfil, guardarPerfil, 
         ),
         simcErr ? /* @__PURE__ */ jsx27("div", { role: "alert", style: { ...S.aviso, marginTop: 6 }, children: simcErr }) : null,
         simcNota ? /* @__PURE__ */ jsx27("div", { style: { ...S.sub, marginTop: 6 }, children: simcNota }) : null,
-        /* @__PURE__ */ jsxs27("div", { style: { display: "flex", gap: 8, marginTop: 8 }, children: [
+        /* @__PURE__ */ jsxs28("div", { style: { display: "flex", gap: 8, marginTop: 8 }, children: [
           /* @__PURE__ */ jsx27(Button12, { size: "xs", onClick: importarSimc, children: t(lang, "guia.simc.importar") }),
           /* @__PURE__ */ jsx27(Button12, { variant: "ghost", size: "xs", onClick: () => {
             setSimcOpen(false);
@@ -82566,7 +82953,7 @@ function GuiaPrincipal({ ctx, almacen, estado, recargar, perfil, guardarPerfil, 
 }
 
 // src/vistas/legacy.jsx
-import { Fragment as Fragment22, jsx as jsx28, jsxs as jsxs28 } from "react/jsx-runtime";
+import { Fragment as Fragment22, jsx as jsx28, jsxs as jsxs29 } from "react/jsx-runtime";
 agregarTextos({
   "guia.leg.titulo": "Legacy — puntos de cuenta",
   "guia.leg.sub": "WoW: Forever · 65 pts ganables · 16 por personaje",
@@ -82743,17 +83130,17 @@ function VistaLegacy({ estado, perfil, lang }) {
     const p = D.profesiones && D.profesiones.profesiones && D.profesiones.profesiones[id];
     return p ? nombre(p.n, lang) : alt;
   };
-  return /* @__PURE__ */ jsxs28(Fragment22, { children: [
-    /* @__PURE__ */ jsxs28(Tarjeta, { estilo: GOLD, titulo: /* @__PURE__ */ jsxs28("span", { style: { display: "inline-flex", alignItems: "center", gap: 8 }, children: [
+  return /* @__PURE__ */ jsxs29(Fragment22, { children: [
+    /* @__PURE__ */ jsxs29(Tarjeta, { estilo: GOLD, titulo: /* @__PURE__ */ jsxs29("span", { style: { display: "inline-flex", alignItems: "center", gap: 8 }, children: [
       /* @__PURE__ */ jsx28(Icono, { n: "coin", size: 14 }),
       t(lang, "guia.leg.titulo"),
       /* @__PURE__ */ jsx28("span", { style: P.muted, children: t(lang, "guia.leg.sub") })
     ] }), extra: origen, children: [
-      sys.map((s, i) => /* @__PURE__ */ jsxs28("div", { style: { ...P.mst, ...i === sys.length - 1 ? P.mstUlt : {} }, children: [
+      sys.map((s, i) => /* @__PURE__ */ jsxs29("div", { style: { ...P.mst, ...i === sys.length - 1 ? P.mstUlt : {} }, children: [
         /* @__PURE__ */ jsx28("span", { style: P.tdot }),
         /* @__PURE__ */ jsx28("span", { style: P.mstTxt, children: /* @__PURE__ */ jsx28(TextoRico, { html: s }) })
       ] }, i)),
-      /* @__PURE__ */ jsx28("div", { style: { ...P.tip, marginTop: 8 }, children: lvl < 25 ? /* @__PURE__ */ jsx28(TextoRico, { html: L.now && L.now.locked || "" }) : /* @__PURE__ */ jsxs28(Fragment22,
+      /* @__PURE__ */ jsx28("div", { style: { ...P.tip, marginTop: 8 }, children: lvl < 25 ? /* @__PURE__ */ jsx28(TextoRico, { html: L.now && L.now.locked || "" }) : /* @__PURE__ */ jsxs29(Fragment22,
       { children: [
         t(lang, "guia.leg.desbloqueadoPre", { lvl }),
         " ",
@@ -82762,27 +83149,27 @@ function VistaLegacy({ estado, perfil, lang }) {
         t(lang, "guia.leg.desbloqueadoPost")
       ] }) })
     ] }),
-    /* @__PURE__ */ jsxs28(Tarjeta, { titulo: /* @__PURE__ */ jsxs28("span", { style: { display: "inline-flex", alignItems: "center", gap: 8 }, children: [
+    /* @__PURE__ */ jsxs29(Tarjeta, { titulo: /* @__PURE__ */ jsxs29("span", { style: { display: "inline-flex", alignItems: "center", gap: 8 }, children: [
       /* @__PURE__ */ jsx28(Icono, { n: "star", size: 14 }),
       t(lang, "guia.leg.proximos"),
       /* @__PURE__ */ jsx28("span", { style: P.muted, children: t(lang, "guia.leg.aNivel", { lvl, clase: clsName }) })
     ] }), extra: origen, children: [
-      /* @__PURE__ */ jsx28("div", { style: { ...P.loot, borderBottom: "none", paddingBottom: 2 }, children: /* @__PURE__ */ jsxs28("span", { children: [
+      /* @__PURE__ */ jsx28("div", { style: { ...P.loot, borderBottom: "none", paddingBottom: 2 }, children: /* @__PURE__ */ jsxs29("span", { children: [
         /* @__PURE__ */ jsx28("b", { children: clsName }),
         " ",
         /* @__PURE__ */ jsx28("span", { style: P.muted, children: t(lang, "guia.leg.hitosClase") })
       ] }) }),
       MILESTONES.map(([m, label]) => {
         const got = lvl >= m;
-        return /* @__PURE__ */ jsxs28("div", { style: P.loot, children: [
-          /* @__PURE__ */ jsxs28("span", { style: got ? P.lootOwn : {}, children: [
-            /* @__PURE__ */ jsxs28("b", { children: [
+        return /* @__PURE__ */ jsxs29("div", { style: P.loot, children: [
+          /* @__PURE__ */ jsxs29("span", { style: got ? P.lootOwn : {}, children: [
+            /* @__PURE__ */ jsxs29("b", { children: [
               label,
               " ",
               clsName
             ] }),
             " ",
-            /* @__PURE__ */ jsxs28("span", { style: P.muted, children: [
+            /* @__PURE__ */ jsxs29("span", { style: P.muted, children: [
               "— ",
               t(lang, "guia.leg.nivel", { m }),
               got ? t(lang, "guia.leg.yaGanado") : t(lang, "guia.leg.teFalta")
@@ -82797,11 +83184,11 @@ function VistaLegacy({ estado, perfil, lang }) {
         [t(lang, "guia.leg.pvp"), t(lang, "guia.leg.pvpD"), "pvp"],
         [t(lang, "guia.leg.raids"), t(lang, "guia.leg.raidsD"), "raid"],
         [t(lang, "guia.leg.aventura"), t(lang, "guia.leg.aventuraD"), "world"]
-      ].map(([n, d, tag], i, arr) => /* @__PURE__ */ jsxs28("div", { style: { ...P.loot, ...i === arr.length - 1 ? P.lootSinBorde : {} }, children: [
-        /* @__PURE__ */ jsxs28("span", { children: [
+      ].map(([n, d, tag], i, arr) => /* @__PURE__ */ jsxs29("div", { style: { ...P.loot, ...i === arr.length - 1 ? P.lootSinBorde : {} }, children: [
+        /* @__PURE__ */ jsxs29("span", { children: [
           /* @__PURE__ */ jsx28("b", { children: n }),
           " ",
-          /* @__PURE__ */ jsxs28("span", { style: P.muted, children: [
+          /* @__PURE__ */ jsxs29("span", { style: P.muted, children: [
             "— ",
             d
           ] })
@@ -82810,13 +83197,13 @@ function VistaLegacy({ estado, perfil, lang }) {
       ] }, tag)),
       /* @__PURE__ */ jsx28("p", { style: { ...P.tip, margin: "8px 0 0" }, children: /* @__PURE__ */ jsx28(TextoRico, { html: lvl < 25 ? t(lang, "guia.leg.notaBaja") : t(lang, "guia.leg.notaAlta", { lvl }) }) })
     ] }),
-    /* @__PURE__ */ jsxs28(Tarjeta, { titulo: /* @__PURE__ */ jsxs28("span", { style: { display: "inline-flex", alignItems: "center", gap: 8 }, children: [
+    /* @__PURE__ */ jsxs29(Tarjeta, { titulo: /* @__PURE__ */ jsxs29("span", { style: { display: "inline-flex", alignItems: "center", gap: 8 }, children: [
       /* @__PURE__ */ jsx28(Icono, { n: "pin", size: 14 }),
       t(lang, "guia.leg.progress"),
       /* @__PURE__ */ jsx28("span", { style: P.muted, children: t(lang, "guia.leg.progressSub") })
     ] }), extra: origen, children: [
-      progress.map((p, i) => /* @__PURE__ */ jsx28("div", { style: { ...P.loot, ...i === progress.length - 1 ? P.lootSinBorde : {} }, children: /* @__PURE__ */ jsxs28("span", { children: [
-        /* @__PURE__ */ jsxs28("b", { children: [
+      progress.map((p, i) => /* @__PURE__ */ jsx28("div", { style: { ...P.loot, ...i === progress.length - 1 ? P.lootSinBorde : {} }, children: /* @__PURE__ */ jsxs29("span", { children: [
+        /* @__PURE__ */ jsxs29("b", { children: [
           p[0],
           " pts"
         ] }),
@@ -82827,26 +83214,26 @@ function VistaLegacy({ estado, perfil, lang }) {
       ] }) }, i)),
       L.progressNote ? /* @__PURE__ */ jsx28("p", { style: { ...P.tip, margin: "6px 0 0" }, children: L.progressNote }) : null
     ] }),
-    /* @__PURE__ */ jsx28(Tarjeta, { titulo: /* @__PURE__ */ jsxs28("span", { style: { display: "inline-flex", alignItems: "center", gap: 8 }, children: [
+    /* @__PURE__ */ jsx28(Tarjeta, { titulo: /* @__PURE__ */ jsxs29("span", { style: { display: "inline-flex", alignItems: "center", gap: 8 }, children: [
       /* @__PURE__ */ jsx28(Icono, { n: "scroll", size: 14 }),
       t(lang, "guia.leg.challenges"),
-      /* @__PURE__ */ jsxs28("span", { style: P.muted, children: [
+      /* @__PURE__ */ jsxs29("span", { style: P.muted, children: [
         t(lang, "guia.leg.loQuePaga"),
         " · ",
         L.challengesNote || ""
       ] })
     ] }), extra: origen }),
-    challenges.map((c) => /* @__PURE__ */ jsxs28(
+    challenges.map((c) => /* @__PURE__ */ jsxs29(
       Detalle,
       {
         titulo: c.name,
         meta: `~${c.pts} pts · ${c.desc || ""}`,
         extra: origen,
         children: [
-          (c.rows || []).map((r, i) => /* @__PURE__ */ jsx28("div", { style: { ...P.loot, ...i === (c.rows || []).length - 1 ? P.lootSinBorde : {} }, children: /* @__PURE__ */ jsxs28("span", { children: [
+          (c.rows || []).map((r, i) => /* @__PURE__ */ jsx28("div", { style: { ...P.loot, ...i === (c.rows || []).length - 1 ? P.lootSinBorde : {} }, children: /* @__PURE__ */ jsxs29("span", { children: [
             /* @__PURE__ */ jsx28("b", { children: r[0] }),
             " ",
-            /* @__PURE__ */ jsxs28("span", { style: P.muted, children: [
+            /* @__PURE__ */ jsxs29("span", { style: P.muted, children: [
               "— ",
               /* @__PURE__ */ jsx28(TextoRico, { html: r[1] })
             ] })
@@ -82858,28 +83245,28 @@ function VistaLegacy({ estado, perfil, lang }) {
     )),
     Object.entries(perks).map(([pk, Pk]) => {
       const total = (Pk.perks || []).reduce((a, x) => a + (x.r || 0), 0);
-      return /* @__PURE__ */ jsxs28(
+      return /* @__PURE__ */ jsxs29(
         Detalle,
         {
           abierto: pk === "prof",
           estilo: pk === "prof" ? { borderLeft: `3px solid ${C.verde}` } : {},
-          titulo: /* @__PURE__ */ jsxs28("span", { style: { display: "inline-flex", alignItems: "center", gap: 8 }, children: [
+          titulo: /* @__PURE__ */ jsxs29("span", { style: { display: "inline-flex", alignItems: "center", gap: 8 }, children: [
             /* @__PURE__ */ jsx28(Icono, { n: "star", size: 14 }),
             Pk.name
           ] }),
           meta: `${Pk.sub || ""} · ${t(lang, "guia.leg.ranks", { n: total })}`,
           extra: origen,
           children: [
-            (Pk.perks || []).map((p, i) => /* @__PURE__ */ jsx28("div", { style: { ...P.loot, ...i === (Pk.perks || []).length - 1 ? P.lootSinBorde : {} }, children: /* @__PURE__ */ jsxs28("div", { children: [
+            (Pk.perks || []).map((p, i) => /* @__PURE__ */ jsx28("div", { style: { ...P.loot, ...i === (Pk.perks || []).length - 1 ? P.lootSinBorde : {} }, children: /* @__PURE__ */ jsxs29("div", { children: [
               /* @__PURE__ */ jsx28("b", { children: p.n }),
               " ",
-              /* @__PURE__ */ jsxs28(Placa, { tono: p.tag === "gather" ? "now" : "plain", estilo: { marginLeft: 0 }, children: [
+              /* @__PURE__ */ jsxs29(Placa, { tono: p.tag === "gather" ? "now" : "plain", estilo: { marginLeft: 0 }, children: [
                 tagTxt(lang, p.tag),
                 " · ",
                 p.r,
                 "r"
               ] }),
-              p.pre ? /* @__PURE__ */ jsxs28(Placa, { tono: "soon", children: [
+              p.pre ? /* @__PURE__ */ jsxs29(Placa, { tono: "soon", children: [
                 t(lang, "guia.leg.req"),
                 " ",
                 p.pre
@@ -82892,10 +83279,10 @@ function VistaLegacy({ estado, perfil, lang }) {
         pk
       );
     }),
-    /* @__PURE__ */ jsxs28(Tarjeta, { estilo: GOLD, titulo: /* @__PURE__ */ jsxs28("span", { style: { display: "inline-flex", alignItems: "center", gap: 8 }, children: [
+    /* @__PURE__ */ jsxs29(Tarjeta, { estilo: GOLD, titulo: /* @__PURE__ */ jsxs29("span", { style: { display: "inline-flex", alignItems: "center", gap: 8 }, children: [
       /* @__PURE__ */ jsx28(Icono, { n: "star", size: 14 }),
       t(lang, "guia.leg.recoleccion"),
-      /* @__PURE__ */ jsxs28("span", { style: P.muted, children: [
+      /* @__PURE__ */ jsxs29("span", { style: P.muted, children: [
         nombreProf("182", "Herbalism"),
         " · ",
         nombreProf("186", "Mining"),
@@ -82903,12 +83290,12 @@ function VistaLegacy({ estado, perfil, lang }) {
         nombreProf("393", "Skinning")
       ] })
     ] }), extra: origen, children: [
-      /* @__PURE__ */ jsxs28("div", { style: { ...P.mst, marginBottom: 4 }, children: [
+      /* @__PURE__ */ jsxs29("div", { style: { ...P.mst, marginBottom: 4 }, children: [
         /* @__PURE__ */ jsx28("span", { style: P.tdot }),
         /* @__PURE__ */ jsx28("span", { style: P.mstTxt, children: /* @__PURE__ */ jsx28(TextoRico, { html: t(lang, "guia.leg.recoleccionTxt") }) })
       ] }),
-      /* @__PURE__ */ jsxs28("div", { style: { ...P.loot, borderBottom: "none" }, children: [
-        /* @__PURE__ */ jsxs28("span", { children: [
+      /* @__PURE__ */ jsxs29("div", { style: { ...P.loot, borderBottom: "none" }, children: [
+        /* @__PURE__ */ jsxs29("span", { children: [
           /* @__PURE__ */ jsx28("b", { children: t(lang, "guia.leg.bountiful") }),
           " ",
           /* @__PURE__ */ jsx28(Placa, { tono: "now", children: profs.skin ? t(lang, "guia.leg.tuSkinning") : t(lang, "guia.leg.perkArbol") })
@@ -82921,20 +83308,20 @@ function VistaLegacy({ estado, perfil, lang }) {
         items: t(lang, lvl <= 25 ? "guia.leg.tierItems1" : lvl < 46 ? "guia.leg.tierItems2" : "guia.leg.tierItems3")
       }) }) })
     ] }),
-    /* @__PURE__ */ jsxs28(Tarjeta, { titulo: /* @__PURE__ */ jsxs28("span", { style: { display: "inline-flex", alignItems: "center", gap: 8 }, children: [
+    /* @__PURE__ */ jsxs29(Tarjeta, { titulo: /* @__PURE__ */ jsxs29("span", { style: { display: "inline-flex", alignItems: "center", gap: 8 }, children: [
       /* @__PURE__ */ jsx28(Icono, { n: "coin", size: 14 }),
       t(lang, "guia.leg.scarce"),
       /* @__PURE__ */ jsx28("span", { style: P.muted, children: t(lang, "guia.leg.scarceSub") })
     ] }), extra: origen, children: [
       /* @__PURE__ */ jsx28("div", { style: { ...P.loot, borderBottom: "none", paddingBottom: 2 }, children: /* @__PURE__ */ jsx28("span", { style: { ...P.muted, fontSize: 11 }, children: t(lang, "gui\
 a.leg.scarceCols") }) }),
-      scarce.map((s, i) => /* @__PURE__ */ jsx28("div", { style: { ...P.loot, ...i === scarce.length - 1 ? P.lootSinBorde : {} }, children: /* @__PURE__ */ jsxs28("div", { children: [
+      scarce.map((s, i) => /* @__PURE__ */ jsx28("div", { style: { ...P.loot, ...i === scarce.length - 1 ? P.lootSinBorde : {} }, children: /* @__PURE__ */ jsxs29("div", { children: [
         /* @__PURE__ */ jsx28("b", { children: s[0] }),
         " ",
         /* @__PURE__ */ jsx28(Placa, { tono: "plain", estilo: { marginLeft: 0 }, children: s[1] }),
         " ",
         /* @__PURE__ */ jsx28(Placa, { tono: "soon", children: t(lang, "guia.leg.ilvl", { n: s[2] }) }),
-        /* @__PURE__ */ jsxs28("div", { style: { ...P.muted, marginTop: 2 }, children: [
+        /* @__PURE__ */ jsxs29("div", { style: { ...P.muted, marginTop: 2 }, children: [
           "→ ",
           s[3],
           " · ",
@@ -82947,26 +83334,26 @@ a.leg.scarceCols") }) }),
     PROF_META.map(([pk, id, ic]) => {
       const has = !!profs[pk];
       const rows = (gather[pk] || []).filter((e) => !e.fac || e.fac === "both" || e.fac === fac);
-      return /* @__PURE__ */ jsxs28(Tarjeta, { titulo: /* @__PURE__ */ jsxs28("span", { style: { display: "inline-flex", alignItems: "center", gap: 8, flexWrap: "wrap" }, children: [
+      return /* @__PURE__ */ jsxs29(Tarjeta, { titulo: /* @__PURE__ */ jsxs29("span", { style: { display: "inline-flex", alignItems: "center", gap: 8, flexWrap: "wrap" }, children: [
         /* @__PURE__ */ jsx28(Icono, { n: ic, size: 14 }),
         nombreProf(id, pk),
         t(lang, "guia.leg.dondeFarmear"),
-        /* @__PURE__ */ jsxs28("span", { style: P.muted, children: [
+        /* @__PURE__ */ jsxs29("span", { style: P.muted, children: [
           has ? /* @__PURE__ */ jsx28("b", { style: { color: C.verde }, children: t(lang, "guia.leg.tenesProf") }) : null,
           t(lang, "guia.leg.porNivel")
         ] })
       ] }), extra: origen, children: [
         rows.map((e, i) => {
           const inR = lvl >= e.lvl[0] && lvl <= e.lvl[1];
-          return /* @__PURE__ */ jsxs28("div", { style: {
+          return /* @__PURE__ */ jsxs29("div", { style: {
             ...P.loot,
             ...i === rows.length - 1 ? P.lootSinBorde : {},
             ...inR ? { borderLeft: `2px solid ${C.verde}`, paddingLeft: 8 } : {}
           }, children: [
-            /* @__PURE__ */ jsxs28("div", { children: [
+            /* @__PURE__ */ jsxs29("div", { children: [
               /* @__PURE__ */ jsx28("b", { children: e.what }),
               " ",
-              /* @__PURE__ */ jsxs28("span", { style: P.muted, children: [
+              /* @__PURE__ */ jsxs29("span", { style: P.muted, children: [
                 "· ",
                 t(lang, "guia.leg.nv", { a: e.lvl[0], b: e.lvl[1] })
               ] }),
@@ -82984,7 +83371,7 @@ a.leg.scarceCols") }) }),
 }
 
 // src/app.jsx
-import { Fragment as Fragment23, jsx as jsx29, jsxs as jsxs29 } from "react/jsx-runtime";
+import { Fragment as Fragment23, jsx as jsx29, jsxs as jsxs30 } from "react/jsx-runtime";
 var GRUPOS = ["personaje", "mercado", "otros"];
 var SUBPESTANAS = {
   personaje: ["perfil", "ruta", "clase", "profesiones"],
@@ -83005,7 +83392,7 @@ function Navegacion({ ids, activa, elegir, lang, etiqueta, secundaria = false, c
   const uid = useId();
   const idTab = (id) => `${uid}-tab-${id}`;
   const idPanel = (id) => `${uid}-panel-${id}`;
-  return /* @__PURE__ */ jsxs29(Tabs, { value: activa, onValueChange: elegir, style: S.navegacion, children: [
+  return /* @__PURE__ */ jsxs30(Tabs, { value: activa, onValueChange: elegir, style: S.navegacion, children: [
     /* @__PURE__ */ jsx29("div", { style: secundaria ? S.filaSecundaria : S.filaPrincipal, children: /* @__PURE__ */ jsx29(TabsList, { "aria-label": etiqueta, style: secundaria ? S.listaSecundaria : S.
     listaPrincipal, children: ids.map((id) => /* @__PURE__ */ jsx29(
       TabsTrigger,
@@ -83036,12 +83423,12 @@ function Navegacion({ ids, activa, elegir, lang, etiqueta, secundaria = false, c
 }
 function Configuracion({ lang, cambiarLang, reabrir, errorLectura }) {
   const [estado, setEstado] = useState17("");
-  return /* @__PURE__ */ jsxs29(Fragment23, { children: [
-    /* @__PURE__ */ jsxs29("section", { style: S.tarjeta, children: [
+  return /* @__PURE__ */ jsxs30(Fragment23, { children: [
+    /* @__PURE__ */ jsxs30("section", { style: S.tarjeta, children: [
       /* @__PURE__ */ jsx29("strong", { children: t(lang, "config.idioma") }),
       /* @__PURE__ */ jsx29("div", { children: /* @__PURE__ */ jsx29(SegmentedControl7, { value: lang, onChange: cambiarLang, options: [{ id: "en", label: "EN" }, { id: "es", label: "ES" }] }) })
     ] }),
-    /* @__PURE__ */ jsxs29("section", { style: S.tarjeta, children: [
+    /* @__PURE__ */ jsxs30("section", { style: S.tarjeta, children: [
       /* @__PURE__ */ jsx29("strong", { children: t(lang, "config.datos") }),
       /* @__PURE__ */ jsx29("span", { style: S.sub, children: t(lang, "config.datosNota") }),
       /* @__PURE__ */ jsx29("div", { children: /* @__PURE__ */ jsx29(Button13, { variant: "outline", size: "xs", disabled: estado === "cargando", onClick: async () => {
@@ -83170,11 +83557,11 @@ function App({ ctx, almacen, sincronizador, ventas, puente }) {
     nombre(D.personaje.facciones[perfil.faccion].n, lang)
   ].join(" · ") : t(lang, "perfil.vacio");
   const cuerpo = /* @__PURE__ */ jsx29("div", { style: S.cuerpo, children: activa === "configuracion" ? /* @__PURE__ */ jsx29(Configuracion, { lang, cambiarLang, reabrir: releer, errorLectura: error }) :
-  error ? /* @__PURE__ */ jsxs29("div", { role: "alert", style: S.aviso, children: [
+  error ? /* @__PURE__ */ jsxs30("div", { role: "alert", style: S.aviso, children: [
     error,
     " ",
     /* @__PURE__ */ jsx29(Button13, { variant: "outline", size: "xs", onClick: () => releer().catch((e) => setError(e.message || String(e))), children: t(lang, "reintentar") })
-  ] }) : !estado || !perfil ? /* @__PURE__ */ jsx29("p", { role: "status", style: S.sub, children: t(lang, "cargando") }) : activa === "mercado" && !listo ? /* @__PURE__ */ jsxs29("div", { style: S.tarjeta,
+  ] }) : !estado || !perfil ? /* @__PURE__ */ jsx29("p", { role: "status", style: S.sub, children: t(lang, "cargando") }) : activa === "mercado" && !listo ? /* @__PURE__ */ jsxs30("div", { style: S.tarjeta,
   children: [
     /* @__PURE__ */ jsx29("span", { children: t(lang, "mercado.sinPerfil") }),
     /* @__PURE__ */ jsx29("div", { children: /* @__PURE__ */ jsx29(Button13, { size: "xs", onClick: () => cambiarPestana("personaje"), children: t(lang, "tab.personaje") }) })
@@ -83195,8 +83582,8 @@ function App({ ctx, almacen, sincronizador, ventas, puente }) {
       irA: cambiarPestana
     }
   ) }) }, activa);
-  return /* @__PURE__ */ jsxs29("div", { style: S.pagina, children: [
-    /* @__PURE__ */ jsxs29("div", { style: S.cabecera, children: [
+  return /* @__PURE__ */ jsxs30("div", { style: S.pagina, children: [
+    /* @__PURE__ */ jsxs30("div", { style: S.cabecera, children: [
       /* @__PURE__ */ jsx29("strong", { children: t(lang, "app") }),
       /* @__PURE__ */ jsx29("span", { style: S.sub, children: resumen })
     ] }),

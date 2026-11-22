@@ -83,6 +83,13 @@ check('cobertura del scan informada', await p.getByText(/Cobertura del scan/).co
 check('estimaciones marcadas como approx', await p.getByText(/Estimaciones aproximadas/).count() === 1)
 check('nivel y facción del perfil', await p.getByText(/vos nv 30/).count() > 0)
 
+const campControl = p.getByRole('combobox', { name: 'Campamentos' })
+await campControl.selectOption('rotation')
+const rotacion = (await exportar(p)).storage['farm-settings']
+check('rotación aplica y guarda los pesos por defecto sin editar campos',
+  rotacion?.campMode === 'rotation' && JSON.stringify(rotacion.campWeights) === '[0.5,0.3,0.2]', rotacion)
+await campControl.selectOption('single')
+
 const previo = await exportar(p)
 const vp=previo.storage['market-v2-pointer']
 check('persistió puntero conjunto v2', vp?.revision>=1,vp)

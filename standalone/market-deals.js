@@ -3,30 +3,40 @@
  * Módulo puro (sin red, sin DOM, sin datos del juego). Compara el último
  * mínimo anunciado (`unitPriceCopper`) contra la mediana de los mínimos
  * diarios históricos (`HunterHistory.priceStats`), ajustada por confianza
- * (días de muestra + liquidez observada) y tendencia.
+ * estadística (días de muestra) y tendencia.
  *
  * Todo es approx: los precios son ofertas anunciadas, no ventas; los días
  * sin observación no cuentan; una "oferta" es una pista para investigar,
- * nunca una recomendación de compra.
+ * nunca una recomendación de compra. `available` es un CONTEO DE OFERTAS
+ * anunciadas: se informa aparte, nunca es confianza estadística ni volumen
+ * vendido, y no altera el peso del score.
  *
  * Reglas (umbrales configurables vía opts de dealInfo):
  *  - 'sin-datos': menos de minDays (2) días de muestra o mediana inválida.
  *  - 'oferta':     descuento >= offerPct (20%) bajo la mediana histórica.
  *  - 'sobreprecio': prima >= overPct (20%) sobre la mediana histórica.
  *  - 'estable':    cualquier otro caso con datos suficientes.
- *  - Confianza: base por días (>=7 alta, >=4 media, resto baja — con el
- *    piso de 2 días todo resultado sale 'baja' hasta tener 4+); si el día
- *    observado tuvo <=2 ofertas (available) baja un nivel — un mínimo de 1-2
- *    publicaciones es más ruidoso. available null no penaliza (dato ausente,
- *    no liquidez baja).
- *  - score (para ordenar "mejores ofertas"): discount * pesoConfianza *
- *    pesoTendencia. Positivo = bajo la mediana. 'sube' amplifica (un precio
- *    bajo en mercado al alza es más notable), 'baja' atenúa.
+ *  - Confianza: SOLO días de muestra (>=7 alta, >=4 media, resto baja — con
+ *    el piso de 2 días todo sale 'baja' hasta tener 4+). Si el día observado
+ *    tuvo pocas ofertas (available <= 2) se reporta en `available`/`reasons`
+ *    como conteo de ofertas, SIN bajar la confianza ni cambiar el score.
+ *  - Tendencia: `plana` (estado de crafteo) se normaliza a `estable`; `sube`
+ *    amplifica (precio bajo en mercado al alza es más notable), `baja` atenúa;
+ *    `sin-datos` usa peso neutro. Ningún estado cae a un peso misterioso.
+ *  - score (ordenar "mejores ofertas"): discount * pesoConfianza *
+ *    pesoTendencia. Es un RANKING HEURÍSTICO: los pesos están elegidos a mano,
+ *    sin calibración externa ni validación con ventas; `ranking` expone los
+ *    pesos aplicados para que UI/docs lo rotulen. No es probabilidad ni
+ *    predicción de colocación en subasta.
  *
  * Superficie (UMD — window.HunterDeals y module.exports):
  *   dealInfo(item, opts) -> {kind,score,discount,confidence,days,
- *                           medianaLow,minLow,available,ratio,reasons}
- *   MIN_DAYS/OFFER_PCT/OVER_PCT/HIGH_DAYS/MID_DAYS/THIN_AVAIL (constantes)
+ *                           medianaLow,minLow,available,ratio,reasons,
+ *                           ranking:{formula,heuristic,confWeight,
+ *                                    trendWeight,trend}}
+ *   normalizarTendencia(t) -> 'sube'|'baja'|'estable'|'sin-datos'
+ *   MIN_DAYS/OFFER_PCT/OVER_PCT/HIGH_DAYS/MID_DAYS/THIN_AVAIL,
+ *   CONF_W/TREND_W (congeladas, sin deriva accidental)
  */
 (function () {
   'use strict';
@@ -37,9 +47,18 @@
   var HIGH_DAYS = 7;
   var MID_DAYS = 4;
   var THIN_AVAIL = 2;
-  var CONF_W = { alta: 1, media: 0.8, baja: 0.55 };
-  var TREND_W = { sube: 1.15, baja: 0.9, estable: 1, 'sin-datos': 1 };
-  var CONF_NAME = { 0: 'baja', 1: 'media', 2: 'alta' };
+  var CONF_W = Object.freeze({ alta: 1, media: 0.8, baja: 0.55 });
+  var TREND_W = Object.freeze({ sube: 1.15, baja: 0.9, estable: 1, plana: 1, 'sin-datos': 1 });
+  var CONF_NAME = Object.freeze({ 0: 'baja', 1: 'media', 2: 'alta' });
+  // Alias explícito: crafteo usa `plana`, priceStats usa `estable`. Sin esto
+  // el estado caía al peso por defecto 1 por accidente, no por contrato.
+  var TREND_ALIAS = Object.freeze({ plana: 'estable' });
+
+  function normalizarTendencia(t) {
+    if (typeof t !== 'string') return 'sin-datos';
+    if (Object.prototype.hasOwnProperty.call(TREND_ALIAS, t)) return TREND_ALIAS[t];
+    return Object.prototype.hasOwnProperty.call(TREND_W, t) ? t : 'sin-datos';
+  }
 
   function histLib() {
     if (typeof module === 'object' && module && module.exports) {
@@ -87,7 +106,7 @@
     return {
       kind: 'sin-datos', score: null, discount: null, confidence: 'ninguna',
       days: days | 0, medianaLow: null, minLow: null, available: null,
-      ratio: null, reasons: [],
+      ratio: null, reasons: [], ranking: null,
     };
   }
 
@@ -115,14 +134,23 @@
     // (mediana - actual)/mediana da bordes más limpios que 1-ratio en FP.
     var discount = (st.medianaLow - cur) / st.medianaLow;
     var EPS = 1e-9;
-    var base = days >= HIGH_DAYS ? 2 : days >= MID_DAYS ? 1 : 0;
-    var liq = (avail !== null && avail <= THIN_AVAIL) ? -1 : 0;
-    var lvl = Math.max(0, Math.min(2, base + liq));
+    // Confianza = tamaño de muestra (días), nada que ver con el conteo de
+    // ofertas anunciadas: `available` no es venta ni incertidumbre estadística.
+    var lvl = days >= HIGH_DAYS ? 2 : days >= MID_DAYS ? 1 : 0;
     var confidence = CONF_NAME[lvl];
+    var tendencia = normalizarTendencia(st.tendencia);
+    var confWeight = CONF_W[confidence];
+    var trendWeight = TREND_W[tendencia];
     var out = {
       kind: 'estable', score: null, discount: discount, confidence: confidence,
       days: days, medianaLow: st.medianaLow, minLow: st.minLow,
       available: avail, ratio: ratio, reasons: [],
+      // Ranking heurístico: se exponen los pesos aplicados para poder rotular
+      // la cifra; no es probabilidad, no está calibrado con ventas.
+      ranking: {
+        formula: 'discount*confWeight*trendWeight', heuristic: true,
+        confWeight: confWeight, trendWeight: trendWeight, trend: tendencia,
+      },
     };
     var pct = Math.round(Math.abs(discount) * 100);
     if (discount >= offerPct - EPS) {
@@ -135,17 +163,22 @@
       out.reasons.push('Precio cercano a la mediana histórica (approx).');
     }
     if (confidence !== 'alta') {
-      out.reasons.push('Confianza ' + confidence + ' (' + days + ' día' + (days === 1 ? '' : 's') +
-        ' de muestra' + (avail !== null && avail <= THIN_AVAIL ? ', pocas ofertas ese día' : '') + ').');
+      out.reasons.push('Confianza ' + confidence + ' (' + days + ' día' + (days === 1 ? '' : 's') + ' de muestra).');
     }
-    out.score = discount * (CONF_W[confidence] || 0.55) * (TREND_W[st.tendencia] || 1);
+    if (avail !== null && avail <= THIN_AVAIL) {
+      out.reasons.push('Dato de liquidez: pocas ofertas anunciadas ese día (' + avail +
+        ') — conteo de ofertas, no ventas ni confianza estadística.');
+    }
+    out.reasons.push('Ranking heurístico: pesos elegidos a mano, sin calibración externa ni ventas verificadas.');
+    out.score = discount * confWeight * trendWeight;
     return out;
   }
 
   var HunterDeals = {
     MIN_DAYS: MIN_DAYS, OFFER_PCT: OFFER_PCT, OVER_PCT: OVER_PCT,
     HIGH_DAYS: HIGH_DAYS, MID_DAYS: MID_DAYS, THIN_AVAIL: THIN_AVAIL,
-    dealInfo: dealInfo,
+    CONF_W: CONF_W, TREND_W: TREND_W,
+    dealInfo: dealInfo, normalizarTendencia: normalizarTendencia,
   };
 
   var root = typeof globalThis !== 'undefined' ? globalThis : typeof self !== 'undefined' ? self : this;

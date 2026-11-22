@@ -28,6 +28,24 @@ function precioDe(precios, itemId) {
   return Number.isFinite(v) && v > 0 ? v : null
 }
 
+// ── Convenciones cuantitativas explícitas (auditoría H1/H4/H5/H11/H12/H13) ──
+// Comisión de subasta: el precio AH se valora NETO; el vendedor no paga comisión.
+export const AH_CUT = 0.05
+// Tendencia robusta: mínimo de puntos y banda de ruido documentada (heurística, NO calibrada).
+export const TENDENCIA_ROBUSTA = Object.freeze({ minPuntos: 4, umbralPct: 5 })
+export const PROB_SUBIDA_AVISO =
+  'probSubida es una interpolación lineal aproximada de Classic 1.12, NO verificada contra ' +
+  'la fórmula del servidor (SkillGainChance). crafteos = Σ(1/p) por punto suponiendo intentos ' +
+  'independientes: es una esperanza, no un número garantizado; no se estima varianza.'
+export const CONVENCION_RETORNO =
+  'ratio retorno/coste (no (retorno−coste)/coste); la rentabilidad neta se da aparte'
+export const AVISO_COBERTURA_H13 =
+  'Cobertura = puntos sobre recetas con adquisición conocida; no es una cota inferior del coste total ni prueba de coste mínimo/global.'
+export const AVISO_SATURACION =
+  'La liquidez en subasta NO está garantizada (avail es oferta, no ventas). Sin tasa de venta ' +
+  'observada no se supone saturación: el retorno lineal asume que todos los crafts se colocan ' +
+  'al precio unitario. Saturación sólo si el llamador aporta su supuesto explícito.'
+
 // Dificultad de una receta para un skill, con la escala de Classic:
 //   'no'          aún no se puede aprender (skill < rango.aprende)
 //   'naranja'     subida segura (skill < amarillo)
@@ -271,7 +289,7 @@ export function rutaMaxeo(recetas, desde, cap, precios, items, opts = {}) {
   const base = {
     desde: d0, cap: h, pasos: [], totalMateriales: null, totalAdquisicion: 0, total: null,
     cobertura: 0, huecos: [], adquisiciones: [], adquisicionesSinDato: [], sinPrecio: [],
-    avisoEntrenamiento,
+    avisoEntrenamiento, avisoProbabilidad: PROB_SUBIDA_AVISO, recetasConAdquisicionConocida: 0,
   }
   if (!Array.isArray(recetas) || !Number.isFinite(d0) || !Number.isFinite(h) || h <= d0) return base
   const fin = Math.min(h, d0 + MAX_PUNTOS)
@@ -284,6 +302,7 @@ export function rutaMaxeo(recetas, desde, cap, precios, items, opts = {}) {
       cum: puntosEsperadosAcum(r.rango, fin),
     }))
   const conAcq = infos.filter((i) => i.acq.cobre !== null)
+  base.recetasConAdquisicionConocida = conAcq.length
   base.adquisicionesSinDato = infos.filter((i) => i.acq.cobre === null)
     .map((i) => ({ spell: i.r.spell, item: i.acq.item, como: i.r.como }))
   const pagadas = new Set()
@@ -335,7 +354,8 @@ export function rutaMaxeo(recetas, desde, cap, precios, items, opts = {}) {
     }
     totalMat += mat
     puntosCubiertos += j - s
-    pasos.push({ desde: s, hasta: j, spell, crafteos: Math.round(crafteos), costo: Math.round(mat) })
+    // H5: el coste y el retorno usan crafts fraccionales; sólo la vista redondea.
+    pasos.push({ desde: s, hasta: j, spell, crafteos: Math.round(crafteos), crafteosExactos: crafteos, costo: Math.round(mat) })
     s = j
   }
   base.pasos = pasos
@@ -395,22 +415,71 @@ export function tendencia(series) {
   return { direccion, deltaPct: Math.round(deltaPct * 10) / 10 }
 }
 
+// Mediana de los mínimos diarios: estadística robusta (H11). Un solo día extremo no
+// desplaza la mediana; devuelve null si no hay valores finitos.
+export function mediana(valores) {
+  const xs = (Array.isArray(valores) ? valores : []).filter((v) => Number.isFinite(v))
+    .slice().sort((a, b) => a - b)
+  if (!xs.length) return null
+  const m = Math.floor(xs.length / 2)
+  return xs.length % 2 ? xs[m] : (xs[m - 1] + xs[m]) / 2
+}
+
+// Media móvil robusta: mediana de los mínimos de los últimos `ventana` días. Misma forma
+// de salida que mediaMovil; `media` se redondea a cobre entero. null si no hay serie.
+export function medianaMovil(series, ventana) {
+  const s = Array.isArray(series) ? series : []
+  if (!s.length) return null
+  const w = Number.isInteger(ventana) && ventana > 0 ? ventana : s.length
+  const ult = s.slice(-w)
+  const med = mediana(ult.map((e) => e.low))
+  if (med === null) return null
+  return { media: Math.round(med), n: ult.length, desde: ult[0].day, hasta: ult[ult.length - 1].day }
+}
+
+// Tendencia robusta (H11): compara la mediana de la primera mitad con la de la segunda.
+// Requiere >= minPuntos (4) y |Δ| > umbralPct (5%), banda de ruido documentada, no
+// calibrada. Con menos puntos o sin mediana positiva => null (SIN DATOS). No es una
+// predicción: describe las observaciones disponibles.
+export function tendenciaRobusta(series, opts = {}) {
+  const s = Array.isArray(series) ? series : []
+  const min = Number.isInteger(opts && opts.minPuntos) && opts.minPuntos > 0
+    ? opts.minPuntos : TENDENCIA_ROBUSTA.minPuntos
+  const umbral = Number.isFinite(opts && opts.umbralPct) ? opts.umbralPct : TENDENCIA_ROBUSTA.umbralPct
+  if (s.length < min) return null
+  const mitad = Math.floor(s.length / 2)
+  const m1 = mediana(s.slice(0, mitad).map((e) => e.low))
+  const m2 = mediana(s.slice(mitad).map((e) => e.low))
+  if (!(m1 > 0) || m2 === null) return null
+  const delta = ((m2 - m1) / m1) * 100
+  const deltaPct = Math.round(delta * 10) / 10
+  const direccion = deltaPct > umbral ? 'sube' : deltaPct < -umbral ? 'baja' : 'plana'
+  return { direccion, deltaPct, medianaPrimera: m1, medianaSegunda: m2, n: s.length }
+}
+
 // Mapa de precios por media móvil histórica + metadatos por ítem. historyItems:
-// {id: serieCruda}; ventana: días (null = todos). Devuelve {precios: Map(id->media),
-// meta: {id: {media,n,desde,hasta,direccion,deltaPct}}}.
-export function preciosHistoricos(historyItems, ventana) {
+// {id: serieCruda}; ventana: días (null = todos). opts.robusto=true usa mediana de
+// mínimos y tendencia por mitades (H11); por defecto se conserva la media aritmética
+// y la tendencia extremo-a-extremo de antes (compatibilidad con el piloto publicado).
+// Devuelve {precios: Map(id->media), meta: {id: {...}}}.
+export function preciosHistoricos(historyItems, ventana, opts = {}) {
   const precios = new Map(), meta = {}
   if (!historyItems || typeof historyItems !== 'object') return { precios, meta }
+  const robusto = !!(opts && opts.robusto)
   for (const key of Object.keys(historyItems)) {
     const id = Number(key)
     if (!Number.isInteger(id) || id <= 0) continue
     const s = serieHistorico(historyItems[key])
-    const mm = mediaMovil(s, ventana)
+    const mm = robusto ? medianaMovil(s, ventana) : mediaMovil(s, ventana)
     if (!mm) continue
     precios.set(id, mm.media)
-    const t = tendencia(s)
+    const t = robusto ? tendenciaRobusta(s) : tendencia(s)
     meta[id] = { media: mm.media, n: mm.n, desde: mm.desde, hasta: mm.hasta,
       direccion: t ? t.direccion : null, deltaPct: t ? t.deltaPct : null }
+    if (robusto) {
+      meta[id].medianaPrimera = t ? t.medianaPrimera : null
+      meta[id].medianaSegunda = t ? t.medianaSegunda : null
+    }
   }
   return { precios, meta }
 }
@@ -429,6 +498,8 @@ export function roiRuta(recetas, desde, cap, precios, items, opts = {}) {
   const porSpell = new Map()
   for (const r of (Array.isArray(recetas) ? recetas : [])) if (r && Number.isFinite(r.spell)) porSpell.set(r.spell, r)
   const meta = opts && opts.meta ? opts.meta : null
+  const satRaw = opts && opts.saturacion
+  const saturacion = Number.isFinite(satRaw) && satRaw > 0 && satRaw <= 1 ? satRaw : null
   let retVend = 0, retEst = 0, conValor = 0, sinValor = 0
   const reactivos = new Set()
   for (const paso of ruta.pasos) {
@@ -444,12 +515,18 @@ export function roiRuta(recetas, desde, cap, precios, items, opts = {}) {
     const ah = sub !== null ? sub * cant : null
     if (vend === null && ah === null) { sinValor++; continue }
     conValor++
-    if (vend !== null) retVend += paso.crafteos * vend
-    const unitEst = ah !== null ? (vend !== null ? Math.max(ah, vend) : ah) : vend
-    retEst += paso.crafteos * unitEst
+    // H5: usar crafts exactos también en el retorno; el entero es sólo de presentación.
+    const crafteos = Number.isFinite(paso.crafteosExactos) && paso.crafteosExactos > 0
+      ? paso.crafteosExactos : paso.crafteos
+    if (vend !== null) retVend += crafteos * vend
+    // H1: la subasta se valora NETO de comisión; el vendedor no paga comisión.
+    const ahNeto = ah !== null ? ah * (1 - AH_CUT) : null
+    const unitEst = ahNeto !== null ? (vend !== null ? Math.max(ahNeto, vend) : ahNeto) : vend
+    retEst += crafteos * unitEst
   }
   const coste = ruta.total
   const roi = (ret) => (coste !== null && coste > 0 ? ret / coste : null)
+  const rentabilidad = (ret) => (coste !== null && coste > 0 ? (ret - coste) / coste : null)
   let tendenciaResumen = null
   if (meta) {
     let suben = 0, bajan = 0, planas = 0, sinHist = 0
@@ -464,11 +541,22 @@ export function roiRuta(recetas, desde, cap, precios, items, opts = {}) {
     desde: ruta.desde, cap: ruta.cap, cobertura: ruta.cobertura,
     coste, totalMateriales: ruta.totalMateriales, totalAdquisicion: ruta.totalAdquisicion,
     retornoVendedor: Math.round(retVend), retornoEstimado: Math.round(retEst),
+    // H1: `roi*` = retorno/coste; la rentabilidad neta se publica separada.
     roiVendedor: roi(retVend), roiEstimado: roi(retEst),
+    rentabilidadVendedor: rentabilidad(retVend), rentabilidadEstimada: rentabilidad(retEst),
+    convencionRetorno: CONVENCION_RETORNO, comisionAH: AH_CUT,
     netoVendedor: coste !== null ? Math.round(retVend - coste) : null,
     netoEstimado: coste !== null ? Math.round(retEst - coste) : null,
+    // H12: sin supuesto explícito no se inventa una tasa de venta.
+    saturacion, retornoEstimadoAjustado: saturacion !== null ? Math.round(retEst * saturacion) : null,
+    roiEstimadoAjustado: saturacion !== null ? roi(retEst * saturacion) : null,
+    avisoSaturacion: AVISO_SATURACION,
+    // H13: cobertura de skill sobre el subconjunto con adquisición conocida.
+    recetasConsideradas: ruta.recetasConAdquisicionConocida,
+    adquisicionesSinDato: (ruta.adquisicionesSinDato || []).length,
+    avisoCobertura: AVISO_COBERTURA_H13,
     pasosConValor: conValor, pasosSinValor: sinValor,
     tendenciaResumen, huecos: ruta.huecos.length,
-    aviso: 'Retorno vendedor = suelo garantizado. Retorno estimado = subasta si hay precio medio, si no vendedor (el mayor); la liquidez en subasta NO está garantizada (la cantidad disponible es oferta, no ventas). Media de mínimos diarios observados. Entrenamiento de tramos: SIN DATOS.',
+    aviso: 'Retorno vendedor = suelo garantizado. Retorno estimado = subasta NETO de comisión si hay precio medio, si no vendedor (el mayor); la liquidez en subasta NO está garantizada (la cantidad disponible es oferta, no ventas). Media de mínimos diarios observados. Entrenamiento de tramos: SIN DATOS. Ratio retorno/coste, no rentabilidad sobre capital.',
   }
 }

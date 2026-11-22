@@ -479,10 +479,27 @@ SlashCmdList['WOWFOREVERBRIDGE3'] = function(msg)
     capturarPawn(true)
     reportPawn()
   elseif cmd == 'catalogo' then
-    if cosecharAgora() then
+    if not apiStats() then
+      chat('catálogo de stats: este cliente no expone GetItemStats, así que no se pueden leer stats de ítem.')
+    elseif cosecharAgora() then
       reportCatalogo()
     else
-      chat('catálogo de stats: nada que cosechar (sin Auctionator cacheado o sin API de stats).')
+      -- Distinguir las tres causas reales: sin Auctionator, con versión
+      -- inesperada o con el reino actual fuera de su base. Sin esto el usuario
+      -- solo veía «nada que cosechar» y no sabía qué mirar.
+      local db = AUCTIONATOR_PRICE_DATABASE
+      local reino = (type(GetRealmName) == 'function') and GetRealmName() or nil
+      local motivo
+      if type(db) ~= 'table' then
+        motivo = 'Auctionator no tiene su base cargada (¿addon desactivado o sin escaneos?)'
+      elseif db.__dbversion ~= 8 then
+        motivo = 'Auctionator con __dbversion ' .. tostring(db.__dbversion) .. ' (se espera 8)'
+      elseif not Logic.currentRealm(db, reino) then
+        motivo = 'el reino «' .. tostring(reino or '?') .. '» no aparece en la base de Auctionator'
+      else
+        motivo = 'no quedan ítems pendientes en el lote'
+      end
+      chat('catálogo de stats: nada que cosechar — ' .. motivo .. '.')
     end
   else
     chat('uso: /wfbpawn [catalogo]')

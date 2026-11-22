@@ -390,6 +390,26 @@ def _round(x):
     return math.floor(x + 0.5)
 
 
+# Convenciones cuantitativas explícitas (auditoría H1/H4/H5/H11/H12/H13).
+AH_CUT = 0.05  # comisión de subasta: el precio AH se valora NETO; el vendedor no paga
+TENDENCIA_ROBUSTA = {"minPuntos": 4, "umbralPct": 5}  # heurística documentada, NO calibrada
+PROB_SUBIDA_AVISO = (
+    "probSubida es una interpolación lineal aproximada de Classic 1.12, NO verificada contra "
+    "la fórmula del servidor (SkillGainChance). crafteos = Σ(1/p) por punto suponiendo intentos "
+    "independientes: es una esperanza, no un número garantizado; no se estima varianza."
+)
+CONVENCION_RETORNO = "ratio retorno/coste (no (retorno−coste)/coste); la rentabilidad neta se da aparte"
+AVISO_COBERTURA_H13 = (
+    "Cobertura = puntos sobre recetas con adquisición conocida; no es una cota inferior del "
+    "coste total ni prueba de coste mínimo/global."
+)
+AVISO_SATURACION = (
+    "La liquidez en subasta NO está garantizada (avail es oferta, no ventas). Sin tasa de venta "
+    "observada no se supone saturación: el retorno lineal asume que todos los crafts se colocan "
+    "al precio unitario. Saturación sólo si el llamador aporta su supuesto explícito."
+)
+
+
 def costo_unidad(iid, precios, items):
     """Coste de conseguir un reactivo: vendedor (col.10==1, col.9>0) o subasta; null si no."""
     tabla = items.get("items", items) if isinstance(items, dict) else {}
@@ -461,7 +481,8 @@ def ruta_maxeo(recetas, desde, cap, precios, items, faccion=None):
              "no se incluye en el total.")
     base = {"desde": d0, "cap": h, "pasos": [], "totalMateriales": None, "totalAdquisicion": 0,
             "total": None, "cobertura": 0.0, "huecos": [], "adquisiciones": [],
-            "adquisicionesSinDato": [], "sinPrecio": [], "avisoEntrenamiento": aviso}
+            "adquisicionesSinDato": [], "sinPrecio": [], "avisoEntrenamiento": aviso,
+            "avisoProbabilidad": PROB_SUBIDA_AVISO, "recetasConAdquisicionConocida": 0}
     if not isinstance(recetas, list) or h <= d0:
         return base
     fin = min(h, d0 + 1000)
@@ -473,6 +494,7 @@ def ruta_maxeo(recetas, desde, cap, precios, items, faccion=None):
                       "costo": costo_receta(r, precios, items),
                       "nReact": len(r.get("reactivos") or []), "cum": _cum_prob(r.get("rango"), fin)})
     con_acq = [i for i in infos if i["acq"]["cobre"] is not None]
+    base["recetasConAdquisicionConocida"] = len(con_acq)
     base["adquisicionesSinDato"] = [{"spell": i["r"]["spell"], "item": i["acq"]["item"], "como": i["r"].get("como")}
                                     for i in infos if i["acq"]["cobre"] is None]
     pagadas, sin_precio = set(), {}
@@ -529,7 +551,9 @@ def ruta_maxeo(recetas, desde, cap, precios, items, faccion=None):
             j += 1
         total_mat += mat
         puntos += j - s
-        pasos.append({"desde": s, "hasta": j, "spell": spell, "crafteos": _round(crafteos), "costo": _round(mat)})
+        # H5: el coste y el retorno usan crafts fraccionales; sólo la vista redondea.
+        pasos.append({"desde": s, "hasta": j, "spell": spell, "crafteos": _round(crafteos),
+                      "crafteosExactos": crafteos, "costo": _round(mat)})
         s = j
     base["pasos"], base["huecos"], base["sinPrecio"] = pasos, huecos, list(sin_precio.values())
     base["totalAdquisicion"] = _round(total_adq)
@@ -706,12 +730,64 @@ def tendencia(series):
     return {"direccion": direccion, "deltaPct": _round(delta * 10) / 10}
 
 
-def precios_historicos(history_items, ventana=None):
+def mediana(valores):
+    """Mediana de valores finitos; None si vacío. Paridad con mediana (JS)."""
+    xs = sorted(v for v in (valores if isinstance(valores, list) else [])
+                if isinstance(v, (int, float)) and not isinstance(v, bool) and math.isfinite(v))
+    if not xs:
+        return None
+    m = len(xs) // 2
+    return xs[m] if len(xs) % 2 else (xs[m - 1] + xs[m]) / 2
+
+
+def mediana_movil(series, ventana=None):
+    """Mediana de los mínimos de los últimos `ventana` días. Paridad con medianaMovil."""
+    s = series if isinstance(series, list) else []
+    if not s:
+        return None
+    w = ventana if isinstance(ventana, int) and not isinstance(ventana, bool) and ventana > 0 else len(s)
+    ult = s[-w:]
+    med = mediana([e["low"] for e in ult])
+    if med is None:
+        return None
+    return {"media": _round(med), "n": len(ult), "desde": ult[0]["day"], "hasta": ult[-1]["day"]}
+
+
+def tendencia_robusta(series, opts=None):
+    """Compara la mediana de la primera mitad con la de la segunda (H11). Requiere >=4
+    puntos y |Δ| > 5% (banda de ruido documentada, no calibrada). None = SIN DATOS.
+    Paridad con tendenciaRobusta."""
+    s = series if isinstance(series, list) else []
+    opts = opts if isinstance(opts, dict) else {}
+    min_puntos = opts.get("minPuntos", TENDENCIA_ROBUSTA["minPuntos"])
+    umbral = opts.get("umbralPct", TENDENCIA_ROBUSTA["umbralPct"])
+    if not isinstance(min_puntos, int) or isinstance(min_puntos, bool) or min_puntos <= 0:
+        min_puntos = TENDENCIA_ROBUSTA["minPuntos"]
+    if not isinstance(umbral, (int, float)) or isinstance(umbral, bool) or not math.isfinite(umbral):
+        umbral = TENDENCIA_ROBUSTA["umbralPct"]
+    if len(s) < min_puntos:
+        return None
+    mitad = len(s) // 2
+    m1 = mediana([e["low"] for e in s[:mitad]])
+    m2 = mediana([e["low"] for e in s[mitad:]])
+    if m1 is None or m1 <= 0 or m2 is None:
+        return None
+    delta = ((m2 - m1) / m1) * 100
+    delta_pct = _round(delta * 10) / 10
+    direccion = "sube" if delta_pct > umbral else ("baja" if delta_pct < -umbral else "plana")
+    return {"direccion": direccion, "deltaPct": delta_pct,
+            "medianaPrimera": m1, "medianaSegunda": m2, "n": len(s)}
+
+
+def precios_historicos(history_items, ventana=None, opts=None):
     """Mapa {id(str):media(cobre int)} + meta por ítem desde series históricas crudas.
-    Paridad con preciosHistoricos (JS devuelve Map; aquí dict str->int). Devuelve (precios, meta)."""
+    Paridad con preciosHistoricos (JS devuelve Map; aquí dict str->int). opts.robusto=True
+    usa mediana de mínimos y tendencia por mitades (H11); por defecto se conserva la media
+    aritmética y la tendencia extremo-a-extremo. Devuelve (precios, meta)."""
     precios, meta = {}, {}
     if not isinstance(history_items, dict):
         return precios, meta
+    robusto = bool(isinstance(opts, dict) and opts.get("robusto"))
     for key, raw in history_items.items():
         try:
             iid = int(key)
@@ -720,27 +796,34 @@ def precios_historicos(history_items, ventana=None):
         if iid <= 0:
             continue
         s = serie_historico(raw)
-        mm = media_movil(s, ventana)
+        mm = mediana_movil(s, ventana) if robusto else media_movil(s, ventana)
         if not mm:
             continue
         precios[str(iid)] = mm["media"]
-        t = tendencia(s)
+        t = tendencia_robusta(s) if robusto else tendencia(s)
         meta[str(iid)] = {"media": mm["media"], "n": mm["n"], "desde": mm["desde"], "hasta": mm["hasta"],
                           "direccion": t["direccion"] if t else None, "deltaPct": t["deltaPct"] if t else None}
+        if robusto:
+            meta[str(iid)]["medianaPrimera"] = t["medianaPrimera"] if t else None
+            meta[str(iid)]["medianaSegunda"] = t["medianaSegunda"] if t else None
     return precios, meta
 
 
-def roi_ruta(recetas, desde, cap, precios, items, faccion=None, meta=None):
+def roi_ruta(recetas, desde, cap, precios, items, faccion=None, meta=None, saturacion=None):
     """ROI de la ruta de maxeo: coste (ruta_maxeo) vs valor recuperable de los crafts al subir.
-    retornoVendedor = suelo garantizado (col.5 × crafteos × yield). retornoEstimado = mejor valor
-    realizable (AH si hay precio medio, si no vendedor; el mayor). La liquidez AH NO está garantizada
-    (avail es oferta, no ventas). crafts sin valor (crea null) se declaran SIN DATOS. Paridad con roiRuta."""
+    retornoVendedor = suelo garantizado (col.5 × crafteos exactos × yield). retornoEstimado =
+    subasta NETO de comisión AH si hay precio medio, si no vendedor (el mayor); la liquidez AH
+    NO está garantizada (avail es oferta, no ventas). crafts sin valor (crea null) se declaran
+    SIN DATOS. `roi*` = retorno/coste (H1); la rentabilidad neta se publica aparte. Sin
+    `saturacion` explícita no se asume tasa de venta (H12). Paridad con roiRuta."""
     ruta = ruta_maxeo(recetas, desde, cap, precios, items, faccion)
     por_spell = {}
     for r in (recetas if isinstance(recetas, list) else []):
         if isinstance(r, dict) and isinstance(r.get("spell"), int):
             por_spell[r["spell"]] = r
     tabla = items.get("items", items) if isinstance(items, dict) else {}
+    sat = saturacion if (isinstance(saturacion, (int, float)) and not isinstance(saturacion, bool)
+                         and math.isfinite(saturacion) and 0 < saturacion <= 1) else None
     ret_vend, ret_est, con_valor, sin_valor = 0.0, 0.0, 0, 0
     reactivos = set()
     for paso in ruta["pasos"]:
@@ -761,14 +844,23 @@ def roi_ruta(recetas, desde, cap, precios, items, faccion=None, meta=None):
             sin_valor += 1
             continue
         con_valor += 1
+        # H5: usar crafts exactos también en el retorno; el entero es sólo de presentación.
+        crafteos = paso.get("crafteosExactos") if (isinstance(paso.get("crafteosExactos"), (int, float))
+                                                  and paso["crafteosExactos"] > 0) else paso["crafteos"]
         if vend is not None:
-            ret_vend += paso["crafteos"] * vend
-        unit_est = max(ah, vend) if (ah is not None and vend is not None) else (ah if ah is not None else vend)
-        ret_est += paso["crafteos"] * unit_est
+            ret_vend += crafteos * vend
+        # H1: la subasta se valora NETO de comisión; el vendedor no paga comisión.
+        ah_neto = ah * (1 - AH_CUT) if ah is not None else None
+        unit_est = (max(ah_neto, vend) if (ah_neto is not None and vend is not None)
+                    else (ah_neto if ah_neto is not None else vend))
+        ret_est += crafteos * unit_est
     coste = ruta["total"]
 
     def roi(ret):
         return ret / coste if (coste is not None and coste > 0) else None
+
+    def rentabilidad(ret):
+        return (ret - coste) / coste if (coste is not None and coste > 0) else None
 
     tend_res = None
     if meta:
@@ -788,15 +880,27 @@ def roi_ruta(recetas, desde, cap, precios, items, faccion=None, meta=None):
             else:
                 planas += 1
         tend_res = {"suben": suben, "bajan": bajan, "planas": planas, "sinHist": sin_hist}
-    aviso = ("Retorno vendedor = suelo garantizado. Retorno estimado = subasta si hay precio medio, "
+    aviso = ("Retorno vendedor = suelo garantizado. Retorno estimado = subasta NETO de comisión si hay precio medio, "
              "si no vendedor (el mayor); la liquidez en subasta NO está garantizada (la cantidad "
-             "disponible es oferta, no ventas). Media de mínimos diarios observados. Entrenamiento de tramos: SIN DATOS.")
+             "disponible es oferta, no ventas). Media de mínimos diarios observados. Entrenamiento de tramos: SIN DATOS. "
+             "Ratio retorno/coste, no rentabilidad sobre capital.")
     return {"desde": ruta["desde"], "cap": ruta["cap"], "cobertura": ruta["cobertura"],
             "coste": coste, "totalMateriales": ruta["totalMateriales"], "totalAdquisicion": ruta["totalAdquisicion"],
             "retornoVendedor": _round(ret_vend), "retornoEstimado": _round(ret_est),
+            # H1: `roi*` = retorno/coste; la rentabilidad neta se publica separada.
             "roiVendedor": roi(ret_vend), "roiEstimado": roi(ret_est),
+            "rentabilidadVendedor": rentabilidad(ret_vend), "rentabilidadEstimada": rentabilidad(ret_est),
+            "convencionRetorno": CONVENCION_RETORNO, "comisionAH": AH_CUT,
             "netoVendedor": _round(ret_vend - coste) if coste is not None else None,
             "netoEstimado": _round(ret_est - coste) if coste is not None else None,
+            # H12: sin supuesto explícito no se inventa una tasa de venta.
+            "saturacion": sat, "retornoEstimadoAjustado": _round(ret_est * sat) if sat is not None else None,
+            "roiEstimadoAjustado": roi(ret_est * sat) if sat is not None else None,
+            "avisoSaturacion": AVISO_SATURACION,
+            # H13: cobertura de skill sobre el subconjunto con adquisición conocida.
+            "recetasConsideradas": ruta["recetasConAdquisicionConocida"],
+            "adquisicionesSinDato": len(ruta["adquisicionesSinDato"]),
+            "avisoCobertura": AVISO_COBERTURA_H13,
             "pasosConValor": con_valor, "pasosSinValor": sin_valor,
             "tendenciaResumen": tend_res, "huecos": len(ruta["huecos"]), "aviso": aviso}
 
@@ -1222,7 +1326,9 @@ def cmd_roi(D, a, out):
         raise ErrorConsulta("roi necesita --historico FILE (price-history-*.json o bundle con history)")
     hist_items, hmeta = cargar_historico(a.historico, a.reino)
     ventana = a.ventana if a.ventana and a.ventana > 0 else None
-    precios, meta = precios_historicos(hist_items, ventana)
+    robusto = bool(getattr(a, 'robusto', False))
+    precios, meta = precios_historicos(hist_items, ventana, {'robusto': robusto})
+    sat = getattr(a, 'saturacion', None)
     n_spot = 0
     if a.precios:
         spot, _ = cargar_precios(a.precios, a.reino)
@@ -1235,10 +1341,14 @@ def cmd_roi(D, a, out):
     dias = [m["desde"] for m in meta.values()] + [m["hasta"] for m in meta.values()]
     rango = f"{min(dias)}→{max(dias)}" if dias else "?"
     extra = f", {n_spot} con precio spot de respaldo" if n_spot else ""
-    out(f"ROI de maxear a 300 con media móvil de mínimos diarios ({hmeta.get('reino', '?')}, días {rango}, "
+    modo = "mediana de mínimos + tendencia por mitades (robusto)" if robusto else "media móvil de mínimos diarios"
+    out(f"ROI de maxear a 300 con {modo} ({hmeta.get('reino', '?')}, días {rango}, "
         f"{len(meta)} ítems con histórico{extra}).")
-    out("Retorno vendedor = suelo garantizado; retorno estimado = AH (media) o vendedor, el mayor. "
-        "Liquidez AH NO garantizada (oferta≠ventas). Entrenamiento de tramos: SIN DATOS.")
+    out("Retorno vendedor = suelo garantizado; retorno estimado = AH NETO de comisión del 5% o vendedor, "
+        "el mayor. Liquidez AH NO garantizada (oferta≠ventas). Entrenamiento de tramos: SIN DATOS. "
+        "Ratio ROI = retorno/coste; rentabilidad neta se muestra aparte.")
+    if sat is not None:
+        out(f"Saturación supuesta por el llamador: {sat:.0%} (heurística explícita, no estimada de 'avail').")
     profs = D.profesiones["profesiones"]
     faccion = faccion_de(a.faccion) if a.faccion else None
     skill = a.skill if a.skill is not None else 1
@@ -1247,23 +1357,28 @@ def cmd_roi(D, a, out):
     for pid, p in profs.items():
         if pid_filtro and pid != pid_filtro:
             continue
-        roi = roi_ruta(p["recetas"], skill, 300, precios, D.items, faccion, meta)
+        roi = roi_ruta(p["recetas"], skill, 300, precios, D.items, faccion, meta, saturacion=sat)
         filas.append((nombre(p["n"], a.lang), roi))
         if a.detalle:
             out("")
             out(f"=== {nombre(p['n'], a.lang)} ===")
             out(f"Coste (media móvil): materiales {dinero(roi['totalMateriales'])} + adquisición {dinero(roi['totalAdquisicion'])} = {dinero(roi['coste'])}")
-            out(f"Retorno vendedor (suelo): {dinero(roi['retornoVendedor'])} | ROI {pct(roi['roiVendedor'])} | neto {dinero(roi['netoVendedor'])}")
-            out(f"Retorno estimado (AH/vendedor): {dinero(roi['retornoEstimado'])} | ROI {pct(roi['roiEstimado'])} | neto {dinero(roi['netoEstimado'])}")
+            out(f"Retorno vendedor (suelo): {dinero(roi['retornoVendedor'])} | ROI {pct(roi['roiVendedor'])} | rentabilidad {pct(roi['rentabilidadVendedor'])} | neto {dinero(roi['netoVendedor'])}")
+            out(f"Retorno estimado (AH neto 5%/vendedor): {dinero(roi['retornoEstimado'])} | ROI {pct(roi['roiEstimado'])} | rentabilidad {pct(roi['rentabilidadEstimada'])} | neto {dinero(roi['netoEstimado'])}")
+            if roi['retornoEstimadoAjustado'] is not None:
+                out(f"Retorno ajustado con saturación {roi['saturacion']:.0%}: {dinero(roi['retornoEstimadoAjustado'])} | ROI {pct(roi['roiEstimadoAjustado'])} (supuesto del llamador, no medido)")
             tr = roi["tendenciaResumen"]
             if tr:
                 out(f"Tendencia de reactivos: {tr['suben']} suben, {tr['bajan']} bajan, {tr['planas']} planas, {tr['sinHist']} sin histórico")
-            out(f"Cobertura {roi['cobertura'] * 100:.0f}% | pasos con valor {roi['pasosConValor']}, sin valor (SIN DATOS) {roi['pasosSinValor']} | huecos {roi['huecos']}")
+            out(f"Cobertura {roi['cobertura'] * 100:.0f}% | recetas consideradas (adquisición conocida) {roi['recetasConsideradas']}, adquisiciones SIN DATO {roi['adquisicionesSinDato']} | pasos con valor {roi['pasosConValor']}, sin valor (SIN DATOS) {roi['pasosSinValor']} | huecos {roi['huecos']}")
+            out(roi['avisoCobertura'])
     out("")
-    out(f"{'Profesión':<30}{'Coste':>13}{'Ret.vend':>13}{'ROI vend':>9}{'Ret.est':>13}{'ROI est':>9}{'Cob':>7}")
+    out(f"{'Profesión':<30}{'Coste':>13}{'Ret.vend':>13}{'ROI vend':>9}{'Ret.est':>13}{'ROI est':>9}{'Cob':>7}"
+        + (f"{'ROI aj':>9}" if sat is not None else ""))
     for nm, roi in filas:
         out(f"{nm:<30}{dinero(roi['coste']):>13}{dinero(roi['retornoVendedor']):>13}{pct(roi['roiVendedor']):>9}"
-            f"{dinero(roi['retornoEstimado']):>13}{pct(roi['roiEstimado']):>9}{roi['cobertura'] * 100:>6.0f}%")
+            f"{dinero(roi['retornoEstimado']):>13}{pct(roi['roiEstimado']):>9}{roi['cobertura'] * 100:>6.0f}%"
+            + (f"{pct(roi['roiEstimadoAjustado']):>9}" if sat is not None else ""))
     return 0
 
 
@@ -1322,6 +1437,10 @@ def parser():
     s.add_argument("--skill", type=int); s.add_argument("--faccion")
     s.add_argument("--profesion"); s.add_argument("--detalle", action="store_true")
     s.add_argument("--precios", help="precios spot de respaldo para ítems sin histórico")
+    s.add_argument("--robusto", action="store_true",
+                   help="mediana de mínimos y tendencia por mitades en vez de media/extremos (H11)")
+    s.add_argument("--saturacion", type=float, default=None, metavar="F",
+                   help="supuesto explícito 0<F<=1 de tasa de venta; sin él NO se asume (H12)")
     return p
 
 

@@ -111,11 +111,11 @@ class TestRoiRuta(unittest.TestCase):
         roi = C.roi_ruta([rA], 0, 10, PRECIOS, ITEMS)
         self.assertEqual(roi['coste'], 100)
         self.assertEqual(roi['retornoVendedor'], 200)
-        self.assertEqual(roi['retornoEstimado'], 500)
+        self.assertEqual(roi['retornoEstimado'], 475)  # 10 × (50 AH × 0,95 neto AH)
         self.assertEqual(roi['roiVendedor'], 2)
-        self.assertEqual(roi['roiEstimado'], 5)
+        self.assertEqual(roi['roiEstimado'], 4.75)
         self.assertEqual(roi['netoVendedor'], 100)
-        self.assertEqual(roi['netoEstimado'], 400)
+        self.assertEqual(roi['netoEstimado'], 375)
         self.assertEqual(roi['pasosConValor'], 1)
         self.assertEqual(roi['pasosSinValor'], 0)
         self.assertEqual(roi['cobertura'], 1)
@@ -131,7 +131,7 @@ class TestRoiRuta(unittest.TestCase):
         rY = R(1, 'entrenador', rango(0, 10, 10, 10), [[100, 1]], {'crea': [300, 2]})
         roi = C.roi_ruta([rY], 0, 10, PRECIOS, ITEMS)
         self.assertEqual(roi['retornoVendedor'], 400)
-        self.assertEqual(roi['retornoEstimado'], 1000)
+        self.assertEqual(roi['retornoEstimado'], 950)  # 10 × 50 × 0,95 × 2
 
     def test_crea_null_y_sin_valor(self):
         rEnc = R(2, 'entrenador', rango(0, 10, 10, 10), [[100, 1]], {'crea': None})

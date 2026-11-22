@@ -447,6 +447,7 @@ export function ajustesBase(perfil) {
     comp: 'auto', zoneComp: {}, gph: 5,
     prof: { skin: p.has(393), herb: p.has(182), mine: p.has(186) },
     group: false, pvp: true, n: 5, session: 2,
+    campMode: 'single', campWeights: null,
   }
 }
 
@@ -459,6 +460,10 @@ export function normalizarAjustes(s) {
     for (const k of Object.keys(s.zoneComp)) if (COMP_ORDER.includes(s.zoneComp[k])) zc[k] = s.zoneComp[k]
   }
   const p = s.prof || {}, n = Number(s.n)
+  const campMode = s.campMode === 'rotation' ? 'rotation' : 'single'
+  const weights = Array.isArray(s.campWeights) ? s.campWeights : []
+  const valid = weights.length === 3 && weights.every(w => Number.isFinite(w) && w >= 0)
+    && weights.reduce((sum, w) => sum + w, 0) <= 1 + 1e-9
   return {
     comp: COMP_ORDER.includes(s.comp) ? s.comp : 'auto', zoneComp: zc,
     gph: Number.isFinite(+s.gph) && +s.gph > 0 ? Math.min(1000, +s.gph) : 5,
@@ -466,6 +471,8 @@ export function normalizarAjustes(s) {
     group: !!s.group, pvp: s.pvp !== false,
     n: Number.isInteger(n) && n >= 3 && n <= 8 ? n : 5,
     session: [1, 2, 4].includes(+s.session) ? +s.session : 2,
+    // H2: rotación sólo con pesos de tiempo declarados (canonicalizado en el motor).
+    campMode, campWeights: valid ? [...weights] : campMode === 'rotation' ? [0.5, 0.3, 0.2] : null,
   }
 }
 

@@ -21,18 +21,18 @@ byte-idéntico si no hay cambios en `desktop/src/`).
 
 | Harness | Comando | Esperado | Qué cubre |
 |---|---|---|---|
-| `tests/` (node) | `node --test tests/` | **363** pass, 0 fail | lógica de `desktop/src/` + motor: mercado v2/atómico/sync/migración, puente (`bridge*.test.mjs`), TSM, ROI, ruta/maxeo, guía, perfil, recetas propias, niveles de oficio, personaje SimC (`simc.test.mjs`), escala Pawn (`pawn.test.mjs`), catálogo de stats de ítems y equipo por slot (`item-stats.test.mjs`), puntuador Subasta × Pawn (`subasta-pawn.test.mjs`), unificación de etiquetas de reino y presupuesto del histórico (`market-reino-unificado.test.mjs`), techos del parser Lua (`parser-limites.test.mjs`), preguntar-davi, referencias-skill, claves heredadas |
-| `tests/` (python) | `python3 -m unittest discover -s tests` | **87** OK | datos (`test_datos`, catálogo reproducible), desktop (`test_desktop`), maxeo, ROI, skill (`consultar.py`), reproducibilidad de `data/`+drops+bundle |
+| `tests/` (node) | `node --test tests/` | **372** pass, 0 fail | lógica de `desktop/src/` + motor: mercado v2/atómico/sync/migración, puente (`bridge*.test.mjs`), TSM, ROI, ruta/maxeo, guía, perfil, recetas propias, niveles de oficio, personaje SimC (`simc.test.mjs`), escala Pawn (`pawn.test.mjs`), catálogo de stats de ítems y equipo por slot (`item-stats.test.mjs`), puntuador Subasta × Pawn (`subasta-pawn.test.mjs`), unificación de etiquetas de reino y presupuesto del histórico (`market-reino-unificado.test.mjs`), techos del parser Lua (`parser-limites.test.mjs`), preguntar-davi, referencias-skill, claves heredadas |
+| `tests/` (python) | `python3 -m unittest discover -s tests` | **98** OK | datos (`test_datos`, catálogo reproducible), desktop (`test_desktop`), maxeo, ROI, skill (`consultar.py`), reproducibilidad de `data/`+drops+bundle |
 | `addon/tests/` (lua) | `lua5.1 addon/tests/test_bridge.lua` | **180** checks, 0 fallos | diario del puente WoWForeverBridge (captura, poda, retención, epoch) + captura SimC de `Personaje.lua` (eventos, `/wfbp`, `personagemErro`, conservación del export bueno) + captura Pawn de `Pawn.lua` (escala por ClassID/SpecID, pesos, `equipo.ilvl`, `pawnErro`, `/wfbpawn`, wrapper `/wfbp pawn`, captura final en `PLAYER_LEAVING_WORLD`, silencio cuando Pawn ya desinicializó sus proveedores, reintento acotado del equipo) + cosecha del catálogo de stats (`idsDaFonte`, lote por frames, cursor/vuelta, poda) |
-| `desktop/test/` (navegador) | 13 suites, ver abajo | **394** checks, red 0, errores 0 | bundle real en Chromium headless con dobles del SDK |
+| `desktop/test/` (navegador) | 14 suites, ver abajo | **406** checks, red 0, errores 0 | bundle real en Chromium headless con dobles del SDK |
 | build | `cd desktop && node build.mjs` | OK | bundle esbuild reproducible |
 | bundle-check | `python3 scripts/check_desktop_bundle.py desktop/plugin.js` | OK | tamaño/líneas/contratos del bundle |
 
-### Suites navegador (394; 395 con `HERMES_SDK_TABS=1`)
+### Suites navegador (406; 407 con `HERMES_SDK_TABS=1`)
 
-`navegador 51 · mercado-auto 14 · mercado-procedencia 24 · tsm 28 · vista-mercado 56 ·
+`navegador 51 · mercado-auto 14 · mercado-procedencia 24 · tsm 28 · vista-mercado 57 ·
 vista-davi 50 · vista-guia 28 · vista-profesiones 41 · vista-ruta-dungeons 31 ·
-vista-personaje-simc 11 · vista-pawn 13 · vista-subasta-pawn 28 · bridge 19`
+vista-personaje-simc 11 · vista-pawn 13 · vista-subasta-pawn 28 · bridge 19 · farm-routing 11`
 
 Cada suite imprime al final una línea JSON `{"suite":…,"pasadas":N,"red":0,"errores":0}`.
 El arnés (`desktop/test/arnes.mjs`) carga `desktop/plugin.js` en un Chromium headless
@@ -61,8 +61,8 @@ store pnpm no es transitivo. Si el arnés no arranca, recrear esos symlinks (ver
 que `desktop/src/` importa. Sus tests unitarios `.cjs` (`node:test`) cubren el motor
 de forma **única** (parser/deals/chart) y **sí entran al runner canónico**:
 
-- `market.cjs`, `market-history.cjs`, `market-deals.cjs`, `market-chart.cjs`: 80 tests,
-  78 pass / 2 skipped.
+- `market.cjs`, `market-history.cjs`, `market-deals.cjs`, `market-chart.cjs`, `market-farm.cjs`: 116 tests,
+  114 pass / 2 skipped.
 - **Retirados** (Fase 5 del plan de orden): la app standalone legada `index.html` +
   `market-ui.js` + `market-catalog.js` + sus 6 suites Playwright `.mjs` (reemplazada
   por las vistas React del Desktop). También antes (Fase 2): `desktop-state.mjs`
