@@ -222,7 +222,9 @@ def _principal():
     Entrada: {"personaje": {...}, "casos": [{...entrada}, ...]}.
     Salida:  [{"ok", "errores", "perfil"}, ...] en el mismo orden.
     """
-    datos = json.load(sys.stdin)
+    # Bytes, no texto: JSON es UTF-8 (RFC 8259) y en Windows sys.stdin decodifica con
+    # la página de códigos local (cp1252), lo que corrompía reinos no ASCII.
+    datos = json.load(sys.stdin.buffer)
     personaje = datos['personaje']
     resultados = [validar_perfil(caso, personaje) for caso in datos['casos']]
     json.dump(_seguro_json(resultados), sys.stdout, ensure_ascii=True, separators=(',', ':'))
