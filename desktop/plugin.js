@@ -14763,13 +14763,49 @@ rket", "history"].every((k) => b.slots[s][k] === null || typeof b.slots[s][k] ==
 import { Component, useCallback as useCallback3, useEffect as useEffect10, useId, useState as useState17 } from "react";
 import { Button as Button13, SegmentedControl as SegmentedControl7, Tabs, TabsList, TabsTrigger } from "@hermes/plugin-sdk";
 
+// ../contracts/perfil-v1.json
+var perfil_v1_default = {
+  contrato: "perfil-v1",
+  version: 1,
+  descripcion: "Contrato versionado del perfil del jugador (clave 'perfil' en ctx.storage). Lo consumen src/perfil.js (validarPerfil, bundle Desktop) y skills/wow-forever/scripts/perfil.py (validar_pe\
+rfil, skill del agente). Misma entrada produce el mismo {ok, errores, perfil} en ambos.",
+  perfil: {
+    version: 1,
+    campos: ["v", "faccion", "raza", "clase", "nivel", "profesiones", "secundarias", "reino"],
+    nivel_min: 1,
+    nivel_max: 60,
+    facciones: ["alianza", "horda"],
+    profesiones_principales: [171, 164, 333, 202, 182, 165, 186, 393, 197],
+    profesiones_secundarias: [185, 129, 356],
+    max_principales: 2,
+    max_reino: 64
+  },
+  validacion: {
+    errores: ["raza", "clase", "combinacion", "faccion", "nivel", "profesiones", "secundarias", "reino"],
+    semantica: [
+      "entero: número entero o cadena solo de dígitos ASCII; cualquier otro tipo (booleano, flotante no entero, null, objeto) es null",
+      "raza y clase se validan contra personaje.razas / personaje.clases por ID; raza+clase deben ser una combinación de personaje.combinaciones ('combinacion' solo se evalúa si raza y clase ya son vá\
+lidas)",
+      "faccion sale de la raza; si la entrada declara otra facción válida es error 'faccion'; sin raza conocida se acepta 'alianza'|'horda' de la entrada o null",
+      "nivel entero entre nivel_min y nivel_max; en el perfil se guarda con clamp a [nivel_min, nivel_max] (null -> nivel_min)",
+      "profesiones: solo IDs de profesiones_principales, sin repetir, en orden de primera aparición; más de max_principales es error y se recorta",
+      "secundarias: solo IDs de profesiones_secundarias, sin repetir, ordenadas de menor a mayor",
+      "reino: cadena con trim y corte a max_reino caracteres; cualquier otro tipo no nulo es error 'reino'",
+      "errores se deduplican conservando el orden de primera aparición; ok = sin errores; perfil se normaliza aunque haya errores y nunca inventa valores",
+      "campos desconocidos de la entrada se ignoran (no hay skill ni equipo en el perfil v1)"
+    ]
+  }
+};
+
 // ../src/perfil.js
-var VERSION = 1;
-var NIVEL_MAX = 60;
-var PROFESIONES_PRINCIPALES = [171, 164, 333, 202, 182, 165, 186, 393, 197];
-var PROFESIONES_SECUNDARIAS = [185, 129, 356];
-var MAX_PRINCIPALES = 2;
-var MAX_REINO = 64;
+var CONTRATO = perfil_v1_default.perfil;
+var VERSION = CONTRATO.version;
+var NIVEL_MIN = CONTRATO.nivel_min;
+var NIVEL_MAX = CONTRATO.nivel_max;
+var PROFESIONES_PRINCIPALES = [...CONTRATO.profesiones_principales];
+var PROFESIONES_SECUNDARIAS = [...CONTRATO.profesiones_secundarias];
+var MAX_PRINCIPALES = CONTRATO.max_principales;
+var MAX_REINO = CONTRATO.max_reino;
 var CLASE_VIEJA = { hunter: 3, warrior: 1, shaman: 7 };
 var FACCION_VIEJA = { horde: "horda", alliance: "alianza" };
 var entero = (v) => typeof v === "number" && Number.isInteger(v) ? v : typeof v === "string" && /^\d+$/.test(v) ? Number(v) : null;
@@ -14783,7 +14819,7 @@ function razasPara(personaje, faccion, clase) {
   return (personaje?.combinaciones || []).filter(([r, c]) => c === clase && faccionDeRaza(personaje, r) === faccion).map(([r]) => r).sort((a, b) => a - b);
 }
 function perfilVacio() {
-  return { v: VERSION, faccion: null, raza: null, clase: null, nivel: 1, profesiones: [], secundarias: [], reino: "" };
+  return { v: VERSION, faccion: null, raza: null, clase: null, nivel: NIVEL_MIN, profesiones: [], secundarias: [], reino: "" };
 }
 function validarPerfil(entrada, personaje) {
   const errores = [];
@@ -14798,8 +14834,8 @@ function validarPerfil(entrada, personaje) {
   p.faccion = faccionRaza ?? (e.faccion === "alianza" || e.faccion === "horda" ? e.faccion : null);
   if (faccionRaza && e.faccion && e.faccion !== faccionRaza) errores.push("faccion");
   const nivel = entero(e.nivel);
-  if (nivel === null || nivel < 1 || nivel > NIVEL_MAX) errores.push("nivel");
-  p.nivel = nivel === null ? 1 : Math.min(NIVEL_MAX, Math.max(1, nivel));
+  if (nivel === null || nivel < NIVEL_MIN || nivel > NIVEL_MAX) errores.push("nivel");
+  p.nivel = nivel === null ? NIVEL_MIN : Math.min(NIVEL_MAX, Math.max(NIVEL_MIN, nivel));
   const vistas = /* @__PURE__ */ new Set();
   for (const x of Array.isArray(e.profesiones) ? e.profesiones : []) {
     const id = entero(x);
@@ -14839,7 +14875,7 @@ function migrarPerfil(viejo, personaje) {
     raza: razas[0] ?? null,
     clase,
     faccion,
-    nivel: nivel === null ? 1 : Math.min(NIVEL_MAX, Math.max(1, nivel)),
+    nivel: nivel === null ? NIVEL_MIN : Math.min(NIVEL_MAX, Math.max(NIVEL_MIN, nivel)),
     profesiones: v.eng ? [202] : []
   }, personaje);
   return { perfil, razaSupuesta: razas.length > 0 };
@@ -35080,6 +35116,10 @@ var ES = {
   "origen.cliente.ayuda": "Generado de las tablas del cliente de WoW Forever 1.60",
   "origen.curado": "Curado",
   "origen.curado.ayuda": "Escrito a mano en la guía",
+  "origen.desconocida": "Fuente desconocida",
+  "origen.desconocida.ayuda": "Clave de fuente que no reconocemos: no sabemos de dónde sale este dato. No se sustituye por otra fuente.",
+  "origen.sinDeclarar": "Fuente no declarada",
+  "origen.sinDeclarar.ayuda": "Este dato no declara de qué fuente viene: se muestra como procedencia desconocida, no como dato verificado.",
   "perfil.faccion": "Facción",
   "perfil.raza": "Raza",
   "perfil.clase": "Clase",
@@ -35095,11 +35135,21 @@ var ES = {
   "perfil.nueva": "Combinación nueva de Forever",
   "perfil.vacio": "Sin personaje",
   "clase.entrenadores": "Entrenadores de clase",
-  "clase.hechizos": "Hechizos de entrenador",
+  "clase.hechizos": "Hechizos de clase (toda la clase, no por facción)",
   "clase.proximos": "Próximos",
-  "clase.misiones": "Misiones de clase",
+  "clase.misiones": "Misiones de clase (por facción)",
   "clase.competencias": "Armas y armaduras",
   "clase.sinEntrenador": "En Classic 1.12 esta clase no existía en tu facción; los entrenadores de Forever aún no están en ninguna fuente publicable.",
+  "clase.motivo": "Motivo declarado:",
+  "clase.entrenadoresNota": "Solo los entrenadores de tu facción: son de clase y de facción.",
+  "clase.hechizosNota": "Aproximación de Classic 1.12 (CMaNGOS) de toda la clase: la misma lista en Alianza y en Horda. Forever puede diferir.",
+  "clase.misionesNota": "Filtradas por tu facción: solo las misiones de clase de esta facción, no las de la otra.",
+  "clase.competenciasNota": "Líneas de arma y armadura que la clase puede usar (tablas del cliente de Forever).",
+  "clase.misionesSinDatos": "Sin misiones de clase para esta facción en la fuente disponible.",
+  "clase.ficha": "Ficha de clase",
+  "clase.fuentesFicha": "Fuentes declaradas de esta ficha de clase:",
+  "clase.sinPerfil": "Falta la clase en el perfil. Elige facción, raza y clase para ver esta sección.",
+  "clase.sinFaccion": "Falta la facción en el perfil: los entrenadores y las misiones de clase son por facción y no se pueden elegir sin ella.",
   "clase.nivel": "Nv",
   "clase.hechizo": "Hechizo",
   "clase.costo": "Costo",
@@ -35177,11 +35227,21 @@ var EN = {
   "perfil.nueva": "New Forever combination",
   "perfil.vacio": "No character",
   "clase.entrenadores": "Class trainers",
-  "clase.hechizos": "Trainer spells",
+  "clase.hechizos": "Class spells (whole class, not faction-specific)",
   "clase.proximos": "Next",
-  "clase.misiones": "Class quests",
+  "clase.misiones": "Class quests (by faction)",
   "clase.competencias": "Weapons and armor",
   "clase.sinEntrenador": "In Classic 1.12 this class did not exist in your faction; Forever’s trainers are not in any publishable source yet.",
+  "clase.motivo": "Declared reason:",
+  "clase.entrenadoresNota": "Only your faction’s trainers: they are class and faction data.",
+  "clase.hechizosNota": "Classic 1.12 (CMaNGOS) approximation of the whole class: the same list for Alliance and Horde. Forever may differ.",
+  "clase.misionesNota": "Filtered by your faction: only this faction’s class quests, not the other one’s.",
+  "clase.competenciasNota": "Weapon and armor lines the class can use (Forever client tables).",
+  "clase.misionesSinDatos": "No class quests for this faction in the available source.",
+  "clase.ficha": "Class card",
+  "clase.fuentesFicha": "Sources declared for this class record:",
+  "clase.sinPerfil": "The profile has no class. Pick faction, race and class to see this section.",
+  "clase.sinFaccion": "The profile has no faction: class trainers and class quests are faction-scoped and cannot be picked without it.",
   "clase.nivel": "Lv",
   "clase.hechizo": "Spell",
   "clase.costo": "Cost",
@@ -72075,8 +72135,8 @@ function asegurarSprite() {
   if (!existente) (document.head || document.documentElement).appendChild(el);
   hojaSprite = el;
 }
-function Tarjeta({ titulo, extra, children, estilo }) {
-  return /* @__PURE__ */ jsxs("section", { style: { ...S.tarjeta, ...estilo }, children: [
+function Tarjeta({ titulo, extra, children, estilo, ...resto }) {
+  return /* @__PURE__ */ jsxs("section", { ...resto, style: { ...S.tarjeta, ...estilo }, children: [
     titulo ? /* @__PURE__ */ jsxs("div", { style: S.tarjetaTitulo, children: [
       /* @__PURE__ */ jsx("span", { children: titulo }),
       extra
@@ -72084,15 +72144,27 @@ function Tarjeta({ titulo, extra, children, estilo }) {
     children
   ] });
 }
-var ORIGEN = {
+var FUENTES = {
   "cmangos-1.12": { k: "origen.cmangos", c: C.naranja },
   "cliente-forever": { k: "origen.cliente", c: C.verde },
   curado: { k: "origen.curado", c: C.azul }
 };
-function Origen({ f, lang }) {
-  const lista2 = Array.isArray(f) ? f : f ? [f] : [];
-  return /* @__PURE__ */ jsx("span", { style: { display: "inline-flex", gap: 4 }, children: lista2.filter((x) => ORIGEN[x]).map((x) => /* @__PURE__ */ jsx("span", { title: t(lang, ORIGEN[x].k + ".ayud\
-a"), style: { ...S.chip, borderColor: ORIGEN[x].c, color: ORIGEN[x].c }, children: t(lang, ORIGEN[x].k) }, x)) });
+var SIN_DECLARAR = { k: "origen.sinDeclarar", c: C.texto3 };
+function Origen({ f, lang, fallback }) {
+  const crudas = (Array.isArray(f) ? f : f == null ? [] : [f]).map((x) => x == null ? "" : String(x).trim()).filter((x) => x !== "");
+  const items = crudas.length ? crudas.map((x) => FUENTES[x] ? { clave: x, k: FUENTES[x].k, c: FUENTES[x].c } : { clave: x, k: "origen.desconocida", c: C.texto3, desconocida: true }) : fallback ? [{ clave: "",
+  k: SIN_DECLARAR.k, c: SIN_DECLARAR.c, sinDeclarar: true }] : [];
+  return /* @__PURE__ */ jsx("span", { style: { display: "inline-flex", gap: 4, flexWrap: "wrap" }, children: items.map((o, i) => /* @__PURE__ */ jsx(
+    "span",
+    {
+      "data-origen": o.clave || "sin-declarar",
+      "data-desconocida": o.desconocida ? "1" : void 0,
+      title: t(lang, o.k + ".ayuda"),
+      style: { ...S.chip, borderColor: o.c, color: o.c, borderStyle: o.desconocida || o.sinDeclarar ? "dashed" : void 0 },
+      children: o.desconocida ? t(lang, "origen.desconocida") + ": " + o.clave : t(lang, o.k)
+    },
+    (o.clave || "sin-declarar") + ":" + i
+  )) });
 }
 function Hueco({ children, lang }) {
   return /* @__PURE__ */ jsxs("div", { role: "note", style: S.hueco, children: [
@@ -75480,27 +75552,50 @@ import { useState as useState5 } from "react";
 import { Button as Button5 } from "@hermes/plugin-sdk";
 import { Fragment as Fragment7, jsx as jsx6, jsxs as jsxs6 } from "react/jsx-runtime";
 var VENTANA = 10;
-function VistaClase({ perfil, lang }) {
+var FUENTE = { hechizos: "cmangos-1.12", misiones: "cmangos-1.12", entrenadores: "cmangos-1.12", competencias: "cliente-forever" };
+function VistaClase({ perfil, lang, datos = D }) {
   const [todos, setTodos] = useState5(false);
-  const cl = D.clases.clases[String(perfil.clase)];
-  const entrenadores = cl.entrenadores[perfil.faccion] || [];
-  const sinEntrenador = huecos("clases", { tema: "entrenadores", clase: perfil.clase, faccion: perfil.faccion });
-  const hechizos = [...cl.hechizos].sort((a, b) => a.nivel - b.nivel || a.spell - b.spell);
+  const clases = datos.clases && datos.clases.clases || {};
+  const cl = clases[String(perfil && perfil.clase)];
+  const faccion = perfil && perfil.faccion;
+  if (!perfil || !perfil.clase || !cl) {
+    return /* @__PURE__ */ jsx6(Tarjeta, { "data-tarjeta": "clase-sin-datos", titulo: t(lang, "tab.clase"), children: /* @__PURE__ */ jsx6(Hueco, { lang, children: t(lang, "clase.sinPerfil") }) });
+  }
+  if (!faccion || !(datos.personaje.facciones || {})[faccion]) {
+    return /* @__PURE__ */ jsx6(Tarjeta, { "data-tarjeta": "clase-sin-datos", titulo: t(lang, "tab.clase"), children: /* @__PURE__ */ jsx6(Hueco, { lang, children: t(lang, "clase.sinFaccion") }) });
+  }
+  const nombreFaccion = nombre((datos.personaje.facciones[faccion] || {}).n, lang);
+  const sinEntrenador = (datos.clases.huecos || []).filter((h) => h.tema === "entrenadores" && h.clase === perfil.clase && h.faccion === faccion);
+  const entrenadores = cl.entrenadores && cl.entrenadores[faccion] || [];
+  const hechizos = [...cl.hechizos || []].sort((a, b) => a.nivel - b.nivel || a.spell - b.spell);
   const visibles = todos ? hechizos : hechizos.filter((h) => h.nivel > perfil.nivel - 2 && h.nivel <= perfil.nivel + VENTANA);
-  const misiones = (cl.misiones[perfil.faccion] || []).map((id) => [id, D.misiones.misiones[String(id)]]).filter(([, m]) => m).sort((a, b) => a[1].nivel - b[1].nivel);
+  const misiones = (cl.misiones && cl.misiones[faccion] || []).map((id) => [id, (datos.misiones.misiones || {})[String(id)]]).filter(([, m]) => m).sort((a, b) => a[1].nivel - b[1].nivel);
   const porZona = /* @__PURE__ */ new Map();
   for (const e of entrenadores) {
-    const k = e.zona == null ? "—" : nombre(zona(e.zona)?.n, lang) || String(e.zona);
+    const z = e.zona == null ? null : (datos.zonas.zonas || {})[String(e.zona)] || null;
+    const k = e.zona == null ? "—" : nombre(z && z.n, lang) || String(e.zona);
     porZona.set(k, [...porZona.get(k) || [], e]);
   }
   return /* @__PURE__ */ jsxs6(Fragment7, { children: [
+    /* @__PURE__ */ jsxs6(Tarjeta, { "data-tarjeta": "clase-ficha", titulo: t(lang, "clase.ficha"), children: [
+      /* @__PURE__ */ jsx6("div", { style: S.sub, children: t(lang, "clase.fuentesFicha") }),
+      /* @__PURE__ */ jsx6("div", { "data-fuentes": "clase", children: /* @__PURE__ */ jsx6(Origen, { f: cl.f, lang, fallback: true }) })
+    ] }),
     /* @__PURE__ */ jsxs6(
       Tarjeta,
       {
-        titulo: t(lang, "clase.entrenadores") + " · " + nombre(D.personaje.facciones[perfil.faccion].n, lang),
-        extra: /* @__PURE__ */ jsx6(Origen, { f: "cmangos-1.12", lang }),
+        "data-tarjeta": "clase-entrenadores",
+        titulo: t(lang, "clase.entrenadores") + " · " + nombreFaccion,
+        extra: /* @__PURE__ */ jsx6(Origen, { f: FUENTE.entrenadores, lang }),
         children: [
-          sinEntrenador.length ? /* @__PURE__ */ jsx6(Hueco, { lang, children: t(lang, "clase.sinEntrenador") }) : null,
+          /* @__PURE__ */ jsx6("div", { style: S.sub, children: t(lang, "clase.entrenadoresNota") }),
+          sinEntrenador.length ? /* @__PURE__ */ jsxs6(Hueco, { lang, children: [
+            t(lang, "clase.sinEntrenador"),
+            " ",
+            t(lang, "clase.motivo"),
+            " ",
+            sinEntrenador.map((h) => h.motivo).join(" ")
+          ] }) : null,
           [...porZona.entries()].sort().map(([z, lista2]) => /* @__PURE__ */ jsxs6("div", { style: S.fila, children: [
             /* @__PURE__ */ jsx6("span", { style: { minWidth: 160, color: C.texto2 }, children: z }),
             /* @__PURE__ */ jsx6("span", { children: lista2.map((e) => nombre(e.n, lang)).join(", ") })
@@ -75508,10 +75603,11 @@ function VistaClase({ perfil, lang }) {
         ]
       }
     ),
-    /* @__PURE__ */ jsxs6(Tarjeta, { titulo: t(lang, "clase.hechizos"), extra: /* @__PURE__ */ jsxs6(Fragment7, { children: [
-      /* @__PURE__ */ jsx6(Origen, { f: "cmangos-1.12", lang }),
+    /* @__PURE__ */ jsxs6(Tarjeta, { "data-tarjeta": "clase-hechizos", titulo: t(lang, "clase.hechizos"), extra: /* @__PURE__ */ jsxs6(Fragment7, { children: [
+      /* @__PURE__ */ jsx6(Origen, { f: FUENTE.hechizos, lang }),
       /* @__PURE__ */ jsx6(Button5, { variant: "ghost", size: "xs", onClick: () => setTodos(!todos), children: todos ? t(lang, "clase.menos") : t(lang, "clase.todos") })
     ] }), children: [
+      /* @__PURE__ */ jsx6("div", { style: S.sub, children: t(lang, "clase.hechizosNota") }),
       !todos ? /* @__PURE__ */ jsxs6("div", { style: S.sub, children: [
         t(lang, "clase.proximos"),
         " · ",
@@ -75532,14 +75628,36 @@ function VistaClase({ perfil, lang }) {
         ] }, h.spell + ":" + h.nivel)) })
       ] }) : /* @__PURE__ */ jsx6("div", { style: S.sub, children: t(lang, "clase.ninguno") })
     ] }),
-    /* @__PURE__ */ jsx6(Tarjeta, { titulo: t(lang, "clase.misiones"), extra: /* @__PURE__ */ jsx6(Origen, { f: "cmangos-1.12", lang }), children: misiones.length ? misiones.map(([id, m]) => /* @__PURE__ */ jsxs6(
-    "div", { style: { ...S.fila, opacity: m.min > perfil.nivel ? 0.6 : 1 }, children: [
-      /* @__PURE__ */ jsx6("span", { style: { minWidth: 40, color: C.texto3 }, children: m.nivel }),
-      /* @__PURE__ */ jsx6("span", { style: { flex: 1 }, children: nombre(m.t, lang) }),
-      /* @__PURE__ */ jsx6("span", { style: S.sub, children: m.zona != null ? nombre(zona(m.zona)?.n, lang) : m.dungeon != null ? nombre(D.dungeons.clasicos[String(m.dungeon)]?.n, lang) : "" })
-    ] }, id)) : /* @__PURE__ */ jsx6(Hueco, { lang, children: t(lang, "clase.misiones") }) }),
-    /* @__PURE__ */ jsx6(Tarjeta, { titulo: t(lang, "clase.competencias"), extra: /* @__PURE__ */ jsx6(Origen, { f: "cliente-forever", lang }), children: /* @__PURE__ */ jsx6("div", { style: { display: "\
-flex", flexWrap: "wrap", gap: 6 }, children: cl.competencias.map((c) => /* @__PURE__ */ jsx6("span", { style: S.chip, children: nombre(c.n, lang) }, c.id)) }) })
+    /* @__PURE__ */ jsxs6(
+      Tarjeta,
+      {
+        "data-tarjeta": "clase-misiones",
+        titulo: t(lang, "clase.misiones") + " · " + nombreFaccion,
+        extra: /* @__PURE__ */ jsx6(Origen, { f: FUENTE.misiones, lang }),
+        children: [
+          /* @__PURE__ */ jsx6("div", { style: S.sub, children: t(lang, "clase.misionesNota") }),
+          misiones.length ? misiones.map(([id, m]) => /* @__PURE__ */ jsxs6("div", { "data-mision": id, style: { ...S.fila, opacity: m.min > perfil.nivel ? 0.6 : 1 }, children: [
+            /* @__PURE__ */ jsx6("span", { style: { minWidth: 40, color: C.texto3 }, children: m.nivel }),
+            /* @__PURE__ */ jsx6("span", { style: { flex: 1 }, children: nombre(m.t, lang) }),
+            /* @__PURE__ */ jsx6("span", { style: S.sub, children: m.zona != null ? nombre(((datos.zonas.zonas || {})[String(m.zona)] || {}).n, lang) : m.dungeon != null ? nombre(((datos.dungeons.clasicos ||
+            {})[String(m.dungeon)] || {}).n, lang) : "" })
+          ] }, id)) : /* @__PURE__ */ jsx6(Hueco, { lang, children: t(lang, "clase.misionesSinDatos") })
+        ]
+      }
+    ),
+    /* @__PURE__ */ jsxs6(
+      Tarjeta,
+      {
+        "data-tarjeta": "clase-competencias",
+        titulo: t(lang, "clase.competencias"),
+        extra: /* @__PURE__ */ jsx6(Origen, { f: FUENTE.competencias, lang }),
+        children: [
+          /* @__PURE__ */ jsx6("div", { style: S.sub, children: t(lang, "clase.competenciasNota") }),
+          /* @__PURE__ */ jsx6("div", { style: { display: "flex", flexWrap: "wrap", gap: 6 }, children: (cl.competencias || []).map((c) => /* @__PURE__ */ jsx6("span", { style: S.chip, children: nombre(
+          c.n, lang) }, c.id)) })
+        ]
+      }
+    )
   ] });
 }
 

@@ -38,15 +38,16 @@ function expected(name, fallback) {
   const n = Number(raw);
   return Number.isInteger(n) && n >= 0 ? n : fallback;
 }
-const EXPECT_NODE = expected('NODE', 381);
-const EXPECT_PY = expected('PY', 98);
+const EXPECT_NODE = expected('NODE', 388);
+const EXPECT_PY = expected('PY', 122);
 const EXPECT_LUA = expected('LUA', 180);
 // Tests unitarios del motor en standalone/tests/*.cjs (node:test). Los «real
 // fixture» son stat-only por defecto; WOW_FOREVER_REAL_FIXTURE=1 los hace leer
 // contenido de SavedVariables (solo para diagnóstico manual, nunca en gates).
 const EXPECT_CJS = expected('CJS', 123);
 const BROWSER = [
-  ['navegador', process.env.HERMES_SDK_TABS === '1' ? 52 : 51], ['mercado-auto', 14], ['mercado-procedencia', 24],
+  ['navegador', process.env.HERMES_SDK_TABS === '1' ? 52 : 51], ['vista-clase', 23],
+  ['mercado-auto', 14], ['mercado-procedencia', 24],
   ['tsm', 28], ['vista-mercado', 57], ['vista-davi', 50], ['vista-guia', 28],
   ['vista-profesiones', 41], ['vista-ruta-dungeons', 31], ['bridge', 19],
   ['vista-personaje-simc', 11], ['vista-pawn', 13], ['vista-subasta-pawn', 28],
@@ -196,13 +197,22 @@ console.log(`raíz: ${ROOT}\n`);
     for (const [suite, exp] of BROWSER) {
       const r = sh('node', [`test/${suite}.mjs`], path.join(ROOT, 'desktop'), env);
       const lines = r.out.trim().split('\n');
-      let j = null;
-      for (let i = lines.length - 1; i >= 0; i--) {
-        try { const o = JSON.parse(lines[i]); if (o && typeof o.pasadas === 'number') { j = o; break; } } catch { /* no JSON */ }
+      // Una suite puede imprimir VARIOS resúmenes (vista-clase: 14 + 9 = 23).
+      // Sumar todos los JSON {pasadas,...}: quedarse con el último ocultaría
+      // checks y dejaría un gate verde con la mitad de la suite sin contar.
+      let pas = 0, red = 0, err = 0, resumenes = 0;
+      for (const line of lines) {
+        try {
+          const o = JSON.parse(line);
+          if (o && typeof o.pasadas === 'number') {
+            pas += o.pasadas;
+            red += (o.red || 0);
+            err += (o.errores || 0);
+            resumenes++;
+          }
+        } catch { /* no JSON */ }
       }
-      const pas = j ? j.pasadas : null;
-      const red = j ? j.red : null;
-      const err = j ? j.errores : null;
+      if (resumenes === 0) pas = null;
       const ok = r.code === 0 && pas === exp && red === 0 && err === 0;
       if (pas != null) total += pas;
       record(`browser:${suite}`, exp, pas, ok, ok ? '' : `red=${red} errores=${err}\n${tail(r.out, 800)}`);

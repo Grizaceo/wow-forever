@@ -10,7 +10,10 @@
 import ast
 import json
 import os
+import shutil
+import subprocess
 import sys
+import tempfile
 import unittest
 
 RAIZ = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -146,6 +149,82 @@ class TestPerfilPy(unittest.TestCase):
                                 {'raza': 2, 'clase': 1, 'nivel': 5},
                                 {'raza': 1, 'clase': 3, 'nivel': 5}), esperado):
             self.assertEqual(perfil.validar_perfil(entrada, raro)['ok'], ok, entrada)
+
+
+class TestInstalacionSinteticaAgentHalf(unittest.TestCase):
+    """P0 cierre: el sync del agent-half debe llevar `contracts/` con el helper.
+
+    `perfil.py` resuelve el contrato en `parents[3]` del fichero. En el plugin
+    instalado esa raíz es `~/.hermes/plugins/wow-forever/`; copiar sólo
+    `skills/` deja el helper quebrado. El control negativo lo demuestra.
+    La instalación sintética vive en TMPDIR (scratch), nunca en el plugin real.
+    """
+
+    PAYLOAD = ('contracts/perfil-v1.json',
+               'skills/wow-forever/scripts/perfil.py')
+    PAYLOAD_CLI = PAYLOAD + ('skills/wow-forever/scripts/consultar.py',)
+
+    def _instalar(self, tmp, payload):
+        raiz = os.path.join(tmp, 'plugins', 'wow-forever')
+        for rel in payload:
+            dst = os.path.join(raiz, rel)
+            os.makedirs(os.path.dirname(dst), exist_ok=True)
+            shutil.copy2(os.path.join(RAIZ, rel), dst)
+        # El payload real del agente-half incluye data/; la CLI resuelve
+        # personaje.json desde --datos, nunca desde el repo ni desde el cwd.
+        shutil.copytree(os.path.join(RAIZ, 'data'), os.path.join(raiz, 'data'))
+        return raiz
+
+    def test_cli_real_desde_instalacion_sintetica(self):
+        """`consultar.py perfil` usa el helper junto a él, sin repo ni cwd."""
+        with tempfile.TemporaryDirectory(prefix='wow-perfil-cli-') as tmp:
+            raiz = self._instalar(tmp, self.PAYLOAD_CLI)
+            cli = os.path.join(raiz, 'skills', 'wow-forever', 'scripts', 'consultar.py')
+            args = [sys.executable, cli, '--datos', os.path.join(raiz, 'data'),
+                    'perfil', '--raza', '5', '--clase', '2', '--faccion', 'horda']
+            limpio = {k: v for k, v in os.environ.items()
+                      if k not in ('PYTHONPATH', 'WOW_FOREVER_DATA')}
+            r = subprocess.run(args, capture_output=True, text=True, encoding='utf-8',
+                               cwd='/', env=limpio)
+            self.assertEqual(r.returncode, 0, r.stderr)
+            self.assertIn('No-muerto', r.stdout)
+            self.assertIn('Combinación válida en Forever', r.stdout)
+
+            # Control negativo crítico: sin el helper al lado de la CLI, error
+            # explícito (no un perfil validado a medias ni una excepción muda).
+            os.remove(os.path.join(raiz, 'skills', 'wow-forever', 'scripts', 'perfil.py'))
+            r2 = subprocess.run(args, capture_output=True, text=True, encoding='utf-8',
+                                cwd='/', env=limpio)
+            self.assertEqual(r2.returncode, 2, r2.stdout)
+            self.assertIn('falta el helper canónico perfil.py', r2.stdout)
+
+    def test_helper_valida_desde_instalacion_sintetica(self):
+        casos = [c['entrada'] for c in FIXTURE['casos']]
+        datos = json.dumps({'personaje': PERSONAJE, 'casos': casos})
+        with tempfile.TemporaryDirectory(prefix='wow-perfil-inst-') as tmp:
+            raiz = os.path.join(tmp, 'plugins', 'wow-forever')
+            for rel in self.PAYLOAD:
+                dst = os.path.join(raiz, rel)
+                os.makedirs(os.path.dirname(dst), exist_ok=True)
+                shutil.copy2(os.path.join(RAIZ, rel), dst)
+            script = os.path.join(raiz, 'skills', 'wow-forever', 'scripts', 'perfil.py')
+            # -I y cwd='/' : no puede colarse la raíz del repo por PYTHONPATH ni cwd.
+            r = subprocess.run([sys.executable, '-I', script], input=datos,
+                               capture_output=True, text=True, encoding='utf-8', cwd='/')
+            self.assertEqual(r.returncode, 0, r.stderr)
+            salida = json.loads(r.stdout)
+            self.assertEqual(len(salida), len(casos))
+            for caso, obtenido in zip(casos, salida):
+                self.assertEqual(obtenido, perfil.validar_perfil(caso, PERSONAJE), caso)
+
+            # Control negativo: sin `contracts/` el helper muere al importar.
+            roto = os.path.join(tmp, 'plugins', 'sin-contrato', 'skills', 'wow-forever', 'scripts', 'perfil.py')
+            os.makedirs(os.path.dirname(roto), exist_ok=True)
+            shutil.copy2(script, roto)
+            r2 = subprocess.run([sys.executable, '-I', roto], input=datos,
+                                capture_output=True, text=True, encoding='utf-8', cwd='/')
+            self.assertNotEqual(r2.returncode, 0)
+            self.assertIn('perfil-v1.json', r2.stderr)
 
 
 if __name__ == '__main__':
