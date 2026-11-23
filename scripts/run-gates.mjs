@@ -119,7 +119,7 @@ console.log(`raíz: ${ROOT}\n`);
 
 // 1) node --test tests/  (lógica src/ + motor, fixtures sintéticos)
 {
-  const r = sh('node', ['--test', 'tests/']);
+  const r = sh('node', ['scripts/test-node.mjs']);
   const pass = num(/(?:ℹ|#)\s+pass (\d+)/, r.out);
   const fail = num(/(?:ℹ|#)\s+fail (\d+)/, r.out);
   const tests = num(/(?:ℹ|#)\s+tests (\d+)/, r.out);

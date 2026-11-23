@@ -7,7 +7,7 @@ Permisos: `contents: read` (sin secretos ni credenciales de juego).
 
 | Job | OS | Qué ejecuta |
 |---|---|---|
-| `tests` | ubuntu, macos, windows | `npm ci` en `desktop/`; `node --test tests/`; los seis `standalone/tests/*.cjs`; `python -m unittest discover -s tests`; build del bundle y `check_desktop_bundle.py` |
+| `tests` | ubuntu, macos, windows | `npm ci` en `desktop/`; `node scripts/test-node.mjs`; los seis `standalone/tests/*.cjs`; `python -m unittest discover -s tests`; build del bundle y `check_desktop_bundle.py` |
 | `gates-linux` | ubuntu | lo anterior **más** Lua (`lua5.1`) y las 15 suites Chromium de `desktop/test/`, a través de `node scripts/run-gates.mjs --keep-going` |
 
 Node 22 y Python 3.12 fijados con `actions/setup-*`. Versiones de npm fijadas en
@@ -26,7 +26,7 @@ Sin Chromium/Lua solo los gates portables:
 
 ```sh
 cd desktop && npm ci && cd ..
-node --test tests/
+node scripts/test-node.mjs
 node --test standalone/tests/market.cjs standalone/tests/market-history.cjs \
   standalone/tests/market-deals.cjs standalone/tests/market-chart.cjs \
   standalone/tests/market-farm.cjs standalone/tests/market-farm-routing.cjs

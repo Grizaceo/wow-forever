@@ -39,7 +39,7 @@ jobs:
         run: npm ci
         working-directory: desktop
       - name: Node tests (repo logic)
-        run: node --test tests/
+        run: node scripts/test-node.mjs
       - name: Node tests (standalone engine)
         run: >-
           node --test
