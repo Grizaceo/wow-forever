@@ -24,6 +24,7 @@ import { RutaFarmeo } from './mercado/ruta-farmeo.jsx'
 import { PreguntarDavi } from './preguntar-davi.jsx'
 import { MisVentas } from './mercado/mis-ventas.jsx'
 import { VistaSubastaPawn } from './subasta-pawn.jsx'
+import { TarjetaPawn } from './pawn.jsx'
 
 agregarTextos({
   'mercado.scan.titulo': 'Escaneo de Auctionator',
@@ -944,6 +945,7 @@ export function VistaMercado({ ctx, almacen, sincronizador, ventas, puente, esta
         <div style={S.cuerpo}>
           {barraSub}
           <VistaSubastaPawn ctx={ctx} mercado={mercado} historial={historial} perfil={perfil} lang={lang} />
+          <TarjetaPawn ctx={ctx} lang={lang} perfil={perfil} puente={puente} />
         </div>
       </div>
     )
@@ -1029,6 +1031,8 @@ export function VistaMercado({ ctx, almacen, sincronizador, ventas, puente, esta
     <div style={S.pagina}>
       <div style={S.cuerpo}>
         {barraSub}
+        <div data-testid="market-sources" style={{ display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'flex-start', minWidth: 0 }}>
+        <div data-testid="auctionator-panel" style={{ display: 'flex', flexDirection: 'column', gap: 12, flex: '1 1 560px', minWidth: 0, maxWidth: '100%' }}>
         <Tarjeta titulo={t(lang, 'mercado.scan.titulo')} extra={<span style={S.chip}>{t(lang, 'mercado.tusDatos')}</span>}>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
             <Button onClick={() => leerCarpeta(false)} disabled={importando}>{t(lang, 'mercado.leer')}</Button>
@@ -1224,7 +1228,11 @@ export function VistaMercado({ ctx, almacen, sincronizador, ventas, puente, esta
           </p>
         </Tarjeta>
 
-        <MisVentas ventas={ventas} auctionSnapshot={snapshot} perfil={perfil} lang={lang} />
+        </div>
+        <div style={{ flex: '1 1 560px', minWidth: 0, maxWidth: '100%' }}>
+          <MisVentas ventas={ventas} auctionSnapshot={snapshot} perfil={perfil} lang={lang} />
+        </div>
+        </div>
 
         <Tarjeta titulo={cp(lang, 'Procedencia y ámbitos aislados', 'Provenance and isolated scopes')}>
           <p style={S.sub}>

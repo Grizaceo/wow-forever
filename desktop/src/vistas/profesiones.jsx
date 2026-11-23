@@ -3,7 +3,7 @@
 // margen según tus precios de mercado. El skill se guarda en ctx.storage ('skill-<id>');
 // las recetas que ya tienes, en ('recetas-propias') vía recetas-propias.js.
 import { useEffect, useMemo, useState } from 'react'
-import { Button, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@hermes/plugin-sdk'
+import { Button, Checkbox, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@hermes/plugin-sdk'
 import { preciosDelMercado } from '../../../src/crafteo.js'
 import { perfilParaAgente } from '../../../src/perfil.js'
 import { D, PRINCIPALES, SECUNDARIAS, nombre, zona } from '../datos.js'
@@ -73,7 +73,15 @@ function catalogoLocal() {
   return catalogoCache
 }
 
-export function VistaProfesiones({ ctx, estado, perfil, lang, irA }) {
+export function VistaProfesiones({ ctx, estado, perfil, lang, irA, guardarPerfil }) {
+  const toggle = (lista, id, max) => lista.includes(id) ? lista.filter((x) => x !== id) : lista.length < max ? [...lista, id] : lista
+  const [errorPerfil, setErrorPerfil] = useState('')
+  const cambiarProfesiones = async (parcial) => {
+    try {
+      const r = await guardarPerfil({ ...perfil, ...parcial })
+      setErrorPerfil(r.ok ? '' : t(lang, 'perfil.incompleto'))
+    } catch (e) { setErrorPerfil(e.message || String(e)) }
+  }
   const datos = D.profesiones.profesiones
   // Primero las profesiones del perfil (principales y luego secundarias), luego las demás.
   const orden = useMemo(() => {
@@ -165,6 +173,28 @@ export function VistaProfesiones({ ctx, estado, perfil, lang, irA }) {
 
   return (
     <>
+      <Tarjeta titulo={t(lang, 'perfil.profesiones')}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>
+          {PRINCIPALES.map((id) => (
+            <label key={id} style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+              <Checkbox checked={perfil.profesiones.includes(id)}
+                onCheckedChange={() => cambiarProfesiones({ profesiones: toggle(perfil.profesiones, id, 2) })} />
+              {nombre(D.profesiones.profesiones[id].n, lang)}
+            </label>
+          ))}
+        </div>
+        <span style={S.etiqueta}>{t(lang, 'perfil.secundarias')}</span>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>
+          {SECUNDARIAS.map((id) => (
+            <label key={id} style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+              <Checkbox checked={perfil.secundarias.includes(id)}
+                onCheckedChange={() => cambiarProfesiones({ secundarias: toggle(perfil.secundarias, id, 3) })} />
+              {nombre(D.profesiones.profesiones[id].n, lang)}
+            </label>
+          ))}
+        </div>
+      </Tarjeta>
+      {errorPerfil ? <div role="alert" style={S.sub}>{errorPerfil}</div> : null}
       <Tarjeta titulo={t(lang, 'tab.profesiones')} extra={<Origen f={prof.f || 'cmangos-1.12'} lang={lang} />}>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'flex-end' }}>
           <label style={S.campo} htmlFor="wf-profesion">

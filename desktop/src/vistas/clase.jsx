@@ -1,6 +1,9 @@
 // Clase del personaje: entrenadores de su facción, hechizos por nivel, misiones de clase y
 // competencias. Todo generado; los huecos se dicen con el motivo declarado.
 //
+// Se muestra dentro de Perfil como información opcional: cuatro desplegables nativos,
+// cerrados al montar, cuyo contenido se monta solo al abrirlos (no hay pestaña Clase).
+//
 // Alcance de cada bloque (docs/MODELO-DATOS.md §clases.json):
 //   · hechizos    → de CLASE: la misma lista para las dos facciones (aproximación 1.12).
 //   · misiones    → de FACCIÓN: se filtran por la facción del perfil.
@@ -10,8 +13,31 @@ import { useState } from 'react'
 import { Button } from '@hermes/plugin-sdk'
 import { D, dinero, nombre } from '../datos.js'
 import { C, S } from '../estilos.js'
-import { t } from '../i18n.js'
-import { Hueco, Origen, Tarjeta } from '../ui.jsx'
+import { agregarTextos, t } from '../i18n.js'
+import { Hueco, Origen } from '../ui.jsx'
+
+agregarTextos({ 'clase.opcional': 'Información de clase (opcional)' }, { 'clase.opcional': 'Class reference (optional)' })
+
+// Native disclosure: keyboard accessible, closed on mount, content mounted only on demand.
+// `tarjeta` conserva el contrato `data-tarjeta` de P0 para localizar cada bloque.
+function DetalleClase({ tarjeta, titulo, extra, children }) {
+  const [abierto, setAbierto] = useState(false)
+  return <details data-class-section data-tarjeta={tarjeta} style={S.tarjeta} onToggle={(e) => setAbierto(e.currentTarget.open)}>
+    <summary style={{ cursor: 'pointer', color: C.texto2 }}>{titulo}</summary>
+    {abierto ? <div style={{ paddingTop: 10 }}>
+      <div style={S.tarjetaTitulo}>{extra}</div>
+      {children}
+    </div> : null}
+  </details>
+}
+
+// Contenedor común: rótulo de información opcional.
+function SeccionClase({ lang, tarjeta, children }) {
+  return <section aria-label={t(lang, 'clase.opcional')} data-tarjeta={tarjeta}>
+    <div style={S.etiqueta}>{t(lang, 'clase.opcional')}</div>
+    {children}
+  </section>
+}
 
 const VENTANA = 10   // niveles por delante que se muestran como "próximos"
 
@@ -27,16 +53,16 @@ export function VistaClase({ perfil, lang, datos = D }) {
   // Perfil incompleto: se dice qué falta, no se rompe la vista ni se inventa una facción.
   if (!perfil || !perfil.clase || !cl) {
     return (
-      <Tarjeta data-tarjeta="clase-sin-datos" titulo={t(lang, 'tab.clase')}>
+      <SeccionClase lang={lang} tarjeta="clase-sin-datos">
         <Hueco lang={lang}>{t(lang, 'clase.sinPerfil')}</Hueco>
-      </Tarjeta>
+      </SeccionClase>
     )
   }
   if (!faccion || !(datos.personaje.facciones || {})[faccion]) {
     return (
-      <Tarjeta data-tarjeta="clase-sin-datos" titulo={t(lang, 'tab.clase')}>
+      <SeccionClase lang={lang} tarjeta="clase-sin-datos">
         <Hueco lang={lang}>{t(lang, 'clase.sinFaccion')}</Hueco>
-      </Tarjeta>
+      </SeccionClase>
     )
   }
 
@@ -58,13 +84,13 @@ export function VistaClase({ perfil, lang, datos = D }) {
     porZona.set(k, [...(porZona.get(k) || []), e])
   }
   return (
-    <>
-      <Tarjeta data-tarjeta="clase-ficha" titulo={t(lang, 'clase.ficha')}>
-        <div style={S.sub}>{t(lang, 'clase.fuentesFicha')}</div>
+    <SeccionClase lang={lang}>
+      <div data-tarjeta="clase-ficha" style={{ ...S.sub, display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center', marginBottom: 8 }}>
+        <span>{t(lang, 'clase.fuentesFicha')}</span>
         <div data-fuentes="clase"><Origen f={cl.f} lang={lang} fallback /></div>
-      </Tarjeta>
+      </div>
 
-      <Tarjeta data-tarjeta="clase-entrenadores" titulo={t(lang, 'clase.entrenadores') + ' · ' + nombreFaccion}
+      <DetalleClase tarjeta="clase-entrenadores" titulo={t(lang, 'clase.entrenadores') + ' · ' + nombreFaccion}
         extra={<Origen f={FUENTE.entrenadores} lang={lang} />}>
         <div style={S.sub}>{t(lang, 'clase.entrenadoresNota')}</div>
         {sinEntrenador.length ? <Hueco lang={lang}>{t(lang, 'clase.sinEntrenador')} {t(lang, 'clase.motivo')} {sinEntrenador.map((h) => h.motivo).join(' ')}</Hueco> : null}
@@ -74,9 +100,9 @@ export function VistaClase({ perfil, lang, datos = D }) {
             <span>{lista.map((e) => nombre(e.n, lang)).join(', ')}</span>
           </div>
         ))}
-      </Tarjeta>
+      </DetalleClase>
 
-      <Tarjeta data-tarjeta="clase-hechizos" titulo={t(lang, 'clase.hechizos')} extra={<>
+      <DetalleClase tarjeta="clase-hechizos" titulo={t(lang, 'clase.hechizos')} extra={<>
         <Origen f={FUENTE.hechizos} lang={lang} />
         <Button variant="ghost" size="xs" onClick={() => setTodos(!todos)}>{todos ? t(lang, 'clase.menos') : t(lang, 'clase.todos')}</Button>
       </>}>
@@ -96,9 +122,9 @@ export function VistaClase({ perfil, lang, datos = D }) {
             </tbody>
           </table>
         ) : <div style={S.sub}>{t(lang, 'clase.ninguno')}</div>}
-      </Tarjeta>
+      </DetalleClase>
 
-      <Tarjeta data-tarjeta="clase-misiones" titulo={t(lang, 'clase.misiones') + ' · ' + nombreFaccion}
+      <DetalleClase tarjeta="clase-misiones" titulo={t(lang, 'clase.misiones') + ' · ' + nombreFaccion}
         extra={<Origen f={FUENTE.misiones} lang={lang} />}>
         <div style={S.sub}>{t(lang, 'clase.misionesNota')}</div>
         {misiones.length ? misiones.map(([id, m]) => (
@@ -108,15 +134,15 @@ export function VistaClase({ perfil, lang, datos = D }) {
             <span style={S.sub}>{m.zona != null ? nombre((((datos.zonas.zonas) || {})[String(m.zona)] || {}).n, lang) : m.dungeon != null ? nombre((((datos.dungeons.clasicos) || {})[String(m.dungeon)] || {}).n, lang) : ''}</span>
           </div>
         )) : <Hueco lang={lang}>{t(lang, 'clase.misionesSinDatos')}</Hueco>}
-      </Tarjeta>
+      </DetalleClase>
 
-      <Tarjeta data-tarjeta="clase-competencias" titulo={t(lang, 'clase.competencias')}
+      <DetalleClase tarjeta="clase-competencias" titulo={t(lang, 'clase.competencias')}
         extra={<Origen f={FUENTE.competencias} lang={lang} />}>
         <div style={S.sub}>{t(lang, 'clase.competenciasNota')}</div>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
           {(cl.competencias || []).map((c) => <span key={c.id} style={S.chip}>{nombre(c.n, lang)}</span>)}
         </div>
-      </Tarjeta>
-    </>
+      </DetalleClase>
+    </SeccionClase>
   )
 }

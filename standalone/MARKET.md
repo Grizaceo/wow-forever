@@ -583,6 +583,28 @@ Fuentes candidatas a investigar:
   stats por spec serían el input ideal para "presupuesto de stats".
   `/simc` ya parsea nivel/arma/stats.
 
+### Pendiente — Valoración independiente basada en ventas efectivas TSM
+
+**Idea acordada; no implementada.** Construir una señal de valoración personal
+independiente de las recomendaciones basadas en anuncios de Auctionator.
+
+- Usar exclusivamente ventas de subasta registradas por TSM (`source = Auction`),
+  separando reino y variantes del objeto; excluir comercio directo, COD y vendedores.
+- Evaluar precio realizado reciente, volumen vendido y frecuencia observada, con
+  confianza explícita según tamaño y antigüedad de la muestra. Definir y validar
+  ventanas, ponderaciones y umbrales antes de incorporarlos a recomendaciones.
+- Mostrar ambas señales separadas: **precio anunciado Auctionator** frente a
+  **valoración por ventas propias TSM**. Sin muestra suficiente, indicar
+  «sin evidencia suficiente», sin rellenar la valoración con precios anunciados.
+- No inferir demanda de todo el servidor ni probabilidad de venta a partir de las
+  ventas propias solamente. Expiraciones/cancelaciones pueden repetir unidades;
+  cualquier métrica de rotación requiere definir intentos y período de observación.
+- Distinguir ingresos de beneficio: no descontar dos veces la comisión ya registrada
+  por TSM; considerar fabricación y depósitos perdidos solo cuando existan datos.
+- Validar compatibilidad con el archivo TSM real y respetar la sustitución completa
+  del snapshot: no duplicar filas acumuladas ni prometer conservar historial que TSM
+  haya eliminado. Comprobar la señal con datos posteriores no usados para ajustarla.
+
 ### Largo plazo
 
 Módulos deterministas y reutilizables primero; después un addon propio de

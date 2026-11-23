@@ -51,7 +51,8 @@ vuelve a leerlo tras guardar.
 
 ## Navegación
 
-- **Character** abre **Profile** y agrupa **Route**, **Class** y **Professions**.
+- **Character** abre **Profile** y agrupa **Route** y **Professions**. La antigua pestaña **Class** pasa a cuatro desplegables opcionales dentro de Profile (entrenadores, hechizos, misiones y competencias), cerrados por defecto e independientes. Una preferencia antigua `clase` vuelve a Profile sin perder datos.
+- **Professions** concentra la selección de profesiones principales (máximo dos) y secundarias; Profile ya no repite ese bloque. Los cambios conservan los demás campos del perfil.
 - **Market** queda como segunda sección principal, sin cambios en su navegación interna.
 - **Others and Configuration** agrupa **Dungeons**, **Curated guide** (solo si hay guía para el perfil),
   **Legacy** y **Settings**. Settings incluye idioma de la interfaz y recarga de datos locales.
@@ -106,6 +107,12 @@ más un reloj controlado: comprueba sondeo fuera de Mercado, búsqueda desde ra�
 deduplicación, acumulación, pausa al borrar, reanudación y descarga del plugin.
 
 ## Contabilidad personal TSM · Mis ventas
+
+En Mercado → Ofertas, Auctionator (escaneo y precios) y Mis ventas TSM se presentan
+en columnas iguales, alineadas arriba cuando el contenedor lo permite. Cada columna
+tiene una base de 560 px; en paneles estrechos se apilan. Las tablas conservan scroll
+horizontal local, sin ensanchar toda la página. La distribución no cambia importaciones
+ni introduce una valoración algorítmica nueva.
 
 - `src/tsm.js` importa como **datos** `TradeSkillMasterDB` del addon TSM 4: campos
   `r@<reino>@internalData@csvSales/csvBuys/csvExpired/csvCancelled`. Se comprueba la cabecera
@@ -276,7 +283,7 @@ en cada salida. Por eso (v1.2.1):
   (`PawnAddPluginScale`, `Pawn.lua:5779`) y por eso la captura es en vivo.
 - `bridge-sync.js` sincroniza `pawn`/`pawnErro` en cada ingesta y lee el
   `Pawn.lua` hermano del diario como catálogo (`pawn-catalogo`).
-- La tarjeta «Escala Pawn» (pestaña Personaje) muestra la escala, el chip de
+- La tarjeta «Escala Pawn» (solo en Mercado → Subasta × Pawn) muestra la escala, el chip de
   procedencia, la fecha, los pesos ordenados y el ilvl del equipo; sin captura
   lo declara y explica `/wfbpawn`. DAVI recibe un resumen acotado como parte
   `pawn` del contexto, con el límite «pesos del juego, no simulación de DPS».
