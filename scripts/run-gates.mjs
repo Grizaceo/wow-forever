@@ -37,7 +37,7 @@ const BROWSER = [
   ['navegador', process.env.HERMES_SDK_TABS === '1' ? 52 : 51], ['mercado-auto', 14], ['mercado-procedencia', 24],
   ['tsm', 28], ['vista-mercado', 57], ['vista-davi', 50], ['vista-guia', 28],
   ['vista-profesiones', 41], ['vista-ruta-dungeons', 31], ['bridge', 19],
-  ['vista-personaje-simc', 11], ['vista-pawn', 13], ['vista-subasta-pawn', 28],
+  ['vista-personaje-simc', 11], ['vista-pawn', 15], ['vista-subasta-pawn', 28],
   ['farm-routing', 11],
 ];
 const EXPECT_BROWSER_TOTAL = BROWSER.reduce((n, [, c]) => n + c, 0);

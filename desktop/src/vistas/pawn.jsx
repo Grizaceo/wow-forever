@@ -86,6 +86,19 @@ export function resumenPawn(registro, catalogo, { classe = null, spec = null } =
   return 'Pawn: ' + partes.join(' · ')
 }
 
+// Contexto para DAVI sin montar la tarjeta técnica en Personaje ni abrir archivos del juego.
+export function useResumenPawn(ctx, perfil, lang) {
+  const [datos, setDatos] = useState([null, null])
+  useEffect(() => {
+    let activo = true
+    void Promise.all([lerPawn(ctx), lerCatalogoPawn(ctx)]).then((r) => {
+      if (activo) setDatos(r)
+    })
+    return () => { activo = false }
+  }, [ctx])
+  return resumenPawn(datos[0], datos[1], { classe: perfil?.clase ?? null, spec: null }, lang)
+}
+
 export function TarjetaPawn({ ctx, lang, perfil, puente, onResumen }) {
   const [registro, setRegistro] = useState(null)
   const [catalogo, setCatalogo] = useState(null)
@@ -150,7 +163,7 @@ export function TarjetaPawn({ ctx, lang, perfil, puente, onResumen }) {
       {cargado && !registro ? (
         <div style={S.sub}>
           {t(lang, 'pawn.semCaptura')} — {t(lang, 'pawn.semCaptura.ayuda')}{' '}
-          <Button size="xs" variant="outline" onClick={() => { void ler() }}>{t(lang, 'simc.releer')}</Button>
+          <Button size="xs" variant="outline" onClick={() => { void leer() }}>{t(lang, 'simc.releer')}</Button>
         </div>
       ) : null}
       {registro ? (
@@ -173,7 +186,7 @@ export function TarjetaPawn({ ctx, lang, perfil, puente, onResumen }) {
                 {t(lang, 'pawn.erro')}
               </span>
             ) : null}
-            <Button size="xs" variant="outline" onClick={() => { void ler() }}>{t(lang, 'simc.releer')}</Button>
+            <Button size="xs" variant="outline" onClick={() => { void leer() }}>{t(lang, 'simc.releer')}</Button>
           </div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>
             <div style={{ minWidth: 90 }}>

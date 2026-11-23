@@ -276,7 +276,7 @@ en cada salida. Por eso (v1.2.1):
   (`PawnAddPluginScale`, `Pawn.lua:5779`) y por eso la captura es en vivo.
 - `bridge-sync.js` sincroniza `pawn`/`pawnErro` en cada ingesta y lee el
   `Pawn.lua` hermano del diario como catálogo (`pawn-catalogo`).
-- La tarjeta «Escala Pawn» (pestaña Personaje) muestra la escala, el chip de
+- La tarjeta «Escala Pawn» (solo en Mercado → Subasta × Pawn) muestra la escala, el chip de
   procedencia, la fecha, los pesos ordenados y el ilvl del equipo; sin captura
   lo declara y explica `/wfbpawn`. DAVI recibe un resumen acotado como parte
   `pawn` del contexto, con el límite «pesos del juego, no simulación de DPS».

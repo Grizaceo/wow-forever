@@ -75145,6 +75145,19 @@ function resumenPawn(registro, catalogo, { classe = null, spec = null } = {}, la
   if (registro?.capturado) partes.push(t(lang, "simc.capturado") + " " + fecha2(registro.capturado));
   return "Pawn: " + partes.join(" · ");
 }
+function useResumenPawn(ctx, perfil, lang) {
+  const [datos, setDatos] = useState3([null, null]);
+  useEffect2(() => {
+    let activo = true;
+    void Promise.all([lerPawn(ctx), lerCatalogoPawn(ctx)]).then((r) => {
+      if (activo) setDatos(r);
+    });
+    return () => {
+      activo = false;
+    };
+  }, [ctx]);
+  return resumenPawn(datos[0], datos[1], { classe: perfil?.clase ?? null, spec: null }, lang);
+}
 function TarjetaPawn({ ctx, lang, perfil, puente, onResumen }) {
   const [registro, setRegistro] = useState3(null);
   const [catalogo, setCatalogo] = useState3(null);
@@ -75215,7 +75228,7 @@ function TarjetaPawn({ ctx, lang, perfil, puente, onResumen }) {
       t(lang, "pawn.semCaptura.ayuda"),
       " ",
       /* @__PURE__ */ jsx4(Button3, { size: "xs", variant: "outline", onClick: () => {
-        void ler();
+        void leer();
       }, children: t(lang, "simc.releer") })
     ] }) : null,
     registro ? /* @__PURE__ */ jsxs4(Fragment5, { children: [
@@ -75236,7 +75249,7 @@ function TarjetaPawn({ ctx, lang, perfil, puente, onResumen }) {
         registro.truncado ? /* @__PURE__ */ jsx4("span", { style: { ...S.chip, borderColor: C.amarillo, color: C.amarillo }, children: t(lang, "pawn.truncado") }) : null,
         registro.erro ? /* @__PURE__ */ jsx4("span", { title: registro.erro.msg, style: { ...S.chip, borderColor: C.rojo, color: C.rojo }, children: t(lang, "pawn.erro") }) : null,
         /* @__PURE__ */ jsx4(Button3, { size: "xs", variant: "outline", onClick: () => {
-          void ler();
+          void leer();
         }, children: t(lang, "simc.releer") })
       ] }),
       /* @__PURE__ */ jsxs4("div", { style: { display: "flex", flexWrap: "wrap", gap: 12 }, children: [
@@ -75322,7 +75335,7 @@ function VistaPersonaje({ ctx, perfil, guardarPerfil, razaSupuesta, lang, irA, p
   const [estado, setEstado] = useState4("");
   const [copia, setCopia] = useState4(null);
   const [resumenSimc2, setResumenSimc] = useState4(null);
-  const [resumenPawn2, setResumenPawn] = useState4(null);
+  const resumenPawn2 = useResumenPawn(ctx, borrador, lang);
   const p = borrador;
   const cambiar = async (parcial) => {
     const nuevo = { ...p, ...parcial };
@@ -75416,7 +75429,6 @@ function VistaPersonaje({ ctx, perfil, guardarPerfil, razaSupuesta, lang, irA, p
       /* @__PURE__ */ jsx5("div", { style: S.sub, role: "status", children: estado })
     ] }),
     /* @__PURE__ */ jsx5(TarjetaSimc, { ctx, lang, perfil: p, onAplicar: cambiar, puente, onResumen: setResumenSimc }),
-    /* @__PURE__ */ jsx5(TarjetaPawn, { ctx, lang, perfil: p, puente, onResumen: setResumenPawn }),
     /* @__PURE__ */ jsxs5(Tarjeta, { titulo: t(lang, "perfil.profesiones"), children: [
       /* @__PURE__ */ jsx5("div", { style: { display: "flex", flexWrap: "wrap", gap: 12 }, children: PRINCIPALES.map((id) => /* @__PURE__ */ jsxs5("label", { style: { display: "flex", gap: 6, alignItems: "\
 center" }, children: [
@@ -79920,7 +79932,8 @@ rcado.errorCarpeta", { msg: r?.message ? ` (${r.message})` : "" }));
   if (sub === "subasta") {
     return /* @__PURE__ */ jsx21("div", { style: S.pagina, children: /* @__PURE__ */ jsxs22("div", { style: S.cuerpo, children: [
       barraSub,
-      /* @__PURE__ */ jsx21(VistaSubastaPawn, { ctx, mercado, historial, perfil, lang })
+      /* @__PURE__ */ jsx21(VistaSubastaPawn, { ctx, mercado, historial, perfil, lang }),
+      /* @__PURE__ */ jsx21(TarjetaPawn, { ctx, lang, perfil, puente })
     ] }) });
   }
   const fuenteResumen = (item3) => {

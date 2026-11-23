@@ -24,6 +24,7 @@ import { RutaFarmeo } from './mercado/ruta-farmeo.jsx'
 import { PreguntarDavi } from './preguntar-davi.jsx'
 import { MisVentas } from './mercado/mis-ventas.jsx'
 import { VistaSubastaPawn } from './subasta-pawn.jsx'
+import { TarjetaPawn } from './pawn.jsx'
 
 agregarTextos({
   'mercado.scan.titulo': 'Escaneo de Auctionator',
@@ -944,6 +945,7 @@ export function VistaMercado({ ctx, almacen, sincronizador, ventas, puente, esta
         <div style={S.cuerpo}>
           {barraSub}
           <VistaSubastaPawn ctx={ctx} mercado={mercado} historial={historial} perfil={perfil} lang={lang} />
+          <TarjetaPawn ctx={ctx} lang={lang} perfil={perfil} puente={puente} />
         </div>
       </div>
     )
