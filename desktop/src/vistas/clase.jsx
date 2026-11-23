@@ -1,34 +1,73 @@
 // Clase del personaje: entrenadores de su facción, hechizos por nivel, misiones de clase y
-// competencias. Todo generado; los huecos se dicen.
+// competencias. Todo generado; los huecos se dicen con el motivo declarado.
+//
+// Alcance de cada bloque (docs/MODELO-DATOS.md §clases.json):
+//   · hechizos    → de CLASE: la misma lista para las dos facciones (aproximación 1.12).
+//   · misiones    → de FACCIÓN: se filtran por la facción del perfil.
+//   · entrenadores→ de clase y facción: hay lista de entrenadores por facción.
+//   · competencias → del cliente de Forever (tabla del cliente).
 import { useState } from 'react'
 import { Button } from '@hermes/plugin-sdk'
-import { D, dinero, huecos, nombre, zona } from '../datos.js'
+import { D, dinero, nombre } from '../datos.js'
 import { C, S } from '../estilos.js'
 import { t } from '../i18n.js'
 import { Hueco, Origen, Tarjeta } from '../ui.jsx'
 
 const VENTANA = 10   // niveles por delante que se muestran como "próximos"
 
-export function VistaClase({ perfil, lang }) {
+// Fuentes de cada bloque de la vista (MODELO-DATOS.md §clases.json).
+const FUENTE = { hechizos: 'cmangos-1.12', misiones: 'cmangos-1.12', entrenadores: 'cmangos-1.12', competencias: 'cliente-forever' }
+
+export function VistaClase({ perfil, lang, datos = D }) {
   const [todos, setTodos] = useState(false)
-  const cl = D.clases.clases[String(perfil.clase)]
-  const entrenadores = cl.entrenadores[perfil.faccion] || []
-  const sinEntrenador = huecos('clases', { tema: 'entrenadores', clase: perfil.clase, faccion: perfil.faccion })
-  const hechizos = [...cl.hechizos].sort((a, b) => a.nivel - b.nivel || a.spell - b.spell)
+  const clases = (datos.clases && datos.clases.clases) || {}
+  const cl = clases[String(perfil && perfil.clase)]
+  const faccion = perfil && perfil.faccion
+
+  // Perfil incompleto: se dice qué falta, no se rompe la vista ni se inventa una facción.
+  if (!perfil || !perfil.clase || !cl) {
+    return (
+      <Tarjeta data-tarjeta="clase-sin-datos" titulo={t(lang, 'tab.clase')}>
+        <Hueco lang={lang}>{t(lang, 'clase.sinPerfil')}</Hueco>
+      </Tarjeta>
+    )
+  }
+  if (!faccion || !(datos.personaje.facciones || {})[faccion]) {
+    return (
+      <Tarjeta data-tarjeta="clase-sin-datos" titulo={t(lang, 'tab.clase')}>
+        <Hueco lang={lang}>{t(lang, 'clase.sinFaccion')}</Hueco>
+      </Tarjeta>
+    )
+  }
+
+  const nombreFaccion = nombre((datos.personaje.facciones[faccion] || {}).n, lang)
+  // Huecos declarados en la fuente: con su motivo literal, no con una explicación inventada.
+  const sinEntrenador = ((datos.clases.huecos) || [])
+    .filter((h) => h.tema === 'entrenadores' && h.clase === perfil.clase && h.faccion === faccion)
+  const entrenadores = (cl.entrenadores && cl.entrenadores[faccion]) || []
+  const hechizos = [...(cl.hechizos || [])].sort((a, b) => a.nivel - b.nivel || a.spell - b.spell)
   const visibles = todos ? hechizos : hechizos.filter((h) => h.nivel > perfil.nivel - 2 && h.nivel <= perfil.nivel + VENTANA)
-  const misiones = (cl.misiones[perfil.faccion] || []).map((id) => [id, D.misiones.misiones[String(id)]]).filter(([, m]) => m)
+  const misiones = ((cl.misiones && cl.misiones[faccion]) || [])
+    .map((id) => [id, ((datos.misiones.misiones) || {})[String(id)]])
+    .filter(([, m]) => m)
     .sort((a, b) => a[1].nivel - b[1].nivel)
   const porZona = new Map()
   for (const e of entrenadores) {
-    const k = e.zona == null ? '—' : nombre(zona(e.zona)?.n, lang) || String(e.zona)
+    const z = e.zona == null ? null : (((datos.zonas.zonas) || {})[String(e.zona)] || null)
+    const k = e.zona == null ? '—' : nombre(z && z.n, lang) || String(e.zona)
     porZona.set(k, [...(porZona.get(k) || []), e])
   }
-
   return (
     <>
-      <Tarjeta titulo={t(lang, 'clase.entrenadores') + ' · ' + nombre(D.personaje.facciones[perfil.faccion].n, lang)}
-        extra={<Origen f="cmangos-1.12" lang={lang} />}>
-        {sinEntrenador.length ? <Hueco lang={lang}>{t(lang, 'clase.sinEntrenador')}</Hueco> : null}
+      <Tarjeta data-tarjeta="clase-ficha" titulo={t(lang, 'clase.ficha')}>
+        <div style={S.sub}>{t(lang, 'clase.fuentesFicha')}</div>
+        <div data-fuentes="clase"><Origen f={cl.f} lang={lang} fallback /></div>
+      </Tarjeta>
+
+      <Tarjeta data-tarjeta="clase-entrenadores" titulo={t(lang, 'clase.entrenadores') + ' · ' + nombreFaccion}
+        extra={<Origen f={FUENTE.entrenadores} lang={lang} />}>
+        <div style={S.sub}>{t(lang, 'clase.entrenadoresNota')}</div>
+        {sinEntrenador.length ? <Hueco lang={lang}>{t(lang, 'clase.sinEntrenador')} {t(lang, 'clase.motivo')} {sinEntrenador.map((h) => h.motivo).join(' ')}</Hueco> : null}
         {[...porZona.entries()].sort().map(([z, lista]) => (
           <div key={z} style={S.fila}>
             <span style={{ minWidth: 160, color: C.texto2 }}>{z}</span>
@@ -37,10 +76,11 @@ export function VistaClase({ perfil, lang }) {
         ))}
       </Tarjeta>
 
-      <Tarjeta titulo={t(lang, 'clase.hechizos')} extra={<>
-        <Origen f="cmangos-1.12" lang={lang} />
+      <Tarjeta data-tarjeta="clase-hechizos" titulo={t(lang, 'clase.hechizos')} extra={<>
+        <Origen f={FUENTE.hechizos} lang={lang} />
         <Button variant="ghost" size="xs" onClick={() => setTodos(!todos)}>{todos ? t(lang, 'clase.menos') : t(lang, 'clase.todos')}</Button>
       </>}>
+        <div style={S.sub}>{t(lang, 'clase.hechizosNota')}</div>
         {!todos ? <div style={S.sub}>{t(lang, 'clase.proximos')} · {t(lang, 'clase.hastaNivel')} {perfil.nivel + VENTANA}</div> : null}
         {visibles.length ? (
           <table style={S.tabla}>
@@ -58,19 +98,23 @@ export function VistaClase({ perfil, lang }) {
         ) : <div style={S.sub}>{t(lang, 'clase.ninguno')}</div>}
       </Tarjeta>
 
-      <Tarjeta titulo={t(lang, 'clase.misiones')} extra={<Origen f="cmangos-1.12" lang={lang} />}>
+      <Tarjeta data-tarjeta="clase-misiones" titulo={t(lang, 'clase.misiones') + ' · ' + nombreFaccion}
+        extra={<Origen f={FUENTE.misiones} lang={lang} />}>
+        <div style={S.sub}>{t(lang, 'clase.misionesNota')}</div>
         {misiones.length ? misiones.map(([id, m]) => (
-          <div key={id} style={{ ...S.fila, opacity: m.min > perfil.nivel ? 0.6 : 1 }}>
+          <div key={id} data-mision={id} style={{ ...S.fila, opacity: m.min > perfil.nivel ? 0.6 : 1 }}>
             <span style={{ minWidth: 40, color: C.texto3 }}>{m.nivel}</span>
             <span style={{ flex: 1 }}>{nombre(m.t, lang)}</span>
-            <span style={S.sub}>{m.zona != null ? nombre(zona(m.zona)?.n, lang) : m.dungeon != null ? nombre(D.dungeons.clasicos[String(m.dungeon)]?.n, lang) : ''}</span>
+            <span style={S.sub}>{m.zona != null ? nombre((((datos.zonas.zonas) || {})[String(m.zona)] || {}).n, lang) : m.dungeon != null ? nombre((((datos.dungeons.clasicos) || {})[String(m.dungeon)] || {}).n, lang) : ''}</span>
           </div>
-        )) : <Hueco lang={lang}>{t(lang, 'clase.misiones')}</Hueco>}
+        )) : <Hueco lang={lang}>{t(lang, 'clase.misionesSinDatos')}</Hueco>}
       </Tarjeta>
 
-      <Tarjeta titulo={t(lang, 'clase.competencias')} extra={<Origen f="cliente-forever" lang={lang} />}>
+      <Tarjeta data-tarjeta="clase-competencias" titulo={t(lang, 'clase.competencias')}
+        extra={<Origen f={FUENTE.competencias} lang={lang} />}>
+        <div style={S.sub}>{t(lang, 'clase.competenciasNota')}</div>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-          {cl.competencias.map((c) => <span key={c.id} style={S.chip}>{nombre(c.n, lang)}</span>)}
+          {(cl.competencias || []).map((c) => <span key={c.id} style={S.chip}>{nombre(c.n, lang)}</span>)}
         </div>
       </Tarjeta>
     </>
