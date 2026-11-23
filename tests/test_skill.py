@@ -23,7 +23,22 @@ sys.dont_write_bytecode = True  # nada de __pycache__ dentro de la skill
 import consultar  # noqa: E402
 
 # re y hashlib validan los nombres y la integridad del bundle multipartes.
-PERMITIDOS = {'argparse', 'hashlib', 'json', 'math', 'os', 'pathlib', 're', 'sys', 'unicodedata'}
+# 'perfil' es el helper canónico del contrato perfil-v1 (mismo directorio tras la
+# integración; en local se apunta con PYTHONPATH a wow-p0-profile/scripts). Es
+# stdlib-only y de solo lectura, igual que consultar.py; se verifica en su propia suite.
+PERMITIDOS = {'argparse', 'hashlib', 'json', 'math', 'os', 'pathlib', 'perfil', 're', 'sys', 'unicodedata'}
+
+# Los siete archivos con huecos declarados (antes el informe omitía items.json).
+ARCHIVOS_HUECOS = ('personaje', 'clases', 'profesiones', 'zonas', 'dungeons', 'misiones', 'items')
+
+
+def datos_reales():
+    return consultar.Datos(os.path.join(RAIZ, 'data'))
+
+
+def total_huecos(D):
+    """Cuenta los huecos recogiendo registros, nunca con una cifra escrita a mano."""
+    return sum(len(getattr(D, f).get('huecos', [])) for f in ARCHIVOS_HUECOS)
 
 
 def correr(*args):
@@ -138,6 +153,158 @@ class TestScript(unittest.TestCase):
         self.assertIn('stock limitado', s)
         c, s = correr('mision', '567')
         self.assertIn('Bow of Plunder', s)
+
+
+class TestHuecosSieteArchivos(unittest.TestCase):
+    """P0 paso 3: el informe recorre los 7 archivos, incluido items.json."""
+
+    def test_huecos_incluye_items_y_conteo_programatico(self):
+        codigo, salida = correr('huecos', '--max', '100')
+        self.assertEqual(codigo, 0)
+        esperado = total_huecos(datos_reales())
+        self.assertIn(f'{esperado} huecos declarados', salida)
+        self.assertIn('- items: nombre', salida)
+        self.assertIn('78 items Forever citados por recetas', salida)
+        self.assertEqual(tuple(consultar.ARCHIVOS_HUECOS), ARCHIVOS_HUECOS)
+        D = datos_reales()
+        for archivo in ARCHIVOS_HUECOS:
+            if getattr(D, archivo).get('huecos'):
+                self.assertTrue(any(ln.startswith(f'- {archivo}: ') for ln in salida.splitlines()), archivo)
+
+    def test_tema_nombre_y_recetas(self):
+        codigo, salida = correr('huecos', '--tema', 'nombre', '--max', '100')
+        self.assertEqual(codigo, 0)
+        self.assertIn('1 huecos declarados', salida)
+        self.assertIn('- items: nombre', salida)
+        self.assertNotIn('- clases: entrenadores', salida)
+
+        codigo, salida = correr('huecos', '--tema', 'recetas', '--max', '100')
+        self.assertEqual(codigo, 0)
+        D = datos_reales()
+        # Semántica declarada: '--tema recetas' selecciona los huecos que traen
+        # una lista `recetas` de registros (huecos de receta declarados), sin
+        # editar datos ni inventar motivos.
+        n = sum(1 for f in ARCHIVOS_HUECOS for h in getattr(D, f).get('huecos', []) if h.get('recetas'))
+        self.assertGreater(n, 0)
+        self.assertIn(f'{n} huecos declarados', salida)
+        filas = [ln for ln in salida.splitlines() if ln.startswith('- ')]
+        self.assertEqual(len(filas), n)
+        self.assertTrue(any('adquisicion_forever' in ln for ln in filas))
+        self.assertFalse(any(ln.startswith('- zonas: niveles') for ln in filas))
+
+        codigo, salida = correr('huecos', '--tema', 'tema-inexistente', '--max', '100')
+        self.assertEqual(codigo, 0)
+        self.assertIn('0 huecos declarados', salida)
+
+    def test_filtro_faccion_conserva_sin_filtro(self):
+        D = datos_reales()
+        n = sum(1 for f in ARCHIVOS_HUECOS for h in getattr(D, f).get('huecos', [])
+                if h.get('faccion') in (None, 'horda'))
+        codigo, salida = correr('huecos', '--faccion', 'horda', '--max', '100')
+        self.assertEqual(codigo, 0)
+        self.assertIn(f'{n} huecos declarados', salida)
+        self.assertFalse(any('faccion=alianza' in ln for ln in salida.splitlines()))
+        _, sin_filtro = correr('huecos', '--max', '100')
+        self.assertNotEqual(salida, sin_filtro)
+
+
+class TestMatrizClaseFaccion(unittest.TestCase):
+    """P0 paso 5: 18 pares clase×facción con salida explícita."""
+
+    def test_18_pares_entrenadores_o_sin_datos(self):
+        D = datos_reales()
+        pares = 0
+        for cid, c in D.clases['clases'].items():
+            for fac in ('alianza', 'horda'):
+                pares += 1
+                codigo, salida = correr('entrenadores', '--clase', cid, '--faccion', fac, '--max', '100')
+                self.assertEqual(codigo, 0, (cid, fac, salida))
+                hueco = any(h.get('clase') == int(cid) and h.get('faccion') == fac
+                            and h.get('tema') == 'entrenadores' for h in D.clases.get('huecos', []))
+                if hueco:
+                    self.assertIn('SIN DATOS (entrenadores)', salida)
+                    self.assertFalse(any(ln.startswith('- ') for ln in salida.splitlines()))
+                else:
+                    self.assertTrue(any(ln.startswith('- ') for ln in salida.splitlines()), (cid, fac))
+                    self.assertIn('[Classic 1.12]', salida)
+        self.assertEqual(pares, 18)
+
+    def test_paladin_horda_y_chaman_alianza_no_copian_entrenadores(self):
+        D = datos_reales()
+        for cid, fac, otra in (('2', 'horda', 'alianza'), ('7', 'alianza', 'horda')):
+            codigo, salida = correr('entrenadores', '--clase', cid, '--faccion', fac, '--max', '100')
+            self.assertEqual(codigo, 0)
+            self.assertIn('SIN DATOS (entrenadores)', salida)
+            self.assertEqual(D.clases['clases'][cid]['entrenadores'][fac], [])
+            for e in D.clases['clases'][cid]['entrenadores'][otra]:
+                self.assertNotIn(consultar.nombre(e['n']), salida)
+
+    def test_misiones_clase_paladin_horda_14_y_chaman_alianza_13(self):
+        D = datos_reales()
+        for cid, fac, esperado in (('2', 'horda', 14), ('7', 'alianza', 13)):
+            codigo, salida = correr('misiones-clase', '--clase', cid, '--faccion', fac, '--max', '100')
+            self.assertEqual(codigo, 0)
+            filas = [ln for ln in salida.splitlines() if ln.startswith('- [')]
+            ids = [q for q in D.clases['clases'][cid]['misiones'][fac] if str(q) in D.misiones['misiones']]
+            self.assertEqual(len(filas), min(len(ids), 100))
+            self.assertEqual(len(ids), esperado)  # suelo declarado, no copiado de la otra facción
+
+
+class TestProcedenciaHechizosYMisiones(unittest.TestCase):
+    """P0 paso 6: hechizos = clase/1.12; misiones = facción; sin filtro facción."""
+
+    def test_hechizos_rotulados_clase_y_aproximacion(self):
+        codigo, salida = correr('hechizos', '--clase', 'mago', '--nivel', '10')
+        self.assertEqual(codigo, 0)
+        cabecera = salida.splitlines()[0]
+        self.assertIn('(clase', cabecera)
+        self.assertIn('Classic 1.12', cabecera)
+        self.assertIn('aproximación', cabecera)
+        self.assertNotIn('facción', cabecera.lower())
+
+    def test_misiones_rotuladas_faccion(self):
+        codigo, salida = correr('misiones-clase', '--clase', 'mago', '--faccion', 'horda', '--max', '1')
+        self.assertEqual(codigo, 0)
+        cabecera = salida.splitlines()[0]
+        self.assertIn('misiones de clase', cabecera.lower())
+        self.assertIn('(facción)', cabecera)
+
+    def test_hechizos_sin_filtro_de_faccion(self):
+        D = datos_reales()
+        cid = '8'
+        n = len(D.clases['clases'][cid]['hechizos'])
+        codigo, salida = correr('hechizos', '--clase', 'mago')
+        self.assertEqual(codigo, 0)
+        self.assertEqual(len([ln for ln in salida.splitlines() if ln.startswith('- nivel ')]), n)
+
+    def test_hechizos_rechaza_faccion(self):
+        codigo, salida = correr('hechizos', '--clase', 'mago', '--faccion', 'horda')
+        self.assertEqual(codigo, 2)
+        self.assertIn('por clase', salida)
+        self.assertIn('misiones-clase', salida)
+
+
+class TestPerfilCanonico(unittest.TestCase):
+    """P0 paso 2: consultar.py consume validar_perfil, no una validación duplicada."""
+
+    def test_usa_helper_canonico_y_ids_v1_sin_skill(self):
+        import perfil  # noqa: E402  (mismo módulo que importa consultar.py)
+        self.assertIs(consultar.validar_perfil, perfil.validar_perfil)
+        r = perfil.validar_perfil(
+            {'raza': 5, 'clase': 2, 'nivel': 24, 'profesiones': [164, 186], 'secundarias': [185]},
+            datos_reales().personaje)
+        self.assertTrue(r['ok'], r)
+        self.assertNotIn('skill', r['perfil'])
+        self.assertEqual(set(r['perfil']['profesiones']), {164, 186})
+
+    def test_perfil_incompleto_o_invalido_falla_explicitamente(self):
+        codigo, salida = correr('perfil', '--raza', 'tauren', '--clase', 'mago')
+        self.assertEqual(codigo, 1)
+        self.assertIn('NO válida', salida)
+        self.assertIn('Revisa raza y clase', salida)
+        codigo, salida = correr('perfil', '--raza', 'no-muerto', '--clase', 'paladin', '--nivel', '99')
+        self.assertEqual(codigo, 2)
+        self.assertIn('nivel', salida)
 
 
 class TestVersion(unittest.TestCase):
