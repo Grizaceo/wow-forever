@@ -165,7 +165,7 @@ más profunda evita incluir un ancestro con ese carácter en la ruta relativa.
 
 | Sistema | Validado en esta auditoría | **No** validado |
 | --- | --- | --- |
-| **Linux** | Suite Node 381/381 con fixtures sintéticas (92 pruebas de sync); Python, standalone, build reproducible y revisión del contrato del SDK. CI nativa Node 22 / Python 3.12; gates Lua y 420 checks Chromium. | Cliente WoW real, app Hermes desktop real, diálogo de permisos real, selector real del SDK. |
+| **Linux** | Suite Node 388/388 con fixtures sintéticas (92 pruebas de sync); Python 121/121 con instalación sintética del agente-half; standalone, build reproducible y revisión del contrato del SDK. CI nativa Node 22 / Python 3.12; gates Lua y 443 checks Chromium. | Cliente WoW real, app Hermes desktop real, diálogo de permisos real, selector real del SDK. |
 | **Windows** | CI en runner Windows: Node 22, Python 3.12, standalone, build y bundle-check. Las mismas fixtures de sincronización pasan en ese SO. Revisión estática de las restricciones del SDK. | WoW/Hermes reales; selector y permisos nativos; integración con OneDrive/UNC/ADS y nombres reservados. |
 | **macOS** | CI en runner macOS: Node 22, Python 3.12, standalone, build y bundle-check. Las mismas fixtures de sincronización pasan en ese SO. Revisión estática de las restricciones del SDK. | WoW/Hermes reales; selector y permisos nativos; integración real con APFS case-insensitive. |
 
@@ -203,7 +203,7 @@ node --test tests/sync-path.test.mjs tests/auctionator-discovery.test.mjs \
   tests/mercado-auto.test.mjs tests/market-source.test.mjs tests/market-sync.test.mjs
 # ℹ tests 92 / pass 92 / fail 0   (subconjunto de sincronización)
 node scripts/test-node.mjs
-# ℹ tests 381 / pass 381 / fail 0 (suite completa de Node en este checkout)
+# ℹ tests 388 / pass 388 / fail 0 (suite completa de Node en este checkout)
 
 # Preparar las dependencias del proyecto y Chromium una vez:
 npm ci --prefix desktop
@@ -211,6 +211,19 @@ cd desktop && npx playwright install chromium && cd ..
 node desktop/test/mercado-auto.mjs
 node desktop/test/vista-mercado.mjs
 ```
+
+**Conteo histórico vs. validación local actual.** Los números del bloque anterior
+son los de la CI publicada (Node 22 / Python 3.12 en Linux, Windows y macOS,
+run `45087986470`, commit `b81f5c6`): 388 Node y 121 Python. **No** incluyen las
+validaciones añadidas después en esta rama. En el chequeo local de este checkout
+(Node **v26.12.0**, 2026-11-22) `python3 -m unittest discover -s tests` da
+**122 OK** (el test nuevo de CLI aislada, §9) y los suites navegador focales
+`node desktop/test/navegador.mjs` (51) y `node desktop/test/vista-clase.mjs`
+(14 + 9 = 23) dan 0 red / 0 errores. Estas cifras locales **no están publicadas
+en CI** y no se atribuyen a los runners Node 22/Windows/macOS de la tabla §7.
+El runner canónico completo (`node scripts/run-gates.mjs`) no se ejecutó en este
+trabajo de integración: sus defaults ya se actualizaron a 122 Python, pero el
+resultado «todo verde» del run completo está pendiente.
 
 Bugs concretos corregidos (con regresión en rojo antes del fix, verde después):
 
@@ -229,3 +242,48 @@ Archivos de la corrección de sincronización: `desktop/src/sync-path.js`,
 `tests/auctionator-discovery.test.mjs` y este documento. La integración completa
 incluye además cambios de rendimiento, CI y el bundle regenerado; no se
 desplegó sobre la instalación existente como parte de esta auditoría.
+
+## 9. Sincronización del agente-half: `contracts/` viaja con el helper
+
+La sincronización del agente-half copia a `~/.hermes/plugins/wow-forever/` el
+subconjunto que consume el agente: `data/`, `skills/` y `consultar.py`. Ese
+subconjunto estaba incompleto. `skills/wow-forever/scripts/perfil.py` abre
+`Path(__file__).resolve().parents[3] / 'contracts' / 'perfil-v1.json'`; sin
+`contracts/` el helper muere al importar, y `src/perfil.js` pierde su fuente de
+verdad en el bundle. No hay script de sync versionado: la receta es manual y
+está documentada en la skill `wow-forever-local-data`.
+
+Payload mínimo del agente-half (P0) — es lo que copian las pruebas aisladas:
+
+```text
+data/                                # personaje.json y el resto (la CLI carga data/ bajo demanda)
+skills/                              # scripts/perfil.py y scripts/consultar.py
+contracts/perfil-v1.json             # contrato compartido JS/Python
+```
+
+Verificación sin tocar el plugin instalado (dos pruebas en
+`tests/test_perfil.py::TestInstalacionSinteticaAgentHalf`):
+
+- `test_helper_valida_desde_instalacion_sintetica` copia **sólo** el helper y el
+  contrato (`contracts/perfil-v1.json` + `skills/.../perfil.py`), ejecuta
+  `perfil.py` con `python -I` y `cwd='/'`, compara con `validar_perfil` y comprueba
+  el control negativo (sin `contracts/` → error que nombra `perfil-v1.json`).
+  No es, por sí sola, una prueba del payload completo.
+- `test_cli_real_desde_instalacion_sintetica` sí copia el payload entero
+  (`data/`, `skills/.../perfil.py`, `skills/.../consultar.py`, `contracts/`) a un
+  `TemporaryDirectory` bajo TMPDIR y ejecuta la CLI real
+  `consultar.py --datos <data aislada> perfil --raza 5 --clase 2 --faccion horda`
+  con `cwd='/'` y sin `PYTHONPATH`/`WOW_FOREVER_DATA`. Comprueba la salida válida
+  y el control negativo: al quitar `perfil.py` la CLI responde `error: falta el
+  helper canónico perfil.py (contrato perfil-v1)` con código 2. Esa importación
+  del helper en `consultar.py` es el punto crítico del sync del agente-half.
+
+La CLI se invoca sin `-I` porque la skill usa `python3 <skill>/scripts/consultar.py`:
+con `-I` Python no añade el directorio del script a `sys.path` y el helper
+hermano no se importa (en ese modo la orden `perfil` falla con el error anterior).
+Ninguna de las dos pruebas abre selector, lee SavedVariables ni escribe en
+`~/.hermes`. Total local: 122 tests Python OK (Node v26.12.0, no publicado en CI).
+
+La instalación real revisada en este checkout **no** tenía `contracts/` ni
+`perfil.py`; este cambio no despliega. El despliegue posterior debe añadir
+`contracts/` a la lista de rsync del agente-half.

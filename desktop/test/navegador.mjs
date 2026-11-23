@@ -30,11 +30,21 @@ await p.getByText('Copiado. Pégalo en el chat de Hermes.').waitFor()
 check('copia el perfil para el agente con ctx.os.writeClipboard', await p.evaluate(() =>
   window.copiado === 'Mi personaje de WoW Forever (plugin wow-forever): Horda · No-muerto (Undead, raza 5) · Paladín (Paladin, clase 2) · nivel 24'), await p.evaluate(() => window.copiado))
 
-// 3) Clase: hueco de entrenadores dicho; hechizos listados.
+// 3) Clase: hueco de entrenadores dicho; hechizos listados con su alcance declarado.
 await p.click('[data-tab="clase"]')
-await p.getByText('Hechizos de entrenador').waitFor()
-check('Paladín de la Horda: el hueco de entrenadores se dice', await p.getByText('Sin datos:').count() > 0)
-check('lista hechizos de entrenador', await p.locator('table tbody tr').count() > 0)
+// El contrato P0 cambió la etiqueta: ya no hay «Hechizos de entrenador». Se localiza
+// por `data-tarjeta` (contrato estable) y se comprueba la semántica, no solo que
+// la tarjeta exista: los hechizos son DE CLASE (no por facción) y el hueco de
+// entrenadores (sí por facción) se dice con su motivo.
+await p.locator('[data-tarjeta="clase-hechizos"]').waitFor()
+const tarjetaHechizos = p.locator('[data-tarjeta="clase-hechizos"]')
+const tarjetaEntrenadores = p.locator('[data-tarjeta="clase-entrenadores"]')
+const textoEntrenadores = await tarjetaEntrenadores.innerText()
+check('Paladín de la Horda: el hueco de entrenadores se dice', /Sin datos:/i.test(textoEntrenadores) &&
+  /Motivo declarado:/i.test(textoEntrenadores))
+const textoHechizos = await tarjetaHechizos.innerText()
+check('lista hechizos de clase, no de entrenador', await tarjetaHechizos.locator('tbody tr').count() > 0 &&
+  /hechizos de clase/i.test(textoHechizos) && /no por facción/i.test(textoHechizos))
 check('la columna de nombres se titula Hechizo, no Clase', await p.getByRole('columnheader', { name: 'Hechizo', exact: true }).count() === 1)
 await cerrar()
 

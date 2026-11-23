@@ -23,6 +23,18 @@ import sys
 import unicodedata
 from pathlib import Path
 
+# Helper canónico del perfil (contrato perfil-v1). Tras la integración vive en esta
+# misma carpeta; la importación es opcional para que los órdenes que no usan perfil
+# (p. ej. `fuentes`, que corre con python -I) sigan funcionando sin él.
+try:
+    import perfil
+    validar_perfil = perfil.validar_perfil
+    NIVEL_MIN_PERFIL = perfil.NIVEL_MIN
+except ImportError:  # pragma: no cover - se integra en otro commit
+    perfil = None
+    validar_perfil = None
+    NIVEL_MIN_PERFIL = 1
+
 RAIZ = Path(__file__).resolve().parents[3]  # skills/wow-forever/scripts/consultar.py -> raíz del plugin
 ORIGEN = {"cmangos-1.12": "Classic 1.12", "cliente-forever": "cliente Forever", "curado": "curado"}
 FACCIONES = {"alianza": "alianza", "alliance": "alianza", "a": "alianza",
@@ -193,21 +205,32 @@ def cmd_perfil(D, a, out):
     rid = resolver_raza(D, a.raza, faccion)
     cid = resolver_clase(D, a.clase)
     r, c = D.personaje["razas"][rid], D.personaje["clases"][cid]
-    combo = next((x for x in D.personaje["combinaciones"] if str(x[0]) == rid and str(x[1]) == cid), None)
+    # Una única validación: el helper canónico del contrato perfil-v1. La CLI solo
+    # resuelve nombres a IDs y describe el resultado; no reimplementa las reglas.
+    if validar_perfil is None:
+        raise ErrorConsulta("falta el helper canónico perfil.py (contrato perfil-v1) junto a consultar.py")
+    # La CLI no exige --nivel; el helper sí lo pide. Se le pasa el mínimo del
+    # contrato, que es exactamente con lo que él normaliza un perfil sin nivel.
+    nivel = a.nivel if a.nivel is not None else NIVEL_MIN_PERFIL
+    res = validar_perfil({"raza": rid, "clase": cid, "faccion": faccion, "nivel": nivel}, D.personaje)
     out(f"Raza: {nombre(r['n'], a.lang)} (id {rid}), facción {NOMBRE_FACCION[r['faccion']]} {origen(r['f'])}")
     out(f"Clase: {nombre(c['n'], a.lang)} (id {cid}) {origen(c['f'])}")
-    if not combo:
-        out("Combinación NO válida en el cliente de Forever (CharBaseInfo). Revisa raza y clase.")
-        return 1
-    out("Combinación válida en Forever" + (": NUEVA (no existía en 1.12)" if combo[2] else ", ya existía en 1.12")
+    if not res["ok"]:
+        errores = res["errores"]
+        if any(e in errores for e in ("combinacion", "raza", "clase", "faccion")):
+            out("Combinación NO válida en el cliente de Forever (CharBaseInfo). Revisa raza y clase.")
+            return 1
+        if "nivel" in errores:
+            raise ErrorConsulta("el nivel va de 1 a 60")
+        raise ErrorConsulta("perfil incompleto: " + ", ".join(errores))
+    combo = next((x for x in D.personaje["combinaciones"] if str(x[0]) == rid and str(x[1]) == cid), None)
+    out("Combinación válida en Forever" + (": NUEVA (no existía en 1.12)" if combo and combo[2] else ", ya existía en 1.12")
         + " [cliente Forever]")
     if r.get("inicio"):
         out(f"Zona de inicio: {zona_nombre(D, r['inicio']['zona'], a.lang)} [Classic 1.12]")
     for h in huecos(D, "personaje", raza=int(rid)):
         out(linea_hueco(h))
     if a.nivel is not None:
-        if not 1 <= a.nivel <= 60:
-            raise ErrorConsulta("el nivel va de 1 a 60")
         out(f"Nivel: {a.nivel}")
     return 0
 
@@ -233,13 +256,19 @@ def cmd_entrenadores(D, a, out):
 
 
 def cmd_hechizos(D, a, out):
+    if getattr(a, "faccion", None):
+        raise ErrorConsulta("los hechizos son por clase, no por facción: no se filtran; "
+                            "usa 'misiones-clase --faccion' para las misiones de clase")
     cid = resolver_clase(D, a.clase)
     hs = D.clases["clases"][cid]["hechizos"]
     desde = a.desde if a.desde is not None else (max(1, a.nivel - 3) if a.nivel else 1)
     hasta = a.hasta if a.hasta is not None else (min(60, a.nivel + 4) if a.nivel else 60)
     sel = sorted((h for h in hs if desde <= h["nivel"] <= hasta), key=lambda h: (h["nivel"], h["spell"]))
-    out(f"Hechizos de entrenador de {nombre(D.personaje['clases'][cid]['n'], a.lang)}, niveles {desde}-{hasta}"
-        " [Classic 1.12] (rangos y costos de 1.12; Forever puede diferir)")
+    out(f"Hechizos de entrenador de {nombre(D.personaje['clases'][cid]['n'], a.lang)}"
+        f" — hechizos (clase, aproximación [Classic 1.12]), niveles {desde}-{hasta}"
+        " (rangos y costos de 1.12; Forever puede diferir)")
+    out("Ámbito: clase; los mismos hechizos para Alianza y Horda, sin filtro por bando."
+        " Para misiones por bando: misiones-clase --faccion.")
     if not sel:
         out("Ninguno en ese rango.")
     for h in sel:
@@ -253,7 +282,8 @@ def cmd_misiones_clase(D, a, out):
     faccion = faccion_de(a.faccion)
     ids = D.clases["clases"][cid]["misiones"].get(faccion) or []
     out(f"Misiones de clase de {nombre(D.personaje['clases'][cid]['n'], a.lang)} — {NOMBRE_FACCION[faccion]}"
-        " [Classic 1.12] (títulos en inglés: CMaNGOS no trae traducciones)")
+        " [Classic 1.12] (facción) (títulos en inglés: CMaNGOS no trae traducciones;"
+        " los hechizos son por clase y no se filtran aquí)")
     for h in huecos(D, "clases", clase=int(cid), faccion=faccion, tema="misiones"):
         out(linea_hueco(h))
     ms = D.misiones["misiones"]
@@ -1263,11 +1293,26 @@ def cmd_mision(D, a, out):
     return 0
 
 
+# Los siete archivos que pueden declarar huecos (items.json se añade en este paso).
+ARCHIVOS_HUECOS = ("personaje", "clases", "profesiones", "zonas", "dungeons", "misiones", "items")
+
+
+def hueco_coincide_tema(h, tema):
+    """Sin tema, todos. `--tema recetas` selecciona los huecos que declaran una
+    lista `recetas`, usando solo campos existentes: ni se editan los datos
+    generados ni se inventan motivos."""
+    if not tema:
+        return True
+    if h.get("tema") == tema:
+        return True
+    return tema == "recetas" and bool(h.get("recetas"))
+
+
 def cmd_huecos(D, a, out):
     n = 0
-    for archivo in ("personaje", "clases", "profesiones", "zonas", "dungeons", "misiones"):
+    for archivo in ARCHIVOS_HUECOS:
         for h in huecos(D, archivo):
-            if a.tema and h.get("tema") != a.tema:
+            if not hueco_coincide_tema(h, a.tema):
                 continue
             if a.faccion and h.get("faccion") not in (None, faccion_de(a.faccion)):
                 continue
@@ -1400,9 +1445,10 @@ def parser():
     s.add_argument("--faccion"); s.add_argument("--nivel", type=int)
     s = orden("entrenadores", cmd_entrenadores, "entrenadores de clase de una facción")
     s.add_argument("--clase", required=True); s.add_argument("--faccion", required=True)
-    s = orden("hechizos", cmd_hechizos, "hechizos de entrenador por nivel")
+    s = orden("hechizos", cmd_hechizos, "hechizos de entrenador por nivel (por clase, sin filtro de facción)")
     s.add_argument("--clase", required=True); s.add_argument("--nivel", type=int)
     s.add_argument("--desde", type=int); s.add_argument("--hasta", type=int)
+    s.add_argument("--faccion", help="NO soportado: los hechizos son por clase; se rechaza para no filtrar mal")
     s = orden("misiones-clase", cmd_misiones_clase, "misiones de clase de una facción")
     s.add_argument("--clase", required=True); s.add_argument("--faccion", required=True)
     s.add_argument("--nivel", type=int)
@@ -1456,4 +1502,9 @@ def main(argv=None, out=print):
 
 
 if __name__ == "__main__":
+    # Salida siempre en UTF-8 cuando va a una tubería o archivo (así la lee el agente).
+    # En Windows, sin esto, Python usa la página de códigos local (cp1252) fuera de la
+    # consola y los nombres con tilde llegan corruptos; en consola ya escribe UTF-8.
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8")
     sys.exit(main())

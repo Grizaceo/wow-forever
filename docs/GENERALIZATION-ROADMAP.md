@@ -80,16 +80,14 @@ Recolección: Herboristería, Minería, Pesca, Desuello. Por `como`: `receta` 16
 
 ### 2.4 Huecos declarados
 
-Visibles con `consultar.py huecos` (32 entradas): **2** `inicio` (razas 95/96), **2**
-`entrenadores` (tabla 2.2), **6** `niveles` (zonas 1450, 2482, 2521, 2548, 2652, 2665),
-**21** `botin` (12 mapas clásicos con encuentros sin criatura vinculada + 9 dungeons
-Forever), y **1** entrada en `profesiones` (26 recetas Forever sin ítem-plan; no tiene
-campo `tema`, por eso `huecos --tema recetas` devuelve 0).
-
-**No visible con el script:** `items.json.huecos` tiene 1 entrada (78 ítems citados por
-recetas sin nombre en las tablas del cliente), pero `cmd_huecos` solo recorre
-`personaje, clases, profesiones, zonas, dungeons, misiones`. Es un defecto del propio
-informe de huecos, no un dato sano.
+Visibles con `consultar.py huecos --max 999` (**36** entradas): **2** `inicio`
+(razas 95/96), **2** `entrenadores` (tabla 2.2), **6** `niveles` (zonas 1450, 2482,
+2521, 2548, 2652, 2665), **21** `botin`, **4** de `profesiones`
+(`adquisicion_forever`, `naranja_forever`, `umbral_sobre_amarillo`,
+`plan_cliente_vs_cmangos`) y **1** de `items.json` (`nombre`, 78 ítems). La cifra
+correcta es 36, no 33: el informe ya incluye `items.json` y hay tres huecos de
+profesiones más además del ya documentado `adquisicion_forever`. `--tema nombre` devuelve 1
+y `--tema recetas` devuelve 3 (medido en este checkout).
 
 ---
 
@@ -164,18 +162,22 @@ sale el dato.
 ### Fase 1 — Cerrar huecos que sí se pueden medir (P0)
 
 3. **Hacer visible el hueco de ítems en el informe.** Pre: paso 1. Ref: `cmd_huecos` en
-   `consultar.py` (recorre 6 archivos, omite `items.json`). Criterio: `huecos` sin filtro
-   lista 33 entradas (32 actuales + la de `items.json`); `--tema nombre` devuelve 1;
-   `--tema recetas` devuelve 1 (el hueco de profesiones no tiene `tema`: hay que darle uno
-   o listarlo sin filtrar). Prueba: `tests/test_skill.py`, `tests/referencias-skill.test.mjs`.
+   `consultar.py` (recorre todos los archivos, incluido `items.json`). Criterio verificado:
+   `huecos --max 999` lista **36** entradas; `--tema nombre` devuelve 1; `--tema recetas`
+   devuelve 3. Prueba: `tests/test_skill.py`, `tests/referencias-skill.test.mjs`,
+   `python3 skills/wow-forever/scripts/consultar.py huecos --max 999`.
    Límite: solo cambia el informe; no inventa nombres.
 
 4. **Completar lo que el cliente puede completar.** Pre: paso 3. Ref: `MANIFEST.json`
    (`wago-forever`, `wago-forever-esMX`), `tools/build-datos-juego.py`. Criterio: origin
    de razas 95/96 si las tablas del cliente lo traen; o confirmar el hueco con motivo.
    Para los 78 ítems sin nombre: solo completar desde una tabla pública con hash en el
-   manifiesto. Prueba: `tests/test_datos.py`, `tests/test_reproducible.py` (regenerar en
-   temporal y comparar `MANIFEST`). Límite: **no** rellenar desde knowledge general.
+   manifiesto. **Estado: bloqueado** — para los 78 ítems no hay fuente pública con
+   hash recuperable en `MANIFEST.json`; se mantienen como SIN DATOS. Razas 95/96:
+   el cliente no aporta `inicio`, se confirma el hueco con motivo. Prueba:
+   `tests/test_datos.py`, `tests/test_reproducible.py` (regenerar en temporal y
+   comparar `MANIFEST`). Límite: **no** rellenar desde knowledge general ni tocar
+   archivos del juego.
 
 ### Fase 2 — Entrenadores y hechizos por clase/facción (P0)
 
@@ -192,6 +194,20 @@ sale el dato.
    «hechizos (clase, [Classic 1.12])» frente a «misiones de clase (facción)»; ningún índice
    de hechizo se filtra por facción sin declararlo. Prueba: `tests/test_skill.py`.
    Límite: los 99–180 hechizos por clase son una aproximación de 1.12.
+
+#### Estado P0 al 2026-11-22 (checkout local, Node v26.12.0)
+
+| Paso | Estado | Evidencia real de este checkout |
+|---|---|---|
+| 1 procedencia/SIN DATOS | **Existente y verificado (parcial)** | Etiquetas en la vista de clase (`data-origen`, `data-fuentes`) y en la CLI; `desktop/test/vista-clase.mjs` 23 checks. No verificado en juego real. |
+| 2 perfil canónico | **Existente y verificado** | `contracts/perfil-v1.json`, helper JS/Python; `python3 -m unittest discover -s tests` 122 OK; `tests/perfil.test.mjs` en la suite Node 388 (no reejecutada aquí). |
+| 3 huecos visibles | **Existente y verificado** | `consultar.py huecos --max 999` → 36, `--tema nombre` → 1, `--tema recetas` → 3. |
+| 4 completar con fuente pública | **Bloqueado** | 78 ítems sin nombre y sin hash recuperable en `MANIFEST`; razas 95/96 sin `inicio`. No se inventa dato ni se toca el juego. |
+| 5 entrenadores sin dato | **Existente y verificado** | Paladín/Horda y Chamán/Alianza con «SIN DATOS: … Motivo declarado»; misiones 14 y 13 intactas; `vista-clase` 14 checks de bundle real. |
+| 6 hechizos de clase vs misiones | **Existente y verificado** | «Hechizos de clase (toda la clase, no por facción)» frente a «Misiones de clase (por facción)»; `navegador.mjs` 51 y `vista-clase.mjs` 23 checks, 0 red/0 errores. |
+
+Estados locales: **no** atribuir a la CI histórica Node 22/Windows/macOS (run
+`45087986470`). El coordinador ejecutó el runner canónico completo tras la integración: **23/23 gates verdes**, Node 388, Python 122, standalone 123, Lua 180 y navegador 443. Detalle y límites: `P0-DELIVERY.md`.
 
 ### Fase 3 — Zonas y rutas por nivel (P1)
 

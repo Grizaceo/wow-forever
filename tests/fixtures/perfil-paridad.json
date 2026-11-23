@@ -1,0 +1,1056 @@
+{
+ "contrato": "perfil-v1",
+ "generado": "src/perfil.js validarPerfil",
+ "casos": [
+  {
+   "nombre": "completo",
+   "entrada": {
+    "raza": 5,
+    "clase": 2,
+    "nivel": 24,
+    "profesiones": [
+     164,
+     186
+    ],
+    "secundarias": [
+     356,
+     185
+    ],
+    "reino": " Reino ",
+    "faccion": "horda"
+   },
+   "esperado": {
+    "ok": true,
+    "errores": [],
+    "perfil": {
+     "v": 1,
+     "faccion": "horda",
+     "raza": 5,
+     "clase": 2,
+     "nivel": 24,
+     "profesiones": [
+      164,
+      186
+     ],
+     "secundarias": [
+      185,
+      356
+     ],
+     "reino": "Reino"
+    }
+   }
+  },
+  {
+   "nombre": "ids como cadenas",
+   "entrada": {
+    "raza": "5",
+    "clase": "2",
+    "nivel": "24",
+    "profesiones": [
+     "164",
+     "186"
+    ],
+    "secundarias": [
+     "356"
+    ],
+    "reino": "X"
+   },
+   "esperado": {
+    "ok": true,
+    "errores": [],
+    "perfil": {
+     "v": 1,
+     "faccion": "horda",
+     "raza": 5,
+     "clase": 2,
+     "nivel": 24,
+     "profesiones": [
+      164,
+      186
+     ],
+     "secundarias": [
+      356
+     ],
+     "reino": "X"
+    }
+   }
+  },
+  {
+   "nombre": "faccion contradictoria",
+   "entrada": {
+    "raza": 2,
+    "clase": 1,
+    "nivel": 5,
+    "faccion": "alianza"
+   },
+   "esperado": {
+    "ok": false,
+    "errores": [
+     "faccion"
+    ],
+    "perfil": {
+     "v": 1,
+     "faccion": "horda",
+     "raza": 2,
+     "clase": 1,
+     "nivel": 5,
+     "profesiones": [],
+     "secundarias": [],
+     "reino": ""
+    }
+   }
+  },
+  {
+   "nombre": "faccion invalida con raza horda",
+   "entrada": {
+    "raza": 5,
+    "clase": 2,
+    "nivel": 5,
+    "faccion": "Horde"
+   },
+   "esperado": {
+    "ok": false,
+    "errores": [
+     "faccion"
+    ],
+    "perfil": {
+     "v": 1,
+     "faccion": "horda",
+     "raza": 5,
+     "clase": 2,
+     "nivel": 5,
+     "profesiones": [],
+     "secundarias": [],
+     "reino": ""
+    }
+   }
+  },
+  {
+   "nombre": "combinacion imposible",
+   "entrada": {
+    "raza": 1,
+    "clase": 11,
+    "nivel": 5
+   },
+   "esperado": {
+    "ok": false,
+    "errores": [
+     "combinacion"
+    ],
+    "perfil": {
+     "v": 1,
+     "faccion": "alianza",
+     "raza": 1,
+     "clase": 11,
+     "nivel": 5,
+     "profesiones": [],
+     "secundarias": [],
+     "reino": ""
+    }
+   }
+  },
+  {
+   "nombre": "raza inexistente",
+   "entrada": {
+    "raza": 42,
+    "clase": 1,
+    "nivel": 5
+   },
+   "esperado": {
+    "ok": false,
+    "errores": [
+     "raza"
+    ],
+    "perfil": {
+     "v": 1,
+     "faccion": null,
+     "raza": 42,
+     "clase": 1,
+     "nivel": 5,
+     "profesiones": [],
+     "secundarias": [],
+     "reino": ""
+    }
+   }
+  },
+  {
+   "nombre": "clase inexistente",
+   "entrada": {
+    "raza": 1,
+    "clase": 42,
+    "nivel": 5
+   },
+   "esperado": {
+    "ok": false,
+    "errores": [
+     "clase"
+    ],
+    "perfil": {
+     "v": 1,
+     "faccion": "alianza",
+     "raza": 1,
+     "clase": 42,
+     "nivel": 5,
+     "profesiones": [],
+     "secundarias": [],
+     "reino": ""
+    }
+   }
+  },
+  {
+   "nombre": "raza y clase inexistentes",
+   "entrada": {
+    "raza": 42,
+    "clase": 42,
+    "nivel": 5
+   },
+   "esperado": {
+    "ok": false,
+    "errores": [
+     "raza",
+     "clase"
+    ],
+    "perfil": {
+     "v": 1,
+     "faccion": null,
+     "raza": 42,
+     "clase": 42,
+     "nivel": 5,
+     "profesiones": [],
+     "secundarias": [],
+     "reino": ""
+    }
+   }
+  },
+  {
+   "nombre": "nivel cero",
+   "entrada": {
+    "raza": 1,
+    "clase": 3,
+    "nivel": 0
+   },
+   "esperado": {
+    "ok": false,
+    "errores": [
+     "nivel"
+    ],
+    "perfil": {
+     "v": 1,
+     "faccion": "alianza",
+     "raza": 1,
+     "clase": 3,
+     "nivel": 1,
+     "profesiones": [],
+     "secundarias": [],
+     "reino": ""
+    }
+   }
+  },
+  {
+   "nombre": "nivel 61",
+   "entrada": {
+    "raza": 1,
+    "clase": 3,
+    "nivel": 61
+   },
+   "esperado": {
+    "ok": false,
+    "errores": [
+     "nivel"
+    ],
+    "perfil": {
+     "v": 1,
+     "faccion": "alianza",
+     "raza": 1,
+     "clase": 3,
+     "nivel": 60,
+     "profesiones": [],
+     "secundarias": [],
+     "reino": ""
+    }
+   }
+  },
+  {
+   "nombre": "nivel negativo",
+   "entrada": {
+    "raza": 1,
+    "clase": 3,
+    "nivel": -3
+   },
+   "esperado": {
+    "ok": false,
+    "errores": [
+     "nivel"
+    ],
+    "perfil": {
+     "v": 1,
+     "faccion": "alianza",
+     "raza": 1,
+     "clase": 3,
+     "nivel": 1,
+     "profesiones": [],
+     "secundarias": [],
+     "reino": ""
+    }
+   }
+  },
+  {
+   "nombre": "nivel no numerico",
+   "entrada": {
+    "raza": 1,
+    "clase": 3,
+    "nivel": "abc"
+   },
+   "esperado": {
+    "ok": false,
+    "errores": [
+     "nivel"
+    ],
+    "perfil": {
+     "v": 1,
+     "faccion": "alianza",
+     "raza": 1,
+     "clase": 3,
+     "nivel": 1,
+     "profesiones": [],
+     "secundarias": [],
+     "reino": ""
+    }
+   }
+  },
+  {
+   "nombre": "nivel booleano",
+   "entrada": {
+    "raza": 1,
+    "clase": 3,
+    "nivel": true
+   },
+   "esperado": {
+    "ok": false,
+    "errores": [
+     "nivel"
+    ],
+    "perfil": {
+     "v": 1,
+     "faccion": "alianza",
+     "raza": 1,
+     "clase": 3,
+     "nivel": 1,
+     "profesiones": [],
+     "secundarias": [],
+     "reino": ""
+    }
+   }
+  },
+  {
+   "nombre": "nivel flotante entero",
+   "entrada": {
+    "raza": 1,
+    "clase": 3,
+    "nivel": 24
+   },
+   "esperado": {
+    "ok": true,
+    "errores": [],
+    "perfil": {
+     "v": 1,
+     "faccion": "alianza",
+     "raza": 1,
+     "clase": 3,
+     "nivel": 24,
+     "profesiones": [],
+     "secundarias": [],
+     "reino": ""
+    }
+   }
+  },
+  {
+   "nombre": "nivel flotante no entero",
+   "entrada": {
+    "raza": 1,
+    "clase": 3,
+    "nivel": 24.5
+   },
+   "esperado": {
+    "ok": false,
+    "errores": [
+     "nivel"
+    ],
+    "perfil": {
+     "v": 1,
+     "faccion": "alianza",
+     "raza": 1,
+     "clase": 3,
+     "nivel": 1,
+     "profesiones": [],
+     "secundarias": [],
+     "reino": ""
+    }
+   }
+  },
+  {
+   "nombre": "nivel con ceros",
+   "entrada": {
+    "raza": 1,
+    "clase": 3,
+    "nivel": "007"
+   },
+   "esperado": {
+    "ok": true,
+    "errores": [],
+    "perfil": {
+     "v": 1,
+     "faccion": "alianza",
+     "raza": 1,
+     "clase": 3,
+     "nivel": 7,
+     "profesiones": [],
+     "secundarias": [],
+     "reino": ""
+    }
+   }
+  },
+  {
+   "nombre": "nivel con espacios",
+   "entrada": {
+    "raza": 1,
+    "clase": 3,
+    "nivel": " 5"
+   },
+   "esperado": {
+    "ok": false,
+    "errores": [
+     "nivel"
+    ],
+    "perfil": {
+     "v": 1,
+     "faccion": "alianza",
+     "raza": 1,
+     "clase": 3,
+     "nivel": 1,
+     "profesiones": [],
+     "secundarias": [],
+     "reino": ""
+    }
+   }
+  },
+  {
+   "nombre": "sin nivel",
+   "entrada": {
+    "raza": 1,
+    "clase": 3
+   },
+   "esperado": {
+    "ok": false,
+    "errores": [
+     "nivel"
+    ],
+    "perfil": {
+     "v": 1,
+     "faccion": "alianza",
+     "raza": 1,
+     "clase": 3,
+     "nivel": 1,
+     "profesiones": [],
+     "secundarias": [],
+     "reino": ""
+    }
+   }
+  },
+  {
+   "nombre": "profesiones duplicadas y desconocidas",
+   "entrada": {
+    "raza": 1,
+    "clase": 3,
+    "nivel": 5,
+    "profesiones": [
+     164,
+     164,
+     186,
+     9999,
+     "x",
+     null
+    ]
+   },
+   "esperado": {
+    "ok": false,
+    "errores": [
+     "profesiones"
+    ],
+    "perfil": {
+     "v": 1,
+     "faccion": "alianza",
+     "raza": 1,
+     "clase": 3,
+     "nivel": 5,
+     "profesiones": [
+      164,
+      186
+     ],
+     "secundarias": [],
+     "reino": ""
+    }
+   }
+  },
+  {
+   "nombre": "tres principales",
+   "entrada": {
+    "raza": 1,
+    "clase": 3,
+    "nivel": 5,
+    "profesiones": [
+     171,
+     164,
+     186
+    ]
+   },
+   "esperado": {
+    "ok": false,
+    "errores": [
+     "profesiones"
+    ],
+    "perfil": {
+     "v": 1,
+     "faccion": "alianza",
+     "raza": 1,
+     "clase": 3,
+     "nivel": 5,
+     "profesiones": [
+      171,
+      164
+     ],
+     "secundarias": [],
+     "reino": ""
+    }
+   }
+  },
+  {
+   "nombre": "profesiones no lista",
+   "entrada": {
+    "raza": 1,
+    "clase": 3,
+    "nivel": 5,
+    "profesiones": "x"
+   },
+   "esperado": {
+    "ok": true,
+    "errores": [],
+    "perfil": {
+     "v": 1,
+     "faccion": "alianza",
+     "raza": 1,
+     "clase": 3,
+     "nivel": 5,
+     "profesiones": [],
+     "secundarias": [],
+     "reino": ""
+    }
+   }
+  },
+  {
+   "nombre": "secundarias desordenadas y principal",
+   "entrada": {
+    "raza": 1,
+    "clase": 3,
+    "nivel": 5,
+    "secundarias": [
+     185,
+     185,
+     129,
+     171,
+     356
+    ]
+   },
+   "esperado": {
+    "ok": false,
+    "errores": [
+     "secundarias"
+    ],
+    "perfil": {
+     "v": 1,
+     "faccion": "alianza",
+     "raza": 1,
+     "clase": 3,
+     "nivel": 5,
+     "profesiones": [],
+     "secundarias": [
+      129,
+      185,
+      356
+     ],
+     "reino": ""
+    }
+   }
+  },
+  {
+   "nombre": "reino no cadena",
+   "entrada": {
+    "raza": 1,
+    "clase": 3,
+    "nivel": 5,
+    "reino": 123
+   },
+   "esperado": {
+    "ok": false,
+    "errores": [
+     "reino"
+    ],
+    "perfil": {
+     "v": 1,
+     "faccion": "alianza",
+     "raza": 1,
+     "clase": 3,
+     "nivel": 5,
+     "profesiones": [],
+     "secundarias": [],
+     "reino": ""
+    }
+   }
+  },
+  {
+   "nombre": "reino largo",
+   "entrada": {
+    "raza": 1,
+    "clase": 3,
+    "nivel": 5,
+    "reino": "ReinoReinoReinoReinoReinoReinoReinoReinoReinoReinoReinoReinoReinoReinoReinoReinoReinoReinoReinoReino"
+   },
+   "esperado": {
+    "ok": true,
+    "errores": [],
+    "perfil": {
+     "v": 1,
+     "faccion": "alianza",
+     "raza": 1,
+     "clase": 3,
+     "nivel": 5,
+     "profesiones": [],
+     "secundarias": [],
+     "reino": "ReinoReinoReinoReinoReinoReinoReinoReinoReinoReinoReinoReinoRein"
+    }
+   }
+  },
+  {
+   "nombre": "entrada nula",
+   "entrada": null,
+   "esperado": {
+    "ok": false,
+    "errores": [
+     "raza",
+     "clase",
+     "nivel"
+    ],
+    "perfil": {
+     "v": 1,
+     "faccion": null,
+     "raza": null,
+     "clase": null,
+     "nivel": 1,
+     "profesiones": [],
+     "secundarias": [],
+     "reino": ""
+    }
+   }
+  },
+  {
+   "nombre": "entrada numero",
+   "entrada": 42,
+   "esperado": {
+    "ok": false,
+    "errores": [
+     "raza",
+     "clase",
+     "nivel"
+    ],
+    "perfil": {
+     "v": 1,
+     "faccion": null,
+     "raza": null,
+     "clase": null,
+     "nivel": 1,
+     "profesiones": [],
+     "secundarias": [],
+     "reino": ""
+    }
+   }
+  },
+  {
+   "nombre": "entrada cadena",
+   "entrada": "x",
+   "esperado": {
+    "ok": false,
+    "errores": [
+     "raza",
+     "clase",
+     "nivel"
+    ],
+    "perfil": {
+     "v": 1,
+     "faccion": null,
+     "raza": null,
+     "clase": null,
+     "nivel": 1,
+     "profesiones": [],
+     "secundarias": [],
+     "reino": ""
+    }
+   }
+  },
+  {
+   "nombre": "entrada lista",
+   "entrada": [],
+   "esperado": {
+    "ok": false,
+    "errores": [
+     "raza",
+     "clase",
+     "nivel"
+    ],
+    "perfil": {
+     "v": 1,
+     "faccion": null,
+     "raza": null,
+     "clase": null,
+     "nivel": 1,
+     "profesiones": [],
+     "secundarias": [],
+     "reino": ""
+    }
+   }
+  },
+  {
+   "nombre": "entrada vacia",
+   "entrada": {},
+   "esperado": {
+    "ok": false,
+    "errores": [
+     "raza",
+     "clase",
+     "nivel"
+    ],
+    "perfil": {
+     "v": 1,
+     "faccion": null,
+     "raza": null,
+     "clase": null,
+     "nivel": 1,
+     "profesiones": [],
+     "secundarias": [],
+     "reino": ""
+    }
+   }
+  },
+  {
+   "nombre": "solo raza texto",
+   "entrada": {
+    "raza": "orco"
+   },
+   "esperado": {
+    "ok": false,
+    "errores": [
+     "raza",
+     "clase",
+     "nivel"
+    ],
+    "perfil": {
+     "v": 1,
+     "faccion": null,
+     "raza": null,
+     "clase": null,
+     "nivel": 1,
+     "profesiones": [],
+     "secundarias": [],
+     "reino": ""
+    }
+   }
+  },
+  {
+   "nombre": "paladin horda",
+   "entrada": {
+    "raza": 5,
+    "clase": 2,
+    "nivel": 60,
+    "profesiones": [],
+    "secundarias": [],
+    "reino": ""
+   },
+   "esperado": {
+    "ok": true,
+    "errores": [],
+    "perfil": {
+     "v": 1,
+     "faccion": "horda",
+     "raza": 5,
+     "clase": 2,
+     "nivel": 60,
+     "profesiones": [],
+     "secundarias": [],
+     "reino": ""
+    }
+   }
+  },
+  {
+   "nombre": "shaman alianza",
+   "entrada": {
+    "raza": 3,
+    "clase": 7,
+    "nivel": 1
+   },
+   "esperado": {
+    "ok": true,
+    "errores": [],
+    "perfil": {
+     "v": 1,
+     "faccion": "alianza",
+     "raza": 3,
+     "clase": 7,
+     "nivel": 1,
+     "profesiones": [],
+     "secundarias": [],
+     "reino": ""
+    }
+   }
+  },
+  {
+   "nombre": "raza 95",
+   "entrada": {
+    "raza": 95,
+    "clase": 1,
+    "nivel": 1
+   },
+   "esperado": {
+    "ok": true,
+    "errores": [],
+    "perfil": {
+     "v": 1,
+     "faccion": "alianza",
+     "raza": 95,
+     "clase": 1,
+     "nivel": 1,
+     "profesiones": [],
+     "secundarias": [],
+     "reino": ""
+    }
+   }
+  },
+  {
+   "nombre": "raza 96",
+   "entrada": {
+    "raza": 96,
+    "clase": 7,
+    "nivel": 1
+   },
+   "esperado": {
+    "ok": true,
+    "errores": [],
+    "perfil": {
+     "v": 1,
+     "faccion": "horda",
+     "raza": 96,
+     "clase": 7,
+     "nivel": 1,
+     "profesiones": [],
+     "secundarias": [],
+     "reino": ""
+    }
+   }
+  },
+  {
+   "nombre": "campo desconocido ignorado",
+   "entrada": {
+    "raza": 1,
+    "clase": 3,
+    "nivel": 1,
+    "skill": 999,
+    "equipo": {}
+   },
+   "esperado": {
+    "ok": true,
+    "errores": [],
+    "perfil": {
+     "v": 1,
+     "faccion": "alianza",
+     "raza": 1,
+     "clase": 3,
+     "nivel": 1,
+     "profesiones": [],
+     "secundarias": [],
+     "reino": ""
+    }
+   }
+  },
+  {
+   "nombre": "secundarias repite principal valida",
+   "entrada": {
+    "raza": 1,
+    "clase": 3,
+    "nivel": 1,
+    "profesiones": [
+     164
+    ],
+    "secundarias": [
+     164
+    ]
+   },
+   "esperado": {
+    "ok": false,
+    "errores": [
+     "secundarias"
+    ],
+    "perfil": {
+     "v": 1,
+     "faccion": "alianza",
+     "raza": 1,
+     "clase": 3,
+     "nivel": 1,
+     "profesiones": [
+      164
+     ],
+     "secundarias": [],
+     "reino": ""
+    }
+   }
+  },
+  {
+   "nombre": "reino emoji corte UTF-16",
+   "entrada": {
+    "raza": 1,
+    "clase": 3,
+    "nivel": 5,
+    "reino": "😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀ABC"
+   },
+   "esperado": {
+    "ok": true,
+    "errores": [],
+    "perfil": {
+     "v": 1,
+     "faccion": "alianza",
+     "raza": 1,
+     "clase": 3,
+     "nivel": 5,
+     "profesiones": [],
+     "secundarias": [],
+     "reino": "😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀"
+    }
+   }
+  },
+  {
+   "nombre": "reino emoji corte en mitad de par",
+   "entrada": {
+    "raza": 1,
+    "clase": 3,
+    "nivel": 5,
+    "reino": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx😀"
+   },
+   "esperado": {
+    "ok": true,
+    "errores": [],
+    "perfil": {
+     "v": 1,
+     "faccion": "alianza",
+     "raza": 1,
+     "clase": 3,
+     "nivel": 5,
+     "profesiones": [],
+     "secundarias": [],
+     "reino": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\ud83d"
+    }
+   }
+  },
+  {
+   "nombre": "trim JS no recorta NEL ni separadores",
+   "entrada": {
+    "raza": 1,
+    "clase": 3,
+    "nivel": 5,
+    "reino": "Reino"
+   },
+   "esperado": {
+    "ok": true,
+    "errores": [],
+    "perfil": {
+     "v": 1,
+     "faccion": "alianza",
+     "raza": 1,
+     "clase": 3,
+     "nivel": 5,
+     "profesiones": [],
+     "secundarias": [],
+     "reino": "Reino"
+    }
+   }
+  },
+  {
+   "nombre": "trim JS no recorta U+001C",
+   "entrada": {
+    "raza": 1,
+    "clase": 3,
+    "nivel": 5,
+    "reino": "\u001cReino\u001c"
+   },
+   "esperado": {
+    "ok": true,
+    "errores": [],
+    "perfil": {
+     "v": 1,
+     "faccion": "alianza",
+     "raza": 1,
+     "clase": 3,
+     "nivel": 5,
+     "profesiones": [],
+     "secundarias": [],
+     "reino": "\u001cReino\u001c"
+    }
+   }
+  },
+  {
+   "nombre": "nivel cadena de digitos gigante",
+   "entrada": {
+    "raza": 1,
+    "clase": 3,
+    "nivel": "9999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999"
+   },
+   "esperado": {
+    "ok": false,
+    "errores": [
+     "nivel"
+    ],
+    "perfil": {
+     "v": 1,
+     "faccion": "alianza",
+     "raza": 1,
+     "clase": 3,
+     "nivel": 60,
+     "profesiones": [],
+     "secundarias": [],
+     "reino": ""
+    }
+   }
+  },
+  {
+   "nombre": "raza y clase booleanas",
+   "entrada": {
+    "raza": true,
+    "clase": true,
+    "nivel": 5
+   },
+   "esperado": {
+    "ok": false,
+    "errores": [
+     "raza",
+     "clase"
+    ],
+    "perfil": {
+     "v": 1,
+     "faccion": null,
+     "raza": null,
+     "clase": null,
+     "nivel": 5,
+     "profesiones": [],
+     "secundarias": [],
+     "reino": ""
+    }
+   }
+  }
+ ]
+}

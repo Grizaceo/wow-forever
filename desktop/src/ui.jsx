@@ -25,9 +25,9 @@ function asegurarSprite() {
   hojaSprite = el
 }
 
-export function Tarjeta({ titulo, extra, children, estilo }) {
+export function Tarjeta({ titulo, extra, children, estilo, ...resto }) {
   return (
-    <section style={{ ...S.tarjeta, ...estilo }}>
+    <section {...resto} style={{ ...S.tarjeta, ...estilo }}>
       {titulo ? <div style={S.tarjetaTitulo}><span>{titulo}</span>{extra}</div> : null}
       {children}
     </section>
@@ -35,19 +35,39 @@ export function Tarjeta({ titulo, extra, children, estilo }) {
 }
 
 // De dónde sale un dato: generado de CMaNGOS 1.12 (aproximado para Forever), del cliente
-// de Forever, o curado a mano.
-const ORIGEN = {
+// de Forever, o curado a mano. Las tres etiquetas se distinguen entre sí (texto y color).
+//
+// Una clave que NO está en esta tabla no se filtra en silencio ni se etiqueta como
+// una fuente conocida: se muestra como «fuente desconocida» con su clave cruda, para
+// que se vea que no sabemos de dónde sale el dato (docs/MODELO-DATOS.md §Fuentes).
+// Con `fallback`, además, una fuente ausente o vacía se declara como tal en vez de
+// desaparecer: un dato sin procedencia declarada sigue siendo un dato sin procedencia.
+const FUENTES = {
   'cmangos-1.12': { k: 'origen.cmangos', c: C.naranja },
   'cliente-forever': { k: 'origen.cliente', c: C.verde },
   curado: { k: 'origen.curado', c: C.azul },
 }
-export function Origen({ f, lang }) {
-  const lista = Array.isArray(f) ? f : f ? [f] : []
+const SIN_DECLARAR = { k: 'origen.sinDeclarar', c: C.texto3 }
+export function Origen({ f, lang, fallback }) {
+  const crudas = (Array.isArray(f) ? f : f == null ? [] : [f])
+    .map((x) => (x == null ? '' : String(x).trim()))
+    .filter((x) => x !== '')
+  const items = crudas.length
+    ? crudas.map((x) => (FUENTES[x]
+      ? { clave: x, k: FUENTES[x].k, c: FUENTES[x].c }
+      : { clave: x, k: 'origen.desconocida', c: C.texto3, desconocida: true }))
+    : (fallback ? [{ clave: '', k: SIN_DECLARAR.k, c: SIN_DECLARAR.c, sinDeclarar: true }] : [])
   return (
-    <span style={{ display: 'inline-flex', gap: 4 }}>
-      {lista.filter((x) => ORIGEN[x]).map((x) => (
-        <span key={x} title={t(lang, ORIGEN[x].k + '.ayuda')} style={{ ...S.chip, borderColor: ORIGEN[x].c, color: ORIGEN[x].c }}>
-          {t(lang, ORIGEN[x].k)}
+    <span style={{ display: 'inline-flex', gap: 4, flexWrap: 'wrap' }}>
+      {items.map((o, i) => (
+        <span
+          key={(o.clave || 'sin-declarar') + ':' + i}
+          data-origen={o.clave || 'sin-declarar'}
+          data-desconocida={o.desconocida ? '1' : undefined}
+          title={t(lang, o.k + '.ayuda')}
+          style={{ ...S.chip, borderColor: o.c, color: o.c, borderStyle: o.desconocida || o.sinDeclarar ? 'dashed' : undefined }}
+        >
+          {o.desconocida ? t(lang, 'origen.desconocida') + ': ' + o.clave : t(lang, o.k)}
         </span>
       ))}
     </span>

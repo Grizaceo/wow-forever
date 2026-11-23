@@ -82,7 +82,7 @@ no durante render; una nueva carga del módulo actualiza la hoja existente. La
 regresión falla contra el bundle anterior (`backgroundImage: none`) y pasa contra
 el nuevo. En una repetición local del tratamiento: medianas de 55,7 ms a dungeons,
 23,7 ms a profesiones y 22,5 ms a ruta. Son mediciones headless de esa corrida,
-no promesas para todos los equipos. Los gates finales incluyen 420 checks de
+no promesas para todos los equipos. Los gates finales incluyen 443 checks de
 navegador y la CI ejecuta esos checks solo en Linux.
 
 ## Limitaciones
