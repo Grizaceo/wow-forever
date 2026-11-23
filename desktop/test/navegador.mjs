@@ -59,6 +59,7 @@ for (const tema of ['claro', 'oscuro']) {
   ;({ p, cerrar } = await a.abrir(tema, { perfil: PERFILES.cazadorHorda }))
   await p.locator('#wf-raza').waitFor()
   check(tema + ': solo tres secciones principales', (await ids(p, 'Secciones principales')).join() === principales.join())
+  check(tema + ': Perfil sin selector redundante de profesiones', await p.getByRole('checkbox', { name: 'Peletería', exact: true }).count() === 0)
   for (const [grupo, etiqueta, hojas] of [
     ['personaje', 'Secciones de Personaje', ['perfil', 'ruta', 'clase', 'profesiones']],
     ['mercado', null, ['mercado']],
@@ -73,6 +74,18 @@ for (const tema of ['claro', 'oscuro']) {
       check(tema + ': ' + id + ' activa un panel visible', await tab.getAttribute('aria-selected') === 'true' && await panel.isVisible() && !(await panel.locator('[role="alert"]').count()))
     }
   }
+  await elegir(p, 'personaje')
+  await elegir(p, 'profesiones')
+  const oficio = (name) => p.getByRole('checkbox', { name, exact: true })
+  check(tema + ': Profesiones conserva selección guardada', await oficio('Peletería').isChecked() && await oficio('Desuello').isChecked() && await oficio('Cocina').isChecked())
+  await oficio('Alquimia').click()
+  check(tema + ': máximo dos profesiones principales', !(await oficio('Alquimia').isChecked()))
+  await oficio('Peletería').click()
+  await oficio('Alquimia').click()
+  await oficio('Pesca').click()
+  await elegir(p, 'perfil')
+  const guardadoProf = await p.evaluate((k) => JSON.parse(localStorage.getItem(k)), PREF + 'perfil')
+  check(tema + ': cambios de profesiones persisten sin alterar personaje', guardadoProf.profesiones.includes(171) && !guardadoProf.profesiones.includes(165) && guardadoProf.secundarias.includes(356) && guardadoProf.clase === 3 && guardadoProf.nivel === 30)
   check(tema + ': no ensucia window con globales de la guía', await p.evaluate(() =>
     ['HunterMarket', 'HunterHistory', 'HunterDeals', 'HunterChart', 'HunterFarm', 'HunterDropData', 'HunterMarketCatalog',
      'GUIDE_HUNTER', 'GUIDE_WARRIOR', 'GUIDE_SHAMAN', 'GUIDE_LEGACY'].every((k) => !(k in window))))

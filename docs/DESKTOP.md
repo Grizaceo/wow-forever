@@ -52,6 +52,7 @@ vuelve a leerlo tras guardar.
 ## Navegación
 
 - **Character** abre **Profile** y agrupa **Route**, **Class** y **Professions**.
+- **Professions** concentra la selección de profesiones principales (máximo dos) y secundarias; Profile ya no repite ese bloque. Los cambios conservan los demás campos del perfil.
 - **Market** queda como segunda sección principal, sin cambios en su navegación interna.
 - **Others and Configuration** agrupa **Dungeons**, **Curated guide** (solo si hay guía para el perfil),
   **Legacy** y **Settings**. Settings incluye idioma de la interfaz y recarga de datos locales.

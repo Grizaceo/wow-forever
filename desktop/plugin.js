@@ -35225,7 +35225,7 @@ function agregarTextos(es, en) {
 
 // src/vistas/personaje.jsx
 import { useMemo as useMemo4, useState as useState4 } from "react";
-import { Button as Button4, Checkbox as Checkbox2, Input as Input2, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@hermes/plugin-sdk";
+import { Button as Button4, Input as Input2, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@hermes/plugin-sdk";
 
 // src/ui.jsx
 import { Fragment } from "react";
@@ -75330,7 +75330,7 @@ function Selector({ etiqueta, valor, opciones, onChange, id }) {
     ] })
   ] });
 }
-function VistaPersonaje({ ctx, perfil, guardarPerfil, razaSupuesta, lang, irA, puente }) {
+function VistaPersonaje({ ctx, perfil, guardarPerfil, razaSupuesta, lang, puente }) {
   const [borrador, setBorrador] = useState4(perfil);
   const [estado, setEstado] = useState4("");
   const [copia, setCopia] = useState4(null);
@@ -75368,7 +75368,6 @@ function VistaPersonaje({ ctx, perfil, guardarPerfil, razaSupuesta, lang, irA, p
   };
   const razas = p.faccion && p.clase ? razasPara(D.personaje, p.faccion, p.clase) : [];
   const clasesFac = p.faccion ? CLASES.filter((c) => razasPara(D.personaje, p.faccion, c).length) : CLASES;
-  const toggle = (lista2, id, max) => lista2.includes(id) ? lista2.filter((x) => x !== id) : lista2.length < max ? [...lista2, id] : lista2;
   return /* @__PURE__ */ jsxs5(Fragment6, { children: [
     /* @__PURE__ */ jsxs5(Tarjeta, { titulo: t(lang, "tab.personaje"), extra: /* @__PURE__ */ jsx5(Origen, { f: "cliente-forever", lang }), children: [
       razaSupuesta ? /* @__PURE__ */ jsx5(Aviso, { children: t(lang, "perfil.supuesta") }) : null,
@@ -75429,35 +75428,6 @@ function VistaPersonaje({ ctx, perfil, guardarPerfil, razaSupuesta, lang, irA, p
       /* @__PURE__ */ jsx5("div", { style: S.sub, role: "status", children: estado })
     ] }),
     /* @__PURE__ */ jsx5(TarjetaSimc, { ctx, lang, perfil: p, onAplicar: cambiar, puente, onResumen: setResumenSimc }),
-    /* @__PURE__ */ jsxs5(Tarjeta, { titulo: t(lang, "perfil.profesiones"), children: [
-      /* @__PURE__ */ jsx5("div", { style: { display: "flex", flexWrap: "wrap", gap: 12 }, children: PRINCIPALES.map((id) => /* @__PURE__ */ jsxs5("label", { style: { display: "flex", gap: 6, alignItems: "\
-center" }, children: [
-        /* @__PURE__ */ jsx5(
-          Checkbox2,
-          {
-            checked: p.profesiones.includes(id),
-            onCheckedChange: () => cambiar({ profesiones: toggle(p.profesiones, id, 2) })
-          }
-        ),
-        nombre(D.profesiones.profesiones[id].n, lang)
-      ] }, id)) }),
-      /* @__PURE__ */ jsx5("span", { style: S.etiqueta, children: t(lang, "perfil.secundarias") }),
-      /* @__PURE__ */ jsx5("div", { style: { display: "flex", flexWrap: "wrap", gap: 12 }, children: SECUNDARIAS.map((id) => /* @__PURE__ */ jsxs5("label", { style: { display: "flex", gap: 6, alignItems: "\
-center" }, children: [
-        /* @__PURE__ */ jsx5(
-          Checkbox2,
-          {
-            checked: p.secundarias.includes(id),
-            onCheckedChange: () => cambiar({ secundarias: toggle(p.secundarias, id, 3) })
-          }
-        ),
-        nombre(D.profesiones.profesiones[id].n, lang)
-      ] }, id)) }),
-      p.faccion && p.raza && p.clase ? /* @__PURE__ */ jsx5("div", { children: /* @__PURE__ */ jsxs5(Button4, { size: "xs", onClick: () => irA("clase"), children: [
-        t(lang, "tab.clase"),
-        " →"
-      ] }) }) : null
-    ] }),
     /* @__PURE__ */ jsxs5(Tarjeta, { titulo: t(lang, "perfil.copiar"), children: [
       /* @__PURE__ */ jsx5("div", { style: S.sub, children: t(lang, "perfil.copiar.ayuda") }),
       /* @__PURE__ */ jsx5("div", { children: /* @__PURE__ */ jsx5(Button4, { size: "xs", variant: "outline", disabled: !resumen, onClick: copiar, children: t(lang, "perfil.copiar") }) }),
@@ -75796,7 +75766,7 @@ function alternarEnLista(lista2, id, puesto) {
 }
 
 // src/vistas/ruta/curada.jsx
-import { Checkbox as Checkbox3, SegmentedControl } from "@hermes/plugin-sdk";
+import { Checkbox as Checkbox2, SegmentedControl } from "@hermes/plugin-sdk";
 import { Fragment as Fragment8, jsx as jsx7, jsxs as jsxs7 } from "react/jsx-runtime";
 agregarTextos({
   "ruta.curada": "Ruta curada",
@@ -75908,7 +75878,7 @@ function CuradaRuta({ datos, build, pasos, onPaso, onGuardar, perfil, lang }) {
                 const id = m.lvl + "|" + i;
                 const hecho = pasos.has(id);
                 return /* @__PURE__ */ jsxs7("label", { "data-paso": id, style: { display: "flex", gap: 8, alignItems: "baseline", fontSize: 12, opacity: hecho ? 0.65 : 1 }, children: [
-                  /* @__PURE__ */ jsx7(Checkbox3, { checked: hecho, onCheckedChange: (v) => onPaso(id, v) }),
+                  /* @__PURE__ */ jsx7(Checkbox2, { checked: hecho, onCheckedChange: (v) => onPaso(id, v) }),
                   /* @__PURE__ */ jsx7("span", { style: { minWidth: 28, color: C.texto3 }, children: m.lvl }),
                   /* @__PURE__ */ jsx7("span", { style: S.chip, children: m.cat }),
                   m.loc ? /* @__PURE__ */ jsx7("span", { style: S.chip, children: locLabel(m.loc) }) : null,
@@ -76063,7 +76033,7 @@ function VistaRuta({ almacen, estado, recargar, perfil, lang }) {
 
 // src/vistas/profesiones.jsx
 import { useEffect as useEffect4, useMemo as useMemo10, useState as useState9 } from "react";
-import { Button as Button7, Input as Input3, Select as Select2, SelectContent as SelectContent2, SelectItem as SelectItem2, SelectTrigger as SelectTrigger2, SelectValue as SelectValue2 } from "@hermes/plugin-sdk";
+import { Button as Button7, Checkbox as Checkbox4, Input as Input3, Select as Select2, SelectContent as SelectContent2, SelectItem as SelectItem2, SelectTrigger as SelectTrigger2, SelectValue as SelectValue2 } from "@hermes/plugin-sdk";
 
 // src/recetas-propias.js
 var CLAVE3 = "recetas-propias";
@@ -76220,7 +76190,7 @@ async function leerNiveles(ctx) {
 
 // src/vistas/profesiones/tabla.jsx
 import { useEffect as useEffect3, useMemo as useMemo6, useState as useState7 } from "react";
-import { Checkbox as Checkbox4, SearchField, SegmentedControl as SegmentedControl2 } from "@hermes/plugin-sdk";
+import { Checkbox as Checkbox3, SearchField, SegmentedControl as SegmentedControl2 } from "@hermes/plugin-sdk";
 import { Fragment as Fragment10, jsx as jsx9, jsxs as jsxs9 } from "react/jsx-runtime";
 agregarTextos({
   "prof.recetas": "Recetas",
@@ -76371,7 +76341,7 @@ function TablaRecetas({ prof, skill, precios, items, faccion, lang, sel, onSel, 
           ] }),
           /* @__PURE__ */ jsx9(SearchField, { placeholder: t(lang, "prof.buscar"), value: q, onChange: setQ }),
           propiasAqui ? /* @__PURE__ */ jsxs9("label", { style: { ...S.chip, display: "inline-flex", alignItems: "center", gap: 6, cursor: "pointer" }, children: [
-            /* @__PURE__ */ jsx9(Checkbox4, { checked: ocultarMias, onCheckedChange: (v) => setOcultarMias(!!v) }),
+            /* @__PURE__ */ jsx9(Checkbox3, { checked: ocultarMias, onCheckedChange: (v) => setOcultarMias(!!v) }),
             /* @__PURE__ */ jsx9("span", { children: t(lang, "prof.ocultar.tengo") })
           ] }) : null
         ] }),
@@ -76397,7 +76367,7 @@ function TablaRecetas({ prof, skill, precios, items, faccion, lang, sel, onSel, 
                 style: { cursor: "pointer", background: activa ? C.fondo3 : void 0 },
                 children: [
                   /* @__PURE__ */ jsx9("td", { style: { ...S.td, width: 1 }, onClick: (e) => e.stopPropagation(), children: onPropia ? /* @__PURE__ */ jsx9(
-                    Checkbox4,
+                    Checkbox3,
                     {
                       checked: tiene(r),
                       onCheckedChange: () => onPropia(r.spell),
@@ -76886,7 +76856,17 @@ var PROCEDENCIA_PROF = [
   "data/items.json",
   "builds: cliente-forever " + (D.profesiones.meta?.builds?.["cliente-forever"] || "?") + " / cmangos-1.12 " + (D.profesiones.meta?.builds?.["cmangos-1.12"] || "?")
 ];
-function VistaProfesiones({ ctx, estado, perfil, lang, irA }) {
+function VistaProfesiones({ ctx, estado, perfil, lang, irA, guardarPerfil }) {
+  const toggle = (lista2, id, max) => lista2.includes(id) ? lista2.filter((x) => x !== id) : lista2.length < max ? [...lista2, id] : lista2;
+  const [errorPerfil, setErrorPerfil] = useState9("");
+  const cambiarProfesiones = async (parcial) => {
+    try {
+      const r = await guardarPerfil({ ...perfil, ...parcial });
+      setErrorPerfil(r.ok ? "" : t(lang, "perfil.incompleto"));
+    } catch (e) {
+      setErrorPerfil(e.message || String(e));
+    }
+  };
   const datos = D.profesiones.profesiones;
   const orden = useMemo10(() => {
     const elegidas = [...perfil.profesiones || [], ...perfil.secundarias || []].filter((id) => datos[String(id)]);
@@ -76988,6 +76968,32 @@ function VistaProfesiones({ ctx, estado, perfil, lang, irA }) {
   }), [prof, pidReal, skill, recetaSel, catalogo, precios, lang, resumenPerfil, estado.market, perfil.reino, recetario, skillDeclarado]);
   if (!prof) return /* @__PURE__ */ jsx13(Tarjeta, { titulo: t(lang, "tab.profesiones"), children: /* @__PURE__ */ jsx13(Hueco, { lang, children: t(lang, "prof.huecoEntrenadores") }) });
   return /* @__PURE__ */ jsxs13(Fragment12, { children: [
+    /* @__PURE__ */ jsxs13(Tarjeta, { titulo: t(lang, "perfil.profesiones"), children: [
+      /* @__PURE__ */ jsx13("div", { style: { display: "flex", flexWrap: "wrap", gap: 12 }, children: PRINCIPALES.map((id) => /* @__PURE__ */ jsxs13("label", { style: { display: "flex", gap: 6, alignItems: "\
+center" }, children: [
+        /* @__PURE__ */ jsx13(
+          Checkbox4,
+          {
+            checked: perfil.profesiones.includes(id),
+            onCheckedChange: () => cambiarProfesiones({ profesiones: toggle(perfil.profesiones, id, 2) })
+          }
+        ),
+        nombre(D.profesiones.profesiones[id].n, lang)
+      ] }, id)) }),
+      /* @__PURE__ */ jsx13("span", { style: S.etiqueta, children: t(lang, "perfil.secundarias") }),
+      /* @__PURE__ */ jsx13("div", { style: { display: "flex", flexWrap: "wrap", gap: 12 }, children: SECUNDARIAS.map((id) => /* @__PURE__ */ jsxs13("label", { style: { display: "flex", gap: 6, alignItems: "\
+center" }, children: [
+        /* @__PURE__ */ jsx13(
+          Checkbox4,
+          {
+            checked: perfil.secundarias.includes(id),
+            onCheckedChange: () => cambiarProfesiones({ secundarias: toggle(perfil.secundarias, id, 3) })
+          }
+        ),
+        nombre(D.profesiones.profesiones[id].n, lang)
+      ] }, id)) })
+    ] }),
+    errorPerfil ? /* @__PURE__ */ jsx13("div", { role: "alert", style: S.sub, children: errorPerfil }) : null,
     /* @__PURE__ */ jsx13(Tarjeta, { titulo: t(lang, "tab.profesiones"), extra: /* @__PURE__ */ jsx13(Origen, { f: prof.f || "cmangos-1.12", lang }), children: /* @__PURE__ */ jsxs13("div", { style: {
     display: "flex", flexWrap: "wrap", gap: 12, alignItems: "flex-end" }, children: [
       /* @__PURE__ */ jsxs13("label", { style: S.campo, htmlFor: "wf-profesion", children: [
