@@ -108,6 +108,12 @@ deduplicación, acumulación, pausa al borrar, reanudación y descarga del plugi
 
 ## Contabilidad personal TSM · Mis ventas
 
+En Mercado → Ofertas, Auctionator (escaneo y precios) y Mis ventas TSM se presentan
+en columnas iguales, alineadas arriba cuando el contenedor lo permite. Cada columna
+tiene una base de 560 px; en paneles estrechos se apilan. Las tablas conservan scroll
+horizontal local, sin ensanchar toda la página. La distribución no cambia importaciones
+ni introduce una valoración algorítmica nueva.
+
 - `src/tsm.js` importa como **datos** `TradeSkillMasterDB` del addon TSM 4: campos
   `r@<reino>@internalData@csvSales/csvBuys/csvExpired/csvCancelled`. Se comprueba la cabecera
   CSV exacta; un esquema desconocido, Lua ejecutable, truncamiento o cantidades/importes

@@ -80055,256 +80055,264 @@ rvada: " : s.kind === "chest-obs" ? "Cofre observado: " : "";
   };
   return /* @__PURE__ */ jsx21("div", { style: S.pagina, children: /* @__PURE__ */ jsxs22("div", { style: S.cuerpo, children: [
     barraSub,
-    /* @__PURE__ */ jsxs22(Tarjeta, { titulo: t(lang, "mercado.scan.titulo"), extra: /* @__PURE__ */ jsx21("span", { style: S.chip, children: t(lang, "mercado.tusDatos") }), children: [
-      /* @__PURE__ */ jsxs22("div", { style: { display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }, children: [
-        /* @__PURE__ */ jsx21(Button10, { onClick: () => leerCarpeta(false), disabled: importando, children: t(lang, "mercado.leer") }),
-        /* @__PURE__ */ jsx21(Button10, { variant: "outline", onClick: () => leerCarpeta(true), disabled: importando, children: t(lang, "mercado.otra") }),
-        /* @__PURE__ */ jsx21(Button10, { variant: "outline", onClick: () => fileRef.current?.click(), disabled: importando, children: t(lang, "mercado.archivo") }),
-        /* @__PURE__ */ jsx21("input", { ref: fileRef, type: "file", accept: ".lua", onChange: onArchivo, style: { display: "none" } }),
-        /* @__PURE__ */ jsx21(Button10, { variant: "outline", onClick: borrar, disabled: importando || !snapshot, children: confirmBorrar ? t(lang, "mercado.borrarSi") : t(lang, "mercado.borrar") }),
-        /* @__PURE__ */ jsx21(
-          Button10,
+    /* @__PURE__ */ jsxs22("div", { "data-testid": "market-sources", style: { display: "flex", flexWrap: "wrap", gap: 12, alignItems: "flex-start", minWidth: 0 }, children: [
+      /* @__PURE__ */ jsxs22("div", { "data-testid": "auctionator-panel", style: { display: "flex", flexDirection: "column", gap: 12, flex: "1 1 560px", minWidth: 0, maxWidth: "100%" }, children: [
+        /* @__PURE__ */ jsxs22(Tarjeta, { titulo: t(lang, "mercado.scan.titulo"), extra: /* @__PURE__ */ jsx21("span", { style: S.chip, children: t(lang, "mercado.tusDatos") }), children: [
+          /* @__PURE__ */ jsxs22("div", { style: { display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }, children: [
+            /* @__PURE__ */ jsx21(Button10, { onClick: () => leerCarpeta(false), disabled: importando, children: t(lang, "mercado.leer") }),
+            /* @__PURE__ */ jsx21(Button10, { variant: "outline", onClick: () => leerCarpeta(true), disabled: importando, children: t(lang, "mercado.otra") }),
+            /* @__PURE__ */ jsx21(Button10, { variant: "outline", onClick: () => fileRef.current?.click(), disabled: importando, children: t(lang, "mercado.archivo") }),
+            /* @__PURE__ */ jsx21("input", { ref: fileRef, type: "file", accept: ".lua", onChange: onArchivo, style: { display: "none" } }),
+            /* @__PURE__ */ jsx21(Button10, { variant: "outline", onClick: borrar, disabled: importando || !snapshot, children: confirmBorrar ? t(lang, "mercado.borrarSi") : t(lang, "mercado.borrar") }),
+            /* @__PURE__ */ jsx21(
+              Button10,
+              {
+                variant: "outline",
+                "data-testid": "export-cli",
+                onClick: exportarPreciosCli,
+                disabled: importando || exportandoCli || !snapshot || !realm,
+                children: exportandoCli ? cp(lang, "Exportando…", "Exporting…") : cp(lang, "Exportar precios para el CLI", "Export prices for CLI")
+              }
+            )
+          ] }),
+          /* @__PURE__ */ jsxs22("label", { style: S.sub, children: [
+            /* @__PURE__ */ jsx21(Checkbox9, { checked: auto.enabled, onCheckedChange: cambiarAuto, disabled: importando }),
+            lang === "en" ? " Automatic tracking · every 30 s while Hermes is open" : " Seguimiento automático · cada 30 s con Hermes abierto"
+          ] }),
+          /* @__PURE__ */ jsxs22("p", { "data-testid": "auctionator-auto-status", style: S.sub, children: [
+            lang === "en" ? "Automatic status: " : "Estado automático: ",
+            auto.status,
+            auto.checkedAt ? ` · ${fmtFecha(auto.checkedAt)}` : "",
+            auto.message ? ` · ${auto.message}` : "",
+            auto.error && !auto.message ? ` · ${auto.error}` : "",
+            auto.histOk === false ? lang === "en" ? " · History pending; will retry." : " · Historial pendiente; se reintentará." : ""
+          ] }),
+          puente && /* @__PURE__ */ jsx21(PuenteEstado, { puente, lang }),
+          /* @__PURE__ */ jsx21("p", { style: S.sub, children: lang === "en" ? "Grant WTF/Account/<account>/SavedVariables once (a parent folder only if the bounded search can complete). Not Interface\
+/AddOns. After an in-game scan, use /reload or log out to write prices to disk. Changing tabs does not stop tracking." : "Autoriza una vez WTF/Account/<cuenta>/SavedVariables (una carpeta superior sol\
+o si la búsqueda acotada puede completarse). No Interface/AddOns. Tras escanear en el juego, usa /reload o cierra sesión para guardar los precios en disco. Cambiar de pestaña no detiene el seguimiento\
+." }),
+          /* @__PURE__ */ jsx21("p", { role: "status", "aria-live": "polite", style: { ...S.sub, margin: 0 }, children: mensaje || (snapshot ? t(lang, "mercado.restaurado") : t(lang, "mercado.vacio.sc\
+an")) }),
+          snapshot && fres && /* @__PURE__ */ jsxs22("div", { style: { display: "flex", gap: 10, flexWrap: "wrap", fontSize: 12, color: C.texto2 }, children: [
+            /* @__PURE__ */ jsxs22("span", { children: [
+              t(lang, "mercado.frescura.importado"),
+              ": ",
+              fmtFecha(fres.importedAt)
+            ] }),
+            /* @__PURE__ */ jsxs22("span", { children: [
+              t(lang, "mercado.frescura.max"),
+              ": ",
+              fres.fechaMax || "—",
+              fres.diasDesde != null ? ` (${t(lang, "mercado.frescura.hace", { dias: fres.diasDesde })})` : ""
+            ] }),
+            histInfo.days > 0 && /* @__PURE__ */ jsx21("span", { children: t(lang, "mercado.frescura.hist", { dias: histInfo.days, entradas: histInfo.entries }) })
+          ] }),
+          exportCli && /* @__PURE__ */ jsx21("div", { "data-testid": "export-cli-estado", role: "status", "aria-live": "polite", style: { ...S.sub, marginTop: 8 }, children: exportCli.ok ? /* @__PURE__ */ jsxs22(
+          Fragment16, { children: [
+            /* @__PURE__ */ jsxs22("span", { style: { color: C.verde }, children: [
+              "✓ ",
+              cp(
+                lang,
+                `Exportado precios-cli.json · reino ${exportCli.reino} · ${exportCli.n} ítems con precio.`,
+                `Exported precios-cli.json · realm ${exportCli.reino} · ${exportCli.n} priced items.`
+              )
+            ] }),
+            /* @__PURE__ */ jsxs22("div", { style: { display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginTop: 4 }, children: [
+              /* @__PURE__ */ jsx21("code", { style: { fontSize: 11, color: C.texto2 }, children: exportCli.cmd }),
+              /* @__PURE__ */ jsx21(
+                Button10,
+                {
+                  variant: "outline",
+                  "data-testid": "export-cli-copiar",
+                  onClick: () => {
+                    Promise.resolve(ctx.os.writeClipboard(exportCli.cmd)).catch(() => {
+                    });
+                  },
+                  children: cp(lang, "Copiar comando", "Copy command")
+                }
+              )
+            ] }),
+            /* @__PURE__ */ jsx21("p", { style: { margin: "4px 0 0", fontSize: 11, color: C.texto3 }, children: cp(
+              lang,
+              "Queda en la carpeta de datos del plugin (Ajustes → Plugins → revelar carpeta). Formato canónico {valores, reino, fecha} que lee consultar.py maxeo --precios.",
+              "Lands in the plugin data folder (Settings → Plugins → reveal folder). Canonical {valores, reino, fecha} format read by consultar.py maxeo --precios."
+            ) })
+          ] }) : /* @__PURE__ */ jsxs22("span", { style: { color: C.rojo }, children: [
+            "✗ ",
+            cp(lang, "No se exportó: ", "Export failed: "),
+            exportCli.error
+          ] }) }),
+          fres?.aviso && /* @__PURE__ */ jsx21(Aviso, { children: t(lang, "mercado.frescura.aviso") }),
+          (snapshot?.warnings || []).map((w, i) => /* @__PURE__ */ jsxs22("p", { style: S.sub, children: [
+            "⚠ ",
+            w
+          ] }, i)),
+          esLegacy || snapshot && !scopes.length ? /* @__PURE__ */ jsxs22("div", { role: "status", "data-testid": "procedencia-desconocida", style: { ...S.aviso, marginTop: 10 }, children: [
+            /* @__PURE__ */ jsx21("strong", { children: cp(lang, "Procedencia DESCONOCIDA (UNKNOWN)", "UNKNOWN provenance") }),
+            " — ",
+            cp(
+              lang,
+              "Estos precios vienen de Auctionator sin exportador verificado: la región, las reglas, la casa y el canal son desconocidos. No se pueden comparar con otra casa ni usar para recomendar ve\
+ntas.",
+              "These prices come from Auctionator with no verified exporter: region, ruleset, house and posting channel are unknown. They cannot be compared with another house or used to recommend sal\
+es."
+            )
+          ] }) : null,
+          /* @__PURE__ */ jsxs22("details", { style: { fontSize: 12 }, children: [
+            /* @__PURE__ */ jsx21("summary", { style: { cursor: "pointer", color: C.texto3 }, children: t(lang, "mercado.privacidad.titulo") }),
+            /* @__PURE__ */ jsx21("p", { style: S.sub, children: t(lang, "mercado.privacidad.texto") })
+          ] })
+        ] }),
+        /* @__PURE__ */ jsx21(Tarjeta, { titulo: t(lang, "mercado.aviso.titulo"), children: /* @__PURE__ */ jsx21("p", { style: { ...S.sub, margin: 0 }, children: t(lang, "mercado.aviso.texto") }) }),
+        /* @__PURE__ */ jsxs22(
+          Tarjeta,
           {
-            variant: "outline",
-            "data-testid": "export-cli",
-            onClick: exportarPreciosCli,
-            disabled: importando || exportandoCli || !snapshot || !realm,
-            children: exportandoCli ? cp(lang, "Exportando…", "Exporting…") : cp(lang, "Exportar precios para el CLI", "Export prices for CLI")
+            titulo: t(lang, "mercado.tabla.titulo"),
+            extra: /* @__PURE__ */ jsx21(Origen, { f: ["cliente-forever", "cmangos-1.12"], lang }),
+            children: [
+              /* @__PURE__ */ jsxs22("div", { style: { display: "flex", gap: 12, flexWrap: "wrap", alignItems: "flex-end" }, children: [
+                /* @__PURE__ */ jsxs22("label", { style: S.campo, children: [
+                  /* @__PURE__ */ jsx21("span", { style: S.etiqueta, children: t(lang, "mercado.realm") }),
+                  /* @__PURE__ */ jsxs22(Select4, { value: realm ? realmId(realm) : realmName, onValueChange: (v) => {
+                    const r = snapshot.realms.find((r2) => realmId(r2) === v);
+                    setRealmChoice(v);
+                    setRealmName(r?.name || "");
+                    setPagina(0);
+                    setDetalleKey(null);
+                  }, disabled: !snapshot, children: [
+                    /* @__PURE__ */ jsx21(SelectTrigger4, { "aria-label": t(lang, "mercado.realm"), children: /* @__PURE__ */ jsx21(SelectValue4, { placeholder: "—" }) }),
+                    /* @__PURE__ */ jsx21(SelectContent4, { children: (snapshot?.realms || []).map((r) => /* @__PURE__ */ jsxs22(SelectItem4, { value: realmId(r), children: [
+                      r.name,
+                      snapshot.realms.filter((x) => x.name === r.name).length > 1 ? ` · ${r.identity?.auctionPool || "UNKNOWN"} · ${r.identity?.postingChannel || "—"}` : ""
+                    ] }, realmId(r))) })
+                  ] })
+                ] }),
+                /* @__PURE__ */ jsxs22("label", { style: { ...S.campo, flex: 1, minWidth: 220 }, children: [
+                  /* @__PURE__ */ jsx21("span", { style: S.etiqueta, children: t(lang, "mercado.buscar") }),
+                  /* @__PURE__ */ jsx21(SearchField2, { value: busqueda, onChange: (v) => {
+                    setBusqueda(v);
+                    setPagina(0);
+                  }, placeholder: t(lang, "mercado.buscar.ph") })
+                ] }),
+                /* @__PURE__ */ jsxs22("label", { style: S.campo, children: [
+                  /* @__PURE__ */ jsx21("span", { style: S.etiqueta, children: t(lang, "mercado.orden") }),
+                  /* @__PURE__ */ jsxs22(Select4, { value: orden, onValueChange: (v) => {
+                    setOrden(v);
+                    setPagina(0);
+                  }, children: [
+                    /* @__PURE__ */ jsx21(SelectTrigger4, { "aria-label": t(lang, "mercado.orden"), children: /* @__PURE__ */ jsx21(SelectValue4, {}) }),
+                    /* @__PURE__ */ jsx21(SelectContent4, { children: ORDENES.map((o) => /* @__PURE__ */ jsx21(SelectItem4, { value: o, children: t(lang, `mercado.orden.${o}`) }, o)) })
+                  ] })
+                ] })
+              ] }),
+              /* @__PURE__ */ jsxs22("div", { style: { display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center" }, children: [
+                /* @__PURE__ */ jsx21(Checkbox9, { checked: soloRecientes, onCheckedChange: (v) => {
+                  setSoloRecientes(!!v);
+                  setPagina(0);
+                } }),
+                /* @__PURE__ */ jsx21("span", { style: { fontSize: 12 }, children: t(lang, "mercado.f.recientes") }),
+                /* @__PURE__ */ jsx21(Checkbox9, { checked: conFuente, onCheckedChange: (v) => {
+                  setConFuente(!!v);
+                  setPagina(0);
+                } }),
+                /* @__PURE__ */ jsxs22("span", { style: { fontSize: 12 }, children: [
+                  t(lang, "mercado.f.conFuente"),
+                  " (",
+                  nivel,
+                  ")"
+                ] }),
+                /* @__PURE__ */ jsx21(Checkbox9, { checked: soloFarmable, onCheckedChange: (v) => {
+                  setSoloFarmable(!!v);
+                  setPagina(0);
+                } }),
+                /* @__PURE__ */ jsx21("span", { style: { fontSize: 12 }, children: t(lang, "mercado.f.farmeable") }),
+                /* @__PURE__ */ jsx21(Checkbox9, { checked: soloOfertas, onCheckedChange: (v) => {
+                  setSoloOfertas(!!v);
+                  setPagina(0);
+                } }),
+                /* @__PURE__ */ jsx21("span", { style: { fontSize: 12 }, children: t(lang, "mercado.f.ofertas") })
+              ] }),
+              /* @__PURE__ */ jsxs22("details", { style: { fontSize: 12 }, children: [
+                /* @__PURE__ */ jsx21("summary", { style: { cursor: "pointer", color: C.texto3 }, children: t(lang, "mercado.filtros.titulo") }),
+                /* @__PURE__ */ jsx21("p", { style: S.sub, children: t(lang, "mercado.filtros.texto") })
+              ] }),
+              snapshot && fres && /* @__PURE__ */ jsxs22("p", { style: S.sub, children: [
+                t(lang, "mercado.frescura.importado"),
+                ": ",
+                fmtFecha(fres.importedAt),
+                " · DB ",
+                snapshot.sourceVersion,
+                (snapshot.warnings || []).length ? ` · ${snapshot.warnings.length} ${t(lang, "mercado.avisos")}` : ""
+              ] }),
+              /* @__PURE__ */ jsx21("p", { role: "status", style: S.etiqueta, children: snapshot ? t(lang, "mercado.contador", { visibles: visibles.length, total: items.length, ordenTxt, pag: paginaSegura +
+              1, paginas }) : t(lang, "mercado.vacio.scan") }),
+              /* @__PURE__ */ jsx21("div", { style: { overflowX: "auto" }, children: /* @__PURE__ */ jsxs22("table", { style: S.tabla, children: [
+                /* @__PURE__ */ jsx21("thead", { children: /* @__PURE__ */ jsxs22("tr", { children: [
+                  /* @__PURE__ */ jsx21("th", { style: S.th, children: t(lang, "mercado.col.item") }),
+                  /* @__PURE__ */ jsx21("th", { style: S.th, children: t(lang, "mercado.col.min") }),
+                  /* @__PURE__ */ jsx21("th", { style: S.th, children: t(lang, "mercado.col.dia") }),
+                  /* @__PURE__ */ jsx21("th", { style: S.th, children: t(lang, "mercado.col.oferta") }),
+                  /* @__PURE__ */ jsx21("th", { style: S.th, children: t(lang, "mercado.col.fuente") }),
+                  /* @__PURE__ */ jsx21("th", { style: S.th, children: t(lang, "mercado.col.farmeo") })
+                ] }) }),
+                /* @__PURE__ */ jsx21("tbody", { children: !snapshot ? /* @__PURE__ */ jsx21(FilaVacia, { texto: t(lang, "mercado.vacio.scan") }) : !paginaItems.length ? /* @__PURE__ */ jsx21(FilaVacia,
+                { texto: t(lang, "mercado.vacio.filtros") }) : paginaItems.map((i) => {
+                  const daily = i.history.find((h) => h.day === i.observedDay);
+                  const nombreVisible = nombreItem(i, D.items, CATALOGO2, lang) || i.sourceKey;
+                  const fuente = fuenteResumen(i);
+                  return /* @__PURE__ */ jsxs22("tr", { children: [
+                    /* @__PURE__ */ jsx21("td", { style: S.td, children: /* @__PURE__ */ jsxs22("div", { style: { display: "flex", gap: 6, alignItems: "flex-start", minWidth: 0 }, children: [
+                      /* @__PURE__ */ jsx21(IconoItem, { id: i.itemId, size: 28, titulo: nombreVisible }),
+                      /* @__PURE__ */ jsxs22("div", { style: { minWidth: 0 }, children: [
+                        /* @__PURE__ */ jsx21(
+                          "button",
+                          {
+                            type: "button",
+                            onClick: () => setDetalleKey(i.sourceKey),
+                            style: { background: "none", border: "none", padding: 0, color: C.acento, cursor: "pointer", font: "inherit", textAlign: "left" },
+                            children: nombreVisible
+                          }
+                        ),
+                        i.itemId == null ? /* @__PURE__ */ jsxs22("div", { style: S.etiqueta, children: [
+                          t(lang, "mercado.variante"),
+                          " · ",
+                          i.sourceKey
+                        ] }) : /* @__PURE__ */ jsxs22("div", { style: S.etiqueta, title: t(lang, "mercado.clave") + " " + i.sourceKey, children: [
+                          "#",
+                          i.itemId
+                        ] }),
+                        /* @__PURE__ */ jsx21(InsigniaOferta, { deal: dealOf(i), lang })
+                      ] })
+                    ] }) }),
+                    /* @__PURE__ */ jsx21("td", { style: S.td, children: /* @__PURE__ */ jsx21(Dinero, { cobre: i.unitPriceCopper }) }),
+                    /* @__PURE__ */ jsxs22("td", { style: S.td, children: [
+                      fechaDe(i.observedDay) || "—",
+                      /* @__PURE__ */ jsx21("div", { style: S.etiqueta, children: edadTexto(i) })
+                    ] }),
+                    /* @__PURE__ */ jsx21("td", { style: S.td, children: daily?.available == null ? t(lang, "mercado.det.sinDato") : daily.available }),
+                    /* @__PURE__ */ jsx21("td", { style: { ...S.td, maxWidth: 220 }, children: /* @__PURE__ */ jsx21("div", { title: fuente, style: { overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "\
+nowrap" }, children: fuente }) }),
+                    /* @__PURE__ */ jsx21("td", { style: S.td, children: farmCell(i) })
+                  ] }, i.sourceKey);
+                }) })
+              ] }) }),
+              snapshot && paginas > 1 && /* @__PURE__ */ jsxs22("div", { style: { display: "flex", gap: 8, alignItems: "center" }, children: [
+                /* @__PURE__ */ jsx21(Button10, { variant: "outline", size: "xs", disabled: paginaSegura === 0, onClick: () => setPagina(paginaSegura - 1), children: t(lang, "mercado.anterior") }),
+                /* @__PURE__ */ jsx21(Button10, { variant: "outline", size: "xs", disabled: paginaSegura + 1 >= paginas, onClick: () => setPagina(paginaSegura + 1), children: t(lang, "mercado.siguient\
+e") })
+              ] }),
+              /* @__PURE__ */ jsxs22("p", { style: S.sub, children: [
+                t(lang, "mercado.det.cobertura", { addon: CATALOGO2?.source?.addon || t(lang, "mercado.det.sinCatalogo") }),
+                " ",
+                CATALOGO2?.source?.coverage || ""
+              ] })
+            ]
           }
         )
       ] }),
-      /* @__PURE__ */ jsxs22("label", { style: S.sub, children: [
-        /* @__PURE__ */ jsx21(Checkbox9, { checked: auto.enabled, onCheckedChange: cambiarAuto, disabled: importando }),
-        lang === "en" ? " Automatic tracking · every 30 s while Hermes is open" : " Seguimiento automático · cada 30 s con Hermes abierto"
-      ] }),
-      /* @__PURE__ */ jsxs22("p", { "data-testid": "auctionator-auto-status", style: S.sub, children: [
-        lang === "en" ? "Automatic status: " : "Estado automático: ",
-        auto.status,
-        auto.checkedAt ? ` · ${fmtFecha(auto.checkedAt)}` : "",
-        auto.message ? ` · ${auto.message}` : "",
-        auto.error && !auto.message ? ` · ${auto.error}` : "",
-        auto.histOk === false ? lang === "en" ? " · History pending; will retry." : " · Historial pendiente; se reintentará." : ""
-      ] }),
-      puente && /* @__PURE__ */ jsx21(PuenteEstado, { puente, lang }),
-      /* @__PURE__ */ jsx21("p", { style: S.sub, children: lang === "en" ? "Grant WTF/Account/<account>/SavedVariables once (a parent folder only if the bounded search can complete). Not Interface/Add\
-Ons. After an in-game scan, use /reload or log out to write prices to disk. Changing tabs does not stop tracking." : "Autoriza una vez WTF/Account/<cuenta>/SavedVariables (una carpeta superior solo si\
- la búsqueda acotada puede completarse). No Interface/AddOns. Tras escanear en el juego, usa /reload o cierra sesión para guardar los precios en disco. Cambiar de pestaña no detiene el seguimiento." }),
-      /* @__PURE__ */ jsx21("p", { role: "status", "aria-live": "polite", style: { ...S.sub, margin: 0 }, children: mensaje || (snapshot ? t(lang, "mercado.restaurado") : t(lang, "mercado.vacio.scan")) }),
-      snapshot && fres && /* @__PURE__ */ jsxs22("div", { style: { display: "flex", gap: 10, flexWrap: "wrap", fontSize: 12, color: C.texto2 }, children: [
-        /* @__PURE__ */ jsxs22("span", { children: [
-          t(lang, "mercado.frescura.importado"),
-          ": ",
-          fmtFecha(fres.importedAt)
-        ] }),
-        /* @__PURE__ */ jsxs22("span", { children: [
-          t(lang, "mercado.frescura.max"),
-          ": ",
-          fres.fechaMax || "—",
-          fres.diasDesde != null ? ` (${t(lang, "mercado.frescura.hace", { dias: fres.diasDesde })})` : ""
-        ] }),
-        histInfo.days > 0 && /* @__PURE__ */ jsx21("span", { children: t(lang, "mercado.frescura.hist", { dias: histInfo.days, entradas: histInfo.entries }) })
-      ] }),
-      exportCli && /* @__PURE__ */ jsx21("div", { "data-testid": "export-cli-estado", role: "status", "aria-live": "polite", style: { ...S.sub, marginTop: 8 }, children: exportCli.ok ? /* @__PURE__ */ jsxs22(
-      Fragment16, { children: [
-        /* @__PURE__ */ jsxs22("span", { style: { color: C.verde }, children: [
-          "✓ ",
-          cp(
-            lang,
-            `Exportado precios-cli.json · reino ${exportCli.reino} · ${exportCli.n} ítems con precio.`,
-            `Exported precios-cli.json · realm ${exportCli.reino} · ${exportCli.n} priced items.`
-          )
-        ] }),
-        /* @__PURE__ */ jsxs22("div", { style: { display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginTop: 4 }, children: [
-          /* @__PURE__ */ jsx21("code", { style: { fontSize: 11, color: C.texto2 }, children: exportCli.cmd }),
-          /* @__PURE__ */ jsx21(
-            Button10,
-            {
-              variant: "outline",
-              "data-testid": "export-cli-copiar",
-              onClick: () => {
-                Promise.resolve(ctx.os.writeClipboard(exportCli.cmd)).catch(() => {
-                });
-              },
-              children: cp(lang, "Copiar comando", "Copy command")
-            }
-          )
-        ] }),
-        /* @__PURE__ */ jsx21("p", { style: { margin: "4px 0 0", fontSize: 11, color: C.texto3 }, children: cp(
-          lang,
-          "Queda en la carpeta de datos del plugin (Ajustes → Plugins → revelar carpeta). Formato canónico {valores, reino, fecha} que lee consultar.py maxeo --precios.",
-          "Lands in the plugin data folder (Settings → Plugins → reveal folder). Canonical {valores, reino, fecha} format read by consultar.py maxeo --precios."
-        ) })
-      ] }) : /* @__PURE__ */ jsxs22("span", { style: { color: C.rojo }, children: [
-        "✗ ",
-        cp(lang, "No se exportó: ", "Export failed: "),
-        exportCli.error
-      ] }) }),
-      fres?.aviso && /* @__PURE__ */ jsx21(Aviso, { children: t(lang, "mercado.frescura.aviso") }),
-      (snapshot?.warnings || []).map((w, i) => /* @__PURE__ */ jsxs22("p", { style: S.sub, children: [
-        "⚠ ",
-        w
-      ] }, i)),
-      esLegacy || snapshot && !scopes.length ? /* @__PURE__ */ jsxs22("div", { role: "status", "data-testid": "procedencia-desconocida", style: { ...S.aviso, marginTop: 10 }, children: [
-        /* @__PURE__ */ jsx21("strong", { children: cp(lang, "Procedencia DESCONOCIDA (UNKNOWN)", "UNKNOWN provenance") }),
-        " — ",
-        cp(
-          lang,
-          "Estos precios vienen de Auctionator sin exportador verificado: la región, las reglas, la casa y el canal son desconocidos. No se pueden comparar con otra casa ni usar para recomendar ventas\
-.",
-          "These prices come from Auctionator with no verified exporter: region, ruleset, house and posting channel are unknown. They cannot be compared with another house or used to recommend sales."
-        )
-      ] }) : null,
-      /* @__PURE__ */ jsxs22("details", { style: { fontSize: 12 }, children: [
-        /* @__PURE__ */ jsx21("summary", { style: { cursor: "pointer", color: C.texto3 }, children: t(lang, "mercado.privacidad.titulo") }),
-        /* @__PURE__ */ jsx21("p", { style: S.sub, children: t(lang, "mercado.privacidad.texto") })
-      ] })
+      /* @__PURE__ */ jsx21("div", { style: { flex: "1 1 560px", minWidth: 0, maxWidth: "100%" }, children: /* @__PURE__ */ jsx21(MisVentas, { ventas, auctionSnapshot: snapshot, perfil, lang }) })
     ] }),
-    /* @__PURE__ */ jsx21(Tarjeta, { titulo: t(lang, "mercado.aviso.titulo"), children: /* @__PURE__ */ jsx21("p", { style: { ...S.sub, margin: 0 }, children: t(lang, "mercado.aviso.texto") }) }),
-    /* @__PURE__ */ jsxs22(
-      Tarjeta,
-      {
-        titulo: t(lang, "mercado.tabla.titulo"),
-        extra: /* @__PURE__ */ jsx21(Origen, { f: ["cliente-forever", "cmangos-1.12"], lang }),
-        children: [
-          /* @__PURE__ */ jsxs22("div", { style: { display: "flex", gap: 12, flexWrap: "wrap", alignItems: "flex-end" }, children: [
-            /* @__PURE__ */ jsxs22("label", { style: S.campo, children: [
-              /* @__PURE__ */ jsx21("span", { style: S.etiqueta, children: t(lang, "mercado.realm") }),
-              /* @__PURE__ */ jsxs22(Select4, { value: realm ? realmId(realm) : realmName, onValueChange: (v) => {
-                const r = snapshot.realms.find((r2) => realmId(r2) === v);
-                setRealmChoice(v);
-                setRealmName(r?.name || "");
-                setPagina(0);
-                setDetalleKey(null);
-              }, disabled: !snapshot, children: [
-                /* @__PURE__ */ jsx21(SelectTrigger4, { "aria-label": t(lang, "mercado.realm"), children: /* @__PURE__ */ jsx21(SelectValue4, { placeholder: "—" }) }),
-                /* @__PURE__ */ jsx21(SelectContent4, { children: (snapshot?.realms || []).map((r) => /* @__PURE__ */ jsxs22(SelectItem4, { value: realmId(r), children: [
-                  r.name,
-                  snapshot.realms.filter((x) => x.name === r.name).length > 1 ? ` · ${r.identity?.auctionPool || "UNKNOWN"} · ${r.identity?.postingChannel || "—"}` : ""
-                ] }, realmId(r))) })
-              ] })
-            ] }),
-            /* @__PURE__ */ jsxs22("label", { style: { ...S.campo, flex: 1, minWidth: 220 }, children: [
-              /* @__PURE__ */ jsx21("span", { style: S.etiqueta, children: t(lang, "mercado.buscar") }),
-              /* @__PURE__ */ jsx21(SearchField2, { value: busqueda, onChange: (v) => {
-                setBusqueda(v);
-                setPagina(0);
-              }, placeholder: t(lang, "mercado.buscar.ph") })
-            ] }),
-            /* @__PURE__ */ jsxs22("label", { style: S.campo, children: [
-              /* @__PURE__ */ jsx21("span", { style: S.etiqueta, children: t(lang, "mercado.orden") }),
-              /* @__PURE__ */ jsxs22(Select4, { value: orden, onValueChange: (v) => {
-                setOrden(v);
-                setPagina(0);
-              }, children: [
-                /* @__PURE__ */ jsx21(SelectTrigger4, { "aria-label": t(lang, "mercado.orden"), children: /* @__PURE__ */ jsx21(SelectValue4, {}) }),
-                /* @__PURE__ */ jsx21(SelectContent4, { children: ORDENES.map((o) => /* @__PURE__ */ jsx21(SelectItem4, { value: o, children: t(lang, `mercado.orden.${o}`) }, o)) })
-              ] })
-            ] })
-          ] }),
-          /* @__PURE__ */ jsxs22("div", { style: { display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center" }, children: [
-            /* @__PURE__ */ jsx21(Checkbox9, { checked: soloRecientes, onCheckedChange: (v) => {
-              setSoloRecientes(!!v);
-              setPagina(0);
-            } }),
-            /* @__PURE__ */ jsx21("span", { style: { fontSize: 12 }, children: t(lang, "mercado.f.recientes") }),
-            /* @__PURE__ */ jsx21(Checkbox9, { checked: conFuente, onCheckedChange: (v) => {
-              setConFuente(!!v);
-              setPagina(0);
-            } }),
-            /* @__PURE__ */ jsxs22("span", { style: { fontSize: 12 }, children: [
-              t(lang, "mercado.f.conFuente"),
-              " (",
-              nivel,
-              ")"
-            ] }),
-            /* @__PURE__ */ jsx21(Checkbox9, { checked: soloFarmable, onCheckedChange: (v) => {
-              setSoloFarmable(!!v);
-              setPagina(0);
-            } }),
-            /* @__PURE__ */ jsx21("span", { style: { fontSize: 12 }, children: t(lang, "mercado.f.farmeable") }),
-            /* @__PURE__ */ jsx21(Checkbox9, { checked: soloOfertas, onCheckedChange: (v) => {
-              setSoloOfertas(!!v);
-              setPagina(0);
-            } }),
-            /* @__PURE__ */ jsx21("span", { style: { fontSize: 12 }, children: t(lang, "mercado.f.ofertas") })
-          ] }),
-          /* @__PURE__ */ jsxs22("details", { style: { fontSize: 12 }, children: [
-            /* @__PURE__ */ jsx21("summary", { style: { cursor: "pointer", color: C.texto3 }, children: t(lang, "mercado.filtros.titulo") }),
-            /* @__PURE__ */ jsx21("p", { style: S.sub, children: t(lang, "mercado.filtros.texto") })
-          ] }),
-          snapshot && fres && /* @__PURE__ */ jsxs22("p", { style: S.sub, children: [
-            t(lang, "mercado.frescura.importado"),
-            ": ",
-            fmtFecha(fres.importedAt),
-            " · DB ",
-            snapshot.sourceVersion,
-            (snapshot.warnings || []).length ? ` · ${snapshot.warnings.length} ${t(lang, "mercado.avisos")}` : ""
-          ] }),
-          /* @__PURE__ */ jsx21("p", { role: "status", style: S.etiqueta, children: snapshot ? t(lang, "mercado.contador", { visibles: visibles.length, total: items.length, ordenTxt, pag: paginaSegura +
-          1, paginas }) : t(lang, "mercado.vacio.scan") }),
-          /* @__PURE__ */ jsx21("div", { style: { overflowX: "auto" }, children: /* @__PURE__ */ jsxs22("table", { style: S.tabla, children: [
-            /* @__PURE__ */ jsx21("thead", { children: /* @__PURE__ */ jsxs22("tr", { children: [
-              /* @__PURE__ */ jsx21("th", { style: S.th, children: t(lang, "mercado.col.item") }),
-              /* @__PURE__ */ jsx21("th", { style: S.th, children: t(lang, "mercado.col.min") }),
-              /* @__PURE__ */ jsx21("th", { style: S.th, children: t(lang, "mercado.col.dia") }),
-              /* @__PURE__ */ jsx21("th", { style: S.th, children: t(lang, "mercado.col.oferta") }),
-              /* @__PURE__ */ jsx21("th", { style: S.th, children: t(lang, "mercado.col.fuente") }),
-              /* @__PURE__ */ jsx21("th", { style: S.th, children: t(lang, "mercado.col.farmeo") })
-            ] }) }),
-            /* @__PURE__ */ jsx21("tbody", { children: !snapshot ? /* @__PURE__ */ jsx21(FilaVacia, { texto: t(lang, "mercado.vacio.scan") }) : !paginaItems.length ? /* @__PURE__ */ jsx21(FilaVacia, {
-            texto: t(lang, "mercado.vacio.filtros") }) : paginaItems.map((i) => {
-              const daily = i.history.find((h) => h.day === i.observedDay);
-              const nombreVisible = nombreItem(i, D.items, CATALOGO2, lang) || i.sourceKey;
-              const fuente = fuenteResumen(i);
-              return /* @__PURE__ */ jsxs22("tr", { children: [
-                /* @__PURE__ */ jsx21("td", { style: S.td, children: /* @__PURE__ */ jsxs22("div", { style: { display: "flex", gap: 6, alignItems: "flex-start", minWidth: 0 }, children: [
-                  /* @__PURE__ */ jsx21(IconoItem, { id: i.itemId, size: 28, titulo: nombreVisible }),
-                  /* @__PURE__ */ jsxs22("div", { style: { minWidth: 0 }, children: [
-                    /* @__PURE__ */ jsx21(
-                      "button",
-                      {
-                        type: "button",
-                        onClick: () => setDetalleKey(i.sourceKey),
-                        style: { background: "none", border: "none", padding: 0, color: C.acento, cursor: "pointer", font: "inherit", textAlign: "left" },
-                        children: nombreVisible
-                      }
-                    ),
-                    i.itemId == null ? /* @__PURE__ */ jsxs22("div", { style: S.etiqueta, children: [
-                      t(lang, "mercado.variante"),
-                      " · ",
-                      i.sourceKey
-                    ] }) : /* @__PURE__ */ jsxs22("div", { style: S.etiqueta, title: t(lang, "mercado.clave") + " " + i.sourceKey, children: [
-                      "#",
-                      i.itemId
-                    ] }),
-                    /* @__PURE__ */ jsx21(InsigniaOferta, { deal: dealOf(i), lang })
-                  ] })
-                ] }) }),
-                /* @__PURE__ */ jsx21("td", { style: S.td, children: /* @__PURE__ */ jsx21(Dinero, { cobre: i.unitPriceCopper }) }),
-                /* @__PURE__ */ jsxs22("td", { style: S.td, children: [
-                  fechaDe(i.observedDay) || "—",
-                  /* @__PURE__ */ jsx21("div", { style: S.etiqueta, children: edadTexto(i) })
-                ] }),
-                /* @__PURE__ */ jsx21("td", { style: S.td, children: daily?.available == null ? t(lang, "mercado.det.sinDato") : daily.available }),
-                /* @__PURE__ */ jsx21("td", { style: { ...S.td, maxWidth: 220 }, children: /* @__PURE__ */ jsx21("div", { title: fuente, style: { overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "\
-nowrap" }, children: fuente }) }),
-                /* @__PURE__ */ jsx21("td", { style: S.td, children: farmCell(i) })
-              ] }, i.sourceKey);
-            }) })
-          ] }) }),
-          snapshot && paginas > 1 && /* @__PURE__ */ jsxs22("div", { style: { display: "flex", gap: 8, alignItems: "center" }, children: [
-            /* @__PURE__ */ jsx21(Button10, { variant: "outline", size: "xs", disabled: paginaSegura === 0, onClick: () => setPagina(paginaSegura - 1), children: t(lang, "mercado.anterior") }),
-            /* @__PURE__ */ jsx21(Button10, { variant: "outline", size: "xs", disabled: paginaSegura + 1 >= paginas, onClick: () => setPagina(paginaSegura + 1), children: t(lang, "mercado.siguiente") })
-          ] }),
-          /* @__PURE__ */ jsxs22("p", { style: S.sub, children: [
-            t(lang, "mercado.det.cobertura", { addon: CATALOGO2?.source?.addon || t(lang, "mercado.det.sinCatalogo") }),
-            " ",
-            CATALOGO2?.source?.coverage || ""
-          ] })
-        ]
-      }
-    ),
-    /* @__PURE__ */ jsx21(MisVentas, { ventas, auctionSnapshot: snapshot, perfil, lang }),
     /* @__PURE__ */ jsxs22(Tarjeta, { titulo: cp(lang, "Procedencia y ámbitos aislados", "Provenance and isolated scopes"), children: [
       /* @__PURE__ */ jsx21("p", { style: S.sub, children: cp(
         lang,
