@@ -28,6 +28,10 @@ function BadgeZona({ e, lang, fmt }) {
   bits.push(<Chip key="c">{t(lang, 'mercado.farm.comp')}: {COMP_LABEL[e.comp?.comp] || e.comp?.comp}</Chip>)
   if (e.travel?.min) bits.push(<Chip key="v">{t(lang, 'mercado.farm.viaje', { min: e.travel.min })}{e.travel.fp ? '' : ` · ${t(lang, 'mercado.farm.sinVuelo')}`}{e.travel.hub ? ` · ${t(lang, 'mercado.farm.tuRuta')}` : ''}</Chip>)
   if (e.vendorGph) bits.push(<Chip key="g">≈{fmt.gph(e.vendorGph)}/h {t(lang, 'mercado.farm.vendedor')}</Chip>)
+  if (e.liqUnknown > 0) bits.push(<Chip key="liq" color={C.amarillo}>{t(lang, 'mercado.farm.liqSinDatos')}: {e.liqUnknown}</Chip>)
+  if (e.usefulBonus > 0) bits.push(<Chip key="ub" color={C.azul}>{t(lang, 'mercado.farm.bonusUtiles')} +{fmt.pct ? fmt.pct(e.usefulBonus) : e.usefulBonus}</Chip>)
+  if (e.rareApprox) bits.push(<Chip key="ra" color={C.amarillo}>{t(lang, 'mercado.farm.rareAprox')}</Chip>)
+  bits.push(<Chip key="h" color={C.texto2}>{t(lang, 'mercado.farm.heuristico')}</Chip>)
   return <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>{bits}</div>
 }
 
@@ -202,6 +206,32 @@ export function Farmeo({ items, perfil, settings, onSettings, lang }) {
                 </SelectContent>
               </Select>
             </label>
+            <label style={S.campo}>
+              <span style={S.etiqueta}>{t(lang, 'mercado.farm.campMode')}</span>
+              <Select value={settings.campMode || 'single'} onValueChange={(v) => cambiar({ campMode: v === 'rotation' ? 'rotation' : 'single' })}>
+                <SelectTrigger aria-label={t(lang, 'mercado.farm.campMode')}><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="single">{t(lang, 'mercado.farm.campSingle')}</SelectItem>
+                  <SelectItem value="rotation">{t(lang, 'mercado.farm.campRotation')}</SelectItem>
+                </SelectContent>
+              </Select>
+            </label>
+            {settings.campMode === 'rotation' && (
+              <label style={S.campo}>
+                <span style={S.etiqueta}>{t(lang, 'mercado.farm.campPesos')}</span>
+                <div style={{ display: 'flex', gap: 4 }}>
+                  {settings.campWeights.map((w, i) => (
+                    <Input key={i} type="number" min="0" max="1" step="0.05" value={w}
+                      onChange={(e) => {
+                        const next = [...settings.campWeights]
+                        const presupuesto = 1 - next.reduce((s, x, j) => s + (j === i ? 0 : x), 0)
+                        next[i] = Math.max(0, Math.min(presupuesto, +e.target.value || 0))
+                        cambiar({ campWeights: next })
+                      }} />
+                  ))}
+                </div>
+              </label>
+            )}
           </div>
           <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
             <Checkbox checked={!!settings.prof.skin} onCheckedChange={(v) => cambiarProf('skin', !!v)} />
@@ -284,6 +314,7 @@ export function Farmeo({ items, perfil, settings, onSettings, lang }) {
                   {calculo.stats ? t(lang, 'mercado.farm.coberturaLinea', { matched: calculo.stats.matched, total: calculo.stats.total, pct: calculo.stats.pct }) : ''}
                   {' '}{t(lang, 'mercado.farm.estimaciones')}
                 </p>
+                <p style={S.sub}>{t(lang, 'mercado.farm.notaMetodo')}</p>
               </div>
             </>
           )}

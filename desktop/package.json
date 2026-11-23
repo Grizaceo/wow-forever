@@ -7,9 +7,13 @@
   "scripts": {
     "build": "node build.mjs",
     "check": "python3 ../scripts/check_desktop_bundle.py",
-    "test": "node test/navegador.mjs"
+    "test": "node test/navegador.mjs",
+    "gates": "node ../scripts/run-gates.mjs"
   },
   "devDependencies": {
-    "esbuild": "0.28.2"
+    "esbuild": "0.28.2",
+    "playwright": "1.64.0",
+    "react": "19.3.0",
+    "react-dom": "19.3.0"
   }
 }

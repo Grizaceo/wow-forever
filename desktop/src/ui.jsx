@@ -1,11 +1,29 @@
 // Piezas de interfaz compartidas por las vistas.
-import { Fragment } from 'react'
+import { Fragment, useInsertionEffect } from 'react'
 import { C, CALIDAD, CLASES_RICAS, S } from './estilos.js'
 import { dinero, item, nombre } from './datos.js'
 import { t } from './i18n.js'
 import { ICONOS } from './iconos-datos.js'
 
 const SPRITE_URL = `url("data:image/webp;base64,${ICONOS.sprite}")`
+
+// El sprite pesa ~2,3 MB en base64. Meterlo en el `style` de cada <IconoItem>
+// obliga a React a volver a parsear ese string por cada miniaturita (en la vista
+// de dungeons o profesiones hay cientos), y era el coste dominante al cambiar de
+// pestaña. Se escribe una sola vez en una hoja de estilo y cada icono solo lleva
+// sus coordenadas cortas. La imagen y el aspecto son idénticos.
+let hojaSprite = null
+function asegurarSprite() {
+  if (typeof document === 'undefined') return
+  if (hojaSprite && hojaSprite.isConnected) return
+  const existente = document.getElementById('wf-iconos-sprite')
+  const el = existente || document.createElement('style')
+  el.id = 'wf-iconos-sprite'
+  // Una carga nueva del módulo reemplaza CSS antiguo, sin duplicar la hoja.
+  el.textContent = `.wf-icono{display:inline-block;flex:0 0 auto;border-radius:3px;background-image:${SPRITE_URL};background-repeat:no-repeat}`
+  if (!existente) (document.head || document.documentElement).appendChild(el)
+  hojaSprite = el
+}
 
 export function Tarjeta({ titulo, extra, children, estilo }) {
   return (
@@ -49,6 +67,7 @@ export function Aviso({ children }) {
 // espacio (sin interrogantes ni ruido visual) para que las filas no salten.
 export function IconoItem({ id, size = 24, titulo }) {
   const celda = id == null ? undefined : ICONOS.mapa[String(id)]
+  useInsertionEffect(() => { if (celda != null) asegurarSprite() }, [celda])
   if (celda == null) return <span aria-hidden="true" style={{ width: size, height: size, flex: '0 0 auto', display: 'inline-block' }} />
   const col = celda % ICONOS.columnas
   const fila = Math.floor(celda / ICONOS.columnas)
@@ -57,14 +76,10 @@ export function IconoItem({ id, size = 24, titulo }) {
       role="img"
       aria-label={titulo || ''}
       title={titulo || undefined}
+      className="wf-icono"
       style={{
         width: size,
         height: size,
-        flex: '0 0 auto',
-        display: 'inline-block',
-        borderRadius: 3,
-        backgroundImage: SPRITE_URL,
-        backgroundRepeat: 'no-repeat',
         backgroundSize: `${ICONOS.columnas * size}px ${ICONOS.filas * size}px`,
         backgroundPosition: `${-col * size}px ${-fila * size}px`,
       }}

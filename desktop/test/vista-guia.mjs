@@ -1,6 +1,6 @@
 // Prueba de la sección Guía curada + Legacy (mismo arnés que navegador.mjs).
 //   PLAYWRIGHT_MODULE=… CHROMIUM_PATH=… node desktop/test/vista-guia.mjs
-import { iniciar, PERFILES, PREF } from './arnes.mjs'
+import { abrirVista, iniciar, PERFILES, PREF } from './arnes.mjs'
 
 const a = await iniciar()
 const { check } = a
@@ -27,7 +27,7 @@ const esperarBuild = async (p, pred) => {
 
 // ---------------------------------------------------------------- 1) Cazador Horda, tema claro
 let { p, cerrar } = await a.abrir('claro', { perfil: PERFILES.cazadorHorda, build: SEMILLA })
-await p.click('[data-tab="guia"]')
+await abrirVista(p, 'guia')
 await p.getByText('Senda del Cazador').waitFor()
 check('cazador horda: guía abre con ficha del perfil', await p.evaluate(() =>
   document.querySelector('.ficha') && /Cazador/.test(document.querySelector('.ficha').innerText)
@@ -71,7 +71,7 @@ check('extras: compras AH, tips y aviso Forever', await p.evaluate(() =>
   /Forever/.test(document.body.innerText) && /tips/i.test(document.body.innerText)))
 
 // Legacy con el cazador: clase resaltada + gather con su Skinning.
-await p.click('[data-tab="legacy"]')
+await abrirVista(p, 'legacy')
 await p.getByText('Legacy — puntos de cuenta').waitFor()
 check('legacy del cazador: hitos Novice/Experienced/Master Cazador', await p.evaluate(() =>
   /Novice Cazador/.test(document.body.innerText) && /Master Cazador/.test(document.body.innerText)))
@@ -86,7 +86,7 @@ await cerrar()
 
 // ---------------------------------------------------------------- 2) Mismo cazador en tema oscuro
 ;({ p, cerrar } = await a.abrir('oscuro', { perfil: PERFILES.cazadorHorda, build: SEMILLA }))
-await p.click('[data-tab="guia"]')
+await abrirVista(p, 'guia')
 await p.getByText('Senda del Cazador').waitFor()
 await p.getByRole('radio', { name: 'Armas' }).click()
 await p.locator('input[data-wid="venomstrike"]').waitFor()
@@ -100,7 +100,7 @@ await cerrar()
 
 // ---------------------------------------------------------------- 3) /simc: importación completa
 ;({ p, cerrar } = await a.abrir('claro', { perfil: PERFILES.cazadorHorda, build: SEMILLA }))
-await p.click('[data-tab="guia"]')
+await abrirVista(p, 'guia')
 await p.getByText('Importar /simc').click()
 await p.locator('textarea').fill(
   'hunter="Fixture"\nlevel=28\nrace=troll\nserver=camwow_us1_pvp\n' +
@@ -138,14 +138,16 @@ for (const [nom, per] of [['guerrero horda', GUERRERO_H], ['guerrero alianza', G
   ['chamán horda', CHAMAN_H], ['chamán alianza', PERFILES.chamanAlianza]]) {
   ;({ p, cerrar } = await a.abrir('claro', { perfil: per, build: SEMILLA }))
   await p.getByText('Raza').first().waitFor()
+  await p.click('[data-tab="otros"]')
   check(nom + ': sin pestaña de guía curada', await p.locator('[data-tab="guia"]').count() === 0)
   await cerrar()
 }
 
 // ---------------------------------------------------------------- 5) Legacy con el Mago Cielonado (sin guía)
 ;({ p, cerrar } = await a.abrir('claro', { perfil: PERFILES.magoCielonato, build: SEMILLA }))
+await p.click('[data-tab="otros"]')
 check('mago cielonado: sin pestaña guía', await p.locator('[data-tab="guia"]').count() === 0)
-await p.click('[data-tab="legacy"]')
+await abrirVista(p, 'legacy')
 await p.getByText('Legacy — puntos de cuenta').waitFor()
 check('legacy del mago: hitos con su clase', await p.evaluate(() =>
   /Novice Mago/.test(document.body.innerText) && /Master Mago/.test(document.body.innerText)))

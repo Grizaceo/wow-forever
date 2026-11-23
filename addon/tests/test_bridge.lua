@@ -214,6 +214,8 @@ _G.PawnGetInventoryItemValues = function()
 end
 dofile('addon/WoWForeverBridge/Pawn.lua')
 ok(events['PLAYER_ENTERING_WORLD'] and events['PLAYER_LOGOUT'] and events['PLAYER_QUITING'], 'Pawn registra eventos')
+ok(events['PLAYER_LEAVING_WORLD'], 'Pawn registra PLAYER_LEAVING_WORLD (antes del logout)')
+ok(type(scripts['OnUpdate']) == 'function', 'Pawn registra OnUpdate para reintentar el equipo')
 ok(type(SlashCmdList['WOWFOREVERBRIDGE3']) == 'function', 'Pawn registra /wfbpawn')
 ok(type(SlashCmdList['WOWFOREVERBRIDGE2']) == 'function', 'Pawn mantém /wfbp (wrapper)')
 
@@ -259,12 +261,247 @@ ok(type(WoWForeverBridgeDB.pawnErro) == 'table', 'pawnErro registrado')
 ok(tostring(WoWForeverBridgeDB.pawnErro.erro):find('boom', 1, true) ~= nil, 'pawnErro mensaje')
 _G.UnitClass = function() return 'Cazador', 'Cazador', 3 end
 
+-- Regresión: Pawn se apaga al salir (PawnOnLogout -> PawnUnitializePlugins deja
+-- ProviderActive y Values en nil). Antes eso grababa "sem escala para classID 3"
+-- en cada logout y el plugin lo mostraba como fallo permanente.
+local function apagarPawn()
+  for _, escala in pairs(PawnCommon.Scales) do
+    if escala.Provider then escala.ProviderActive = nil; escala.Values = nil end
+  end
+end
+local function ligarPawn()
+  PawnCommon.Scales['"Classic":HUNTER1'].ProviderActive = true
+  PawnCommon.Scales['"Classic":HUNTER1'].Values = { Agility = 1.4, Strength = 1 }
+  PawnCommon.Scales['"Classic":HUNTER2'].ProviderActive = true
+  PawnCommon.Scales['"Classic":HUNTER2'].Values = { Agility = 1.5, Crit = 0.8 }
+  PawnCommon.Scales['"Classic":MAGE1'].ProviderActive = true
+end
+
+local capturaAntes = WoWForeverBridgeDB.pawn.capturado
+WoWForeverBridgeDB.pawnErro = nil
+apagarPawn()
+nowValue = nowValue + 400
+scripts['OnEvent'](nil, 'PLAYER_LOGOUT')
+eq(WoWForeverBridgeDB.pawn.capturado, capturaAntes, 'logout con Pawn apagado no recaptura')
+eq(WoWForeverBridgeDB.pawnErro, nil, 'logout con Pawn apagado no graba error falso')
+ok(type(WoWForeverBridgeDB.pawn) == 'table', 'captura buena sobrevive al logout')
+
+nowValue = nowValue + 400
+SlashCmdList['WOWFOREVERBRIDGE3']('pawn')
+eq(WoWForeverBridgeDB.pawnErro, nil, '/wfbpawn con Pawn apagado tampoco inventa error')
+eq(WoWForeverBridgeDB.pawn.capturado, capturaAntes, '/wfbpawn con Pawn apagado no recaptura')
+
+-- Con Pawn vivo, PLAYER_LEAVING_WORLD sí es la captura final (antes del apagado).
+ligarPawn()
+nowValue = nowValue + 400
+scripts['OnEvent'](nil, 'PLAYER_LEAVING_WORLD')
+eq(WoWForeverBridgeDB.pawn.capturado, nowValue, 'PLAYER_LEAVING_WORLD captura con Pawn vivo')
+eq(WoWForeverBridgeDB.pawn.escala, '"Classic":HUNTER2', 'captura final respeta la spec activa')
+
+-- Error real (Pawn vivo, ninguna escala con el ClassID): se declara con contexto.
+_G.UnitClass = function() return 'X', 'X', 99 end
+nowValue = nowValue + 400
+SlashCmdList['WOWFOREVERBRIDGE3']('pawn')
+ok(type(WoWForeverBridgeDB.pawnErro) == 'table', 'Pawn vivo sin escala sí registra error')
+ok(tostring(WoWForeverBridgeDB.pawnErro.erro):find('classID 99', 1, true) ~= nil, 'el error real declara el classID')
+ok(tostring(WoWForeverBridgeDB.pawnErro.erro):find('escalas=', 1, true) ~= nil, 'el error real incluye el conteo de escalas')
+eq(WoWForeverBridgeDB.pawn.capturado, nowValue - 400, 'un error real no pisa la captura buena')
+_G.UnitClass = function() return 'Cazador', 'Cazador', 3 end
+
+-- Reintento del equipo: en PEW Pawn devuelve ilvl sin valores (datos de ítem sin
+-- cachear). Un reintento a los 45 s los recupera; nunca entra en bucle.
+local inventarioBom = _G.PawnGetInventoryItemValues
+_G.PawnGetInventoryItemValues = function() return {}, 0, 33 end
+nowValue = nowValue + 400
+scripts['OnEvent'](nil, 'PLAYER_ENTERING_WORLD')
+eq(#WoWForeverBridgeDB.pawn.equipo.valores, 0, 'PEW temprano: equipo con ilvl y sin valores')
+_G.PawnGetInventoryItemValues = inventarioBom
+local capturadoCedo = WoWForeverBridgeDB.pawn.capturado
+nowValue = nowValue + 21
+scripts['OnUpdate'](nil, 21)
+eq(WoWForeverBridgeDB.pawn.capturado, capturadoCedo, 'OnUpdate no captura antes del plazo')
+nowValue = nowValue + 30
+scripts['OnUpdate'](nil, 30)
+ok(WoWForeverBridgeDB.pawn.capturado > capturadoCedo, 'el reintento recaptura pasado el plazo')
+ok(#WoWForeverBridgeDB.pawn.equipo.valores > 0, 'el reintento recupera los valores del equipo')
+local capturadoRetry = WoWForeverBridgeDB.pawn.capturado
+scripts['OnUpdate'](nil, 500)
+eq(WoWForeverBridgeDB.pawn.capturado, capturadoRetry, 'sin equipo incompleto ya no reintenta')
+
 -- PawnCommon ausente: silencio, sem erro novo, sem quebrar.
 _G.PawnCommon = nil
-local erroAntes = WoWForeverBridgeDB.pawnErro.capturado
+local erroAntes = WoWForeverBridgeDB.pawnErro
 SlashCmdList['WOWFOREVERBRIDGE3']('')
-eq(WoWForeverBridgeDB.pawnErro.capturado, erroAntes, 'sem PawnCommon nao grava erro novo')
+eq(WoWForeverBridgeDB.pawnErro, erroAntes, 'sem PawnCommon nao grava erro novo')
 ok(true, 'sem PawnCommon no revienta')
+
+-- ===== Cosecha del catálogo de stats: lógica pura (sin API) =====
+
+-- idsDaFonte: solo claves decimales positivas; ASC, sin duplicados.
+local idsFonte = L.idsDaFonte({ version = 2, ['2589'] = {}, [1000] = {}, ['1000'] = {},
+  ['12345:0:0:0'] = {}, abc = {}, ['0'] = {} })
+eq(#idsFonte, 2, 'idsDaFonte cuenta solo ids numéricos')
+eq(idsFonte[1], 1000, 'idsDaFonte ASC (primero)')
+eq(idsFonte[2], 2589, 'idsDaFonte ASC (segundo)')
+eq(#L.idsDaFonte(nil), 0, 'idsDaFonte nil -> vacío')
+eq(#L.idsDaFonte({ version = 2 }), 0, 'idsDaFonte sin ids -> vacío')
+
+-- loteColheita: cursor ASC, salta resueltos, acota por maxLote y da una vuelta.
+local idsSeq = { 10, 20, 30, 40, 50 }
+local lote = L.loteColheita(idsSeq, 0, {}, 2)
+eq(#lote.ids, 2, 'lote respeta maxLote')
+eq(lote.ids[1], 10, 'lote empieza en el menor'); eq(lote.ids[2], 20, 'lote sigue ASC')
+eq(lote.cursor, 20, 'lote avanza cursor al último intentado')
+eq(lote.volta, false, 'lote sin vuelta a mitad de lista')
+local res2 = { [10] = { i = 1 }, [20] = { i = 1 } }
+local lote2 = L.loteColheita(idsSeq, 0, res2, 2)
+eq(lote2.ids[1], 30, 'lote salta ids ya resueltos'); eq(lote2.cursor, 40, 'lote salta pero avanza cursor')
+local lote3 = L.loteColheita(idsSeq, 40, res2, 5)
+eq(lote3.volta, true, 'lote marca vuelta al llegar al final')
+eq(lote3.ids[1], 50, 'lote sirve el último pendiente antes de envolver')
+local vistos, dup = {}, false
+for i = 1, #lote3.ids do
+  if vistos[lote3.ids[i]] then dup = true end
+  vistos[lote3.ids[i]] = true
+end
+ok(not dup, 'lote no repite ids en la misma vuelta')
+local loteCheio = L.loteColheita(idsSeq, 0, { [10] = {}, [20] = {}, [30] = {}, [40] = {}, [50] = {} }, 100)
+eq(#loteCheio.ids, 0, 'lote sin pendientes -> vacío')
+eq(loteCheio.volta, false, 'pase completo sin pendientes no envuelve: deja el cursor al final')
+eq(loteCheio.cursor, 50, 'pase completo sin pendientes deja el cursor al final')
+local loteEnvol = L.loteColheita(idsSeq, 50, { [10] = {}, [20] = {}, [30] = {}, [40] = {}, [50] = {} }, 100)
+eq(loteEnvol.volta, true, 'lote ya en el final envuelve para reintentar')
+eq(#loteEnvol.ids, 0, 'envolver sin pendientes no sirve ids')
+eq(#L.loteColheita({}, 0, {}, 10).ids, 0, 'lote con fuente vacía -> vacío')
+eq(#L.loteColheita(idsSeq, 0, {}, 0).ids, 0, 'lote con maxLote 0 -> vacío')
+
+-- podarCatalogo: quita lo que ya no está en la fuente.
+local itensPoda = { [10] = { k = {} }, [20] = { k = {} }, [30] = { k = {} } }
+eq(L.podarCatalogo(itensPoda, { 10, 30 }), 1, 'podarCatalogo poda un ítem ausente')
+ok(itensPoda[20] == nil and itensPoda[10] ~= nil, 'podarCatalogo respeta la fuente')
+eq(L.podarCatalogo({}, { 1 }), 0, 'podarCatalogo vacío no poda nada')
+
+-- normalizarStats: ordena, descarta 0/no numérico y redondea a 2 decimales.
+local norm, trNorm = L.normalizarStats({ ITEM_MOD_STAMINA_SHORT = 12, ITEM_MOD_AGILITY_SHORT = 8.333,
+  ITEM_MOD_X_SHORT = 0, Texto = 'no', Sub = {} })
+eq(norm.ITEM_MOD_STAMINA_SHORT, 12, 'normalizarStats entero')
+eq(norm.ITEM_MOD_AGILITY_SHORT, 8.33, 'normalizarStats redondea a 2 decimales')
+eq(norm.ITEM_MOD_X_SHORT, nil, 'normalizarStats descarta 0')
+eq(norm.Texto, nil, 'normalizarStats descarta no numérico')
+eq(norm.Sub, nil, 'normalizarStats descarta sub-tabla')
+eq(trNorm, false, 'normalizarStats sin truncado')
+local normTrunc, trSi = L.normalizarStats({ B = 1, A = 2, C = 3 }, 2)
+eq(trSi, true, 'normalizarStats marca truncado')
+eq(normTrunc.A, 2, 'normalizarStats truncado conserva orden alfabético')
+eq(normTrunc.C, nil, 'normalizarStats truncado corta el resto')
+local normNada, trNada = L.normalizarStats(nil, 40)
+eq(next(normNada), nil, 'normalizarStats nil -> vacío'); eq(trNada, false, 'normalizarStats nil sin truncado')
+
+-- ensureCatalogo: corrupción nunca rompe.
+local catNovo = L.ensureCatalogo(nil)
+eq(catNovo.v, 1, 'ensureCatalogo crea v=1'); ok(type(catNovo.itens) == 'table', 'ensureCatalogo crea itens')
+local catRoto = L.ensureCatalogo({ v = 1, itens = 'x', cursor = -5, volta = 'x' })
+ok(type(catRoto.itens) == 'table', 'ensureCatalogo arregla itens')
+eq(catRoto.cursor, 0, 'ensureCatalogo arregla cursor'); eq(catRoto.volta, 0, 'ensureCatalogo arregla volta')
+
+-- ===== Cosecha del catálogo de stats: pegamento con API mockeada =====
+events, scripts = {}, {}
+_G.PawnCommon = {
+  Scales = {
+    ['"Classic":HUNTER1'] = { LocalizedName = 'Hunter: BM', Provider = 'Classic', ProviderActive = true,
+      ClassID = 3, SpecID = 1, Role = 'DAMAGER', Values = { Agility = 1.4, Stamina = 0.2 } },
+  },
+}
+_G.UnitClass = function() return 'Cazador', 'Cazador', 3 end
+_G.GetSpecialization = function() return 1 end
+_G.PawnGetAllStatValues = function(nome) return PawnCommon.Scales[nome] and PawnCommon.Scales[nome].Values or nil end
+_G.PawnGetInventoryItemValues = function() return { { '"Classic":HUNTER1', 9.5, 0, 'Hunter: BM' } }, 1, 40 end
+-- C_Item mockeado: 2001 y 2002 cacheados, 2003 no (GetItemInfo nil).
+_G.C_Item = {
+  GetItemInfo = function(arg)
+    local id = tonumber(arg) or tonumber(string.match(tostring(arg), '^item:(%d+)$') or '')
+    if id == 2001 or id == 2002 then
+      return 'Ítem ' .. id, '|Hitem:' .. id .. ':0:0:0|h[x]|h', 3, 40, 30
+    end
+    return nil
+  end,
+  GetItemInfoInstant = function(link)
+    local id = tonumber(string.match(tostring(link), 'item:(%d+)') or '')
+    return id, 'x', 'x', 'INVTYPE_CHEST', 'icon', 4, 3
+  end,
+  GetDetailedItemLevelInfo = function(link)
+    local id = tonumber(string.match(tostring(link), 'item:(%d+)') or '')
+    return id == 2001 and 40 or 44
+  end,
+  GetItemStats = function(link)
+    local id = tonumber(string.match(tostring(link), 'item:(%d+)') or '')
+    if id == 2001 then return { ITEM_MOD_STAMINA_SHORT = 10, ITEM_MOD_AGILITY_SHORT = 5, SinPeso = 1 } end
+    if id == 2002 then return { ITEM_MOD_AGILITY_SHORT = 12 } end
+    return nil
+  end,
+}
+_G.GetInventoryItemLink = function(_, slot)
+  if slot == 5 then return '|Hitem:2002:0:0:0|h[x]|h' end
+  return nil
+end
+_G.AUCTIONATOR_PRICE_DATABASE = { __dbversion = 8, ['PvP'] = { version = 2,
+  ['2001'] = { m = 100, h = { [2501] = 100 } },
+  [2002] = { m = 90, h = { [2501] = 90 } },
+  ['2003'] = { m = 80, h = { [2501] = 80 } } } }
+WoWForeverBridgeDB.pawnCatalogo = nil
+dofile('addon/WoWForeverBridge/Pawn.lua')
+SlashCmdList['WOWFOREVERBRIDGE3']('catalogo')
+local cat = WoWForeverBridgeDB.pawnCatalogo
+ok(type(cat) == 'table', '/wfbpawn catalogo crea pawnCatalogo')
+eq(cat.v, 1, 'pawnCatalogo v=1'); eq(cat.fonte, 3, 'pawnCatalogo cuenta ids de la fuente')
+eq(cat.resolvidos, 2, 'pawnCatalogo resuelve los cacheados')
+eq(cat.pendentes, 1, 'pawnCatalogo declara el pendiente no cacheado')
+ok(cat.itens[2003] == nil, 'ítem no cacheado no inventa stats')
+eq(cat.itens[2001].i, 40, 'cosecha ilvl de 2001')
+eq(cat.itens[2001].l, 'INVTYPE_CHEST', 'cosecha equipLoc')
+eq(cat.itens[2001].c, 4, 'cosecha classID'); eq(cat.itens[2001].s, 3, 'cosecha subClassID')
+eq(cat.itens[2001].k.ITEM_MOD_STAMINA_SHORT, 10, 'cosecha stat crudo')
+eq(cat.itens[2001].k.SinPeso, 1, 'cosecha conserva stats sin peso conocido (el plugin decide)')
+eq(cat.itens[2002].i, 44, 'ilvl real desde GetDetailedItemLevelInfo')
+eq(cat.itens[2002].id, 2002, 'cosecha guarda el itemID')
+eq(cat.colhido, nowValue, 'cosecha marca colhido')
+eq(cat.cursor, 2003, 'cosecha avanza el cursor')
+ok(WoWForeverBridgeDB.pawnCatalogo.itens[2001] ~= nil, 'segundo ciclo conserva lo ya cosechado')
+
+-- /wfbp catalogo también cosecha (wrapper) y repite sin duplicar.
+local antesCiclo = cat.ciclo
+SlashCmdList['WOWFOREVERBRIDGE2']('catalogo')
+eq(WoWForeverBridgeDB.pawnCatalogo.ciclo, antesCiclo + 1, '/wfbp catalogo cuenta un ciclo nuevo')
+eq(WoWForeverBridgeDB.pawnCatalogo.resolvidos, 2, 'repetir cosecha no duplica ítems')
+
+-- Sin API de stats: no se inventa nada.
+_G.C_Item = nil
+_G.GetItemStats = nil
+WoWForeverBridgeDB.pawnCatalogo = nil
+events, scripts = {}, {}
+dofile('addon/WoWForeverBridge/Pawn.lua')
+SlashCmdList['WOWFOREVERBRIDGE3']('catalogo')
+eq(WoWForeverBridgeDB.pawnCatalogo, nil, 'sin API de stats no se crea catálogo')
+
+-- Equipo por slot: se captura junto a la escala (delta contra lo equipado).
+_G.C_Item = {
+  GetItemInfoInstant = function(link)
+    local id = tonumber(string.match(tostring(link), 'item:(%d+)') or '')
+    return id, 'x', 'x', 'INVTYPE_CHEST', 'icon', 4, 3
+  end,
+  GetDetailedItemLevelInfo = function() return 44 end,
+  GetItemStats = function() return { ITEM_MOD_AGILITY_SHORT = 12 } end,
+}
+events, scripts = {}, {}
+dofile('addon/WoWForeverBridge/Pawn.lua')
+scripts['OnEvent'](nil, 'PLAYER_ENTERING_WORLD')
+local pwEquip = WoWForeverBridgeDB.pawn
+ok(type(pwEquip.equipado) == 'table', 'captura guarda equipo por slot')
+eq(pwEquip.equipado[5].id, 2002, 'equipo por slot guarda itemID del slot 5')
+eq(pwEquip.equipado[5].l, 'INVTYPE_CHEST', 'equipo por slot guarda equipLoc')
+eq(pwEquip.equipado[5].k.ITEM_MOD_AGILITY_SHORT, 12, 'equipo por slot guarda stats')
+eq(pwEquip.equipado[1], nil, 'equipo por slot omite slots vacíos')
+ok(type(pwEquip.equipo.valores) == 'table', 'equipo.valores (Pawn) sigue intacto')
 
 print(string.format('test_bridge.lua: %d checks, %d fallos', checks, failures))
 os.exit(failures == 0 and 0 or 1)

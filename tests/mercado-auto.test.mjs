@@ -12,11 +12,79 @@ function fixture() {
     requestFolder: async () => { picker++; throw Error('picker') },
     list: async () => ({ok:true,entries:[]}),
     readText: async(id,p) => id === 'data' ? {ok:disk.has(p),text:disk.get(p)} : {ok:true,text:source},
-    writeText: async(id,p,text) => { writes++; disk.set(p,text); return {ok:true} },
+    writeText: async(id,p,text) => {
+      writes++
+      if (Buffer.byteLength(text, 'utf8') > 4 * 1024 * 1024) return {ok:false,error:'too-large'}
+      disk.set(p,text)
+      return {ok:true}
+    },
   } }
-  return {ctx,store:createStore(ctx),set:s=>source=s,writes:()=>writes,picker:()=>picker,storage}
+  return {ctx,store:createStore(ctx),set:s=>source=s,writes:()=>writes,picker:()=>picker,storage,disk}
 }
 function lua(day, price) { return `AUCTIONATOR_PRICE_DATABASE = { ["__dbversion"] = 8, ["Realm"] = { version = 2, ["2589"] = { m = ${price}, h = { ["${day}"] = ${price} }, a = { ["${day}"] = 5 } } } }` }
+function largeLua(n = 34118) {
+  const items = Array.from({ length: n }, (_, i) => {
+    const key = i === 0 ? 2589 : 100000 + i
+    return `["${key}"]={m=76543,h={["2501"]=65432,["2502"]=76543},a={["2502"]=5}}`
+  })
+  return `AUCTIONATOR_PRICE_DATABASE={__dbversion=8,["Realm"]={version=2,${items.join(',')}}}`
+}
+
+test('el sondeo conserva todos los precios y días de un export que normaliza a más de 4 MiB', async () => {
+  const f = fixture(), sync = auto.createMarketSync(f.ctx, f.store)
+  assert.equal((await sync.poll()).status, 'ok')
+  const before = await f.store.read()
+  f.set(largeLua())
+  const result = await sync.poll()
+  assert.equal(result.status, 'ok', result.message)
+  const after = await createStore(f.ctx).read()
+  assert.equal(after.revision, before.revision + 1)
+  assert.equal(after.history.revision, after.revision)
+  assert.ok(H.byteSize(after.market.snapshot) > 4 * 1024 * 1024)
+  assert.equal(after.market.snapshot.realms[0].items.length, 34118)
+  assert.equal(after.market.snapshot.realms[0].items.find(i => i.itemId === 2589).unitPriceCopper, 76543)
+  assert.deepEqual(realms(after).Realm.items['2589'].map(r => r[0]), [2500, 2501, 2502])
+  const n = f.writes()
+  assert.equal((await sync.poll()).status, 'unchanged')
+  assert.equal(f.writes(), n)
+  assert.equal(f.picker(), 0)
+})
+
+test('si falla la escritura intermedia, reabre la pareja anterior y reintenta el mismo export', async () => {
+  const f = fixture(), sync = auto.createMarketSync(f.ctx, f.store)
+  assert.equal((await sync.poll()).status, 'ok')
+  const pointer = f.storage.get('market-v2-pointer'), before = await f.store.read()
+  const write = f.ctx.files.writeText
+  let attempts = 0
+  f.ctx.files.writeText = (id, path, text) => ++attempts === 2 ? {ok:false,error:'io-error'} : write(id, path, text)
+  f.set(largeLua(24000))
+  const failed = await sync.poll()
+  assert.equal(failed.error, 'save', failed.message)
+  assert.equal(attempts, 2)
+  assert.deepEqual(f.storage.get('market-v2-pointer'), pointer)
+  assert.deepEqual(await createStore(f.ctx).read(), before)
+  f.ctx.files.writeText = write
+  assert.equal((await sync.poll()).status, 'ok')
+  assert.equal((await createStore(f.ctx).read()).revision, pointer.revision + 1)
+})
+
+test('un fragmento faltante o alterado no se interpreta como mercado vacío ni se sobrescribe', async () => {
+  const f = fixture(), sync = auto.createMarketSync(f.ctx, f.store)
+  f.set(largeLua(24000))
+  assert.equal((await sync.poll()).status, 'ok')
+  const pointer = f.storage.get('market-v2-pointer'), writes = f.writes()
+  const part = `market-v2-${pointer.slot}.part-001.json`, original = f.disk.get(part)
+  assert.ok(original.includes('76543'))
+  f.disk.delete(part)
+  await assert.rejects(createStore(f.ctx).read(), /incompleto/)
+  f.disk.set(part, original.replace('76543', '76542')) // mismo tamaño, JSON todavía válido
+  await assert.rejects(createStore(f.ctx).read(), /integridad/)
+  const restarted = auto.createMarketSync(f.ctx, createStore(f.ctx))
+  const failed = await restarted.poll()
+  assert.equal(failed.error, 'load', failed.message)
+  assert.deepEqual(f.storage.get('market-v2-pointer'), pointer)
+  assert.equal(f.writes(), writes)
+})
 test('sondeo importa cambios, conserva días anteriores y no reescribe contenido idéntico', async () => {
   assert.equal(typeof auto.createMarketSync, 'function')
   const f=fixture(), sync=auto.createMarketSync(f.ctx,f.store)

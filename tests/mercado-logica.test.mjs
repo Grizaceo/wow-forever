@@ -217,3 +217,10 @@ test('nombreItem: items.json es/en, catálogo, variante', () => {
 })
 
 test('PAGE_SIZE = 50', () => assert.equal(PAGE_SIZE, 50))
+
+
+test('rotación sin pesos guardados aplica los pesos visibles desde el primer render', () => {
+  assert.deepEqual(normalizarAjustes({ campMode: 'rotation' }).campWeights, [0.5, 0.3, 0.2])
+  assert.deepEqual(normalizarAjustes({ campMode: 'rotation', campWeights: [0.8, 0.6, 0] }).campWeights, [0.5, 0.3, 0.2])
+  assert.deepEqual(normalizarAjustes({ campMode: 'rotation', campWeights: [1, 0, 0] }).campWeights, [1, 0, 0])
+})

@@ -199,8 +199,30 @@ test('parsePawnCaptura: equipo inválido se descarta sin tirar la captura', () =
   assert.equal(c3.equipo.ilvl, 20)
 })
 
-// ---------- escalaDoJogador ----------
+test('parsePawnCaptura: acepta arrays Lua que llegan como objeto con claves numéricas', () => {
+  // El lector de SavedVariables entrega {a,b} como {1:a,2:b} con claves string
+  // (standalone/market.js:769), así que en producción equipo/candidatas NUNCA
+  // son arrays JS. Los tests con arrays reales no lo veían.
+  const c = parsePawnCaptura({
+    ...CAPTURA,
+    equipo: { valores: { 1: { escala: 'a', valor: 1.5 }, 2: { escala: 'b', valor: 22 } }, ilvl: 24 },
+    candidatas: { 1: { nome: 'Hunter: Beast Mastery', classID: 3 }, 2: { nome: 'Hunter: Survival' } },
+  })
+  assert.equal(c.equipo.valores.length, 2)
+  assert.equal(c.equipo.valores[0].escala, 'a')
+  assert.equal(c.equipo.valores[1].valor, 22)
+  assert.equal(c.equipo.ilvl, 24)
+  assert.equal(c.candidatas.length, 2)
+  assert.equal(c.candidatas[0].nome, 'Hunter: Beast Mastery')
+  // Orden por índice numérico, no por orden de inserción ("10" no va antes que "2").
+  const d = parsePawnCaptura({ ...CAPTURA, equipo: { valores: { 10: { escala: 'diez', valor: 10 }, 2: { escala: 'dos', valor: 2 } } } })
+  assert.deepEqual(d.equipo.valores.map((v) => v.escala), ['dos', 'diez'])
+  // Clave no numérica: no adivinamos, la lista entera se descarta.
+  const e = parsePawnCaptura({ ...CAPTURA, equipo: { valores: { 1: { escala: 'a', valor: 1 }, otra: { escala: 'b', valor: 2 } } } })
+  assert.equal(e.equipo.valores.length, 0)
+})
 
+// ---------- escalaDoJogador ----------
 test('escalaDoJogador: la captura del addon manda sobre el catálogo', () => {
   const cat = parsePawnScales(PAWN_LUA)
   const r = escalaDoJogador(cat, CAPTURA, { classe: 3, spec: 2 })

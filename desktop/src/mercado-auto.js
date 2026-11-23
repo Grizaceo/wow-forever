@@ -57,11 +57,17 @@ export function createMarketSync(ctx, almacen) {
   async function commitRaw(raw, realm) {
     if (stopped) return { status: 'stopped' }
     if (!snapshotValido(raw)) return { status: 'error', error: 'invalid' }
-    const est = await almacen.read()
+    let est
+    try { est = await almacen.read() }
+    catch (e) { return { status: 'error', error: 'load', message: e?.message || String(e) } }
     const paired = typeof almacen.commitV2 === 'function' && typeof almacen.backupForMigration === 'function'
-    const { snapshot, store } = planImportacion(paired ? snapshotSinIdentificar(raw) : raw, {
-      snapshotActual: snapshotVisible(est.market, est.history), historyStore: est.history?.store || null,
-    })
+    let plan
+    try {
+      plan = planImportacion(paired ? snapshotSinIdentificar(raw) : raw, {
+        snapshotActual: snapshotVisible(est.market, est.history), historyStore: est.history?.store || null,
+      })
+    } catch (e) { return { status: 'error', error: 'plan', message: e?.message || String(e) } }
+    const { snapshot, store } = plan
     const sel = raw.realms.some(r => r.name === (realm || est.market?.realm)) ? (realm || est.market.realm) : raw.realms[0]?.name
     if (stopped) return { status: 'stopped' }
     if (paired) {

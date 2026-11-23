@@ -18,6 +18,14 @@ facción, con una skill para que tu agente responda con los mismos datos.
 - WoW Forever es el juego oficial de Blizzard (producto `wowf`, cliente 1.60), no un servidor
   privado. Este proyecto no tiene afiliación con Blizzard.
 
+## Estabilidad y verificación
+
+- [CI reproducible y preparación local](docs/CI.md) (Linux, macOS, Windows).
+- [Solución de problemas de sincronización](docs/SYNC-TROUBLESHOOTING.md).
+- [Mediciones de rendimiento entre pestañas](docs/PERFORMANCE-TAB-SWITCH.md).
+- [Roadmap de generalización](docs/GENERALIZATION-ROADMAP.md): admitir perfiles
+  no equivale a tener la misma profundidad de guía para todos los personajes.
+
 ## Instalación
 
 ```sh

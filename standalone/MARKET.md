@@ -8,6 +8,39 @@
 > precarga y persistencia IndexedDB eran propias de esa app. El plugin Desktop
 > se documenta en **`docs/DESKTOP.md`**.
 
+## Métricas por ítem: ruta completa
+
+`itemMetrics` elige la mejor fuente elegible por rendimiento efectivo:
+
+```
+campDenom = muertes/h × probabilidad × cantidad media
+routeFactor = viaje.factor × riesgo.mult × competencia.mult
+denom = campDenom × routeFactor
+gph = denom × precio neto por unidad                 # cobre/h
+coste por unidad = oro/h objetivo × 10000 / denom    # cobre/unidad
+margen relativo = (precio neto − coste) / coste
+```
+
+El campo histórico `roi` conserva ese margen frente al objetivo de tiempo;
+**no es un retorno sobre capital ni una venta garantizada**. `campGph`
+conserva el bruto del campamento para explicar el descuento en tabla y detalle.
+La vía por ítem no aplica la liquidez de zona. El score de zonas incluye
+bonus de útiles y no debe presentarse como ingreso efectivo garantizado.
+
+`routeCamps`, `alternativeCamps` y `spawnTotal` describen opciones elegibles
+del mismo ítem y zona. Desempatan rutas con igual rendimiento; **no suman
+drops simultáneos ni sustituyen la cota de spawns/respawn del campamento**.
+No son densidad geográfica medida: no conocemos recorridos reales ni
+competencia observada. Desolace reconoce vuelo de ambas facciones; corregir la etiqueta no reduce
+los 22/25 minutos supuestos de viaje. La UI no
+afirma que el personaje lo haya desbloqueado. Viaje, PvP y competencia son
+supuestos aproximados y modificables, no telemetría del servidor.
+
+Regresión sintética: Horda, nivel 38, competencia baja, sesión 2 h, precios
+17100c Magic Dust / 3999c Elemental Air (no cotizaciones actuales). Con PvP,
+Air supera el margen de Dust; al quitar PvP el orden puede invertirse. No se
+codifica una preferencia universal por un ítem.
+
 ## Uso
 
 En el plugin Desktop: pestaña **Mercado**, botón de importación
@@ -129,15 +162,23 @@ mínimo anunciado (`unitPriceCopper`) contra la **mediana de los mínimos
 diarios** históricos (`priceStats`), con ajustes deterministas:
 
 - `dealInfo(item, opts)` → `{kind, score, discount, confidence, days,
-  medianaLow, minLow, available, ratio, reasons}`.
+  medianaLow, minLow, available, ratio, reasons, ranking}`.
 - `kind`: `sin-datos` (<2 días de muestra o mediana inválida), `oferta`
   (descuento ≥20% bajo la mediana), `sobreprecio` (prima ≥20%), `estable`.
   Umbrales configurables vía `opts` (`offerPct`, `overPct`, `minDays`).
-- `confidence`: base por días (≥7 alta, ≥4 media, resto baja); si el día
-  observado tuvo ≤2 ofertas (`available`) baja un nivel — un mínimo de 1-2
-  publicaciones es más ruidoso. `available` null no penaliza.
+- `confidence`: SOLO días de muestra (≥7 alta, ≥4 media, resto baja; con el
+  piso de 2 días todo sale 'baja' hasta 4+). Es confianza **estadística**:
+  el conteo de ofertas anunciadas (`available`) NO la baja ni cambia el score;
+  se informa aparte en `available`/`reasons` (≤2 → "pocas ofertas anunciadas,
+  conteo de ofertas, no ventas"). `available` null = dato ausente, no penaliza.
 - `score` para ordenar "Mejores ofertas": `discount × pesoConfianza ×
-  pesoTendencia` (tendencia `sube` amplifica, `baja` atenúa).
+  pesoTendencia`. Es un **ranking heurístico**: pesos elegidos a mano
+  (confianza 1/0,8/0,55; tendencia 1,15/0,9/1), sin calibración externa ni
+  validación con ventas — no es probabilidad ni promesa de colocación.
+  `ranking` expone `{formula, heuristic, confWeight, trendWeight, trend}`
+  para poder rotular la cifra; las tablas de pesos van congeladas. El estado
+  `plana` de crafteo se normaliza explícitamente a `estable` (mismo peso).
+  Tendencia `sube` amplifica, `baja` atenúa; `sin-datos` usa peso neutro.
 - Acepta entradas de snapshot y filas compactas del store.
 
 UI: badges `oferta −N%`/`caro +N%` en la tabla (con tooltip de mediana,
@@ -224,58 +265,79 @@ los spawns propios de esa zona (`otherZones` del dataset: pares
 `[zoneKey, spawns]`). Una fuente es elegible según facción, profesiones
 (piel/hierbas/minería), nivel del mob, regla de grupo/solitario e instancias.
 Oro/hora estimado por ítem×fuente: `K × chance × avgCount ×
-precio×(1−5% de corte AH)` con K = bajas u acciones por hora según rank,
-niveles, spawns y respawn (supuestos fijos en el código: ~20–90 s por baja
-según rango, 10 s por recolección). La liquidez L del ítem modula el valor de
-zona: `log10(1+oferta)` acotado, penalizada si el precio no es reciente
-(>3 días).
+precio×(1−5% de corte AH)`. `K` se descompone en `rateInfo(src, level)`:
+`cycleRate` (bajas/recolecciones por hora según rango, niveles y tiempos de
+20–90 s por baja y 10 s por recolección) y `spawnCap = spawns×3600/respawnSec`,
+y se toma `min(cycleRate, spawnCap)`. Si no hay `respawnSec`, se usa un piso de
+60 s **sólo como fallback declarado como aproximado** (`respawnKnown:false`,
+`basis:'respawn-fallback-60s'`); no es un dato observado. La liquidez L del
+ítem modula **sólo la vía de zona**: `log10(1+oferta)` acotado a [0,15; 1],
+penalizado ×0,5 si el precio no es reciente (>3 días). Si el ítem no tiene
+`available` en su `observedDay`, L es **SIN DATOS (`factor:null`) y no se
+aplica ningún ajuste**: `available` es profundidad de oferta anunciada, no
+volumen vendido. Las métricas por ítem (`itemMetrics`, tabla) no integran L;
+la vía de zona (`rank`) sí. `MODEL.itemMetrics.liquidityApplied=false` y
+`MODEL.zoneEntry.liquidityApplied=true` lo declaran.
 
 Guarda contra precios outlier: una oferta mínima única o casi nula puede ser
 un anzuelo (p. ej. un listing suelto a 50000g). Si el ítem tiene `available ≤ 2`
-en el historial del `observedDay` (`null` cuenta como 0), su precio de venta a
+en el historial del `observedDay` (si falta el dato, no se aplica el recorte), su precio de venta a
 vendedor `sellPriceCopper` del dataset es >0 y el precio listado supera
 `OUTLIER_VENDOR_MULT×sell` (=50×), todas las estimaciones usan
 `50×sellPriceCopper` como precio de referencia en lugar del precio real
-(`doubtful=true`). El neto sigue siendo `floor(refPrice×(1−5%))`; el flag se
-expone en `itemMetrics`/`topItems` y la tabla, el detalle y las tarjetas avisan
-"precio dudoso (≤2 ofertas, tope 50× vendedor)". En el scan real 29 de 2862
+(`referencePrice()` → `clampOutlier()`). Es un **freno conservador heurístico**,
+no una prueba de que el precio fuera erróneo: sin acceso al juego no se puede
+validar la legitimidad de un listing concreto. `doubtful=true`, `clamped=true` y
+`rule` exponen cuándo se aplicó. En el scan real 29 de 2862
 ítems con precio del dataset cumplían la condición.
 
 Las rarezas y los cofres no usan la tasa por entidad (en la práctica dominaban
 el score: cada rare hasta ~2 bajas/h y cada cofre hasta 6 aperturas/h). En su
 lugar hay un presupuesto por zona. Rareza: EV por baja de cada rare elegible
 = Σ `chance×avgCount×net×L` de sus fuentes con ítems de tu scan;
-`rareValue = min(1, 0.2×N_eligibles) × media del EV` (ceros incluidos).
+`rareValue = Σ(tasa del raro × su EV)`, escalando todas las tasas por
+`min(1, 1/Σ tasas)` si el total supera 1/h. La misma escala se usa para el
+valor de vendedor por baja. La tasa se obtiene con
+`rareRate()`, que usa `spawns×3600/respawnSec` **si se conoce el respawn** (cota
+física, `approx:false`) y, si no, `RARE_K = 0,2 bajas/h` marcado
+explícitamente como calibración aproximada (`approx:true`,
+`basis:'RARE_K-heuristic'`). El ranking expone `rareRateSum` y `rareApprox`.
 Cofres: EV por apertura de cada tipo de cofre (objeto público `chest` u
 observado RareScanner) y `chestValue = min(4, 0.05×puntos) × EV medio
 ponderado por puntos`, donde los puntos son los spawns del cofre en la zona
 (públicos por zona + spots conocidos RareScanner). Ojo: los "puntos de cofre
 conocidos" son pools del mapa, no cofres simultáneos — el tope de 4
 aperturas/h lo refleja. A nivel ítem (tabla, mejor fuente, detalle) las
-fuentes rare usan K=0.2 bajas/h y las de cofre K=`min(4, 0.05×puntos de esa
+fuentes rare usan `rareRate()` y las de cofre K=`min(4, 0.05×puntos de esa
 zona)`.
 
-Las zonas se puntúan por el valor de sus mejores camps (1.º + 0.5·2.º +
-0.25·3.º, solo mobs/objetos normales — rares y cofres van por presupuesto),
-más `rareValue` y `chestValue`, más bonus por ítems útiles para tu
-clase/arma preferida. Los útiles salen de TODO el dataset de la zona (no solo
-del scan): ítems con fuente elegible en la zona y chance ≥0.5% o de rareza,
-filtrados por calidad ≥verde, nivel requerido, clase permitida y equipo usable
-(Bow/Gun/etc. según tu `pref`); cada uno muestra el nombre de su fuente.
+Las zonas ordenan los campamentos por **AH + vendedor del mismo sitio** antes
+de aplicar multiplicadores. El modo de un sitio toma el máximo combinado;
+la rotación reparte un único presupuesto de tiempo sobre ese mismo orden (tres
+pesos no negativos de suma ≤1). Desktop aplica los pesos iniciales 0,5 / 0,3 /
+0,2 al activar la rotación sin pesos guardados; el motor directo, sin pesos
+válidos, cae a un sitio. Los raros y cofres son términos incidentales modelados
+por separado, no una ruta física medida.
 
-**Oro de vendedor ("oro puro")**: además del término AH, cada zona suma
-`vendorGph` — la venta a NPC de TODOS los drops elegibles de sus mobs y
-objetos públicos (no depende del scan), ponderada por los 3 mejores
-campamentos como `zoneBase` y excluyendo los ítems presentes en el scan (esos
-ya los computa el término AH). Los ítems del scan sin precio AH usan como
-piso su `sellPriceCopper` sin comisión (`vendorFloor` en `metrics()`). Las
-fuentes observadas RareScanner no aportan al término vendor: son loot valioso,
-no basura. El resultado se muestra como badge `≈X/h vendedor`.
+**Oro de vendedor**: el cálculo reúne los drops elegibles de mobs/objetos
+públicos que no están en el scan y los pisos de vendedor de ítems del scan sin
+precio AH. Estos pisos no pagan comisión ni reciben el ajuste L. La porción de
+vendedor se toma de los mismos campamentos y pesos que la porción AH; el
+vendedor de raros/cofres usa los topes de sus respectivos encuentros. Los
+ítems útiles se cuentan en toda la zona elegible para clase/arma preferida; no
+implican un ingreso marginal medido.
 
-El total AH se multiplica por bonus de útiles (máx. 20%) y luego, junto al
-vendor, por riesgo de facción (propia 1.0, disputada 0.85, enemiga 0.6; PvP
-desactivable), competencia (auto = media, sube si la zona aparece en tu banda
-de nivel o en horario pico 18–23; o manual/por zona) **y factor de traslado**.
+El total AH se multiplica por `usefulBonusFor(n).factor = min(0,2, 0,02×n)`
+y luego, junto al vendor, por riesgo de facción (propia 1.0, disputada 0.85,
+enemiga 0.6; PvP desactivable), competencia (auto = media, sube si la zona
+aparece en tu banda de nivel o en horario pico 18–23; o manual/por zona) **y
+factor de traslado**. `scoreNoBonus` expone el score sin el bonus de útiles
+para comparar sensibilidad. El bonus de útiles es **heurístico por conteo**:
+multiplica sólo la vía AH, sin valorar marginalmente cada ítem útil. El riesgo
+y la competencia son **heurísticos declarados** (`MODEL.risk.heuristic`,
+`MODEL.competition.heuristic`): no hay datos de población que los validen y no
+se ha inventado calibración. `compFor()` y `riskInfo()` devuelven `heuristic:true`
+y `basis`.
 
 **Traslado**: tabla `TRAVEL` curada por zona×facción con minutos estimados de
 ida y vuelta al punto de venta más cercano (basada en flight paths de Classic
@@ -284,7 +346,25 @@ farmeo elegible (1/2/4 h, default 2 h, persistida en `state.farm.session`).
 Zonas donde tu facción no tiene vuelo propio castigan fuerte (p. ej. Westfall
 para la Horda ≈ 55 min → ×0.69 con sesión de 2 h); si la zona está en tu banda
 de nivel de la guía el viaje se descuenta ×0.5. La card muestra badge
-`viaje ~N min` (+ `sin vuelo` / `tu ruta`) y una línea en `reasons`.
+`viaje ~N min` (+ `sin vuelo` / `tu ruta`) y una línea en `reasons`. Es una
+aproximación declarada (`MODEL.travel.heuristic`, `travelFor().approx`), no un
+tiempo medido en juego.
+
+**ROI = retorno/coste, no retorno de capital.** `roi` legado sigue siendo
+`margen / farmCost`, donde `farmCost = gphRef×10000 / (K×chance×avgCount)` es
+coste de tiempo imputado, no capital invertido. `metrics()` también expone
+`marginPct = (net−farmCost)/farmCost`, `returnOverCost = net/farmCost`,
+`roiLabel='retorno/coste'` y `roiNote` para que la UI y los tests no
+reinterpreten la cifra. `marginInfo()` es la función pura detrás de esto.
+
+**Superficie de auditoría (toda heurística, sin calibración inventada).**
+`HunterFarm.MODEL` publica `risk`, `competition`, `travel`, `liquidity`,
+`outlier`, `usefulBonus`, `rare` (heurísticos) y `roi`, `itemMetrics`,
+`zoneEntry` (declaraciones de aplicación). Funciones puras exportadas:
+`campAggregate`, `clampOutlier`, `liquidityInfo`, `referencePrice`, `rareRate`,
+`rateInfo`, `usefulBonusFor`, `marginInfo`, `riskInfo`. Ninguna afirma ventas
+reales, población de jugadores ni legitimidad de precios observados en juego.
+Los tests enfocados viven en `standalone/tests/market-farm.cjs`.
 
 **Guía de farmeo**: `GUIDE_FARMS`/`GUIDE_PRINCIPLES` (curados del video de
 recomendaciones) se renderizan como card "Granjas de la guía" con los spots
@@ -451,8 +531,11 @@ orden "Mejores ofertas" y filtro "Solo ofertas").
 
 Comparar `unitPriceCopper` actual contra las estadísticas históricas:
 
-- Deal score = precio actual vs mediana/mínimo histórico + liquidez
-  (`available` del día más reciente) + tendencia (`priceStats.tendencia`).
+- Deal score = precio actual vs mediana/mínimo histórico + confianza
+  estadística (días de muestra) + tendencia (`priceStats.tendencia`).
+  `available` es conteo de ofertas anunciadas: no es confianza ni volumen
+  vendido, se informa aparte y no altera el score. Ranking heurístico (pesos
+  a mano, sin calibración ni validación con ventas), no predicción de venta.
 - UI: orden "Mejores ofertas", badges de oferta/sobreprecio y filtro
   "solo ofertas". Umbrales configurables; toda estimación etiquetada
   "approx" (son ofertas anunciadas, no ventas).

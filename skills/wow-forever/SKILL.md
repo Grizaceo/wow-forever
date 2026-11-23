@@ -118,7 +118,7 @@ tres fuentes locales: **Auctionator** (precios anunciados), la **contabilidad TS
   esté abierto, incluso fuera de la pestaña Mercado. No abre selectores en segundo plano.
   Solo importa bytes distintos y válidos, fusionando el histórico local. Borrar precios
   pausa el sondeo para no repoblar lo borrado; se puede reanudar con el conmutador.
-- **Diario del puente WoWForeverBridge**: un addon compañero (v1.0.1) captura cada escaneo de
+- **Diario del puente WoWForeverBridge**: un addon compañero (v1.3.0) captura cada escaneo de
   Auctionator en un diario por día (`WoWForeverBridge.lua`, SavedVariables `WoWForeverBridgeDB`)
   que sobrevive la poda de ~21 días de Auctionator. El plugin lo sondea con el mismo
   seguimiento automático (30 s) desde la misma carpeta concedida; no abre otro selector. Es
@@ -141,6 +141,27 @@ tres fuentes locales: **Auctionator** (precios anunciados), la **contabilidad TS
 - Probar recuperación de carpeta revocada, limpieza de errores anteriores y fallos en la
   segunda fase del borrado: no prometer conservación de datos si el historial ya se vació
   o el commit quedó incierto. Mantener el rechazo de búsquedas incompletas/ambiguas.
+- Si el panel dice **«Estado v2 inválido; no se escribió»**, comparar la etiqueta de reino del
+  snapshot guardado con la del scan nuevo: Auctionator rotula el mismo servidor «PvP» o
+  «PvP Horde» según la facción del personaje activo. Con identidad opaca (todo `UNKNOWN`) el
+  nombre no separa pools, y la fusión duplicaba los ítems hasta pasar los 4 MiB de `writeText`.
+  El plan conserva la etiqueta del scan nuevo, lo declara en `snapshot.warnings` y mueve el
+  histórico al nombre nuevo con `mergeRows`. El tope del SDK es 4 MiB por archivo:
+  los conjuntos v2 grandes se parten y se verifican antes de publicar el puntero.
+  El histórico tiene presupuesto propio; si ni el último día cabe, se conserva
+  la pareja anterior y se muestra el error.
+- Si el panel dice **«Bridge: too many entries (offset N)»**, el límite es del parser Lua, no del
+  validador del plugin: el diario guarda ~75.000 entradas por día y la retención por defecto
+  (14 días) pide ~1.050.000. Techo actual `ENTRIES_LIMIT` 1.200.000 con `MAX_BYTES` 8 MiB.
+  Para medir sin exponer datos, parsear con una copia del parser de tope elevado que solo
+  imprima conteos y tamaños.
+- Antes de diagnosticar «SIN DATOS» en Subasta × Pawn, confirmar que el addon **instalado**
+  tiene la cosecha: `grep -c pawnCatalogo .../Interface/AddOns/WoWForeverBridge/Pawn.lua`. El
+  repo puede estar al día y el juego correr una copia vieja; copiar `addon/WoWForeverBridge/*`
+  y pedir `/reload`.
+- Verificar el puntero `market-v2-pointer` y el conjunto activo: reconstruir el
+  manifiesto con `consultar.py` y cotejar `revision`, precios e histórico. Los 30 s
+  son el intervalo de sondeo, no una promesa de nueva revisión sin datos nuevos.
 - Si el usuario te pega números de la página: `m` es el último mínimo unitario observado, en
   cobre (1 oro = 10000), no una venta. Oro por hora, ROI y ofertas son **estimaciones** con
   drops de Classic 1.12 y sin datos de población.

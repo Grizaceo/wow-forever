@@ -194,7 +194,7 @@ class TestParidadJS(unittest.TestCase):
                 f.write("import { readFileSync } from 'node:fs'\n")
                 f.write("const f = JSON.parse(readFileSync(process.argv[2], 'utf8'))\n")
                 f.write("process.stdout.write(JSON.stringify(rutaMaxeo(f.recetas, f.desde, f.cap, f.precios, f.items, { faccion: f.faccion })))\n")
-            proc = subprocess.run(['node', mj, fj], capture_output=True, text=True, timeout=180)
+            proc = subprocess.run(['node', mj, fj], capture_output=True, text=True, encoding='utf-8', timeout=180)
             self.assertEqual(proc.returncode, 0, proc.stderr)
             js = json.loads(proc.stdout)
         py = C.ruta_maxeo(recetas, 1, 300, precios, items, 'horda')

@@ -21,37 +21,65 @@ byte-idéntico si no hay cambios en `desktop/src/`).
 
 | Harness | Comando | Esperado | Qué cubre |
 |---|---|---|---|
-| `tests/` (node) | `node --test tests/` | **324** pass, 0 fail | lógica de `desktop/src/` + motor: mercado v2/atómico/sync/migración, puente (`bridge*.test.mjs`), TSM, ROI, ruta/maxeo, guía, perfil, recetas propias, niveles de oficio, personaje SimC (`simc.test.mjs`), escala Pawn (`pawn.test.mjs`), preguntar-davi, referencias-skill, claves heredadas |
-| `tests/` (python) | `python3 -m unittest discover -s tests` | **86** OK | datos (`test_datos`, catálogo reproducible), desktop (`test_desktop`), maxeo, ROI, skill (`consultar.py`), reproducibilidad de `data/`+drops+bundle |
-| `addon/tests/` (lua) | `lua5.1 addon/tests/test_bridge.lua` | **95** checks, 0 fallos | diario del puente WoWForeverBridge (captura, poda, retención, epoch) + captura SimC de `Personaje.lua` (eventos, `/wfbp`, `personagemErro`, conservación del export bueno) + captura Pawn de `Pawn.lua` (escala por ClassID/SpecID, pesos, `equipo.ilvl`, `pawnErro`, `/wfbpawn`, wrapper `/wfbp pawn`) |
-| `desktop/test/` (navegador) | 12 suites, ver abajo | **349** checks, red 0, errores 0 | bundle real en Chromium headless con dobles del SDK |
+| `tests/` (node) | `node scripts/test-node.mjs` | **381** pass, 0 fail | lógica de `desktop/src/` + motor: mercado v2/atómico/sync/migración, puente (`bridge*.test.mjs`), TSM, ROI, ruta/maxeo, guía, perfil, recetas propias, niveles de oficio, personaje SimC (`simc.test.mjs`), escala Pawn (`pawn.test.mjs`), catálogo de stats de ítems y equipo por slot (`item-stats.test.mjs`), puntuador Subasta × Pawn (`subasta-pawn.test.mjs`), unificación de etiquetas de reino y presupuesto del histórico (`market-reino-unificado.test.mjs`), techos del parser Lua (`parser-limites.test.mjs`), preguntar-davi, referencias-skill, claves heredadas |
+| `tests/` (python) | `python3 -m unittest discover -s tests` | **98** OK | datos (`test_datos`, catálogo reproducible), desktop (`test_desktop`), maxeo, ROI, skill (`consultar.py`), reproducibilidad de `data/`+drops+bundle |
+| `addon/tests/` (lua) | `lua5.1 addon/tests/test_bridge.lua` | **180** checks, 0 fallos | diario del puente WoWForeverBridge (captura, poda, retención, epoch) + captura SimC de `Personaje.lua` (eventos, `/wfbp`, `personagemErro`, conservación del export bueno) + captura Pawn de `Pawn.lua` (escala por ClassID/SpecID, pesos, `equipo.ilvl`, `pawnErro`, `/wfbpawn`, wrapper `/wfbp pawn`, captura final en `PLAYER_LEAVING_WORLD`, silencio cuando Pawn ya desinicializó sus proveedores, reintento acotado del equipo) + cosecha del catálogo de stats (`idsDaFonte`, lote por frames, cursor/vuelta, poda) |
+| `desktop/test/` (navegador) | 15 suites, ver abajo | **420** checks, red 0, errores 0 | bundle real en Chromium headless con dobles del SDK |
 | build | `cd desktop && node build.mjs` | OK | bundle esbuild reproducible |
 | bundle-check | `python3 scripts/check_desktop_bundle.py desktop/plugin.js` | OK | tamaño/líneas/contratos del bundle |
 
-### Suites navegador (349)
+Los defaults viven en `scripts/run-gates.mjs`. Si una rama incorpora tests nuevos
+antes de actualizarlos, se pueden sobreescribir temporalmente con
+`WOW_GATES_EXPECT_NODE`, `WOW_GATES_EXPECT_PY`, `WOW_GATES_EXPECT_LUA` y
+`WOW_GATES_EXPECT_CJS` (p. ej. `WOW_GATES_EXPECT_NODE=381 node scripts/run-gates.mjs`).
+CI no los define: usa los defaults versionados.
 
-`navegador 37 · mercado-auto 11 · mercado-procedencia 24 · tsm 28 · vista-mercado 56 ·
+### Suites navegador (420; 421 con `HERMES_SDK_TABS=1`)
+
+`navegador 51 · mercado-auto 14 · mercado-procedencia 24 · tsm 28 · vista-mercado 57 ·
 vista-davi 50 · vista-guia 28 · vista-profesiones 41 · vista-ruta-dungeons 31 ·
-vista-personaje-simc 11 · vista-pawn 13 · bridge 19`
+vista-personaje-simc 11 · vista-pawn 13 · vista-subasta-pawn 28 · bridge 19 · farm-routing 11 · tab-performance 14`
 
 Cada suite imprime al final una línea JSON `{"suite":…,"pasadas":N,"red":0,"errores":0}`.
 El arnés (`desktop/test/arnes.mjs`) carga `desktop/plugin.js` en un Chromium headless
 con dobles de `ctx.files`/`ctx.storage`/`ctx.ui` que **replican el tope real del host**
-(`writeText` ≤ 4 MiB, `electron/plugin-files-ops.ts`). `red` cuenta requests de red
+(`writeText` ≤ 4 MiB UTF-8 **por archivo**, `electron/plugin-files-ops.ts`). Los archivos
+del SDK viven en un mapa aparte del `localStorage` de preferencias; la reapertura recibe
+ambos estados. `red` cuenta requests de red
 (debe ser 0: el plugin no tiene red) y `errores` errores de página/consola.
 
-Entorno (el runner lo autodescubre; también se puede fijar a mano):
+## Preparación del entorno (sin rutas privadas)
+
+Todo lo que necesitan los gates está fijado en `desktop/package.json` y
+`desktop/package-lock.json` (esbuild, Playwright, React y ReactDOM). No se
+requiere ningún checkout de Hermes ni checkout de juego:
 
 ```sh
-export PLAYWRIGHT_MODULE=/home/gris96/.hermes/hermes-agent/node_modules/.pnpm/playwright@1.64.0/node_modules/playwright/index.mjs
-export CHROMIUM_PATH=/home/gris96/.cache/ms-playwright/chromium-1248/chrome-linux64/chrome
-node desktop/test/<suite>.mjs
+cd desktop
+npm ci                              # instala las versiones fijadas del lock
+npx playwright install chromium     # una vez por máquina (o por job de CI)
+cd ..
+node scripts/run-gates.mjs --keep-going
 ```
 
-React/ReactDOM/esbuild se **prestan** del checkout de Hermes (`~/.hermes/hermes-agent`)
-vía symlinks en `desktop/node_modules`; no están en el `package.json` del repo y el
-store pnpm no es transitivo. Si el arnés no arranca, recrear esos symlinks (ver
-`docs/DESKTOP.md`). Los gates de navegador no requieren instalar nada en el repo.
+Para correr una suite suelta basta `node desktop/test/<suite>.mjs` desde la raíz
+del repo; el arnés resuelve React/ReactDOM desde `desktop/node_modules` y
+Playwright desde su instalación local. Overrides opcionales (no necesarios en
+CI, pero útiles para apuntar a otra instalación):
+
+```sh
+export PLAYWRIGHT_MODULE=/ruta/a/playwright/index.mjs
+export CHROMIUM_PATH=/ruta/a/chrome
+export HERMES_DESKTOP_PKG=/ruta/a/package.json   # aporta react/react-dom
+```
+
+`HERMES_AGENT_DIR` solo habilita el lint de Hermes en `tests/test_desktop.py`;
+si no está definido ese test se salta y el resto corre igual. Del mismo modo,
+`~/.cache/wow-forever-drops` solo alimenta `tests/test_reproducible.py`: si
+faltan esas entradas privadas se salta, nunca se leen SavedVariables reales.
+`WOW_FOREVER_REAL_FIXTURE=1` es diagnóstico manual y **nunca** se usa en gates.
+
+La CI ejecuta exactamente estos comandos; ver `docs/CI.md`.
 
 ## Tests del motor en `standalone/tests/` (gate `node motor .cjs`)
 
@@ -59,8 +87,8 @@ store pnpm no es transitivo. Si el arnés no arranca, recrear esos symlinks (ver
 que `desktop/src/` importa. Sus tests unitarios `.cjs` (`node:test`) cubren el motor
 de forma **única** (parser/deals/chart) y **sí entran al runner canónico**:
 
-- `market.cjs`, `market-history.cjs`, `market-deals.cjs`, `market-chart.cjs`: 80 tests,
-  78 pass / 2 skipped.
+- `market.cjs`, `market-history.cjs`, `market-deals.cjs`, `market-chart.cjs`, `market-farm.cjs`: 116 tests,
+  114 pass / 2 skipped.
 - **Retirados** (Fase 5 del plan de orden): la app standalone legada `index.html` +
   `market-ui.js` + `market-catalog.js` + sus 6 suites Playwright `.mjs` (reemplazada
   por las vistas React del Desktop). También antes (Fase 2): `desktop-state.mjs`

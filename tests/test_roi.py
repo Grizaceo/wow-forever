@@ -5,6 +5,7 @@
 - Paridad real: roi_ruta() == roiRuta() de src/crafteo.js sobre las recetas reales de Herrería
   con un histórico sintético determinista (si hay node), comparando también precios y meta.
 """
+import hashlib
 import importlib.util
 import json
 import os
@@ -110,11 +111,11 @@ class TestRoiRuta(unittest.TestCase):
         roi = C.roi_ruta([rA], 0, 10, PRECIOS, ITEMS)
         self.assertEqual(roi['coste'], 100)
         self.assertEqual(roi['retornoVendedor'], 200)
-        self.assertEqual(roi['retornoEstimado'], 500)
+        self.assertEqual(roi['retornoEstimado'], 475)  # 10 × (50 AH × 0,95 neto AH)
         self.assertEqual(roi['roiVendedor'], 2)
-        self.assertEqual(roi['roiEstimado'], 5)
+        self.assertEqual(roi['roiEstimado'], 4.75)
         self.assertEqual(roi['netoVendedor'], 100)
-        self.assertEqual(roi['netoEstimado'], 400)
+        self.assertEqual(roi['netoEstimado'], 375)
         self.assertEqual(roi['pasosConValor'], 1)
         self.assertEqual(roi['pasosSinValor'], 0)
         self.assertEqual(roi['cobertura'], 1)
@@ -130,7 +131,7 @@ class TestRoiRuta(unittest.TestCase):
         rY = R(1, 'entrenador', rango(0, 10, 10, 10), [[100, 1]], {'crea': [300, 2]})
         roi = C.roi_ruta([rY], 0, 10, PRECIOS, ITEMS)
         self.assertEqual(roi['retornoVendedor'], 400)
-        self.assertEqual(roi['retornoEstimado'], 1000)
+        self.assertEqual(roi['retornoEstimado'], 950)  # 10 × 50 × 0,95 × 2
 
     def test_crea_null_y_sin_valor(self):
         rEnc = R(2, 'entrenador', rango(0, 10, 10, 10), [[100, 1]], {'crea': None})
@@ -203,6 +204,30 @@ class TestCargarHistorico(unittest.TestCase):
         with self.assertRaises(C.ErrorConsulta):
             self._cargar({'store': {'realms': {}}})
 
+    def test_conjunto_v2_en_partes(self):
+        reino = 'Prueba Ñ 🍂'
+        obj = {'version': 1, 'revision': 7,
+               'market': {'snapshot': {'realms': [{'name': reino, 'items': [
+                   {'itemId': 100, 'unitPriceCopper': 10}]}], 'warnings': ['ñ' * 6000] * 400}},
+               'history': {'v': 2, 'scopes': {'id': {'realms': {reino: {'items': {'100': [[2504, 10]]}}}}}}}
+        body = json.dumps(obj, ensure_ascii=False, separators=(',', ':')).encode()
+        # División UTF-8 real: nunca se parte un punto de código entre dos archivos.
+        cut = 3 * 1024 * 1024
+        while body[cut] & 0xc0 == 0x80:
+            cut -= 1
+        with tempfile.TemporaryDirectory() as td:
+            p = Path(td) / 'market-v2-b.json'
+            p.write_text(json.dumps({'version': 2, 'revision': 7, 'parts': 2, 'bytes': len(body),
+                                     'sha256': hashlib.sha256(body).hexdigest()}), encoding='utf-8')
+            p.with_name('market-v2-b.part-000.json').write_bytes(body[:cut])
+            last = p.with_name('market-v2-b.part-001.json')
+            last.write_bytes(body[cut:])
+            self.assertEqual(C.cargar_historico(p), ({'100': [[2504, 10]]}, {'reino': reino, 'v': 2}))
+            self.assertEqual(C.cargar_precios(p)[0], {'100': 10})
+            last.write_bytes(body[cut:].replace(b'2504', b'2505', 1))
+            with self.assertRaisesRegex(C.ErrorConsulta, 'integridad'):
+                C.cargar_historico(p)
+
 
 @unittest.skipUnless(shutil.which('node'), 'node no disponible')
 class TestParidadJS(unittest.TestCase):
@@ -240,7 +265,7 @@ class TestParidadJS(unittest.TestCase):
                 f.write("const { precios, meta } = preciosHistoricos(f.historyItems)\n")
                 f.write("const roi = roiRuta(f.recetas, f.desde, f.cap, precios, f.items, { faccion: f.faccion, meta })\n")
                 f.write("process.stdout.write(JSON.stringify({ roi, precios: Object.fromEntries(precios), meta }))\n")
-            proc = subprocess.run(['node', mj, fj], capture_output=True, text=True, timeout=180)
+            proc = subprocess.run(['node', mj, fj], capture_output=True, text=True, encoding='utf-8', timeout=180)
             self.assertEqual(proc.returncode, 0, proc.stderr)
             js = json.loads(proc.stdout)
         self.assertEqual(js['roi'], py_roi)

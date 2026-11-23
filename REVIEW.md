@@ -124,3 +124,72 @@ APIs/símbolos de Pawn usados en `addon/WoWForeverBridge/Pawn.lua`, todos existe
 - `PawnGetInventoryItemValues` itera slots y consulta datos de ítems: si Pawn no está inicializado (`PawnIsInitialized` false) falla con `VgerCore.Fail` → `pcall` lo captura y `equipo` queda `null`; nunca rompe la captura de pesos.
 - El wrapper de `/wfbp` depende de que `Personaje.lua` cargue antes que `Pawn.lua` (orden del `.toc`); si se reordena, `/wfbp pawn` dejaría de funcionar (el resto sigue).
 - `pawn-catalogo` crece con el `Pawn.lua` del usuario (tope 200 escalas, campos acotados); sin datos de escalas no se guarda nada.
+
+---
+
+## Corrección v1.2.1 — el `pawnErro` falso de cada salida (2026-11-21)
+
+**Síntoma en datos reales del plugin** (storage `wow-hunter-guide.pawn`): última
+captura buena `capturado=1795285517` (15:25:17) y, 527 s después,
+`erro.msg = "pawn: sem escala para classID 3"` (`capturado=1795286044`, 15:34:04,
+el mismo instante en que WoW escribió SavedVariables). La tarjeta mostraba un
+fallo permanente con la captura buena intacta, y `equipo.valores` venía vacío
+con `ilvl 24`.
+
+**Causa raíz (leída en el Pawn instalado, no supuesta):**
+`PawnOnLogout()` (`Pawn.lua:524`) llama `PawnUnitializePlugins()`
+(`Pawn.lua:5665-5676`), que recorre las escalas y deja `ProviderActive = nil`,
+`Values = nil`. Pawn carga antes que `WoWForeverBridge` (`P` < `W`), así que en
+`PLAYER_LOGOUT` su handler corre primero: nuestro `escolherEscala` exigía
+`ProviderActive` y no encontraba ninguna candidata, grabando un error que no era
+de datos sino de orden de eventos. El `ilvl` sin valores por escala es el mismo
+problema visto en `PLAYER_ENTERING_WORLD`: `PawnGetAllItemValues` devuelve 0
+para todo mientras no haya caché de ítems y `PawnAddStatToTable` descarta
+`Amount == 0` (`Pawn.lua:2693`).
+
+**Cambios (`addon/WoWForeverBridge/Pawn.lua`, toc 1.2.1):**
+1. Captura final en `PLAYER_LEAVING_WORLD` (antes de `PLAYER_LOGOUT`), registrado
+   dentro de `pcall` por compatibilidad con clientes que no lo conozcan.
+2. `pluginsAtivos()`: si Pawn ya no tiene proveedores vivos, la captura sale en
+   silencio — ni captura, ni `pawnErro`, ni throttle consumido.
+3. El `pawnErro` real (Pawn vivo, ninguna escala con el `ClassID`) ahora declara
+   `(escalas=N, ativas=M)`.
+4. Reintento acotado del equipo a los 45 s, máximo 2 intentos por entrada al
+   mundo, solo si `equipo.valores` vino vacío.
+
+**Pruebas:** 18 checks nuevos en `addon/tests/test_bridge.lua`
+(**113** checks, 0 fallos) que reproducen el estado real: Pawn apagado antes del
+logout, `/wfbpawn` en ese estado, `PLAYER_LEAVING_WORLD` con Pawn vivo, error
+real con conteo, y el reintento del equipo con reloj avanzado.
+`scripts/run-gates.mjs` (`EXPECT_LUA`) y `docs/TESTING.md` actualizados.
+
+**Hueco que sigue:** la confirmación en vivo depende de reiniciar el cliente con
+el addon 1.2.1; el reintento del equipo solo se puede validar en sesión real
+(el arnés simula el reloj).
+
+## Corrección del contrato de datos (tablas Lua como objetos) — 2026-11-21
+
+**Síntoma:** la tarjeta mostraba `equipo` con `ilvl 24` y **cero valores** por
+escala, aunque Pawn sí calculaba valores en el juego (confirmado por Cristóbal y
+verificado en el SavedVariables: `equipo.valores` con 3 entradas y números
+reales).
+
+**Causa raíz:** `parseSavedVariables` (`standalone/market.js:769-779`) convierte
+toda tabla Lua en objeto con claves string; un array `{a,b,c}` llega como
+`{1:a,2:b,3:c}`. `desktop/src/pawn.js` exigía `Array.isArray(eq.valores)` —y lo
+mismo con `candidatas`—, guarda que en producción **nunca** se cumplía porque los
+tests en JS construyen arrays reales. Comprobado sobre el archivo real:
+`typeof eq.valores === 'object'`, `isArray === false`, claves `1..3`.
+
+**Cambios:** `listaNumerada()` en `desktop/src/pawn.js` acepta array JS o
+cualquier objeto con claves enteras positivas, ordena por índice numérico (no por
+orden de inserción) y descarta la lista entera si aparece una clave no numérica
+en vez de adivinar. Se usa para `equipo.valores` y `candidatas`.
+
+**Pruebas:** 1 test nuevo en `tests/pawn.test.mjs` (**325** node, 0 fallos) más
+verificación sobre el SavedVariables real: 3 valores (240.22 / 252.98 / 239.89) y
+3 candidatas.
+
+**Nota de diseño:** no se tocó `parseSavedVariables`. Es el lector genérico que
+también alimenta mercado y TSM; normalizar en el borde de Pawn acota el cambio al
+productor que sí escribe arrays.

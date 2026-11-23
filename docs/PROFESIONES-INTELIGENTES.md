@@ -198,17 +198,39 @@ relativos: se etiquetan «día N», no se inventan fechas.
 
 - **Inversión** = `totalMateriales + totalAdquisicion` de `rutaMaxeo`/`ruta_maxeo`, con los
   reactivos valorados a la media móvil histórica (no al snapshot puntual).
-- **Retorno vendedor (suelo garantizado)** = `venta_cobre` (col.5) × crafteos × yield. Lo que
-  el vendedor paga siempre; no depende de liquidez.
-- **Retorno estimado (AH)** = por craft, el **mayor** de {precio medio AH × yield, vendedor}.
-  Es una **estimación**: la media es de mínimos diarios observados y `avail` es oferta, no
-  volumen negociado → **la liquidez en subasta NO está garantizada**.
-- **ROI** = retorno / inversión; **neto** = retorno − inversión. `null` si no hay ruta con
-  precio (coste `null`).
+- **Retorno vendedor (suelo garantizado)** = `venta_cobre` (col.5) × **crafts exactos** × yield.
+  Lo que el vendedor paga siempre; no depende de liquidez.
+- **Retorno estimado (AH)** = por craft, el **mayor** de {precio medio AH × (1 − 0,05) × yield,
+  vendedor}: la subasta se valora **neta de comisión del 5 %** (H1) y el vendedor no paga
+  comisión. Es una **estimación**: la media es de mínimos diarios observados y `avail` es oferta,
+  no volumen negociado → **la liquidez en subasta NO está garantizada**.
+- **Convención del ratio** (H1): `roiVendedor`/`roiEstimado` = **retorno / inversión**, NO
+  `(retorno − inversión) / inversión`. La rentabilidad neta se publica aparte como
+  `rentabilidadVendedor`/`rentabilidadEstimada`; `neto*` = retorno − inversión. `null` si no
+  hay ruta con precio (coste `null`).
+- **Crafts fraccionales** (H5): el coste usa `Σ(1/p)` por punto y el retorno usa ese mismo
+  número exacto; `pasos[].crafteos` es sólo el número entero de presentación. Redondear los
+  crafts antes del retorno mezcla dos magnitudes (p. ej. 5/3 crafts → 50c, no 60c).
+- **Probabilidad de subida** (H4): `probSubida` es una interpolación **lineal aproximada** de
+  Classic 1.12, **no verificada** contra `SkillGainChance` del servidor. Los crafts son una
+  esperanza suponiendo intentos independientes; no se estima varianza. Se expone como
+  `avisoProbabilidad` en `rutaMaxeo`/`ruta_maxeo`.
+- **Saturación** (H12): sin `saturacion` explícita, `retornoEstimado` es lineal y asume que
+  **todos** los crafts se colocan al precio unitario; `retornoEstimadoAjustado` es `null`.
+  Sólo si el llamador aporta un supuesto `0 < saturacion <= 1` se publica el ajustado
+  (`retornoEstimado × saturacion`) y su ROI. No se inventa tasa de venta a partir de `avail`.
 - Crafts sin valor (`crea:null`, p.ej. encantamientos; o ítem sin fila ni precio) se declaran
   **SIN DATOS** y quedan fuera del retorno (`pasosSinValor`).
 - **Tendencia**: cambio % del último mínimo diario respecto al primero; `sube`/`baja`/`plana`
   (plana si |Δ|<2%). Resumen sobre los reactivos de la ruta. Serie <2 puntos → SIN DATOS.
+- **Tendencia robusta** (H11, óptica nueva): `preciosHistoricos(..., null, {robusto:true})` /
+  `precios_historicos(..., opts={'robusto':True})` sustituye la media por **mediana de mínimos
+  diarios** y calcula `tendenciaRobusta` comparando la mediana de la primera mitad con la de la
+  segunda (mínimo 4 puntos, banda de ruido de ±5 % documentada y **no calibrada**). Un día
+  extremo no desplaza la mediana. El modo por defecto conserva la media/tendencia anterior.
+- **Cobertura** (H13): fracción de puntos cubierta por recetas **con adquisición conocida**.
+  `recetasConsideradas` y `adquisicionesSinDato` lo hacen explícitos: es cobertura de skill en
+  ese subconjunto, **no es una cota inferior del coste total ni prueba de coste mínimo/global**.
 - El **coste de entrenamiento de tramos sigue SIN DATOS** (no entra en el ROI).
 
 ### CLI
@@ -216,28 +238,69 @@ relativos: se etiquetan «día N», no se inventan fechas.
     python3 skills/wow-forever/scripts/consultar.py roi \
       --historico ~/.config/Hermes/plugin-files/data/wow-hunter-guide/market-v2-b.json \
       --reino PvP --faccion horda [--profesion herreria] [--detalle] [--ventana N] [--precios spot.json]
+      [--robusto] [--saturacion F]
 
 `--ventana N` limita la media a los últimos N días (por defecto todos). `--precios` añade
-precios spot de respaldo para ítems sin histórico. Sin `--historico` → exit 2. La tabla
-muestra coste, retorno vendedor, ROI vendedor, retorno estimado, ROI estimado y cobertura;
-`--detalle` añade neto, tendencia de reactivos y pasos con/sin valor.
+precios spot de respaldo para ítems sin histórico. `--robusto` cambia a mediana de mínimos y
+tendencia por mitades (H11). `--saturacion F` (0<F≤1) aplica un supuesto **explícito del
+llamador** de tasa de venta y añade la columna `ROI aj`; sin él no se asume nada (H12).
+Sin `--historico` → exit 2. La tabla muestra coste, retorno vendedor, ROI vendedor, retorno
+estimado, ROI estimado y cobertura; `--detalle` añade neto, rentabilidad neta, ajuste por
+saturación, tendencia de reactivos, `recetasConsideradas`/`adquisicionesSinDato` (H13) y
+pasos con/sin valor.
 
 Piloto verificado sobre el **v2 activo** (PvP, horda, días 2504→2514, 7300 ítems): Herrería
 1→300 coste **668o 96p 13c** (materiales 655o 18p 60c + adquisición 13o 77p 53c), retorno
-vendedor **222o 64p 59c** (ROI 33%, neto −447o 68p 46c), estimado **430o 55p 78c** (ROI 64%,
-neto −239o 59p 65c); 11 reactivos suben, 17 bajan; 100% cobertura, 26 pasos con valor,
-0 SIN DATOS. Encantamiento: retorno 0 (`crea:null` → SIN DATOS). Recolección: cobertura baja
-(no hay ruta de crafteo).
+vendedor **222o 64p 59c** (ROI 33%), estimado **430o 55p 78c** (ROI 64%); 11 reactivos suben,
+17 bajan; 100% cobertura, 26 pasos con valor, 0 SIN DATOS. Encantamiento: retorno 0
+(`crea:null` → SIN DATOS). Recolección: cobertura baja (no hay ruta de crafteo).
+
+Las cifras de retorno son las del **snapshot publicado**, no una corrida nueva: tras H1 el
+retorno estimado se valora neto de comisión AH, así que una regeneración con el mismo
+histórico dará otro valor. **No se inventa aquí un retorno nuevo**: se conservan los importes
+publicados y se corrigen sólo los netos, que estaban copiados de otra corrida.
+
+### Control numérico del piloto
+
+Invariante de publicación: todas las cifras de una fila deben venir del **mismo snapshot,
+reino y rango de días**, expresadas en cobre entero:
+
+    coste = materiales + adquisicion
+    netoVendedor = retornoVendedor − coste
+    netoEstimado = retornoEstimado − coste
+    roiVendedor = retornoVendedor / coste
+    roiEstimado = retornoEstimado / coste
+
+| Skill | Materiales | Adquisición | Coste | Ret. vendedor | Neto vendedor | Ret. estimado | Neto estimado | ROI vendedor | ROI estimado |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| Herrería | 6.551.860 | 137.753 | 6.689.613 | 2.226.459 | -4.463.154 | 4.305.578 | -2.384.035 | 0,33 | 0,64 |
+
+Cifras previamente publicadas y **retiradas** por romper la identidad: neto vendedor
+−4.476.846 (diferencia 13.692 cobre) y neto estimado −2.395.965 (diferencia 11.930 cobre):
+sus costes implícitos, 6.703.305 y 6.701.543, no coinciden con el coste declarado. Con 26
+pasos, un redondeo de medio cobre sería del orden de 13 cobre, no miles. `tests/test_cuantitativo.py`
+parsea esta tabla y verifica las cinco identidades con tolerancia 0 (el formato redondea los
+ROI a 2 decimales, no el cobre), además de guardar los dos contraejemplos como regresión.
 
 ### Paridad y tests
 
-`serieHistorico`/`mediaMovil`/`tendencia`/`preciosHistoricos`/`roiRuta` (JS) ↔
-`serie_historico`/`media_movil`/`tendencia`/`precios_historicos`/`roi_ruta` + `valor_creado`
-(Python). `tests/roi.test.mjs` (13) y `tests/test_roi.py` (17, incluida paridad real sobre
-Herrería con histórico sintético: `roi`, `precios` y `meta` idénticos). `_round` half-up;
-desempate de ruta heredado de `rutaMaxeo`. Los exports ROI **no** los importa la UI →
-esbuild los tree-shakea: el bundle desktop no cambia por esta feature (verificado: el delta
-de un build fresco no contiene ningún identificador ROI).
+`serieHistorico`/`mediaMovil`/`mediana`/`medianaMovil`/`tendencia`/`tendenciaRobusta`/
+`preciosHistoricos`/`roiRuta`/`rutaMaxeo` (JS) ↔ `serie_historico`/`media_movil`/`mediana`/
+`mediana_movil`/`tendencia`/`tendencia_robusta`/`precios_historicos`/`roi_ruta`/`ruta_maxeo`
+(Python), más `valor_creado`. `tests/roi.test.mjs` (13), `tests/ruta-maxeo.test.mjs` (9),
+`tests/cuantitativo.test.mjs` (8) y `tests/test_roi.py` (17), `tests/test_maxeo.py` (14),
+`tests/test_cuantitativo.py` (11: H1/H4/H5/H11/H12/H13, invariante del piloto y paridad
+real sobre Herrería con histórico sintético, modo robusto y saturación: `roi`, `ruta`,
+`precios` y `meta` idénticos). Foco: 30 tests Node + 42 Python, todos verdes. Suite completa:
+367 Node (eran 359) y 97 Python (eran 86). `_round` half-up; desempate de ruta heredado de
+`rutaMaxeo`. `scripts/run-gates.mjs` **no se tocó**: sus expectativas (359/86) quedan
+desactualizadas por los +8/+11 tests nuevos hasta que su responsable las actualice.
+
+Nota: `test_desktop.py::test_build_reproducible` falla en este árbol de trabajo porque
+`desktop/src` difiere de `desktop/plugin.js`: además de los cambios de otros agentes
+(farming/deals), este cambio añade dos avisos (H4/H5 y H13) en
+`desktop/src/vistas/profesiones/plan.jsx`. `node build.mjs` compila correctamente; **no se
+regeneró** `desktop/plugin.js` para no pisar el trabajo ajeno pendiente.
 
 ## Pendiente (Fase 3)
 

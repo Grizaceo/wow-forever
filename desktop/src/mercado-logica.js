@@ -16,9 +16,8 @@ export { HunterMarket, HunterHistory, HunterDeals, HunterChart, HunterIdentity, 
 export const Farm = FarmModule
 
 export const PAGE_SIZE = 50
-// El snapshot persistido conserva solo una ventana reciente por ítem (la serie
-// completa vive en el store de historial); margen bajo el límite de 4 MiB de
-// ctx.files, igual que en standalone/market-ui.js.
+// El snapshot persistido conserva solo una ventana reciente por ítem. El
+// histórico tiene un presupuesto propio, independiente de la captura v2.
 export const SNAPSHOT_KEEP_DAYS = 5
 export const HISTORY_MAX_BYTES = 4194304 - 4096
 export const EPOCH = Date.UTC(2020, 0, 1)
@@ -250,6 +249,35 @@ export function snapshotSinIdentificar(raw) {
     observation:{scope:'legacy',fromDay:null,toDay:null,capturedAt:raw.importedAt},
     realms:raw.realms.map(r=>({...r,identity:structuredClone(identity)})) }
 }
+// La identidad deja de distinguir pools cuando todo quedó UNKNOWN: en ese caso
+// el nombre del reino es una etiqueta del cliente, no evidencia de otro pool.
+const identidadOpaca = (r) => {
+  const id = r?.identity
+  return !!id && id.game === 'UNKNOWN' && id.region === 'UNKNOWN' &&
+    id.ruleset === 'UNKNOWN' && id.auctionPool === 'UNKNOWN' && id.postingChannel === null
+}
+
+// Mueve el acumulado de un reino a otro nombre dentro del store v2. El store
+// indexa por nombre, así que sin esto un reino renombrado por el cliente parte
+// el histórico en dos claves y pierde la serie continua.
+function renombrarReinoStore(store, viejo, nuevo) {
+  if (!store || store.v !== 2 || viejo === nuevo || !store.scopes) return store
+  const out = structuredClone(store)
+  for (const sk of Object.keys(out.scopes)) {
+    const realms = out.scopes[sk]?.realms
+    if (!realms || !realms[viejo]) continue
+    const origen = realms[viejo]
+    const destino = realms[nuevo]
+    if (!destino) { realms[nuevo] = origen; delete realms[viejo]; continue }
+    for (const src of Object.keys(origen.items || {})) {
+      const previas = destino.items[src]
+      destino.items[src] = previas ? HunterHistory.mergeRows(previas, origen.items[src]) : origen.items[src]
+    }
+    delete realms[viejo]
+  }
+  return HunterHistory.validStoreV2(out) ? out : store
+}
+
 export function planImportacion(raw, { snapshotActual = null, historyStore = null } = {}) {
   const v2 = raw?.schemaVersion === 2 || historyStore?.v === 2 || snapshotActual?.schemaVersion === 2
   if (v2) {
@@ -260,17 +288,46 @@ export function planImportacion(raw, { snapshotActual = null, historyStore = nul
     const key = r => JSON.stringify([HunterIdentity.identityKey(r.identity), r.name])
     const byScope = new Map((snapshotActual?.schemaVersion === 2 ? snapshotActual.realms : []).map(r => [key(r), r]))
     for (const r of raw.realms) byScope.set(key(r), r)
-    const combined = { ...raw, realms: [...byScope.values()] }
+    // Auctionator rotula el mismo servidor según la facción del personaje
+    // activo ("PvP" vs "PvP Horde"). Si la identidad es opaca, el nombre no
+    // puede separar pools: se colapsa a una sola entrada por identidad (la del
+    // scan nuevo) para no duplicar ítems ni reventar el tope del snapshot.
+    const delScan = new Set((raw.realms || []).map(key))
+    const realms = []
+    const porIdentidad = new Map()
+    const renombres = []
+    for (const r of [...byScope.values()]) {
+      const ik = HunterIdentity.identityKey(r.identity)
+      const i = porIdentidad.get(ik)
+      if (i === undefined) { porIdentidad.set(ik, realms.length); realms.push(r); continue }
+      const previo = realms[i]
+      if (previo.name === r.name) { realms[i] = r; continue }
+      if (!identidadOpaca(r) || !identidadOpaca(previo)) { realms.push(r); continue }
+      const rNuevo = delScan.has(key(r)), pNuevo = delScan.has(key(previo))
+      if (rNuevo && !pNuevo) { renombres.push([previo.name, r.name]); realms[i] = r; continue }
+      if (!rNuevo && pNuevo) continue
+      realms.push(r)
+    }
+    const combined = { ...raw, realms }
+    if (renombres.length) {
+      const avisos = renombres.map(([v, n]) =>
+        `Reino unificado: «${v}» y «${n}» son el mismo pool sin identidad verificada; se conserva «${n}» y el histórico queda en una sola serie.`)
+      combined.warnings = [...(Array.isArray(raw.warnings) ? raw.warnings : []), ...avisos]
+    }
     const snapshot = HunterHistory.trimSnapshotHistory(combined, SNAPSHOT_KEEP_DAYS)
-    const base = historyStore && historyStore.v === 2
+    let base = historyStore && historyStore.v === 2
       ? historyStore
       : (historyStore
         ? HunterHistory.migrateStoreV1(historyStore, 'local:legacy')
         : (snapshotActual && snapshotActual.schemaVersion === 2
           ? HunterHistory.storeV2FromSnapshot(snapshotActual)
           : HunterHistory.emptyStoreV2()))
-    const budget = Math.max(256, HISTORY_MAX_BYTES - HunterHistory.byteSize(snapshot))
-    const store = HunterHistory.fitStoreV2(HunterHistory.storeV2Merge(base, raw), budget)
+    for (const [v, n] of renombres) base = renombrarReinoStore(base, v, n)
+    const merged = HunterHistory.storeV2Merge(base, raw)
+    const store = HunterHistory.fitStoreV2(merged, HISTORY_MAX_BYTES)
+    if (Object.keys(merged.scopes).length && !Object.keys(store.scopes).length) {
+      throw new Error('El histórico no cabe en su presupuesto ni conservando solo el último día. Se conservan los datos anteriores.')
+    }
     return { snapshot, store }
   }
   const snapshot = HunterHistory.trimSnapshotHistory(raw, SNAPSHOT_KEEP_DAYS)
@@ -390,6 +447,7 @@ export function ajustesBase(perfil) {
     comp: 'auto', zoneComp: {}, gph: 5,
     prof: { skin: p.has(393), herb: p.has(182), mine: p.has(186) },
     group: false, pvp: true, n: 5, session: 2,
+    campMode: 'single', campWeights: null,
   }
 }
 
@@ -402,6 +460,10 @@ export function normalizarAjustes(s) {
     for (const k of Object.keys(s.zoneComp)) if (COMP_ORDER.includes(s.zoneComp[k])) zc[k] = s.zoneComp[k]
   }
   const p = s.prof || {}, n = Number(s.n)
+  const campMode = s.campMode === 'rotation' ? 'rotation' : 'single'
+  const weights = Array.isArray(s.campWeights) ? s.campWeights : []
+  const valid = weights.length === 3 && weights.every(w => Number.isFinite(w) && w >= 0)
+    && weights.reduce((sum, w) => sum + w, 0) <= 1 + 1e-9
   return {
     comp: COMP_ORDER.includes(s.comp) ? s.comp : 'auto', zoneComp: zc,
     gph: Number.isFinite(+s.gph) && +s.gph > 0 ? Math.min(1000, +s.gph) : 5,
@@ -409,6 +471,8 @@ export function normalizarAjustes(s) {
     group: !!s.group, pvp: s.pvp !== false,
     n: Number.isInteger(n) && n >= 3 && n <= 8 ? n : 5,
     session: [1, 2, 4].includes(+s.session) ? +s.session : 2,
+    // H2: rotación sólo con pesos de tiempo declarados (canonicalizado en el motor).
+    campMode, campWeights: valid ? [...weights] : campMode === 'rotation' ? [0.5, 0.3, 0.2] : null,
   }
 }
 

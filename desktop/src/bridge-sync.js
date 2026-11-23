@@ -12,8 +12,9 @@ import { dataUrlBytes } from './auctionator.js'
 import { BRIDGE_FILE, BRIDGE_MAX_BYTES, parseBridge, bridgeToSnapshot } from './bridge.js'
 import { sincronizarPersonagem } from './simc.js'
 import { sincronizarPawn, sincronizarCatalogoPawn } from './pawn.js'
+import { sincronizarPawnStats } from './item-stats.js'
+import { safeSyncPath as safePath } from './sync-path.js'
 
-const safePath = p => typeof p === 'string' && p.length <= 2048 && !p.includes('\\') && !/[\x00-\x1f]/.test(p) && p.split('/').every(s => s && s !== '.' && s !== '..' && !s.includes(':'))
 
 async function findBridge(files, folder, read) {
   if (typeof files.list !== 'function') return read(folder, BRIDGE_FILE)
@@ -165,6 +166,14 @@ export function createBridgeSync(ctx, marketSync) {
       if (pn.status === 'ok') publish({ pawn: 'ok' })
     } catch (e) {
       publish({ pawn: 'error', pawnError: String(e?.message || e).slice(0, 200) })
+    }
+    // Catálogo de stats por ítem (pawnCatalogo): mismo bloque del puente, sin
+    // archivos extra. Si el addon aún no cosechó nada, no se toca lo guardado.
+    try {
+      const st = await sincronizarPawnStats(ctx, journal, Date.now())
+      if (st.status === 'ok') publish({ pawnStats: 'ok' })
+    } catch (e) {
+      publish({ pawnStats: 'error', pawnStatsError: String(e?.message || e).slice(0, 200) })
     }
     await syncCatalogoPawn(hit)
     if (!journal.entries.length) {

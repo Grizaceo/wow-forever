@@ -30,6 +30,8 @@ agregarTextos({
   'prof.max.estimacion': 'Ruta golosa por coste esperado por punto: materiales + adquisición de la receta amortizada sobre los puntos que aporta, pagada una sola vez. Incluye recetas verdes. Estimación con la fórmula aproximada de Classic; no garantiza nada en Forever.',
   'prof.max.avisoEntrenamiento': 'El coste de entrenar los tramos con el trainer no está en los datos (SIN DATOS): no se incluye en el total.',
   'prof.max.cobertura': '{pct}% del tramo cubierto por la ruta con precio.',
+  'prof.max.cobertura.nota': 'Cobertura = puntos sobre recetas con adquisición conocida (no una cota inferior del coste ni prueba de mínimo global).',
+  'prof.max.crafts.nota': 'Crafts esperados (∑1/p, fraccionales) suponiendo intentos independientes con la fórmula aproximada de Classic: esperanza, no garantía; sin varianza estimada.',
   'prof.max.adquisicion': 'Adquisición de recetas',
   'prof.max.adquisicion.nota': 'Se paga una sola vez. Fuente: gratis (entrenador/automática), vendedor de tu facción o subasta.',
   'prof.max.materiales': 'Materiales',
@@ -59,6 +61,8 @@ agregarTextos({
   'prof.max.estimacion': 'Greedy route by expected cost per point: materials + recipe acquisition amortized over the points it yields, paid once. Includes green recipes. Estimate with the approximate Classic formula; not guaranteed on Forever.',
   'prof.max.avisoEntrenamiento': 'The cost of training tiers with the trainer is not in the data (NO DATA): it is not included in the total.',
   'prof.max.cobertura': '{pct}% of the range covered by the priced route.',
+  'prof.max.cobertura.nota': 'Coverage = points over recipes with known acquisition (not a lower bound on cost nor proof of a global minimum).',
+  'prof.max.crafts.nota': 'Expected crafts (∑1/p, fractional) assuming independent attempts with the approximate Classic formula: an expectation, not a guarantee; no variance estimate.',
   'prof.max.adquisicion': 'Recipe acquisition',
   'prof.max.adquisicion.nota': 'Paid once. Source: free (trainer/automatic), a vendor of your faction or the auction house.',
   'prof.max.materiales': 'Materials',
@@ -150,6 +154,8 @@ export function PlanSubida({ prof, skill, trainers, precios, items, lang, irA, f
           ) : (
             <>
               <div style={{ ...S.sub, marginTop: 6 }}>{t(lang, 'prof.max.cobertura', { pct: pct1(ruta.cobertura) })}</div>
+              <div style={S.sub}>{t(lang, 'prof.max.cobertura.nota')}</div>
+              <div style={S.sub}>{t(lang, 'prof.max.crafts.nota')}</div>
               <div style={{ maxHeight: 320, overflowY: 'auto', marginTop: 6 }}>
                 {pasos.map((p, i) => {
                   const r = porSpell.get(p.spell)

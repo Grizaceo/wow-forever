@@ -80,11 +80,11 @@ test('roiRuta: retorno vendedor (suelo) y estimado (AH), ROI y neto', () => {
   const roi = roiRuta([rA], 0, 10, { 100: 10, 300: 50 }, ITEMS)
   assert.equal(roi.coste, 100)
   assert.equal(roi.retornoVendedor, 200) // 10 crafts × 20c
-  assert.equal(roi.retornoEstimado, 500) // 10 × max(50 AH, 20 vend)
+  assert.equal(roi.retornoEstimado, 475) // 10 × (50 AH × 0,95 neto de comisión)
   assert.equal(roi.roiVendedor, 2)
-  assert.equal(roi.roiEstimado, 5)
+  assert.equal(roi.roiEstimado, 4.75)
   assert.equal(roi.netoVendedor, 100)
-  assert.equal(roi.netoEstimado, 400)
+  assert.equal(roi.netoEstimado, 375)
   assert.equal(roi.pasosConValor, 1)
   assert.equal(roi.pasosSinValor, 0)
   assert.equal(roi.cobertura, 1)
@@ -94,7 +94,7 @@ test('roiRuta: retorno vendedor (suelo) y estimado (AH), ROI y neto', () => {
 test('roiRuta: AH por debajo del vendedor => el estimado usa el mayor (suelo)', () => {
   const roi = roiRuta([rA], 0, 10, { 100: 10, 300: 5 }, ITEMS)
   assert.equal(roi.retornoVendedor, 200)
-  assert.equal(roi.retornoEstimado, 200) // max(5, 20) = 20
+  assert.equal(roi.retornoEstimado, 200) // max(5×0,95 ; 20) = 20 (suelo)
   assert.equal(roi.roiEstimado, 2)
 })
 
@@ -102,7 +102,7 @@ test('roiRuta: yield >1 multiplica el retorno', () => {
   const rY = R(1, 'entrenador', rango(0, 10, 10, 10), [[100, 1]], { crea: [300, 2] })
   const roi = roiRuta([rY], 0, 10, { 100: 10, 300: 50 }, ITEMS)
   assert.equal(roi.retornoVendedor, 400) // 10 × 20 × 2
-  assert.equal(roi.retornoEstimado, 1000) // 10 × 50 × 2
+  assert.equal(roi.retornoEstimado, 950) // 10 × 50 × 0,95 × 2
 })
 
 test('roiRuta: crea null (encantamiento) e ítem sin valor => SIN DATOS, retorno 0', () => {

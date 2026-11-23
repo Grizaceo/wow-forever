@@ -3,7 +3,7 @@
 // búsqueda ES/EN, detalle con SVG, borrado con confirmación, fallo de escritura
 // y recomendador de farmeo, en tema claro y oscuro, sin red ni errores JS.
 //   PLAYWRIGHT_MODULE=… CHROMIUM_PATH=… node desktop/test/vista-mercado.mjs
-import { iniciar, PERFILES, PREF } from './arnes.mjs'
+import { iniciar, exportarEstado as exportar, PERFILES } from './arnes.mjs'
 
 const FIXTURE = 'AUCTIONATOR_PRICE_DATABASE={__dbversion=8,["Prueba"]={version=2,' +
   '["2589"]={m=120,h={["2140"]=130},l={["2140"]=120},a={["2140"]=20}},' +
@@ -14,21 +14,6 @@ const FIXTURE_MANUAL = 'AUCTIONATOR_PRICE_DATABASE={__dbversion=8,["Manual"]={ve
 const a = await iniciar()
 const { check } = a
 
-// Exporta localStorage de la página al formato `previo` de a.abrir().
-async function exportar(p) {
-  const crudo = await p.evaluate(() => {
-    const o = {}
-    for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); o[k] = localStorage.getItem(k) }
-    return o
-  })
-  const previo = { storage: {}, archivos: {} }
-  for (const [k, v] of Object.entries(crudo)) {
-    if (k.startsWith('archivo.')) previo.archivos[k.slice(8)] = v
-    else if (k === PREF + 'perfil') previo.perfil = JSON.parse(v)
-    else previo.storage[k.slice(PREF.length)] = JSON.parse(v)
-  }
-  return previo
-}
 
 const texto = (p) => p.evaluate(() => document.body.innerText)
 const esperar = (p, re) => p.waitForFunction((src) => new RegExp(src).test(document.body.innerText), re.source, { timeout: 15000 })
@@ -98,6 +83,13 @@ check('cobertura del scan informada', await p.getByText(/Cobertura del scan/).co
 check('estimaciones marcadas como approx', await p.getByText(/Estimaciones aproximadas/).count() === 1)
 check('nivel y facción del perfil', await p.getByText(/vos nv 30/).count() > 0)
 
+const campControl = p.getByRole('combobox', { name: 'Campamentos' })
+await campControl.selectOption('rotation')
+const rotacion = (await exportar(p)).storage['farm-settings']
+check('rotación aplica y guarda los pesos por defecto sin editar campos',
+  rotacion?.campMode === 'rotation' && JSON.stringify(rotacion.campWeights) === '[0.5,0.3,0.2]', rotacion)
+await campControl.selectOption('single')
+
 const previo = await exportar(p)
 const vp=previo.storage['market-v2-pointer']
 check('persistió puntero conjunto v2', vp?.revision>=1,vp)
@@ -109,7 +101,7 @@ check('respaldo legado durable',!!previo.archivos['pre-v2-backup.json'])
 await p.getByRole('button', { name: 'Exportar precios para el CLI' }).first().click()
 await esperar(p, /Exportado precios-cli\.json/)
 check('export CLI: confirma reino e ítems exportados', /reino Prueba/.test(await texto(p)) && /2 ítems con precio/.test(await texto(p)))
-const cli = JSON.parse(await p.evaluate(() => localStorage.getItem('archivo.precios-cli.json')))
+const cli = JSON.parse(await p.evaluate(() => archivosData.get('precios-cli.json')))
 check('export CLI: formato canónico (schemaVersion/reino/fecha/valores)', cli.schemaVersion === 1 && cli.reino === 'Prueba' && typeof cli.fecha === 'string' && cli.valores && typeof cli.valores === 'object', cli)
 check('export CLI: precios exactos del reino seleccionado', cli.valores['2589'] === 120 && cli.valores['6469'] === 99999 && Object.keys(cli.valores).length === 2, cli.valores)
 check('export CLI: muestra el comando consultar.py maxeo --precios', /consultar\.py maxeo --precios/.test(await texto(p)) && /precios-cli\.json/.test(await texto(p)))

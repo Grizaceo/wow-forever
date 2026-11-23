@@ -186,6 +186,39 @@ Clave `personaje-simc` en `ctx.storage` (módulo `desktop/src/simc.js`):
   del perfil manual (nivel, reino, raza/facción solo si son válidas para la clase,
   profesiones); la vista pide confirmación antes de aplicar.
 
+### Catálogo de stats de ítems y equipo puesto (`pawn-stats`)
+
+Clave `pawn-stats` en `ctx.storage` (módulo `desktop/src/item-stats.js`). Es lo
+que permite puntuar una oferta de subasta contra el personaje:
+
+```json
+{"version": 1, "colhido": 1763300000, "fonte": 6, "resolvidos": 1200,
+ "pendentes": 0, "truncado": false,
+ "itens": {"6469": {"itemID": 6469, "ilvl": 30, "equipLoc": "INVTYPE_RANGED",
+                    "classID": 2, "subClassID": 2,
+                    "stats": {"Agility": 4, "Stamina": 2}, "truncado": false}}}
+```
+
+- Origen: `WoWForeverBridgeDB.pawnCatalogo`, escrito por
+  `addon/WoWForeverBridge/Pawn.lua` y parseado en `bridge.js` (`parseBridge`)
+  antes de llegar a `sincronizarPawnStats`. El ítem crudo del addon usa claves
+  cortas (`i`/`l`/`c`/`s`/`k`/`t`); `recItem` acepta ambas formas.
+- `stats` se guarda **ya en claves Pawn** (`Agility`, `Stamina`, …) porque
+  `mapearStats` traduce el `k` crudo (`ITEM_MOD_AGILITY_SHORT`, `RESISTANCE6_NAME`,
+  …) al normalizar. `mapearStats` es idempotente: una clave que ya es Pawn se
+  conserva y no se reporta en `sinMapa`.
+- Sin catálogo el estado es honesto: `itens: {}`, `colhido: null`, y la vista
+  declara `SIN DATOS` con el comando que lo genera. Nunca se borra lo guardado
+  por un puente que venga vacío.
+- El **equipo puesto** viene aparte, dentro de la captura Pawn
+  (`'pawn'` → `equipado[]`), con `{slot, itemID, ilvl, equipLoc, stats}`; el
+  ranking lo indexa por slot (`equipadoPorSlot`).
+
+Consumo: `desktop/src/subasta-pawn.js` combina este catálogo, la escala Pawn y
+las ofertas del snapshot de subasta para producir `{filas, excluidos, resumen}`.
+Es una función pura: mismas entradas → misma tabla, sin red, sin reloj y sin
+modelo de lenguaje en el cálculo.
+
 ## Guías curadas
 
 Las guías escritas a mano (hoy Cazador de la Horda y Legacy en `standalone/guide-*.js`;
@@ -207,3 +240,28 @@ convierten a este esquema común:
 
 `tipo` puede ser `clase`, `profesion` o `zona`. La página muestra primero lo generado y
 encima lo curado, con su etiqueta.
+
+## Importación del mercado: etiqueta de reino y techos
+
+El snapshot v2 indexa cada pool por `[identityKey, nombre de reino]`. Cuando la identidad no
+está acreditada (todo `UNKNOWN`, `postingChannel: null`), el nombre es una etiqueta del cliente
+y no evidencia de otro pool: Auctionator rotula el mismo servidor como «PvP» o «PvP Horde» según
+la facción del personaje activo.
+
+- Si dos entradas comparten identidad, difieren en el nombre y la identidad es **opaca**,
+  `planImportacion` conserva la del scan nuevo, lo declara en `snapshot.warnings`
+  («Reino unificado: …») y mueve el acumulado del store al nombre nuevo con `mergeRows`, para
+  que la serie no se parta en dos claves.
+- Con identidad acreditada el nombre sigue separando pools: no se colapsa nada.
+
+Presupuesto: 4 MiB UTF-8 es el tope **por archivo** de `writeText`, no el de los
+precios más el histórico. El conjunto A/B admite hasta 32 MiB fragmentados. El
+snapshot conserva los precios corrientes y una ventana reciente por ítem; el
+histórico tiene su propio presupuesto de casi 4 MiB. Si ni el último día del
+histórico cabe o el conjunto supera el tope, no se publica y se conserva la
+pareja anterior. Un sondeo sin bytes nuevos no es una actualización.
+
+Parser Lua: `MAX_BYTES` 8 MiB y `ENTRIES_LIMIT` 1.200.000. Un diario del puente guarda ~75.000
+entradas por día (7.368 ítems × 4 campos) y el addon retiene 14 días ⇒ ~1.050.000. Con el techo
+anterior (250.000) el archivo dejaba de leerse en la cuarta jornada y el puente entero quedaba
+sin importar.
