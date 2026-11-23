@@ -33,6 +33,21 @@ const CHAMAN_HORDA = { v: 1, faccion: 'horda', raza: 2, clase: 7, nivel: 24, pro
 const a = propio ? await iniciar({ plugin: propio }) : await iniciar()
 const { check } = a
 
+// La clase es opcional y vive en Perfil: cuatro desplegables nativos que montan su
+// contenido al abrirse. Se abren todos para leer cada bloque por su `data-tarjeta`.
+const BLOQUES_CLASE = ['clase-entrenadores', 'clase-hechizos', 'clase-misiones', 'clase-competencias']
+async function abrirDesplegables(p, dentro = '') {
+  for (const id of BLOQUES_CLASE) {
+    const d = p.locator(`${dentro} [data-tarjeta="${id}"]`.trim())
+    if (await d.count() && await d.getAttribute('open') === null) await d.locator('summary').click()
+  }
+}
+async function abrirClase(p) {
+  await abrirVista(p, 'perfil')
+  await p.locator('[data-tarjeta="clase-hechizos"]').waitFor()
+  await abrirDesplegables(p)
+}
+
 const hechizos = (p) => p.locator('[data-tarjeta="clase-hechizos"] tbody tr td:nth-child(2)').allInnerTexts()
 const idsMision = (p) => p.locator('[data-tarjeta="clase-misiones"] [data-mision]').count()
 const verTodos = async (p) => {
@@ -42,7 +57,7 @@ const verTodos = async (p) => {
 
 // Cazador Horda: las tres tarjetas con su fuente, y el alcance declarado.
 let { p, cerrar } = await a.abrir('claro', { perfil: PERFILES.cazadorHorda })
-await abrirVista(p, 'clase')
+await abrirClase(p)
 await p.locator('[data-tarjeta="clase-hechizos"]').waitFor()
 check('clase: la tarjeta de hechizos declara que la lista es de toda la clase', await p.evaluate(() =>
   /no por facción/i.test(document.querySelector('[data-tarjeta="clase-hechizos"]').innerText)))
@@ -62,7 +77,7 @@ await cerrar()
 
 // Paladín: mismo hechizo en las dos faciones, misiones distintas, SIN DATOS con motivo.
 ;({ p, cerrar } = await a.abrir('claro', { perfil: PALADIN_HORDA }))
-await abrirVista(p, 'clase')
+await abrirClase(p)
 await p.locator('[data-tarjeta="clase-hechizos"]').waitFor()
 await verTodos(p)
 const hechizosHorda = await hechizos(p)
@@ -76,7 +91,7 @@ check('paladín horda: sus misiones de clase siguen visibles (14)', misionesHord
 await cerrar()
 
 ;({ p, cerrar } = await a.abrir('claro', { perfil: PALADIN_ALIANZA }))
-await abrirVista(p, 'clase')
+await abrirClase(p)
 await p.locator('[data-tarjeta="clase-hechizos"]').waitFor()
 await verTodos(p)
 const hechizosAlianza = await hechizos(p)
@@ -92,7 +107,7 @@ await cerrar()
 
 // Chamán: el otro caso sin entrenadores (Alianza) y el resto con lista completa.
 ;({ p, cerrar } = await a.abrir('claro', { perfil: PERFILES.chamanAlianza }))
-await abrirVista(p, 'clase')
+await abrirClase(p)
 await p.locator('[data-tarjeta="clase-hechizos"]').waitFor()
 check('chamán alianza: SIN DATOS con motivo declarado para los entrenadores', await p.evaluate(() => {
   const t = document.querySelector('[data-tarjeta="clase-entrenadores"]').innerText
@@ -103,7 +118,7 @@ check('chamán alianza: sus misiones de clase siguen visibles (13)', await idsMi
 await cerrar()
 
 ;({ p, cerrar } = await a.abrir('claro', { perfil: CHAMAN_HORDA }))
-await abrirVista(p, 'clase')
+await abrirClase(p)
 await p.locator('[data-tarjeta="clase-hechizos"]').waitFor()
 check('chamán horda: el mismo caso tiene lista de misiones de su facción (73)', await idsMision(p) === 73)
 await cerrar()
@@ -174,6 +189,7 @@ export default {
 const b = await iniciar({ plugin: sintetico })
 const { p: ps, cerrar: cerrarS } = await b.abrir('claro')
 await ps.locator('[data-zona="fuentes"]').waitFor()
+await abrirDesplegables(ps, '[data-zona="clase-desconocida"]')
 b.check('procedencia: las tres fuentes conocidas se distinguen entre sí', await ps.evaluate(() => {
   const chips = [...document.querySelectorAll('[data-zona="fuentes"] [data-origen]')]
   const conocidos = chips.filter((x) => ['cliente-forever', 'cmangos-1.12', 'curado'].includes(x.dataset.origen))

@@ -6,7 +6,6 @@ import { D, guiaCurada, nombre, setIdioma } from './datos.js'
 import { S } from './estilos.js'
 import { t } from './i18n.js'
 import { VistaPersonaje } from './vistas/personaje.jsx'
-import { VistaClase } from './vistas/clase.jsx'
 import { VistaRuta } from './vistas/ruta.jsx'
 import { VistaProfesiones } from './vistas/profesiones.jsx'
 import { VistaDungeons } from './vistas/dungeons.jsx'
@@ -16,12 +15,12 @@ import { VistaLegacy } from './vistas/legacy.jsx'
 
 const GRUPOS = ['personaje', 'mercado', 'otros']
 const SUBPESTANAS = {
-  personaje: ['perfil', 'ruta', 'clase', 'profesiones'],
+  personaje: ['perfil', 'ruta', 'profesiones'],
   otros: ['dungeons', 'guia', 'legacy', 'configuracion'],
 }
 const INICIO = { personaje: 'perfil', mercado: 'mercado', otros: 'configuracion' }
 const VISTAS = {
-  perfil: VistaPersonaje, ruta: VistaRuta, clase: VistaClase, profesiones: VistaProfesiones,
+  perfil: VistaPersonaje, ruta: VistaRuta, profesiones: VistaProfesiones,
   dungeons: VistaDungeons, guia: VistaGuia, legacy: VistaLegacy, mercado: VistaMercado,
 }
 
@@ -140,7 +139,7 @@ export function App({ ctx, almacen, sincronizador, ventas, puente }) {
     try { ctx.storage.set('idioma', idioma) } catch { /* preferencia */ }
   }
   const cambiarPestana = (p) => {
-    const destino = INICIO[p] || p
+    const destino = p === 'clase' ? 'perfil' : INICIO[p] || p
     setPestana(destino)
     try { ctx.storage.set('pestana', destino) } catch { /* preferencia */ }
   }

@@ -1,15 +1,16 @@
-// Selector de personaje: facción → raza → clase, nivel, profesiones y reino.
+// Selector de personaje: facción → raza → clase, nivel y reino.
 import { useMemo, useState } from 'react'
-import { Button, Checkbox, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@hermes/plugin-sdk'
+import { Button, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@hermes/plugin-sdk'
 import { perfilParaAgente, razasPara } from '../../../src/perfil.js'
-import { D, FACCIONES, PRINCIPALES, SECUNDARIAS, nombre } from '../datos.js'
+import { D, FACCIONES, nombre } from '../datos.js'
 import { C, S } from '../estilos.js'
 import { agregarTextos, t } from '../i18n.js'
 import { Aviso, Origen, Tarjeta } from '../ui.jsx'
 import { construirContextoPersonaje } from '../davi.js'
 import { PreguntarDavi } from './preguntar-davi.jsx'
 import { TarjetaSimc } from './personaje-simc.jsx'
-import { TarjetaPawn } from './pawn.jsx'
+import { useResumenPawn } from './pawn.jsx'
+import { VistaClase } from './clase.jsx'
 
 agregarTextos({
   'perfil.copiar': 'Copiar perfil para el agente',
@@ -48,12 +49,12 @@ function Selector({ etiqueta, valor, opciones, onChange, id }) {
   )
 }
 
-export function VistaPersonaje({ ctx, perfil, guardarPerfil, razaSupuesta, lang, irA, puente }) {
+export function VistaPersonaje({ ctx, perfil, guardarPerfil, razaSupuesta, lang, puente }) {
   const [borrador, setBorrador] = useState(perfil)
   const [estado, setEstado] = useState('')
   const [copia, setCopia] = useState(null)
   const [resumenSimc, setResumenSimc] = useState(null)
-  const [resumenPawn, setResumenPawn] = useState(null)
+  const resumenPawn = useResumenPawn(ctx, borrador, lang)
   const p = borrador
 
   const cambiar = async (parcial) => {
@@ -84,7 +85,6 @@ export function VistaPersonaje({ ctx, perfil, guardarPerfil, razaSupuesta, lang,
 
   const razas = p.faccion && p.clase ? razasPara(D.personaje, p.faccion, p.clase) : []
   const clasesFac = p.faccion ? CLASES.filter((c) => razasPara(D.personaje, p.faccion, c).length) : CLASES
-  const toggle = (lista, id, max) => lista.includes(id) ? lista.filter((x) => x !== id) : lista.length < max ? [...lista, id] : lista
 
   return (
     <>
@@ -115,30 +115,7 @@ export function VistaPersonaje({ ctx, perfil, guardarPerfil, razaSupuesta, lang,
         <div style={S.sub} role="status">{estado}</div>
       </Tarjeta>
       <TarjetaSimc ctx={ctx} lang={lang} perfil={p} onAplicar={cambiar} puente={puente} onResumen={setResumenSimc} />
-      <TarjetaPawn ctx={ctx} lang={lang} perfil={p} puente={puente} onResumen={setResumenPawn} />
-      <Tarjeta titulo={t(lang, 'perfil.profesiones')}>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>
-          {PRINCIPALES.map((id) => (
-            <label key={id} style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-              <Checkbox checked={p.profesiones.includes(id)}
-                onCheckedChange={() => cambiar({ profesiones: toggle(p.profesiones, id, 2) })} />
-              {nombre(D.profesiones.profesiones[id].n, lang)}
-            </label>
-          ))}
-        </div>
-        <span style={S.etiqueta}>{t(lang, 'perfil.secundarias')}</span>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>
-          {SECUNDARIAS.map((id) => (
-            <label key={id} style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-              <Checkbox checked={p.secundarias.includes(id)}
-                onCheckedChange={() => cambiar({ secundarias: toggle(p.secundarias, id, 3) })} />
-              {nombre(D.profesiones.profesiones[id].n, lang)}
-            </label>
-          ))}
-        </div>
-        {p.faccion && p.raza && p.clase
-          ? <div><Button size="xs" onClick={() => irA('clase')}>{t(lang, 'tab.clase')} →</Button></div> : null}
-      </Tarjeta>
+      {p.clase && p.faccion && p.raza ? <VistaClase key={p.clase + ':' + p.faccion} perfil={p} lang={lang} /> : null}
       <Tarjeta titulo={t(lang, 'perfil.copiar')}>
         <div style={S.sub}>{t(lang, 'perfil.copiar.ayuda')}</div>
         <div>

@@ -40,7 +40,8 @@ const CATALOGO = {
 
 // ---------------------------------------------------------------- 1) Estado vacío
 let { p, cerrar } = await a.abrir('claro', { perfil: PERFILES.cazadorHorda })
-await p.click('[data-tab="personaje"]')
+await p.click('[data-tab="mercado"]')
+await p.getByRole('radio', { name: 'Subasta × Pawn' }).click()
 await p.getByText('Sin captura de Pawn').waitFor()
 check('pawn: estado vacío declara que no hay captura', await p.getByText('Sin captura de Pawn').count() >= 1)
 check('pawn: el estado vacío explica cómo capturar (/wfbpawn)', await p.getByText('/wfbpawn').count() >= 1)
@@ -51,7 +52,8 @@ await cerrar()
   perfil: PERFILES.cazadorHorda,
   storage: { pawn: CAPTURA, 'pawn-catalogo': CATALOGO },
 }))
-await p.click('[data-tab="personaje"]')
+await p.click('[data-tab="mercado"]')
+await p.getByRole('radio', { name: 'Subasta × Pawn' }).click()
 await p.getByText('Escala Pawn').first().waitFor()
 await p.locator('[data-pawn-fila]').first().waitFor()
 check('pawn: tarjeta «Escala Pawn» visible', await p.getByText('Escala Pawn').count() >= 1)
@@ -61,21 +63,30 @@ check('pawn: peso Agility 1.5 visible', await p.getByText('Agility 1.5').count()
 check('pawn: nombre de escala y proveedor', await p.getByText('Hunter: Beast Mastery').count() >= 1 && await p.getByText('Classic').count() >= 1)
 check('pawn: ilvl del equipo puesto', await p.getByText('ilvl 33').count() >= 1)
 check('pawn: catálogo declara 4 escalas', await p.getByText('4 escalas en Pawn.lua').count() >= 1)
+await p.getByRole('button', { name: 'Actualizar', exact: true }).click()
+await p.locator('[data-pawn-fila]').first().waitFor()
+await p.locator('[data-testid="pawn-consent"]').check()
+await p.getByRole('radio', { name: 'Ofertas', exact: true }).click()
+check('pawn: no aparece en Ofertas', await p.locator('[data-testid="pawn-consent"]').count() === 0)
+await p.click('[data-tab="personaje"]')
+await p.locator('#wf-raza').waitFor()
+check('pawn: Personaje no muestra tarjeta ni pesos', await p.locator('[data-testid="pawn-consent"], [data-pawn-fila]').count() === 0)
 await p.getByRole('button', { name: 'Preguntar a DAVI', exact: true }).first().click()
 await p.getByText('Incluir escala Pawn').waitFor()
 check('pawn: DAVI ofrece «Incluir escala Pawn»', await p.getByText('Incluir escala Pawn').count() === 1)
 await p.getByRole('button', { name: 'Cerrar', exact: true }).click()
 await cerrar()
 
-// ---------------------------------------------------------------- 3) Captura sin pesos
-;({ p, cerrar } = await a.abrir('claro', {
+// ---------------------------------------------------------------- 3) Captura sin pesos (tema oscuro)
+;({ p, cerrar } = await a.abrir('oscuro', {
   perfil: PERFILES.cazadorHorda,
   storage: {
     pawn: { ...CAPTURA, pesos: {}, equipo: null },
     'pawn-catalogo': CATALOGO,
   },
 }))
-await p.click('[data-tab="personaje"]')
+await p.click('[data-tab="mercado"]')
+await p.getByRole('radio', { name: 'Subasta × Pawn' }).click()
 await p.getByText('La escala capturada no trajo pesos.').waitFor()
 check('pawn: captura sin pesos lo declara (no inventa)', await p.getByText('La escala capturada no trajo pesos.').count() === 1)
 check('pawn: sin filas de pesos', await p.locator('[data-pawn-fila]').count() === 0)

@@ -28,7 +28,7 @@ const { p, cerrar } = await a.abrir('claro', { perfil: PERFILES.cazadorHorda, id
 async function medir(pares) {
   return p.evaluate(async ({ pares, reps }) => {
     const GRUPO = {
-      perfil: 'personaje', ruta: 'personaje', clase: 'personaje', profesiones: 'personaje',
+      perfil: 'personaje', ruta: 'personaje', profesiones: 'personaje',
       configuracion: 'otros', dungeons: 'otros', guia: 'otros', legacy: 'otros',
     }
     const panelDe = (id) => {
@@ -94,7 +94,7 @@ try {
   //    se conserva al ida y vuelta (la optimización no toca el ciclo de vida).
   const hojas = [
     ['personaje', 'perfil', '#wf-raza'], ['personaje', 'ruta', '[data-tab="ruta"][aria-selected="true"]'],
-    ['personaje', 'clase', '[data-tab="clase"][aria-selected="true"]'],
+    // Sin hoja «clase»: la referencia de clase vive en Perfil como desplegables opcionales.
     ['personaje', 'profesiones', '#wf-profesion'],
     ['mercado', 'mercado', '[data-tab="mercado"][aria-selected="true"]'],
     ['otros', 'configuracion', '[data-tab="configuracion"][aria-selected="true"]'],
