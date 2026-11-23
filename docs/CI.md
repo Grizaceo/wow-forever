@@ -10,7 +10,7 @@ Permisos: `contents: read` (sin secretos ni credenciales de juego).
 | `tests` | ubuntu, macos, windows | `npm ci` en `desktop/`; `node scripts/test-node.mjs`; los seis `standalone/tests/*.cjs`; `python -m unittest discover -s tests`; build del bundle y `check_desktop_bundle.py` |
 | `gates-linux` | ubuntu | lo anterior **más** Lua (`lua5.1`) y las 15 suites Chromium de `desktop/test/`, a través de `node scripts/run-gates.mjs --keep-going` |
 
-Node 22 y Python 3.12 fijados con `actions/setup-*`. Versiones de npm fijadas en
+Node 22 y Python 3.12 fijados con `actions/setup-*`. Versiones de paquetes fijadas en
 `desktop/package-lock.json`: esbuild 0.28.2, Playwright 1.64.0, React/ReactDOM
 19.3.0. `PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1` evita descargas duplicadas durante
 `npm ci`; el job de gates instala Chromium con `npx playwright install --with-deps chromium`.

@@ -74,6 +74,17 @@ la suite nueva en el gate canónico.
   en línea, `background-size`/posiciones idénticos y que Profesiones se rerenderiza
   igual al revisitarla.
 
+## Verificación final tras revisión adversarial
+
+La suite integrada tiene ahora **14 checks**: añade recuperación de una hoja CSS
+antigua sin duplicarla. La escritura del sprite ocurre en `useInsertionEffect`,
+no durante render; una nueva carga del módulo actualiza la hoja existente. La
+regresión falla contra el bundle anterior (`backgroundImage: none`) y pasa contra
+el nuevo. En una repetición local del tratamiento: medianas de 55,7 ms a dungeons,
+23,7 ms a profesiones y 22,5 ms a ruta. Son mediciones headless de esa corrida,
+no promesas para todos los equipos. Los gates finales incluyen 420 checks de
+navegador y la CI ejecuta esos checks solo en Linux.
+
 ## Limitaciones
 
 - Solo fixtures sintéticos: no hay archivos de juego, cuentas ni SavedVariables

@@ -151,13 +151,23 @@ Errores de importación que **no** son pérdida de datos:
 
 ---
 
+## Limitaciones deliberadas del descubrimiento
+
+Si cualquier listado es incompleto o contiene una ruta insegura, se detiene toda
+la búsqueda: no es posible descartar otra cuenta en la parte no enumerada. No se
+elige silenciosamente el primer archivo válido. Para recuperarse, conceder una
+carpeta más específica: el `SavedVariables` de la cuenta deseada. No hace falta
+borrar archivos ni mover la cuenta. Se rechaza `:` también en Linux/macOS como
+política portable, aunque allí pueda ser un nombre válido; seleccionar una carpeta
+más profunda evita incluir un ancestro con ese carácter en la ruta relativa.
+
 ## 7. Matriz de validación de sistemas operativos (honesta)
 
 | Sistema | Validado en esta auditoría | **No** validado |
 | --- | --- | --- |
-| **Linux** | Node 26.12.0, `node --test` con fixtures sintéticas; 92 pruebas de sincronización en verde y 381/381 en la suite completa. Revisión del código del SDK (`plugin-files.ts`, `plugin-files-ops.ts`, `plugin-files-guards.ts`). | Cliente WoW real, app Hermes desktop real, diálogo de permisos real, selector real del SDK. |
-| **Windows** | Sólo revisión estática del contrato del SDK (`path.win32`, `toRel()` con `/`, `REL_PATH_MAX=1024`, rechazo de `:`/UNC/dispositivos reservados) y fixtures sintéticas ejecutadas **en Linux**. | Host Windows real, NTFS/OneDrive, UNC, ADS, nombres reservados, selector nativo, WoW real. |
-| **macOS** | Sólo revisión estática del contrato del SDK (guardia `..namedfork`, `caseless` en Darwin) y fixtures sintéticas ejecutadas **en Linux**. | Host macOS real, APFS case-insensitive, diálogo de permisos real, WoW real. |
+| **Linux** | Suite Node 381/381 con fixtures sintéticas (92 pruebas de sync); Python, standalone, build reproducible y revisión del contrato del SDK. CI nativa Node 22 / Python 3.12; gates Lua y 420 checks Chromium. | Cliente WoW real, app Hermes desktop real, diálogo de permisos real, selector real del SDK. |
+| **Windows** | CI en runner Windows: Node 22, Python 3.12, standalone, build y bundle-check. Las mismas fixtures de sincronización pasan en ese SO. Revisión estática de las restricciones del SDK. | WoW/Hermes reales; selector y permisos nativos; integración con OneDrive/UNC/ADS y nombres reservados. |
+| **macOS** | CI en runner macOS: Node 22, Python 3.12, standalone, build y bundle-check. Las mismas fixtures de sincronización pasan en ese SO. Revisión estática de las restricciones del SDK. | WoW/Hermes reales; selector y permisos nativos; integración real con APFS case-insensitive. |
 
 **Revisión adicional (SimC / Pawn).** `desktop/src/simc.js` normaliza saltos
 CRLF y CR (`replace(/\r\n?/g, '\n')`), `desktop/src/pawn.js` ordena con
@@ -167,10 +177,15 @@ para ordenar razones de exclusión en la UI, nunca para identidad ni
 procedencia. No se encontró bug de plataforma en esos parsers y no se
 modificaron.
 
-**Conclusión:** la compatibilidad multiplataforma se validó por *contrato y
-fixtures deterministas*, **no** ejecutando Windows ni macOS. Antes de afirmar
-soporte de primera clase en esos sistemas hay que correr las mismas pruebas en
-un host real y repetir el checklist §2–§6 con permisos reales.
+**Evidencia remota:** [run 45087986470](https://github.com/Grizaceo/wow-forever/actions/runs/45087986470),
+commit `b81f5c6728b6d79384a77e96d52e52522246c1d1`: los cuatro jobs terminaron
+en verde. Se corrigió tanto la enumeración de tests en Node 22 como la decodificación
+UTF-8 de JSON de Node en los tests Python de Windows.
+
+**Conclusión:** las fixtures y builds se ejecutaron en los tres SO mediante CI;
+esto **no** valida tres instalaciones de WoW ni el selector real del SDK. Antes
+de afirmar soporte de primera clase hay que repetir el checklist §2–§6 en la
+app y cliente reales, con permisos reales, en cada sistema.
 
 La distribución incluye el bundle regenerado y el runner canónico ejecuta
 también las suites de navegador con fixtures. Estos tests no sustituyen
@@ -187,7 +202,7 @@ node --test tests/sync-path.test.mjs tests/auctionator-discovery.test.mjs \
   tests/tsm.test.mjs tests/bridge-sync.test.mjs tests/bridge.test.mjs \
   tests/mercado-auto.test.mjs tests/market-source.test.mjs tests/market-sync.test.mjs
 # ℹ tests 92 / pass 92 / fail 0   (subconjunto de sincronización)
-node --test tests/*.test.mjs
+node scripts/test-node.mjs
 # ℹ tests 381 / pass 381 / fail 0 (suite completa de Node en este checkout)
 
 # Preparar las dependencias del proyecto y Chromium una vez:
@@ -208,8 +223,9 @@ Bugs concretos corregidos (con regresión en rojo antes del fix, verde después)
    `\` y `..namedfork`; se unificó en `desktop/src/sync-path.js` con el
    contrato real del SDK (1024 / 255, sólo `/`).
 
-Archivos propios de esta auditoría: `desktop/src/sync-path.js`,
+Archivos de la corrección de sincronización: `desktop/src/sync-path.js`,
 `desktop/src/auctionator.js`, `desktop/src/bridge-sync.js`,
 `desktop/src/tsm-sync.js`, `tests/sync-path.test.mjs`,
-`tests/auctionator-discovery.test.mjs` y este documento. No se tocó
-`app.jsx`, vistas, runner, `package.json`, CI ni bundles.
+`tests/auctionator-discovery.test.mjs` y este documento. La integración completa
+incluye además cambios de rendimiento, CI y el bundle regenerado; no se
+desplegó sobre la instalación existente como parte de esta auditoría.

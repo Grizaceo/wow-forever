@@ -108,7 +108,7 @@ informe de huecos, no un dato sano.
 | Zonas por nivel | 51 | 39 con niveles | 6 ciudades (N/A) + 6 huecos | `zonas` |
 | Dungeon clásico | 26 · 251 jefes | 26 con rangos; 220 jefes con botín | 12 mapas con botín sin vincular | `dungeon` |
 | Dungeon Forever | 9 · 58 jefes | 9 con nombres y orden de jefes | 0 botín, 0 rangos: dato del servidor | `dungeon` |
-| Guía curada | 2 de 9 clases | Cazador/Horda y Legacy | 7 clases sin guía; Guerrero y Chamán se retiraron por errores | `references/INDICE.md` |
+| Guía curada | 1 clase + contenido Legacy | Cazador/Horda; Legacy no es una clase | Sin guía equivalente para las otras clases; Guerrero y Chamán se retiraron por errores | `references/INDICE.md` |
 | Pawn / equipo | depende de la cuenta | catálogo de 29 escalas | pesos **no** persistidos en SavedVariables; solo en runtime | `desktop/src/pawn.js` |
 
 ---
@@ -123,16 +123,16 @@ configuración concreta. Cada supuesto debe convertirse en una opción declarada
 | # | Supuesto del Cazador Horda | Evidencia en el repo | Efecto en otro jugador | Destino |
 |---|---|---|---|---|
 | H1 | **Facción Horda**: ruta Durotar/Barrens/Org/Entrañas, zep UC→Org, quests «(Horda)» | §«Ruta de niveles», hitos y `Dungeons` de la guía | Alianza no tiene ruta curada | Paso 7 |
-| H2 | **Raza Trol**: `/cast Berserking` en la macro de Rapid Fire y «Trol = Bow Specialization» | guía líneas 559, 685 | Otras razas tienen otro racial; la macro queda inválida | Paso 5 |
-| H3 | **Spec**: BM por defecto; recompensa de la quest 50 cambia (Devilsaur Eye para MM/SV, Tooth para BM); macros con talentos BM/MM | guía líneas 219–221, 545–607, 669–677 | El premio y las macros no son universales | Paso 6 |
-| H4 | **Arma**: arco por defecto, gun alternativo, `pref: 'any'`; escasez de guns de Horda hasta 48 | guía 679–687; `perfilParaMotor` en `docs/prompts/devin-equipo-simc-pawn.md` | Otro clas/e spec necesita otro mapa de armas | Paso 6 |
-| H5 | **Nivel y armadura**: 1–60, dual wield al 20, entrenar malla al 40, quest de clase al 10 y 50 | guía hitos 10/20/40/50 | Cambia por clase | Pasos 3 y 8 |
-| H6 | **Profesiones**: Ingeniería para las armas de fuego marcadas (Deadly Blunderbuss, etc.); comida para el pet | tabla de armas y «Tips de hunter» | El perfil guarda profesiones, pero **no skill** | Paso 4 |
-| H7 | **Restricciones de ítem**: BoE en subasta, BOP («Nightstalker Bow ligado al recogerlo»), recompensa solo Horda, armas `Ingeniería` | tabla de armas, listas de dungeon | `items.json` **no codifica** clase/raza/facción/oficio que puede equipar: solo `nivel_req` y clase/subclase del *ítem* | Paso 5 |
-| H8 | **Escala Pawn**: 29 escalas con `ClassID`/`SpecID`/`Role`/`Provider` pero sin `Values`; pesos solo en runtime (`PawnGetAllStatValues`); selección capturada → clase+spec → clase → `null` | `docs/prompts/devin-equipo-simc-pawn.md` §§5–6 | Sin captura no hay ranking; no se puede inventar peso ni DPS | Paso 6 |
+| H2 | **Raza Trol**: `/cast Berserking` en la macro de Rapid Fire y «Trol = Bow Specialization» | guía líneas 559, 685 | Otras razas tienen otro racial; la macro queda inválida | Paso 11 |
+| H3 | **Spec**: BM por defecto; recompensa de la quest 50 cambia (Devilsaur Eye para MM/SV, Tooth para BM); macros con talentos BM/MM | guía líneas 219–221, 545–607, 669–677 | El premio y las macros no son universales | Pasos 12 y 14 |
+| H4 | **Arma**: arco por defecto, gun alternativo, `pref: 'any'`; escasez de guns de Horda hasta 48 | guía 679–687; `perfilParaMotor` en `docs/prompts/devin-equipo-simc-pawn.md` | Otra clase/spec necesita otro mapa de armas | Pasos 10, 11 y 13 |
+| H5 | **Nivel y armadura**: 1–60, dual wield al 20, entrenar malla al 40, quest de clase al 10 y 50 | guía hitos 10/20/40/50 | Cambia por clase | Pasos 7, 10 y 14 |
+| H6 | **Profesiones**: Ingeniería para las armas de fuego marcadas (Deadly Blunderbuss, etc.); comida para el pet | tabla de armas y «Tips de hunter» | El perfil guarda profesiones, pero **no skill** | Pasos 8 y 9 |
+| H7 | **Restricciones de ítem**: BoE en subasta, BOP («Nightstalker Bow ligado al recogerlo»), recompensa solo Horda, armas `Ingeniería` | tabla de armas, listas de dungeon | `items.json` **no codifica** clase/raza/facción/oficio que puede equipar: solo `nivel_req` y clase/subclase del *ítem* | Paso 10 |
+| H8 | **Escala Pawn**: 29 escalas con `ClassID`/`SpecID`/`Role`/`Provider` pero sin `Values`; pesos solo en runtime (`PawnGetAllStatValues`); selección capturada → clase+spec → clase → `null` | `docs/prompts/devin-equipo-simc-pawn.md` §§5–6 | Sin captura no hay ranking; no se puede inventar peso ni DPS | Paso 12 |
 
 La guía ya advierte en «Sobre el servidor "Forever"» que usa datos 1.12 y que conviene
-verificar cada ítem en el juego. Esa advertencia debe generalizese a **todas** las clases,
+verificar cada ítem en el juego. Esa advertencia debe generalizarse a **todas** las clases,
 no solo al Cazador.
 
 ---
@@ -205,22 +205,25 @@ sale el dato.
 
 ### Fase 4 — Profesiones con skill real (P1)
 
-8. **Plan de subida para los 12 oficios y 2 facciones.** Pre: fase 2, perfil con skill.
-   Ref: `src/crafteo.js` (`dificultad`, `dificultadReceta`, `probSubida`, `costoReceta`,
-   `valorCreado`, `plan de subida`), `cmd_profesion`, `cmd_maxeo`, `cmd_roi`. Criterio:
-   las 26 recetas Forever sin ítem-plan y las 48 `como: desconocido` devuelven
-   `dificultad: desconocida` / «no se sabe si se puede aprender», nunca `naranja`; el plan
-   marca tramos sin candidata con `spell: null`. Prueba: `tests/crafteo.test.mjs`,
-   `tests/oficios.test.mjs`, `tests/recetas-propias.test.mjs`, `tests/test_maxeo.py`,
-   `tests/test_roi.py`. Límite: la probabilidad de subida es la regla de Classic,
-   aproximada para Forever; sin precios, `costo: null`.
-
-9. **Skill de profesión en el perfil, no booleano.** Pre: paso 8. Ref: `src/perfil.js`
+8. **Skill de profesión en el perfil, no booleano.** Pre: pasos 1–2; habilita el paso 9.
+   Ref: `src/perfil.js`
    (hoy guarda solo IDs), `desktop/src/simc.js` (donde llega el skill), `docs/MODELO-DATOS.md`
    §«Estado del personaje desde SimulationCraft». Criterio: `profesiones:[{id, skill}]`
    validado; ausencia de skill → «skill desconocido» en el plan. Prueba:
    `tests/perfil.test.mjs`, `tests/simc.test.mjs`. Límite: SimC manda en nivel/clase/spec;
    el perfil manda en facción; no se mezclan silenciosamente.
+
+9. **Plan de subida para los 12 oficios y 2 facciones.** Pre: fase 2 y paso 8. No ofrecer
+   un plan de fabricación para recolección como si fueran actividades idénticas:
+   mostrar su estrategia o un hueco explícito. Ref: `src/crafteo.js` (`dificultad`,
+   `dificultadReceta`, `probSubida`, `costoReceta`, `valorCreado`, `plan de subida`),
+   `cmd_profesion`, `cmd_maxeo`, `cmd_roi`. Criterio: las 26 recetas Forever sin
+   ítem-plan y las 48 `como: desconocido` devuelven `dificultad: desconocida` /
+   «no se sabe si se puede aprender», nunca `naranja`; el plan marca tramos sin
+   candidata con `spell: null`. Prueba: `tests/crafteo.test.mjs`, `tests/oficios.test.mjs`,
+   `tests/recetas-propias.test.mjs`, `tests/test_maxeo.py`, `tests/test_roi.py`.
+   Límite: la probabilidad de subida es la regla de Classic, aproximada para Forever;
+   sin precios, `costo: null`.
 
 ### Fase 5 — Ítems y restricciones (P1)
 
@@ -264,7 +267,7 @@ sale el dato.
 14. **Cobertura honesta de guías curadas.** Pre: fases 5–6. Ref:
     `tools/build-referencias-skill.mjs`, `tools/auditar-curado.mjs`,
     `skills/wow-forever/references/INDICE.md`. Criterio: el índice dice explícitamente que
-    solo hay Cazador/Horda y Legacy; para las otras 7 clases se usa el dato generado y se
+    solo hay Cazador/Horda y contenido Legacy; para las otras clases se usa el dato generado y se
     dice «sin guía curada»; Guerrero y Chamán siguen retirados. Prueba:
     `tests/referencias-skill.test.mjs`, `tests/curado-datos.test.mjs`, `tests/test_skill.py`.
     Límite: no redactar guías nuevas a mano como si fueran verificadas.
@@ -279,20 +282,32 @@ sale el dato.
 ### Fase 8 — Puerta de cobertura (P2, coordinación con CI)
 
 16. **Chequeo de suelos de cobertura, no de deseos.** Pre: fases 0–7. Ref:
-    `scripts/run-gates.mjs` (propiedad de otro trabajador: **no editar desde aquí**),
+    `scripts/run-gates.mjs`,
     `docs/TESTING.md`. Criterio: una comprobación de solo lectura falla si bajan los
     suelos medidos — 9 clases, 10 razas, 12 profesiones, 56 combinaciones, 2146 recetas,
     39 zonas con niveles, 16/18 pares con entrenadores, 220 jefes clásicos con botín — o
     si aparece un hueco sin motivo. Prueba: la propia puerta existente más
     `tests/test_datos.py`, `tests/test_reproducible.py`. Límite: la puerta no puede exigir
-    botín Forever, que es dato del servidor; verificaría un estado imposible.
+    botín Forever aún no incorporado. Ampliar esa cobertura requiere primero una fuente
+    verificable del servidor y pruebas de procedencia; no sustituirla por Classic.
+
+    **Puerta de producto, además de conteos:** validar las 56 combinaciones con perfiles
+    de nivel 1/10/20/40/60; cubrir las 12 profesiones con skill ausente, inicial y máximo;
+    verificar escalas Pawn ausentes y de otra clase/spec; exigir que ningún resultado de
+    Alianza incluya rutas Horda ni que un racial Trol aparezca para otra raza. Usar una
+    matriz pairwise documentada para el resto de variables, con casos obligatorios de
+    Paladín/Horda, Chamán/Alianza y razas 95/96. Hacer onboarding desde cero con testers
+    de Windows/macOS/Linux (selector nativo, permisos, cuenta única/múltiple, `/reload`,
+    archivo ausente, escritura parcial y revocación), sin intervención manual del autor.
+    Registrar versión de cliente/addons/host y marcar cada combinación no probada: una
+    CI verde de parsers no certifica la experiencia de un jugador independiente.
 
 ---
 
 ## 6. Límites que no deben cruzarse
 
-- **Botín Forever:** 9 dungeons, 58 jefes, **0** con botín. Es dato del servidor sin
-  fuente publicable; se reporta SIN DATOS, nunca con botín de 1.12.
+- **Botín Forever:** 9 dungeons, 58 jefes, **0** con botín incorporado. Falta una fuente
+  verificable integrada; se reporta SIN DATOS, nunca con botín de 1.12.
 - **Entrenadores de Paladín/Horda y Chamán/Alianza:** combinaciones válidas del cliente
   ausentes en 1.12. No se copian de la otra facción.
 - **Zona de inicio de Skyborne (razas 95/96):** sin `playercreateinfo` en CMaNGOS.
@@ -306,7 +321,7 @@ sale el dato.
   hay ranking. El valor es una fórmula, no DPS simulado.
 - **Datos de cuenta:** precios viven en la página, no en `data/`. El agente no lee `WTF`,
   `Config.wtf`, credenciales ni ejecuta Lua; la app lo hace dentro de permisos concedidos.
-- **Ningún paso de esta hoja autoriza a tocar archivos de juego ni a hacer commits.**
+- Esta hoja no autoriza por sí misma recolectar datos privados ni modificar archivos de juego.
 
 ---
 
@@ -316,4 +331,5 @@ La hoja está terminada cuando: (a) los 16 pasos tienen prerrequisito, referenci
 medible, prueba y límite; (b) cada cifra citada es reproducible con los comandos de la §1
 sobre la base `6009602`; (c) las 8 suposiciones del Cazador están convertidas en pasos
 concretos; (d) la matriz de la §3 distingue «verificado en cliente», «aproximación
-Classic» y «curado»; y (e) no se ha modificado ningún archivo más que este.
+Classic» y «curado»; y (e) cada brecha sigue identificada como trabajo pendiente, no como
+soporte ya entregado. Cumplir esta definición cierra el documento, no los 16 pasos.

@@ -12,6 +12,8 @@ Comparación: `6009602` → rama `perf/stability-ci`.
 6. **Node 22 vs entorno de desarrollo:** GitHub detectó que `node --test tests/` no descubre el directorio como Node 26. `scripts/test-node.mjs` enumera archivos explícitos sin shell/globs, falla si la lista está vacía y propaga el código de salida. Repetido con Node 22 real: 381/381 aprobadas.
 7. **Guardas de rendimiento:** la espera de contenido ahora rechaza en timeout en vez de resolver; las repeticiones deben ser un entero positivo. No se acepta una vista ausente como una medición válida.
 
+8. **Codificación Windows:** tres pruebas de paridad Node/Python decodificaban stdout con la página de códigos local. Con ACP CP1252, cadenas UTF-8 con acentos dejaban de ser iguales, aunque los números lo fueran. Control rojo: 3 fallos al simular CP1252; corrección verde: 3 aprobadas con `encoding='utf-8'`, sin relajar las comparaciones. CI nativa Windows aprobada después.
+
 ## Alcance de la evidencia
 
 Los fixtures son sintéticos y las pruebas no acceden a cuentas ni SavedVariables personales. Los resultados de CI nativo y de los gates se conservan en GitHub Actions. Las observaciones headless no certifican el selector real, el cliente de juego, Wine, ni comportamiento del filesystem con permisos/revocación durante una sesión real.
