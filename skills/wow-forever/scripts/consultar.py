@@ -1502,4 +1502,9 @@ def main(argv=None, out=print):
 
 
 if __name__ == "__main__":
+    # Salida siempre en UTF-8 cuando va a una tubería o archivo (así la lee el agente).
+    # En Windows, sin esto, Python usa la página de códigos local (cp1252) fuera de la
+    # consola y los nombres con tilde llegan corruptos; en consola ya escribe UTF-8.
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8")
     sys.exit(main())
