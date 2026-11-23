@@ -4,8 +4,22 @@ import { useState } from 'react'
 import { Button } from '@hermes/plugin-sdk'
 import { D, dinero, huecos, nombre, zona } from '../datos.js'
 import { C, S } from '../estilos.js'
-import { t } from '../i18n.js'
-import { Hueco, Origen, Tarjeta } from '../ui.jsx'
+import { agregarTextos, t } from '../i18n.js'
+import { Hueco, Origen } from '../ui.jsx'
+
+agregarTextos({ 'clase.opcional': 'Información de clase (opcional)' }, { 'clase.opcional': 'Class reference (optional)' })
+
+// Native disclosure: keyboard accessible, closed on mount, content mounted only on demand.
+function DetalleClase({ titulo, extra, children }) {
+  const [abierto, setAbierto] = useState(false)
+  return <details data-class-section style={S.tarjeta} onToggle={(e) => setAbierto(e.currentTarget.open)}>
+    <summary style={{ cursor: 'pointer', color: C.texto2 }}>{titulo}</summary>
+    {abierto ? <div style={{ paddingTop: 10 }}>
+      <div style={S.tarjetaTitulo}>{extra}</div>
+      {children}
+    </div> : null}
+  </details>
+}
 
 const VENTANA = 10   // niveles por delante que se muestran como "próximos"
 
@@ -25,8 +39,9 @@ export function VistaClase({ perfil, lang }) {
   }
 
   return (
-    <>
-      <Tarjeta titulo={t(lang, 'clase.entrenadores') + ' · ' + nombre(D.personaje.facciones[perfil.faccion].n, lang)}
+    <section aria-label={t(lang, 'clase.opcional')}>
+      <div style={S.etiqueta}>{t(lang, 'clase.opcional')}</div>
+      <DetalleClase titulo={t(lang, 'clase.entrenadores') + ' · ' + nombre(D.personaje.facciones[perfil.faccion].n, lang)}
         extra={<Origen f="cmangos-1.12" lang={lang} />}>
         {sinEntrenador.length ? <Hueco lang={lang}>{t(lang, 'clase.sinEntrenador')}</Hueco> : null}
         {[...porZona.entries()].sort().map(([z, lista]) => (
@@ -35,9 +50,9 @@ export function VistaClase({ perfil, lang }) {
             <span>{lista.map((e) => nombre(e.n, lang)).join(', ')}</span>
           </div>
         ))}
-      </Tarjeta>
+      </DetalleClase>
 
-      <Tarjeta titulo={t(lang, 'clase.hechizos')} extra={<>
+      <DetalleClase titulo={t(lang, 'clase.hechizos')} extra={<>
         <Origen f="cmangos-1.12" lang={lang} />
         <Button variant="ghost" size="xs" onClick={() => setTodos(!todos)}>{todos ? t(lang, 'clase.menos') : t(lang, 'clase.todos')}</Button>
       </>}>
@@ -56,9 +71,9 @@ export function VistaClase({ perfil, lang }) {
             </tbody>
           </table>
         ) : <div style={S.sub}>{t(lang, 'clase.ninguno')}</div>}
-      </Tarjeta>
+      </DetalleClase>
 
-      <Tarjeta titulo={t(lang, 'clase.misiones')} extra={<Origen f="cmangos-1.12" lang={lang} />}>
+      <DetalleClase titulo={t(lang, 'clase.misiones')} extra={<Origen f="cmangos-1.12" lang={lang} />}>
         {misiones.length ? misiones.map(([id, m]) => (
           <div key={id} style={{ ...S.fila, opacity: m.min > perfil.nivel ? 0.6 : 1 }}>
             <span style={{ minWidth: 40, color: C.texto3 }}>{m.nivel}</span>
@@ -66,13 +81,13 @@ export function VistaClase({ perfil, lang }) {
             <span style={S.sub}>{m.zona != null ? nombre(zona(m.zona)?.n, lang) : m.dungeon != null ? nombre(D.dungeons.clasicos[String(m.dungeon)]?.n, lang) : ''}</span>
           </div>
         )) : <Hueco lang={lang}>{t(lang, 'clase.misiones')}</Hueco>}
-      </Tarjeta>
+      </DetalleClase>
 
-      <Tarjeta titulo={t(lang, 'clase.competencias')} extra={<Origen f="cliente-forever" lang={lang} />}>
+      <DetalleClase titulo={t(lang, 'clase.competencias')} extra={<Origen f="cliente-forever" lang={lang} />}>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
           {cl.competencias.map((c) => <span key={c.id} style={S.chip}>{nombre(c.n, lang)}</span>)}
         </div>
-      </Tarjeta>
-    </>
+      </DetalleClase>
+    </section>
   )
 }

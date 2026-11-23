@@ -31,7 +31,9 @@ check('copia el perfil para el agente con ctx.os.writeClipboard', await p.evalua
   window.copiado === 'Mi personaje de WoW Forever (plugin wow-forever): Horda · No-muerto (Undead, raza 5) · Paladín (Paladin, clase 2) · nivel 24'), await p.evaluate(() => window.copiado))
 
 // 3) Clase: hueco de entrenadores dicho; hechizos listados.
-await p.click('[data-tab="clase"]')
+check('Clase es opcional: cuatro desplegables cerrados en Perfil y ninguna pestaña Clase', await p.locator('[data-class-section]').count() === 4 && await p.locator('[data-class-section][open]').count() === 0 && await p.locator('[data-tab="clase"]').count() === 0)
+await p.locator('[data-class-section] summary').nth(0).click()
+await p.locator('[data-class-section] summary').nth(1).click()
 await p.getByText('Hechizos de entrenador').waitFor()
 check('Paladín de la Horda: el hueco de entrenadores se dice', await p.getByText('Sin datos:').count() > 0)
 check('lista hechizos de entrenador', await p.locator('table tbody tr').count() > 0)
@@ -58,10 +60,21 @@ await cerrar()
 for (const tema of ['claro', 'oscuro']) {
   ;({ p, cerrar } = await a.abrir(tema, { perfil: PERFILES.cazadorHorda }))
   await p.locator('#wf-raza').waitFor()
+  const detalles = p.locator('[data-class-section]')
+  check(tema + ': referencias de clase cerradas por defecto', await detalles.count() === 4 && await detalles.locator('[open]').count() === 0 && await p.locator('[data-class-section][open]').count() === 0)
+  for (let i = 0; i < 4; i++) {
+    await detalles.nth(i).locator('summary').click()
+    await detalles.nth(i).locator('summary + div').waitFor()
+  }
+  check(tema + ': las cuatro referencias de clase se consultan bajo demanda', await p.locator('[data-class-section][open]').count() === 4 && await detalles.nth(1).getByRole('columnheader', {name: 'Hechizo', exact: true}).isVisible() && await detalles.nth(3).locator('summary + div span').count() > 0)
+  await detalles.nth(1).locator('summary').focus()
+  await detalles.nth(1).locator('summary').press('Enter')
+  await detalles.nth(1).locator('summary + div').waitFor({ state: 'detached' })
+  check(tema + ': desplegable de clase se cierra con teclado sin cerrar los demás', await p.locator('[data-class-section][open]').count() === 3)
   check(tema + ': solo tres secciones principales', (await ids(p, 'Secciones principales')).join() === principales.join())
   check(tema + ': Perfil sin selector redundante de profesiones', await p.getByRole('checkbox', { name: 'Peletería', exact: true }).count() === 0)
   for (const [grupo, etiqueta, hojas] of [
-    ['personaje', 'Secciones de Personaje', ['perfil', 'ruta', 'clase', 'profesiones']],
+    ['personaje', 'Secciones de Personaje', ['perfil', 'ruta', 'profesiones']],
     ['mercado', null, ['mercado']],
     ['otros', 'Otras secciones', ['dungeons', 'guia', 'legacy', 'configuracion']],
   ]) {
@@ -84,6 +97,7 @@ for (const tema of ['claro', 'oscuro']) {
   await oficio('Alquimia').click()
   await oficio('Pesca').click()
   await elegir(p, 'perfil')
+  check(tema + ': volver al Perfil no despliega referencias automáticamente', await p.locator('[data-class-section][open]').count() === 0)
   const guardadoProf = await p.evaluate((k) => JSON.parse(localStorage.getItem(k)), PREF + 'perfil')
   check(tema + ': cambios de profesiones persisten sin alterar personaje', guardadoProf.profesiones.includes(171) && !guardadoProf.profesiones.includes(165) && guardadoProf.secundarias.includes(356) && guardadoProf.clase === 3 && guardadoProf.nivel === 30)
   check(tema + ': no ensucia window con globales de la guía', await p.evaluate(() =>
@@ -117,7 +131,7 @@ if (process.env.HERMES_SDK_TABS === '1') {
   const ruta = p.getByRole('tab', { name: 'Ruta', exact: true })
   await ruta.focus()
   await ruta.press('ArrowRight')
-  await p.getByRole('tab', { name: 'Clase', exact: true, selected: true }).waitFor()
+  await p.getByRole('tab', { name: 'Profesiones', exact: true, selected: true }).waitFor()
   const personaje = p.getByRole('tab', { name: 'Personaje', exact: true })
   await personaje.focus()
   await personaje.press('ArrowRight')
@@ -131,6 +145,12 @@ check('Mercado sin perfil sigue visible en segundo lugar', (await ids(p, 'Seccio
 await p.getByRole('button', { name: 'Personaje', exact: true }).click()
 await p.locator('#wf-raza').waitFor()
 check('Mercado sin perfil vuelve a la ficha con un clic', await p.getByRole('tab', { name: 'Perfil', exact: true, selected: true }).isVisible())
+await cerrar()
+
+// Old Class preference now resolves to the optional references in Profile, never a dead tab.
+;({ p, cerrar } = await a.abrir('oscuro', { perfil: PERFILES.cazadorHorda, idioma: 'en', storage: { pestana: 'clase' } }))
+await p.locator('#wf-clase').waitFor()
+check('preferencia Clase antigua vuelve a Profile con referencias opcionales cerradas', await p.getByRole('tab', { name: 'Profile', exact: true, selected: true }).isVisible() && await p.getByRole('tab', { name: 'Class', exact: true }).count() === 0 && await p.getByText('Class reference (optional)', { exact: true }).isVisible() && await p.locator('[data-class-section][open]').count() === 0)
 await cerrar()
 
 // 5) La clave heredada de la 1.0.0 (`auction-path`) se borra sola al cargar el

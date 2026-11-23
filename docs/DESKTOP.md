@@ -51,7 +51,7 @@ vuelve a leerlo tras guardar.
 
 ## Navegación
 
-- **Character** abre **Profile** y agrupa **Route**, **Class** y **Professions**.
+- **Character** abre **Profile** y agrupa **Route** y **Professions**. La antigua pestaña **Class** pasa a cuatro desplegables opcionales dentro de Profile (entrenadores, hechizos, misiones y competencias), cerrados por defecto e independientes. Una preferencia antigua `clase` vuelve a Profile sin perder datos.
 - **Professions** concentra la selección de profesiones principales (máximo dos) y secundarias; Profile ya no repite ese bloque. Los cambios conservan los demás campos del perfil.
 - **Market** queda como segunda sección principal, sin cambios en su navegación interna.
 - **Others and Configuration** agrupa **Dungeons**, **Curated guide** (solo si hay guía para el perfil),

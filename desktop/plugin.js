@@ -35224,8 +35224,8 @@ function agregarTextos(es, en) {
 }
 
 // src/vistas/personaje.jsx
-import { useMemo as useMemo4, useState as useState4 } from "react";
-import { Button as Button4, Input as Input2, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@hermes/plugin-sdk";
+import { useMemo as useMemo4, useState as useState5 } from "react";
+import { Button as Button5, Input as Input2, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@hermes/plugin-sdk";
 
 // src/ui.jsx
 import { Fragment } from "react";
@@ -75300,8 +75300,88 @@ function TarjetaPawn({ ctx, lang, perfil, puente, onResumen }) {
   ] });
 }
 
-// src/vistas/personaje.jsx
+// src/vistas/clase.jsx
+import { useState as useState4 } from "react";
+import { Button as Button4 } from "@hermes/plugin-sdk";
 import { Fragment as Fragment6, jsx as jsx5, jsxs as jsxs5 } from "react/jsx-runtime";
+agregarTextos({ "clase.opcional": "Información de clase (opcional)" }, { "clase.opcional": "Class reference (optional)" });
+function DetalleClase({ titulo, extra, children }) {
+  const [abierto, setAbierto] = useState4(false);
+  return /* @__PURE__ */ jsxs5("details", { "data-class-section": true, style: S.tarjeta, onToggle: (e) => setAbierto(e.currentTarget.open), children: [
+    /* @__PURE__ */ jsx5("summary", { style: { cursor: "pointer", color: C.texto2 }, children: titulo }),
+    abierto ? /* @__PURE__ */ jsxs5("div", { style: { paddingTop: 10 }, children: [
+      /* @__PURE__ */ jsx5("div", { style: S.tarjetaTitulo, children: extra }),
+      children
+    ] }) : null
+  ] });
+}
+var VENTANA = 10;
+function VistaClase({ perfil, lang }) {
+  const [todos, setTodos] = useState4(false);
+  const cl = D.clases.clases[String(perfil.clase)];
+  const entrenadores = cl.entrenadores[perfil.faccion] || [];
+  const sinEntrenador = huecos("clases", { tema: "entrenadores", clase: perfil.clase, faccion: perfil.faccion });
+  const hechizos = [...cl.hechizos].sort((a, b) => a.nivel - b.nivel || a.spell - b.spell);
+  const visibles = todos ? hechizos : hechizos.filter((h) => h.nivel > perfil.nivel - 2 && h.nivel <= perfil.nivel + VENTANA);
+  const misiones = (cl.misiones[perfil.faccion] || []).map((id) => [id, D.misiones.misiones[String(id)]]).filter(([, m]) => m).sort((a, b) => a[1].nivel - b[1].nivel);
+  const porZona = /* @__PURE__ */ new Map();
+  for (const e of entrenadores) {
+    const k = e.zona == null ? "—" : nombre(zona(e.zona)?.n, lang) || String(e.zona);
+    porZona.set(k, [...porZona.get(k) || [], e]);
+  }
+  return /* @__PURE__ */ jsxs5("section", { "aria-label": t(lang, "clase.opcional"), children: [
+    /* @__PURE__ */ jsx5("div", { style: S.etiqueta, children: t(lang, "clase.opcional") }),
+    /* @__PURE__ */ jsxs5(
+      DetalleClase,
+      {
+        titulo: t(lang, "clase.entrenadores") + " · " + nombre(D.personaje.facciones[perfil.faccion].n, lang),
+        extra: /* @__PURE__ */ jsx5(Origen, { f: "cmangos-1.12", lang }),
+        children: [
+          sinEntrenador.length ? /* @__PURE__ */ jsx5(Hueco, { lang, children: t(lang, "clase.sinEntrenador") }) : null,
+          [...porZona.entries()].sort().map(([z, lista2]) => /* @__PURE__ */ jsxs5("div", { style: S.fila, children: [
+            /* @__PURE__ */ jsx5("span", { style: { minWidth: 160, color: C.texto2 }, children: z }),
+            /* @__PURE__ */ jsx5("span", { children: lista2.map((e) => nombre(e.n, lang)).join(", ") })
+          ] }, z))
+        ]
+      }
+    ),
+    /* @__PURE__ */ jsxs5(DetalleClase, { titulo: t(lang, "clase.hechizos"), extra: /* @__PURE__ */ jsxs5(Fragment6, { children: [
+      /* @__PURE__ */ jsx5(Origen, { f: "cmangos-1.12", lang }),
+      /* @__PURE__ */ jsx5(Button4, { variant: "ghost", size: "xs", onClick: () => setTodos(!todos), children: todos ? t(lang, "clase.menos") : t(lang, "clase.todos") })
+    ] }), children: [
+      !todos ? /* @__PURE__ */ jsxs5("div", { style: S.sub, children: [
+        t(lang, "clase.proximos"),
+        " · ",
+        t(lang, "clase.hastaNivel"),
+        " ",
+        perfil.nivel + VENTANA
+      ] }) : null,
+      visibles.length ? /* @__PURE__ */ jsxs5("table", { style: S.tabla, children: [
+        /* @__PURE__ */ jsx5("thead", { children: /* @__PURE__ */ jsxs5("tr", { children: [
+          /* @__PURE__ */ jsx5("th", { style: S.th, children: t(lang, "clase.nivel") }),
+          /* @__PURE__ */ jsx5("th", { style: S.th, children: t(lang, "clase.hechizo") }),
+          /* @__PURE__ */ jsx5("th", { style: S.th, children: t(lang, "clase.costo") })
+        ] }) }),
+        /* @__PURE__ */ jsx5("tbody", { children: visibles.map((h) => /* @__PURE__ */ jsxs5("tr", { style: { opacity: h.nivel <= perfil.nivel ? 1 : 0.75 }, children: [
+          /* @__PURE__ */ jsx5("td", { style: S.td, children: h.nivel }),
+          /* @__PURE__ */ jsx5("td", { style: S.td, children: nombre(h.n, lang) }),
+          /* @__PURE__ */ jsx5("td", { style: S.td, children: dinero(h.costo) })
+        ] }, h.spell + ":" + h.nivel)) })
+      ] }) : /* @__PURE__ */ jsx5("div", { style: S.sub, children: t(lang, "clase.ninguno") })
+    ] }),
+    /* @__PURE__ */ jsx5(DetalleClase, { titulo: t(lang, "clase.misiones"), extra: /* @__PURE__ */ jsx5(Origen, { f: "cmangos-1.12", lang }), children: misiones.length ? misiones.map(([id, m]) => /* @__PURE__ */ jsxs5(
+    "div", { style: { ...S.fila, opacity: m.min > perfil.nivel ? 0.6 : 1 }, children: [
+      /* @__PURE__ */ jsx5("span", { style: { minWidth: 40, color: C.texto3 }, children: m.nivel }),
+      /* @__PURE__ */ jsx5("span", { style: { flex: 1 }, children: nombre(m.t, lang) }),
+      /* @__PURE__ */ jsx5("span", { style: S.sub, children: m.zona != null ? nombre(zona(m.zona)?.n, lang) : m.dungeon != null ? nombre(D.dungeons.clasicos[String(m.dungeon)]?.n, lang) : "" })
+    ] }, id)) : /* @__PURE__ */ jsx5(Hueco, { lang, children: t(lang, "clase.misiones") }) }),
+    /* @__PURE__ */ jsx5(DetalleClase, { titulo: t(lang, "clase.competencias"), extra: /* @__PURE__ */ jsx5(Origen, { f: "cliente-forever", lang }), children: /* @__PURE__ */ jsx5("div", { style: { display: "\
+flex", flexWrap: "wrap", gap: 6 }, children: cl.competencias.map((c) => /* @__PURE__ */ jsx5("span", { style: S.chip, children: nombre(c.n, lang) }, c.id)) }) })
+  ] });
+}
+
+// src/vistas/personaje.jsx
+import { Fragment as Fragment7, jsx as jsx6, jsxs as jsxs6 } from "react/jsx-runtime";
 agregarTextos({
   "perfil.copiar": "Copiar perfil para el agente",
   "perfil.copiar.ayuda": "Pégalo en el chat de Hermes: la skill wow-forever lo usa para responder sobre tu personaje.",
@@ -75322,19 +75402,19 @@ var PROCEDENCIA_PERSONAJE = [
   "builds: cliente-forever " + (D.profesiones.meta?.builds?.["cliente-forever"] || "?") + " / cmangos-1.12 " + (D.profesiones.meta?.builds?.["cmangos-1.12"] || "?")
 ];
 function Selector({ etiqueta, valor, opciones, onChange, id }) {
-  return /* @__PURE__ */ jsxs5("label", { style: S.campo, htmlFor: id, children: [
-    /* @__PURE__ */ jsx5("span", { style: S.etiqueta, children: etiqueta }),
-    /* @__PURE__ */ jsxs5(Select, { value: valor == null ? "" : String(valor), onValueChange: (v) => onChange(v), children: [
-      /* @__PURE__ */ jsx5(SelectTrigger, { id, "aria-label": etiqueta, children: /* @__PURE__ */ jsx5(SelectValue, { placeholder: "—" }) }),
-      /* @__PURE__ */ jsx5(SelectContent, { children: opciones.map(([v, texto2]) => /* @__PURE__ */ jsx5(SelectItem, { value: String(v), children: texto2 }, v)) })
+  return /* @__PURE__ */ jsxs6("label", { style: S.campo, htmlFor: id, children: [
+    /* @__PURE__ */ jsx6("span", { style: S.etiqueta, children: etiqueta }),
+    /* @__PURE__ */ jsxs6(Select, { value: valor == null ? "" : String(valor), onValueChange: (v) => onChange(v), children: [
+      /* @__PURE__ */ jsx6(SelectTrigger, { id, "aria-label": etiqueta, children: /* @__PURE__ */ jsx6(SelectValue, { placeholder: "—" }) }),
+      /* @__PURE__ */ jsx6(SelectContent, { children: opciones.map(([v, texto2]) => /* @__PURE__ */ jsx6(SelectItem, { value: String(v), children: texto2 }, v)) })
     ] })
   ] });
 }
 function VistaPersonaje({ ctx, perfil, guardarPerfil, razaSupuesta, lang, puente }) {
-  const [borrador, setBorrador] = useState4(perfil);
-  const [estado, setEstado] = useState4("");
-  const [copia, setCopia] = useState4(null);
-  const [resumenSimc2, setResumenSimc] = useState4(null);
+  const [borrador, setBorrador] = useState5(perfil);
+  const [estado, setEstado] = useState5("");
+  const [copia, setCopia] = useState5(null);
+  const [resumenSimc2, setResumenSimc] = useState5(null);
   const resumenPawn2 = useResumenPawn(ctx, borrador, lang);
   const p = borrador;
   const cambiar = async (parcial) => {
@@ -75368,11 +75448,11 @@ function VistaPersonaje({ ctx, perfil, guardarPerfil, razaSupuesta, lang, puente
   };
   const razas = p.faccion && p.clase ? razasPara(D.personaje, p.faccion, p.clase) : [];
   const clasesFac = p.faccion ? CLASES.filter((c) => razasPara(D.personaje, p.faccion, c).length) : CLASES;
-  return /* @__PURE__ */ jsxs5(Fragment6, { children: [
-    /* @__PURE__ */ jsxs5(Tarjeta, { titulo: t(lang, "tab.personaje"), extra: /* @__PURE__ */ jsx5(Origen, { f: "cliente-forever", lang }), children: [
-      razaSupuesta ? /* @__PURE__ */ jsx5(Aviso, { children: t(lang, "perfil.supuesta") }) : null,
-      /* @__PURE__ */ jsxs5("div", { style: { display: "flex", flexWrap: "wrap", gap: 12 }, children: [
-        /* @__PURE__ */ jsx5(
+  return /* @__PURE__ */ jsxs6(Fragment7, { children: [
+    /* @__PURE__ */ jsxs6(Tarjeta, { titulo: t(lang, "tab.personaje"), extra: /* @__PURE__ */ jsx6(Origen, { f: "cliente-forever", lang }), children: [
+      razaSupuesta ? /* @__PURE__ */ jsx6(Aviso, { children: t(lang, "perfil.supuesta") }) : null,
+      /* @__PURE__ */ jsxs6("div", { style: { display: "flex", flexWrap: "wrap", gap: 12 }, children: [
+        /* @__PURE__ */ jsx6(
           Selector,
           {
             id: "wf-faccion",
@@ -75382,7 +75462,7 @@ function VistaPersonaje({ ctx, perfil, guardarPerfil, razaSupuesta, lang, puente
             onChange: (v) => cambiar({ faccion: v })
           }
         ),
-        /* @__PURE__ */ jsx5(
+        /* @__PURE__ */ jsx6(
           Selector,
           {
             id: "wf-clase",
@@ -75392,7 +75472,7 @@ function VistaPersonaje({ ctx, perfil, guardarPerfil, razaSupuesta, lang, puente
             onChange: (v) => cambiar({ clase: Number(v) })
           }
         ),
-        /* @__PURE__ */ jsx5(
+        /* @__PURE__ */ jsx6(
           Selector,
           {
             id: "wf-raza",
@@ -75402,9 +75482,9 @@ function VistaPersonaje({ ctx, perfil, guardarPerfil, razaSupuesta, lang, puente
             onChange: (v) => cambiar({ raza: Number(v) })
           }
         ),
-        /* @__PURE__ */ jsxs5("label", { style: S.campo, htmlFor: "wf-nivel", children: [
-          /* @__PURE__ */ jsx5("span", { style: S.etiqueta, children: t(lang, "perfil.nivel") }),
-          /* @__PURE__ */ jsx5(
+        /* @__PURE__ */ jsxs6("label", { style: S.campo, htmlFor: "wf-nivel", children: [
+          /* @__PURE__ */ jsx6("span", { style: S.etiqueta, children: t(lang, "perfil.nivel") }),
+          /* @__PURE__ */ jsx6(
             Input2,
             {
               id: "wf-nivel",
@@ -75416,25 +75496,26 @@ function VistaPersonaje({ ctx, perfil, guardarPerfil, razaSupuesta, lang, puente
             }
           )
         ] }),
-        /* @__PURE__ */ jsxs5("label", { style: S.campo, htmlFor: "wf-reino", children: [
-          /* @__PURE__ */ jsx5("span", { style: S.etiqueta, children: t(lang, "perfil.reino") }),
-          /* @__PURE__ */ jsx5(Input2, { id: "wf-reino", value: p.reino, maxLength: 64, onChange: (e) => cambiar({ reino: e.target.value }) })
+        /* @__PURE__ */ jsxs6("label", { style: S.campo, htmlFor: "wf-reino", children: [
+          /* @__PURE__ */ jsx6("span", { style: S.etiqueta, children: t(lang, "perfil.reino") }),
+          /* @__PURE__ */ jsx6(Input2, { id: "wf-reino", value: p.reino, maxLength: 64, onChange: (e) => cambiar({ reino: e.target.value }) })
         ] })
       ] }),
-      p.raza && p.clase && esNueva(p.raza, p.clase) ? /* @__PURE__ */ jsxs5("div", { style: { ...S.sub, color: C.verde }, children: [
+      p.raza && p.clase && esNueva(p.raza, p.clase) ? /* @__PURE__ */ jsxs6("div", { style: { ...S.sub, color: C.verde }, children: [
         "★ ",
         t(lang, "perfil.nueva")
       ] }) : null,
-      /* @__PURE__ */ jsx5("div", { style: S.sub, role: "status", children: estado })
+      /* @__PURE__ */ jsx6("div", { style: S.sub, role: "status", children: estado })
     ] }),
-    /* @__PURE__ */ jsx5(TarjetaSimc, { ctx, lang, perfil: p, onAplicar: cambiar, puente, onResumen: setResumenSimc }),
-    /* @__PURE__ */ jsxs5(Tarjeta, { titulo: t(lang, "perfil.copiar"), children: [
-      /* @__PURE__ */ jsx5("div", { style: S.sub, children: t(lang, "perfil.copiar.ayuda") }),
-      /* @__PURE__ */ jsx5("div", { children: /* @__PURE__ */ jsx5(Button4, { size: "xs", variant: "outline", disabled: !resumen, onClick: copiar, children: t(lang, "perfil.copiar") }) }),
-      copia ? /* @__PURE__ */ jsx5("div", { style: S.sub, role: "status", children: t(lang, copia.ok ? "perfil.copiado" : "perfil.noCopiado") }) : null,
-      copia && !copia.ok ? /* @__PURE__ */ jsx5("pre", { style: { ...S.sub, whiteSpace: "pre-wrap", userSelect: "text" }, children: copia.texto }) : null
+    /* @__PURE__ */ jsx6(TarjetaSimc, { ctx, lang, perfil: p, onAplicar: cambiar, puente, onResumen: setResumenSimc }),
+    p.clase && p.faccion && p.raza ? /* @__PURE__ */ jsx6(VistaClase, { perfil: p, lang }, p.clase + ":" + p.faccion) : null,
+    /* @__PURE__ */ jsxs6(Tarjeta, { titulo: t(lang, "perfil.copiar"), children: [
+      /* @__PURE__ */ jsx6("div", { style: S.sub, children: t(lang, "perfil.copiar.ayuda") }),
+      /* @__PURE__ */ jsx6("div", { children: /* @__PURE__ */ jsx6(Button5, { size: "xs", variant: "outline", disabled: !resumen, onClick: copiar, children: t(lang, "perfil.copiar") }) }),
+      copia ? /* @__PURE__ */ jsx6("div", { style: S.sub, role: "status", children: t(lang, copia.ok ? "perfil.copiado" : "perfil.noCopiado") }) : null,
+      copia && !copia.ok ? /* @__PURE__ */ jsx6("pre", { style: { ...S.sub, whiteSpace: "pre-wrap", userSelect: "text" }, children: copia.texto }) : null
     ] }),
-    /* @__PURE__ */ jsx5(Tarjeta, { titulo: t(lang, "davi.boton"), children: /* @__PURE__ */ jsx5(
+    /* @__PURE__ */ jsx6(Tarjeta, { titulo: t(lang, "davi.boton"), children: /* @__PURE__ */ jsx6(
       PreguntarDavi,
       {
         ctx,
@@ -75444,74 +75525,6 @@ function VistaPersonaje({ ctx, perfil, guardarPerfil, razaSupuesta, lang, puente
         preguntaInicial: t(lang, "davi.personaje")
       }
     ) })
-  ] });
-}
-
-// src/vistas/clase.jsx
-import { useState as useState5 } from "react";
-import { Button as Button5 } from "@hermes/plugin-sdk";
-import { Fragment as Fragment7, jsx as jsx6, jsxs as jsxs6 } from "react/jsx-runtime";
-var VENTANA = 10;
-function VistaClase({ perfil, lang }) {
-  const [todos, setTodos] = useState5(false);
-  const cl = D.clases.clases[String(perfil.clase)];
-  const entrenadores = cl.entrenadores[perfil.faccion] || [];
-  const sinEntrenador = huecos("clases", { tema: "entrenadores", clase: perfil.clase, faccion: perfil.faccion });
-  const hechizos = [...cl.hechizos].sort((a, b) => a.nivel - b.nivel || a.spell - b.spell);
-  const visibles = todos ? hechizos : hechizos.filter((h) => h.nivel > perfil.nivel - 2 && h.nivel <= perfil.nivel + VENTANA);
-  const misiones = (cl.misiones[perfil.faccion] || []).map((id) => [id, D.misiones.misiones[String(id)]]).filter(([, m]) => m).sort((a, b) => a[1].nivel - b[1].nivel);
-  const porZona = /* @__PURE__ */ new Map();
-  for (const e of entrenadores) {
-    const k = e.zona == null ? "—" : nombre(zona(e.zona)?.n, lang) || String(e.zona);
-    porZona.set(k, [...porZona.get(k) || [], e]);
-  }
-  return /* @__PURE__ */ jsxs6(Fragment7, { children: [
-    /* @__PURE__ */ jsxs6(
-      Tarjeta,
-      {
-        titulo: t(lang, "clase.entrenadores") + " · " + nombre(D.personaje.facciones[perfil.faccion].n, lang),
-        extra: /* @__PURE__ */ jsx6(Origen, { f: "cmangos-1.12", lang }),
-        children: [
-          sinEntrenador.length ? /* @__PURE__ */ jsx6(Hueco, { lang, children: t(lang, "clase.sinEntrenador") }) : null,
-          [...porZona.entries()].sort().map(([z, lista2]) => /* @__PURE__ */ jsxs6("div", { style: S.fila, children: [
-            /* @__PURE__ */ jsx6("span", { style: { minWidth: 160, color: C.texto2 }, children: z }),
-            /* @__PURE__ */ jsx6("span", { children: lista2.map((e) => nombre(e.n, lang)).join(", ") })
-          ] }, z))
-        ]
-      }
-    ),
-    /* @__PURE__ */ jsxs6(Tarjeta, { titulo: t(lang, "clase.hechizos"), extra: /* @__PURE__ */ jsxs6(Fragment7, { children: [
-      /* @__PURE__ */ jsx6(Origen, { f: "cmangos-1.12", lang }),
-      /* @__PURE__ */ jsx6(Button5, { variant: "ghost", size: "xs", onClick: () => setTodos(!todos), children: todos ? t(lang, "clase.menos") : t(lang, "clase.todos") })
-    ] }), children: [
-      !todos ? /* @__PURE__ */ jsxs6("div", { style: S.sub, children: [
-        t(lang, "clase.proximos"),
-        " · ",
-        t(lang, "clase.hastaNivel"),
-        " ",
-        perfil.nivel + VENTANA
-      ] }) : null,
-      visibles.length ? /* @__PURE__ */ jsxs6("table", { style: S.tabla, children: [
-        /* @__PURE__ */ jsx6("thead", { children: /* @__PURE__ */ jsxs6("tr", { children: [
-          /* @__PURE__ */ jsx6("th", { style: S.th, children: t(lang, "clase.nivel") }),
-          /* @__PURE__ */ jsx6("th", { style: S.th, children: t(lang, "clase.hechizo") }),
-          /* @__PURE__ */ jsx6("th", { style: S.th, children: t(lang, "clase.costo") })
-        ] }) }),
-        /* @__PURE__ */ jsx6("tbody", { children: visibles.map((h) => /* @__PURE__ */ jsxs6("tr", { style: { opacity: h.nivel <= perfil.nivel ? 1 : 0.75 }, children: [
-          /* @__PURE__ */ jsx6("td", { style: S.td, children: h.nivel }),
-          /* @__PURE__ */ jsx6("td", { style: S.td, children: nombre(h.n, lang) }),
-          /* @__PURE__ */ jsx6("td", { style: S.td, children: dinero(h.costo) })
-        ] }, h.spell + ":" + h.nivel)) })
-      ] }) : /* @__PURE__ */ jsx6("div", { style: S.sub, children: t(lang, "clase.ninguno") })
-    ] }),
-    /* @__PURE__ */ jsx6(Tarjeta, { titulo: t(lang, "clase.misiones"), extra: /* @__PURE__ */ jsx6(Origen, { f: "cmangos-1.12", lang }), children: misiones.length ? misiones.map(([id, m]) => /* @__PURE__ */ jsxs6(
-    "div", { style: { ...S.fila, opacity: m.min > perfil.nivel ? 0.6 : 1 }, children: [
-      /* @__PURE__ */ jsx6("span", { style: { minWidth: 40, color: C.texto3 }, children: m.nivel }),
-      /* @__PURE__ */ jsx6("span", { style: { flex: 1 }, children: nombre(m.t, lang) }),
-      /* @__PURE__ */ jsx6("span", { style: S.sub, children: m.zona != null ? nombre(zona(m.zona)?.n, lang) : m.dungeon != null ? nombre(D.dungeons.clasicos[String(m.dungeon)]?.n, lang) : "" })
-    ] }, id)) : /* @__PURE__ */ jsx6(Hueco, { lang, children: t(lang, "clase.misiones") }) }),
-    /* @__PURE__ */ jsx6(Tarjeta, { titulo: t(lang, "clase.competencias"), extra: /* @__PURE__ */ jsx6(Origen, { f: "cliente-forever", lang }), children: /* @__PURE__ */ jsx6("div", { style: { display: "\
-flex", flexWrap: "wrap", gap: 6 }, children: cl.competencias.map((c) => /* @__PURE__ */ jsx6("span", { style: S.chip, children: nombre(c.n, lang) }, c.id)) }) })
   ] });
 }
 
@@ -83393,14 +83406,13 @@ a.leg.scarceCols") }) }),
 import { Fragment as Fragment23, jsx as jsx29, jsxs as jsxs30 } from "react/jsx-runtime";
 var GRUPOS = ["personaje", "mercado", "otros"];
 var SUBPESTANAS = {
-  personaje: ["perfil", "ruta", "clase", "profesiones"],
+  personaje: ["perfil", "ruta", "profesiones"],
   otros: ["dungeons", "guia", "legacy", "configuracion"]
 };
 var INICIO = { personaje: "perfil", mercado: "mercado", otros: "configuracion" };
 var VISTAS2 = {
   perfil: VistaPersonaje,
   ruta: VistaRuta,
-  clase: VistaClase,
   profesiones: VistaProfesiones,
   dungeons: VistaDungeons,
   guia: VistaGuia,
@@ -83557,7 +83569,7 @@ function App({ ctx, almacen, sincronizador, ventas, puente }) {
     }
   };
   const cambiarPestana = (p) => {
-    const destino = INICIO[p] || p;
+    const destino = p === "clase" ? "perfil" : INICIO[p] || p;
     setPestana(destino);
     try {
       ctx.storage.set("pestana", destino);

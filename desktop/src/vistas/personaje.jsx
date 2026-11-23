@@ -10,6 +10,7 @@ import { construirContextoPersonaje } from '../davi.js'
 import { PreguntarDavi } from './preguntar-davi.jsx'
 import { TarjetaSimc } from './personaje-simc.jsx'
 import { useResumenPawn } from './pawn.jsx'
+import { VistaClase } from './clase.jsx'
 
 agregarTextos({
   'perfil.copiar': 'Copiar perfil para el agente',
@@ -114,6 +115,7 @@ export function VistaPersonaje({ ctx, perfil, guardarPerfil, razaSupuesta, lang,
         <div style={S.sub} role="status">{estado}</div>
       </Tarjeta>
       <TarjetaSimc ctx={ctx} lang={lang} perfil={p} onAplicar={cambiar} puente={puente} onResumen={setResumenSimc} />
+      {p.clase && p.faccion && p.raza ? <VistaClase key={p.clase + ':' + p.faccion} perfil={p} lang={lang} /> : null}
       <Tarjeta titulo={t(lang, 'perfil.copiar')}>
         <div style={S.sub}>{t(lang, 'perfil.copiar.ayuda')}</div>
         <div>
