@@ -265,7 +265,7 @@ class TestParidadJS(unittest.TestCase):
                 f.write("const { precios, meta } = preciosHistoricos(f.historyItems)\n")
                 f.write("const roi = roiRuta(f.recetas, f.desde, f.cap, precios, f.items, { faccion: f.faccion, meta })\n")
                 f.write("process.stdout.write(JSON.stringify({ roi, precios: Object.fromEntries(precios), meta }))\n")
-            proc = subprocess.run(['node', mj, fj], capture_output=True, text=True, timeout=180)
+            proc = subprocess.run(['node', mj, fj], capture_output=True, text=True, encoding='utf-8', timeout=180)
             self.assertEqual(proc.returncode, 0, proc.stderr)
             js = json.loads(proc.stdout)
         self.assertEqual(js['roi'], py_roi)
