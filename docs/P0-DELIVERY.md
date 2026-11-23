@@ -1,5 +1,7 @@
 # Entrega local P0 — `feat/p0-integrated`
 
+> **Prioridad posterior de Cristóbal:** generalización en pausa. Antes de continuar, revisar en una nueva sesión las ventanas/vistas que podrían reducirse o retirarse. No hay eliminaciones acordadas todavía. Continuidad: [GENERALIZATION-PAUSE.md](GENERALIZATION-PAUSE.md).
+
 Validada por el coordinador mediante `node scripts/run-gates.mjs`: **23/23 gates verdes**, exit 0. Entorno local Linux, Node v26.12.0. No se atribuyen estos resultados a CI remota ni a Windows/macOS.
 
 Checkout: `/home/gris96/wt/wow-p0-integrated`. Base: `cd0d0dcd0bdfa6a3f073640bef1027cc9c080e9e`. No se modificaron datos generados, archivos del juego, SavedVariables, instalación del plugin ni WIP de main. Sin push, PR, merge a main ni despliegue.
