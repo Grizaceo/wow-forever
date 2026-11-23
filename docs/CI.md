@@ -48,7 +48,7 @@ python3 scripts/check_desktop_bundle.py desktop/plugin.js
   adicionales si están presentes; su ausencia no falla el workflow.
 - **Conteos canónicos** (`EXPECT_*` en `scripts/run-gates.mjs`) detectan tests
   que desaparecen o se saltan. Defaults sincronizados con el árbol vivo: node
-  381, python 98, lua 180, `.cjs` 123, navegador 419. Para ramas con tests nuevos
+  381, python 98, lua 180, `.cjs` 123, navegador 420. Para ramas con tests nuevos
   aún no versionados existen `WOW_GATES_EXPECT_{NODE,PY,LUA,CJS}=N`; CI **no** los
   define. Si se añaden suites o tests, actualizarlos a la vez que `docs/TESTING.md`.
 - `desktop/test/tab-performance.mjs` está integrado en `BROWSER`: comprueba

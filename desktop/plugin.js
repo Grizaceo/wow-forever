@@ -35228,7 +35228,7 @@ import { useMemo as useMemo4, useState as useState4 } from "react";
 import { Button as Button4, Checkbox as Checkbox2, Input as Input2, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@hermes/plugin-sdk";
 
 // src/ui.jsx
-import { Fragment } from "react";
+import { Fragment, useInsertionEffect } from "react";
 
 // src/iconos-datos.js
 var ICONOS = {
@@ -72069,14 +72069,10 @@ function asegurarSprite() {
   if (typeof document === "undefined") return;
   if (hojaSprite && hojaSprite.isConnected) return;
   const existente = document.getElementById("wf-iconos-sprite");
-  if (existente) {
-    hojaSprite = existente;
-    return;
-  }
-  const el = document.createElement("style");
+  const el = existente || document.createElement("style");
   el.id = "wf-iconos-sprite";
   el.textContent = `.wf-icono{display:inline-block;flex:0 0 auto;border-radius:3px;background-image:${SPRITE_URL};background-repeat:no-repeat}`;
-  (document.head || document.documentElement).appendChild(el);
+  if (!existente) (document.head || document.documentElement).appendChild(el);
   hojaSprite = el;
 }
 function Tarjeta({ titulo, extra, children, estilo }) {
@@ -72110,10 +72106,12 @@ function Aviso({ children }) {
 }
 function IconoItem({ id, size = 24, titulo }) {
   const celda = id == null ? void 0 : ICONOS.mapa[String(id)];
+  useInsertionEffect(() => {
+    if (celda != null) asegurarSprite();
+  }, [celda]);
   if (celda == null) return /* @__PURE__ */ jsx("span", { "aria-hidden": "true", style: { width: size, height: size, flex: "0 0 auto", display: "inline-block" } });
   const col = celda % ICONOS.columnas;
   const fila = Math.floor(celda / ICONOS.columnas);
-  asegurarSprite();
   return /* @__PURE__ */ jsx(
     "span",
     {

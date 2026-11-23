@@ -50,7 +50,7 @@ const BROWSER = [
   ['tsm', 28], ['vista-mercado', 57], ['vista-davi', 50], ['vista-guia', 28],
   ['vista-profesiones', 41], ['vista-ruta-dungeons', 31], ['bridge', 19],
   ['vista-personaje-simc', 11], ['vista-pawn', 13], ['vista-subasta-pawn', 28],
-  ['farm-routing', 11], ['tab-performance', 13],
+  ['farm-routing', 11], ['tab-performance', 14],
 ];
 const EXPECT_BROWSER_TOTAL = BROWSER.reduce((n, [, c]) => n + c, 0);
 

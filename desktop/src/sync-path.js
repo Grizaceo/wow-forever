@@ -14,6 +14,9 @@
 //
 // Falla cerrado: una ruta con '\' no es una ruta que `list` pueda haber
 // devuelto; se rechaza en vez de interpretarla distinto en cada sistema.
+// Política portable: ':' se rechaza también en Linux/macOS para no persistir
+// rutas incompatibles con Windows. Si un ancestro contiene ':', conceder
+// directamente la carpeta SavedVariables evita ese segmento.
 export const SYNC_REL_PATH_MAX = 1024
 export const SYNC_SEGMENT_MAX = 255
 

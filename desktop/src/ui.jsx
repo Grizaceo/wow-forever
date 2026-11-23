@@ -1,5 +1,5 @@
 // Piezas de interfaz compartidas por las vistas.
-import { Fragment } from 'react'
+import { Fragment, useInsertionEffect } from 'react'
 import { C, CALIDAD, CLASES_RICAS, S } from './estilos.js'
 import { dinero, item, nombre } from './datos.js'
 import { t } from './i18n.js'
@@ -17,11 +17,11 @@ function asegurarSprite() {
   if (typeof document === 'undefined') return
   if (hojaSprite && hojaSprite.isConnected) return
   const existente = document.getElementById('wf-iconos-sprite')
-  if (existente) { hojaSprite = existente; return }
-  const el = document.createElement('style')
+  const el = existente || document.createElement('style')
   el.id = 'wf-iconos-sprite'
+  // Una carga nueva del módulo reemplaza CSS antiguo, sin duplicar la hoja.
   el.textContent = `.wf-icono{display:inline-block;flex:0 0 auto;border-radius:3px;background-image:${SPRITE_URL};background-repeat:no-repeat}`
-  ;(document.head || document.documentElement).appendChild(el)
+  if (!existente) (document.head || document.documentElement).appendChild(el)
   hojaSprite = el
 }
 
@@ -67,10 +67,10 @@ export function Aviso({ children }) {
 // espacio (sin interrogantes ni ruido visual) para que las filas no salten.
 export function IconoItem({ id, size = 24, titulo }) {
   const celda = id == null ? undefined : ICONOS.mapa[String(id)]
+  useInsertionEffect(() => { if (celda != null) asegurarSprite() }, [celda])
   if (celda == null) return <span aria-hidden="true" style={{ width: size, height: size, flex: '0 0 auto', display: 'inline-block' }} />
   const col = celda % ICONOS.columnas
   const fila = Math.floor(celda / ICONOS.columnas)
-  asegurarSprite()
   return (
     <span
       role="img"

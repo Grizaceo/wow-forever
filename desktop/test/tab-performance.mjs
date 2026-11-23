@@ -13,6 +13,7 @@
 import { iniciar, PERFILES } from './arnes.mjs'
 
 const REPS = Number(process.env.TAB_PERF_REPS || 6)
+if (!Number.isInteger(REPS) || REPS < 1) throw new Error('TAB_PERF_REPS debe ser entero positivo')
 const LIMITE_DUNGEONS = Number(process.env.TAB_PERF_DUNGEONS_MS || 500)
 const LIMITE_PROFESIONES = Number(process.env.TAB_PERF_PROFESIONES_MS || 150)
 const LIMITE_RUTA = 250 // tab "normal": no debe degradarse con el cambio
@@ -38,14 +39,20 @@ async function medir(pares) {
       const panel = panelDe(id)
       return !!panel && !panel.hidden && panel.textContent.trim().length > 60
     }
-    const esperar = (id) => new Promise((res) => {
+    const esperar = (id) => new Promise((res, reject) => {
       if (visible(id)) return res()
-      const t0 = performance.now()
       let fin = false
-      const acabar = () => { if (!fin) { fin = true; obs.disconnect(); res() } }
-      const obs = new MutationObserver(() => { if (visible(id) || performance.now() - t0 > 6000) acabar() })
-      obs.observe(document.body, { childList: true, subtree: true, characterData: true })
-      setTimeout(acabar, 6000)
+      let timer
+      const acabar = (error) => {
+        if (fin) return
+        fin = true
+        obs.disconnect()
+        clearTimeout(timer)
+        if (error) reject(error); else res()
+      }
+      const obs = new MutationObserver(() => { if (visible(id)) acabar() })
+      obs.observe(document.body, { childList: true, subtree: true, characterData: true, attributes: true })
+      timer = setTimeout(() => acabar(new Error('vista no visible después de 6000 ms: ' + id)), 6000)
     })
     const activar = async (id) => {
       const grupo = GRUPO[id]
@@ -134,6 +141,22 @@ try {
   check('background del sprite conservado', iconos.estilos.every((e) => e.bg.startsWith('url("data:image/webp;base64,')), iconos.estilos[0])
   check('background-size conservado', iconos.estilos.every((e) => e.size === '1280px 680px'), iconos.estilos[0])
   check('posiciones de icono distintas', new Set(iconos.estilos.map((e) => e.pos)).size > 1, iconos.estilos.slice(0, 3))
+
+  // Simula una hoja de una versión anterior que sobrevive a una recarga.
+  await p.locator('[data-tab="configuracion"]').click()
+  await p.evaluate(() => {
+    document.getElementById('wf-iconos-sprite')?.remove()
+    const vieja = document.createElement('style')
+    vieja.id = 'wf-iconos-sprite'
+    vieja.textContent = '.wf-icono{background-image:none}'
+    document.head.appendChild(vieja)
+  })
+  await p.locator('[data-tab="dungeons"]').click()
+  const recuperado = await p.evaluate(() => ({
+    hojas: document.querySelectorAll('#wf-iconos-sprite').length,
+    bg: getComputedStyle(document.querySelector('.wf-icono')).backgroundImage.slice(0, 30),
+  }))
+  check('sprite antiguo reemplazado sin duplicados', recuperado.hojas === 1 && recuperado.bg.startsWith('url("data:image/webp;base64,'), recuperado)
 
   // 3) Rendimiento: mismas medidas que en la auditoría, con calentamiento.
   const m = await medir([
