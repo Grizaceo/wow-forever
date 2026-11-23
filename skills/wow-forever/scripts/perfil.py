@@ -16,6 +16,7 @@ versión JS). ``entrada`` es el perfil sin validar (lo que llega de la UI o del 
 import json
 import math
 import re
+import sys
 from pathlib import Path
 
 RAIZ = Path(__file__).resolve().parents[3]  # skills/wow-forever/scripts/perfil.py -> raíz del plugin
@@ -34,8 +35,51 @@ CAMPOS = tuple(CONTRATO['campos'])
 
 # JS: /^\d+$/ solo ASCII; en Python \d también casa dígitos unicode.
 _RE_ENTERO = re.compile(r'[0-9]+')
-# trim de JS (WhiteSpace + LineTerminator, incluye \ufeff y espacios unicode).
-_RE_BORDES_REINO = re.compile(r'^[\s\ufeff]+|[\s\ufeff]+$')
+# String.prototype.trim() de JS = WhiteSpace + LineTerminator. NO incluye U+0085
+# ni U+001C..U+001F, que sí incluye \s de Python; SÍ incluye U+FEFF (ZWNBSP).
+_BORDES_JS = ('\t\n\v\f\r \u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005'
+              '\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000\ufeff')
+
+
+def _js_truthy(v):
+    """Truthiness de JS: {}, [], strings no vacíos y números no cero son truthy."""
+    if v is None or v is False:
+        return False
+    if isinstance(v, (int, float)):
+        return v != 0 and not (isinstance(v, float) and math.isnan(v))
+    if isinstance(v, str):
+        return len(v) > 0
+    return True
+
+
+def _clave_js(v):
+    """String(Infinity) de JS es 'Infinity', no 'inf' como str() de Python."""
+    return 'Infinity' if v == math.inf else str(v)
+
+
+def _corte_utf16(s, n):
+    """s.slice(0, n) de JS: cuenta unidades UTF-16; puede dejar un surrogado suelto."""
+    unidades = []
+    for ch in s:
+        cp = ord(ch)
+        if cp > 0xFFFF:
+            cp -= 0x10000
+            unidades.extend((0xD800 + (cp >> 10), 0xDC00 + (cp & 0x3FF)))
+        else:
+            unidades.append(cp)
+    unidades = unidades[:n]
+    salida = []
+    i = 0
+    while i < len(unidades):
+        u = unidades[i]
+        # Recomponer pares completos; si el corte parte el par, conservar el suelto.
+        if 0xD800 <= u <= 0xDBFF and i + 1 < len(unidades) and 0xDC00 <= unidades[i + 1] <= 0xDFFF:
+            salida.append(chr(0x10000 + ((u - 0xD800) << 10) + (unidades[i + 1] - 0xDC00)))
+            i += 2
+        else:
+            salida.append(chr(u))
+            i += 1
+    return ''.join(salida)
 
 
 def _entero(v):
@@ -55,11 +99,10 @@ def _entero(v):
     if isinstance(v, float):
         return int(v) if math.isfinite(v) and v.is_integer() else None
     if isinstance(v, str) and _RE_ENTERO.fullmatch(v):
-        try:
-            f = float(v)
-        except ValueError:
-            return None
-        return int(f) if math.isfinite(f) and f.is_integer() else None
+        # La rama cadena de JS `entero` devuelve Number(v) SIN exigir isInteger:
+        # una cadena de dígitos enorme da Infinity (y el nivel se fija en 60).
+        f = float(v)
+        return math.inf if math.isinf(f) else int(f)
     return None
 
 
@@ -110,9 +153,11 @@ def validar_perfil(entrada, personaje):
     p['clase'] = _entero(e.get('clase'))
     razas = _dict(_dict(personaje).get('razas'))
     clases = _dict(_dict(personaje).get('clases'))
-    if p['raza'] is None or not isinstance(razas.get(str(p['raza'])), dict):
+    # JS comprueba truthiness (`!personaje?.razas?.[String(raza)]`), no tipo:
+    # un objeto vacío o una cadena no vacía cuentan como raza/clase existente.
+    if p['raza'] is None or not _js_truthy(razas.get(_clave_js(p['raza']))):
         errores.append('raza')
-    if p['clase'] is None or not isinstance(clases.get(str(p['clase'])), dict):
+    if p['clase'] is None or not _js_truthy(clases.get(_clave_js(p['clase']))):
         errores.append('clase')
     if not errores and not combinacion_valida(personaje, p['raza'], p['clase']):
         errores.append('combinacion')
@@ -152,8 +197,36 @@ def validar_perfil(entrada, personaje):
 
     reino = e.get('reino')
     if isinstance(reino, str):
-        p['reino'] = _RE_BORDES_REINO.sub('', reino)[:MAX_REINO]
+        p['reino'] = _corte_utf16(reino.strip(_BORDES_JS), MAX_REINO)
     elif reino is not None:
         errores.append('reino')
 
     return {'ok': not errores, 'errores': list(dict.fromkeys(errores)), 'perfil': p}
+
+
+def _seguro_json(obj):
+    """Imita JSON.stringify de JS: Infinity/NaN se serializan como null."""
+    if isinstance(obj, float) and not math.isfinite(obj):
+        return None
+    if isinstance(obj, dict):
+        return {k: _seguro_json(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [_seguro_json(v) for v in obj]
+    return obj
+
+
+def _principal():
+    """Modo lote para el arnés de paridad: JSON en stdin -> JSON en stdout.
+
+    No usa Node ni subprocess: el proceso Python calcula sus propios resultados.
+    Entrada: {"personaje": {...}, "casos": [{...entrada}, ...]}.
+    Salida:  [{"ok", "errores", "perfil"}, ...] en el mismo orden.
+    """
+    datos = json.load(sys.stdin)
+    personaje = datos['personaje']
+    resultados = [validar_perfil(caso, personaje) for caso in datos['casos']]
+    json.dump(_seguro_json(resultados), sys.stdout, ensure_ascii=True, separators=(',', ':'))
+
+
+if __name__ == '__main__':
+    _principal()

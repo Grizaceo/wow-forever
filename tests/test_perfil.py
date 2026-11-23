@@ -115,6 +115,38 @@ class TestPerfilPy(unittest.TestCase):
             with self.subTest(caso=caso['nombre']):
                 self.assertEqual(perfil.validar_perfil(caso['entrada'], PERSONAJE), caso['esperado'])
 
+    def test_regresiones_utf16_trim_y_precision(self):
+        base = {'raza': 1, 'clase': 3, 'nivel': 5}
+        emoji = chr(0x1F600)
+        # JS slice cuenta unidades UTF-16: 40 emoji + 3 ASCII -> 32 emoji.
+        r = perfil.validar_perfil(dict(base, reino=emoji * 40 + 'ABC'), PERSONAJE)
+        self.assertEqual(r['perfil']['reino'], emoji * 32)
+        # Corte en mitad de un par deja un surrogado alto suelto, como JS.
+        r = perfil.validar_perfil(dict(base, reino='x' * 63 + emoji), PERSONAJE)
+        self.assertEqual(len(r['perfil']['reino']), perfil.MAX_REINO)
+        self.assertEqual(ord(r['perfil']['reino'][-1]), 0xD83D)
+        # \s de Python recorta de más: JS trim conserva U+0085 y U+001C.
+        for cp in (0x85, 0x1C):
+            ch = chr(cp)
+            r = perfil.validar_perfil(dict(base, reino=ch + 'Reino' + ch), PERSONAJE)
+            self.assertEqual(r['perfil']['reino'], ch + 'Reino' + ch)
+        # La rama cadena de JS no exige isInteger: '9'*400 es Infinity -> nivel 60.
+        r = perfil.validar_perfil({'raza': 1, 'clase': 3, 'nivel': '9' * 400}, PERSONAJE)
+        self.assertEqual(r['perfil']['nivel'], 60)
+        self.assertEqual(r['errores'], ['nivel'])
+
+    def test_regresion_valores_personaje_no_dict(self):
+        raro = json.loads(json.dumps(PERSONAJE))
+        raro['razas']['1'] = 'notdict'
+        raro['razas']['2'] = {}
+        raro['clases']['3'] = 'x'
+        # JS comprueba truthiness, no isinstance(dict): coincide con la validación JS.
+        esperado = [True, True, True]
+        for entrada, ok in zip(({'raza': 1, 'clase': 1, 'nivel': 5},
+                                {'raza': 2, 'clase': 1, 'nivel': 5},
+                                {'raza': 1, 'clase': 3, 'nivel': 5}), esperado):
+            self.assertEqual(perfil.validar_perfil(entrada, raro)['ok'], ok, entrada)
+
 
 if __name__ == '__main__':
     unittest.main()

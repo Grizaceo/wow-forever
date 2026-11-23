@@ -910,6 +910,147 @@
      "reino": ""
     }
    }
+  },
+  {
+   "nombre": "reino emoji corte UTF-16",
+   "entrada": {
+    "raza": 1,
+    "clase": 3,
+    "nivel": 5,
+    "reino": "😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀ABC"
+   },
+   "esperado": {
+    "ok": true,
+    "errores": [],
+    "perfil": {
+     "v": 1,
+     "faccion": "alianza",
+     "raza": 1,
+     "clase": 3,
+     "nivel": 5,
+     "profesiones": [],
+     "secundarias": [],
+     "reino": "😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀"
+    }
+   }
+  },
+  {
+   "nombre": "reino emoji corte en mitad de par",
+   "entrada": {
+    "raza": 1,
+    "clase": 3,
+    "nivel": 5,
+    "reino": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx😀"
+   },
+   "esperado": {
+    "ok": true,
+    "errores": [],
+    "perfil": {
+     "v": 1,
+     "faccion": "alianza",
+     "raza": 1,
+     "clase": 3,
+     "nivel": 5,
+     "profesiones": [],
+     "secundarias": [],
+     "reino": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\ud83d"
+    }
+   }
+  },
+  {
+   "nombre": "trim JS no recorta NEL ni separadores",
+   "entrada": {
+    "raza": 1,
+    "clase": 3,
+    "nivel": 5,
+    "reino": "Reino"
+   },
+   "esperado": {
+    "ok": true,
+    "errores": [],
+    "perfil": {
+     "v": 1,
+     "faccion": "alianza",
+     "raza": 1,
+     "clase": 3,
+     "nivel": 5,
+     "profesiones": [],
+     "secundarias": [],
+     "reino": "Reino"
+    }
+   }
+  },
+  {
+   "nombre": "trim JS no recorta U+001C",
+   "entrada": {
+    "raza": 1,
+    "clase": 3,
+    "nivel": 5,
+    "reino": "\u001cReino\u001c"
+   },
+   "esperado": {
+    "ok": true,
+    "errores": [],
+    "perfil": {
+     "v": 1,
+     "faccion": "alianza",
+     "raza": 1,
+     "clase": 3,
+     "nivel": 5,
+     "profesiones": [],
+     "secundarias": [],
+     "reino": "\u001cReino\u001c"
+    }
+   }
+  },
+  {
+   "nombre": "nivel cadena de digitos gigante",
+   "entrada": {
+    "raza": 1,
+    "clase": 3,
+    "nivel": "9999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999"
+   },
+   "esperado": {
+    "ok": false,
+    "errores": [
+     "nivel"
+    ],
+    "perfil": {
+     "v": 1,
+     "faccion": "alianza",
+     "raza": 1,
+     "clase": 3,
+     "nivel": 60,
+     "profesiones": [],
+     "secundarias": [],
+     "reino": ""
+    }
+   }
+  },
+  {
+   "nombre": "raza y clase booleanas",
+   "entrada": {
+    "raza": true,
+    "clase": true,
+    "nivel": 5
+   },
+   "esperado": {
+    "ok": false,
+    "errores": [
+     "raza",
+     "clase"
+    ],
+    "perfil": {
+     "v": 1,
+     "faccion": null,
+     "raza": null,
+     "clase": null,
+     "nivel": 5,
+     "profesiones": [],
+     "secundarias": [],
+     "reino": ""
+    }
+   }
   }
  ]
 }

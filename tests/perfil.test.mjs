@@ -1,5 +1,6 @@
 // node --test tests/perfil.test.mjs — usa el data/personaje.json real generado.
 import assert from 'node:assert/strict'
+import { spawnSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
 import { migrarPerfil, razasPara, validarPerfil, NIVEL_MAX } from '../src/perfil.js'
@@ -112,6 +113,54 @@ test('paridad JS/Python: fixture compartido tests/fixtures/perfil-paridad.json',
   assert.equal(fx.contrato, 'perfil-v1')
   for (const c of fx.casos) {
     assert.deepEqual(validarPerfil(c.entrada, personaje), c.esperado, c.nombre)
+  }
+})
+
+// Paridad EJECUTADA: Python valida en su propio proceso con su propia copia del
+// contrato; Node valida aquí. No se compara contra un `esperado` pregenerado.
+function pararEnPython(casos, personajePara = personaje) {
+  const script = new URL('../skills/wow-forever/scripts/perfil.py', import.meta.url).pathname
+  const r = spawnSync('python3', [script], {
+    input: JSON.stringify({ personaje: personajePara, casos }),
+    encoding: 'utf8',
+    maxBuffer: 32 * 1024 * 1024,
+  })
+  assert.equal(r.status, 0, `python3 falló: ${r.stderr}`)
+  return JSON.parse(r.stdout)
+}
+
+test('paridad EJECUTADA JS/Python: fixture + 56 combinaciones x 5 niveles', () => {
+  const fx = JSON.parse(readFileSync(new URL('./fixtures/perfil-paridad.json', import.meta.url), 'utf8'))
+  const casos = fx.casos.map((c) => c.entrada)
+  for (const [raza, clase] of personaje.combinaciones) {
+    for (const nivel of [1, 10, 20, 40, 60]) casos.push({ raza, clase, nivel })
+  }
+  const salida = pararEnPython(casos)
+  assert.equal(salida.length, casos.length)
+  for (let i = 0; i < casos.length; i++) {
+    // JSON.stringify es la forma persistida: Infinity -> null, surrogados sueltos -> \udXXX.
+    const js = JSON.parse(JSON.stringify(validarPerfil(casos[i], personaje)))
+    assert.deepEqual(salida[i], js, `caso ${i}: ${JSON.stringify(casos[i])}`)
+  }
+})
+
+test('paridad EJECUTADA con personaje atípico y entradas array/string/null', () => {
+  const raro = JSON.parse(JSON.stringify(personaje))
+  raro.razas['1'] = 'notdict'
+  raro.razas['2'] = {}
+  raro.clases['3'] = 'x'
+  const casos = [
+    { raza: 1, clase: 1, nivel: 5 },
+    { raza: 2, clase: 1, nivel: 5 },
+    { raza: 1, clase: 3, nivel: 5 },
+    null, 'x', [], {},
+    { raza: '9'.repeat(400), clase: 3, nivel: 5 },
+    { raza: 1, clase: 3, nivel: '9'.repeat(400) },
+  ]
+  const salida = pararEnPython(casos, raro)
+  for (let i = 0; i < casos.length; i++) {
+    const js = JSON.parse(JSON.stringify(validarPerfil(casos[i], raro)))
+    assert.deepEqual(salida[i], js, `caso ${i}: ${JSON.stringify(casos[i])}`)
   }
 })
 
