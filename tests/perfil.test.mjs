@@ -2,6 +2,7 @@
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
 import test from 'node:test'
 import { migrarPerfil, razasPara, validarPerfil, NIVEL_MAX } from '../src/perfil.js'
 
@@ -119,7 +120,8 @@ test('paridad JS/Python: fixture compartido tests/fixtures/perfil-paridad.json',
 // Paridad EJECUTADA: Python valida en su propio proceso con su propia copia del
 // contrato; Node valida aquí. No se compara contra un `esperado` pregenerado.
 function pararEnPython(casos, personajePara = personaje) {
-  const script = new URL('../skills/wow-forever/scripts/perfil.py', import.meta.url).pathname
+  // fileURLToPath, no .pathname: en Windows .pathname da «/D:/…» y python lo convierte en «D:\\D:\\…».
+  const script = fileURLToPath(new URL('../skills/wow-forever/scripts/perfil.py', import.meta.url))
   const r = spawnSync('python3', [script], {
     input: JSON.stringify({ personaje: personajePara, casos }),
     encoding: 'utf8',
