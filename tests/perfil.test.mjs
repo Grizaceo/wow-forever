@@ -63,6 +63,58 @@ test('migración desde la guía anterior conserva clase, facción y nivel', () =
   assert.equal(vacio.perfil.clase, null)
 })
 
+test('las 56 combinaciones valen en todos los niveles de prueba', () => {
+  const niveles = [1, 10, 20, 40, 60]
+  for (const [raza, clase] of personaje.combinaciones) {
+    const faccion = personaje.razas[String(raza)].faccion
+    for (const nivel of niveles) {
+      const r = validarPerfil({ raza, clase, nivel }, personaje)
+      assert.equal(r.ok, true, `raza ${raza} clase ${clase} nivel ${nivel}: ${r.errores}`)
+      assert.equal(r.perfil.faccion, faccion)
+      assert.equal(r.perfil.nivel, nivel)
+    }
+  }
+})
+
+test('casos pedidos: paladín Horda, chamán Alianza, razas 95/96', () => {
+  const casos = [
+    [{ raza: NOMUERTO, clase: PALADIN, nivel: 60 }, 'horda'],
+    [{ raza: ENANO, clase: CHAMAN, nivel: 1 }, 'alianza'],
+    [{ raza: 95, clase: GUERRERO, nivel: 1 }, 'alianza'],
+    [{ raza: 96, clase: DRUIDA, nivel: 60 }, 'horda'],
+  ]
+  for (const [entrada, faccion] of casos) {
+    const r = validarPerfil(entrada, personaje)
+    assert.equal(r.ok, true, r.errores.join(','))
+    assert.equal(r.perfil.faccion, faccion)
+  }
+})
+
+test('profesiones: IDs válidos, duplicados, desconocidos y tope de 2', () => {
+  const base = { raza: ORCO, clase: GUERRERO, nivel: 5 }
+  assert.deepEqual(validarPerfil({ ...base, profesiones: [164, 186], secundarias: [185, 129, 356] }, personaje).perfil.secundarias, [129, 185, 356])
+  const malo = validarPerfil({ ...base, profesiones: [164, '186', 164, 393, 202, 0, -1, 1.5], secundarias: [164, 999] }, personaje)
+  assert.deepEqual(malo.perfil.profesiones, [164, 186])
+  assert.ok(malo.errores.includes('profesiones') && malo.errores.includes('secundarias'))
+})
+
+test('reino: trim, corte a 64 y tipo inválido', () => {
+  const base = { raza: ORCO, clase: GUERRERO, nivel: 5 }
+  assert.equal(validarPerfil({ ...base, reino: '  Mi reino  ' }, personaje).perfil.reino, 'Mi reino')
+  assert.equal(validarPerfil({ ...base, reino: 'x'.repeat(100) }, personaje).perfil.reino.length, 64)
+  const r = validarPerfil({ ...base, reino: 123 }, personaje)
+  assert.ok(r.errores.includes('reino'))
+  assert.equal(r.perfil.reino, '')
+})
+
+test('paridad JS/Python: fixture compartido tests/fixtures/perfil-paridad.json', () => {
+  const fx = JSON.parse(readFileSync(new URL('./fixtures/perfil-paridad.json', import.meta.url), 'utf8'))
+  assert.equal(fx.contrato, 'perfil-v1')
+  for (const c of fx.casos) {
+    assert.deepEqual(validarPerfil(c.entrada, personaje), c.esperado, c.nombre)
+  }
+})
+
 test('perfilParaAgente: resumen con nombres e IDs, sin el reino', async () => {
   const { perfilParaAgente } = await import('../src/perfil.js')
   const profesiones = JSON.parse(readFileSync(new URL('../data/profesiones.json', import.meta.url), 'utf8')).profesiones

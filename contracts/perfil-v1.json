@@ -1,0 +1,30 @@
+{
+  "contrato": "perfil-v1",
+  "version": 1,
+  "descripcion": "Contrato versionado del perfil del jugador (clave 'perfil' en ctx.storage). Lo consumen src/perfil.js (validarPerfil, bundle Desktop) y skills/wow-forever/scripts/perfil.py (validar_perfil, skill del agente). Misma entrada produce el mismo {ok, errores, perfil} en ambos.",
+  "perfil": {
+    "version": 1,
+    "campos": ["v", "faccion", "raza", "clase", "nivel", "profesiones", "secundarias", "reino"],
+    "nivel_min": 1,
+    "nivel_max": 60,
+    "facciones": ["alianza", "horda"],
+    "profesiones_principales": [171, 164, 333, 202, 182, 165, 186, 393, 197],
+    "profesiones_secundarias": [185, 129, 356],
+    "max_principales": 2,
+    "max_reino": 64
+  },
+  "validacion": {
+    "errores": ["raza", "clase", "combinacion", "faccion", "nivel", "profesiones", "secundarias", "reino"],
+    "semantica": [
+      "entero: número entero o cadena solo de dígitos ASCII; cualquier otro tipo (booleano, flotante no entero, null, objeto) es null",
+      "raza y clase se validan contra personaje.razas / personaje.clases por ID; raza+clase deben ser una combinación de personaje.combinaciones ('combinacion' solo se evalúa si raza y clase ya son válidas)",
+      "faccion sale de la raza; si la entrada declara otra facción válida es error 'faccion'; sin raza conocida se acepta 'alianza'|'horda' de la entrada o null",
+      "nivel entero entre nivel_min y nivel_max; en el perfil se guarda con clamp a [nivel_min, nivel_max] (null -> nivel_min)",
+      "profesiones: solo IDs de profesiones_principales, sin repetir, en orden de primera aparición; más de max_principales es error y se recorta",
+      "secundarias: solo IDs de profesiones_secundarias, sin repetir, ordenadas de menor a mayor",
+      "reino: cadena con trim y corte a max_reino caracteres; cualquier otro tipo no nulo es error 'reino'",
+      "errores se deduplican conservando el orden de primera aparición; ok = sin errores; perfil se normaliza aunque haya errores y nunca inventa valores",
+      "campos desconocidos de la entrada se ignoran (no hay skill ni equipo en el perfil v1)"
+    ]
+  }
+}

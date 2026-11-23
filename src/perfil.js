@@ -1,12 +1,18 @@
 // Perfil del jugador: validación, normalización y migración desde la guía anterior.
 // Módulo ES puro (sin DOM ni SDK). `personaje` es el contenido de data/personaje.json.
+// Las constantes y la semántica canónica viven en contracts/perfil-v1.json, compartido
+// con skills/wow-forever/scripts/perfil.py: misma entrada, mismo {ok, errores, perfil}.
+import contratoPerfil from '../contracts/perfil-v1.json' with { type: 'json' }
 
-export const VERSION = 1
-export const NIVEL_MAX = 60
-export const PROFESIONES_PRINCIPALES = [171, 164, 333, 202, 182, 165, 186, 393, 197]
-export const PROFESIONES_SECUNDARIAS = [185, 129, 356]
-export const MAX_PRINCIPALES = 2
-const MAX_REINO = 64
+const CONTRATO = contratoPerfil.perfil
+
+export const VERSION = CONTRATO.version
+export const NIVEL_MIN = CONTRATO.nivel_min
+export const NIVEL_MAX = CONTRATO.nivel_max
+export const PROFESIONES_PRINCIPALES = [...CONTRATO.profesiones_principales]
+export const PROFESIONES_SECUNDARIAS = [...CONTRATO.profesiones_secundarias]
+export const MAX_PRINCIPALES = CONTRATO.max_principales
+const MAX_REINO = CONTRATO.max_reino
 
 // Estado de la guía anterior (standalone/index.html): cls, fac, lvl.
 const CLASE_VIEJA = { hunter: 3, warrior: 1, shaman: 7 }
@@ -31,7 +37,7 @@ export function razasPara(personaje, faccion, clase) {
 }
 
 export function perfilVacio() {
-  return { v: VERSION, faccion: null, raza: null, clase: null, nivel: 1, profesiones: [], secundarias: [], reino: '' }
+  return { v: VERSION, faccion: null, raza: null, clase: null, nivel: NIVEL_MIN, profesiones: [], secundarias: [], reino: '' }
 }
 
 // Devuelve {ok, errores, perfil}. `perfil` va normalizado aunque haya errores,
@@ -52,8 +58,8 @@ export function validarPerfil(entrada, personaje) {
   if (faccionRaza && e.faccion && e.faccion !== faccionRaza) errores.push('faccion')
 
   const nivel = entero(e.nivel)
-  if (nivel === null || nivel < 1 || nivel > NIVEL_MAX) errores.push('nivel')
-  p.nivel = nivel === null ? 1 : Math.min(NIVEL_MAX, Math.max(1, nivel))
+  if (nivel === null || nivel < NIVEL_MIN || nivel > NIVEL_MAX) errores.push('nivel')
+  p.nivel = nivel === null ? NIVEL_MIN : Math.min(NIVEL_MAX, Math.max(NIVEL_MIN, nivel))
 
   const vistas = new Set()
   for (const x of Array.isArray(e.profesiones) ? e.profesiones : []) {
@@ -89,7 +95,7 @@ export function migrarPerfil(viejo, personaje) {
   const razas = clase && faccion ? razasPara(personaje, faccion, clase) : []
   const { perfil } = validarPerfil({
     raza: razas[0] ?? null, clase, faccion,
-    nivel: nivel === null ? 1 : Math.min(NIVEL_MAX, Math.max(1, nivel)),
+    nivel: nivel === null ? NIVEL_MIN : Math.min(NIVEL_MAX, Math.max(NIVEL_MIN, nivel)),
     profesiones: v.eng ? [202] : [],
   }, personaje)
   return { perfil, razaSupuesta: razas.length > 0 }
