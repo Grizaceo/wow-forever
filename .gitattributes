@@ -1,0 +1,8 @@
+# The generated bundle and its SHA-256 must be identical across all runners.
+# Keep text checkouts LF even when Windows has core.autocrlf=true.
+* text=auto eol=lf
+*.png binary
+*.webp binary
+*.jpg binary
+*.gif binary
+*.woff2 binary

@@ -13,32 +13,44 @@
  * en gates), así que el stack canónico respeta el contrato de privacidad (solo
  * stat).
  *
- * Entorno navegador (opcional; se autodescubre si falta):
- *   PLAYWRIGHT_MODULE  ruta a playwright/index.mjs
- *   CHROMIUM_PATH      ruta al chrome de ms-playwright
+ * Entorno navegador: las dependencias se fijan en desktop/package-lock.json
+ * (`npm ci` en desktop/, `npx playwright install chromium`). Overrides opcionales:
+ *   PLAYWRIGHT_MODULE  ruta al index.mjs de Playwright
+ *   CHROMIUM_PATH      ruta al binario de Chromium
+ *   HERMES_DESKTOP_PKG package.json que aporta react/react-dom (por defecto,
+ *                      el propio desktop/package.json del repo)
  */
 import { spawnSync } from 'node:child_process';
-import { existsSync, readdirSync } from 'node:fs';
+import { existsSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const KEEP_GOING = process.argv.includes('--keep-going');
 
-// Conteos esperados del stack canónico (actualizar a mano si se añaden tests).
-const EXPECT_NODE = 372;
-const EXPECT_PY = 98;
-const EXPECT_LUA = 180;
+// Conteos canónicos: detectan tests que desaparecen o se saltan silenciosamente.
+// Overrides opcionales WOW_GATES_EXPECT_{NODE,PY,LUA,CJS}=N para ramas en las
+// que aterrizan tests nuevos antes de actualizar estos defaults.
+function expected(name, fallback) {
+  const raw = process.env[`WOW_GATES_EXPECT_${name}`];
+  if (raw === undefined) return fallback;
+  const n = Number(raw);
+  return Number.isInteger(n) && n >= 0 ? n : fallback;
+}
+const EXPECT_NODE = expected('NODE', 381);
+const EXPECT_PY = expected('PY', 98);
+const EXPECT_LUA = expected('LUA', 180);
 // Tests unitarios del motor en standalone/tests/*.cjs (node:test). Los «real
 // fixture» son stat-only por defecto; WOW_FOREVER_REAL_FIXTURE=1 los hace leer
 // contenido de SavedVariables (solo para diagnóstico manual, nunca en gates).
-const EXPECT_CJS = 123;
+const EXPECT_CJS = expected('CJS', 123);
 const BROWSER = [
   ['navegador', process.env.HERMES_SDK_TABS === '1' ? 52 : 51], ['mercado-auto', 14], ['mercado-procedencia', 24],
   ['tsm', 28], ['vista-mercado', 57], ['vista-davi', 50], ['vista-guia', 28],
   ['vista-profesiones', 41], ['vista-ruta-dungeons', 31], ['bridge', 19],
   ['vista-personaje-simc', 11], ['vista-pawn', 13], ['vista-subasta-pawn', 28],
-  ['farm-routing', 11],
+  ['farm-routing', 11], ['tab-performance', 13],
 ];
 const EXPECT_BROWSER_TOTAL = BROWSER.reduce((n, [, c]) => n + c, 0);
 
@@ -50,27 +62,38 @@ function sh(cmd, args, cwd = ROOT, env = process.env) {
 function num(re, s) { const m = re.exec(s); return m ? Number(m[1]) : null; }
 const tail = (s, n = 1500) => s.slice(-n);
 
+// Descubrimiento de Lua sin `bash`: solo PATH, portable en cualquier runner.
+function findOnPath(names) {
+  const dirs = (process.env.PATH || '').split(path.delimiter).filter(Boolean);
+  for (const name of names) for (const dir of dirs) {
+    for (const file of [name, `${name}.exe`]) {
+      const candidate = path.join(dir, file);
+      if (existsSync(candidate)) return candidate;
+    }
+  }
+  return null;
+}
+
 function resolveBrowserEnv() {
-  const home = process.env.HOME || '';
-  let pm = process.env.PLAYWRIGHT_MODULE;
-  if (!pm || !existsSync(pm)) {
-    pm = null;
-    const base = path.join(home, '.hermes/hermes-agent/node_modules/.pnpm');
-    if (existsSync(base)) for (const d of readdirSync(base).filter(x => x.startsWith('playwright@')).sort()) {
-      const p = path.join(base, d, 'node_modules/playwright/index.mjs');
-      if (existsSync(p)) { pm = p; break; }
-    }
+  // Sin rutas de máquina: Playwright/React/ReactDOM son dependencias fijadas del
+  // repo, resueltas desde desktop/package.json (lo que hace `npm ci` en desktop/).
+  const reqDesktop = createRequire(path.join(ROOT, 'desktop', 'package.json'));
+  let pw = null;
+  try { pw = reqDesktop('playwright'); } catch { /* se informa abajo */ }
+
+  // Overrides explícitos: tienen prioridad sobre los defaults del proyecto.
+  let pm = process.env.PLAYWRIGHT_MODULE || null;
+  if (pm && !existsSync(pm)) pm = null;
+  const havePlaywright = Boolean(pm || pw ||
+    existsSync(path.join(ROOT, 'desktop', 'node_modules', 'playwright', 'index.mjs')));
+
+  let ch = process.env.CHROMIUM_PATH || null;
+  if (ch && !existsSync(ch)) ch = null;
+  if (!ch && pw) {
+    const exe = pw.chromium.executablePath();
+    if (exe && existsSync(exe)) ch = exe;
   }
-  let ch = process.env.CHROMIUM_PATH;
-  if (!ch || !existsSync(ch)) {
-    ch = null;
-    const base = path.join(home, '.cache/ms-playwright');
-    if (existsSync(base)) for (const d of readdirSync(base).filter(x => x.startsWith('chromium-')).sort()) {
-      const p = path.join(base, d, 'chrome-linux64/chrome');
-      if (existsSync(p)) { ch = p; break; }
-    }
-  }
-  return { pm, ch };
+  return { pm, ch, havePlaywright };
 }
 
 const results = [];
@@ -127,7 +150,7 @@ console.log(`raíz: ${ROOT}\n`);
 
 // 3) lua addon/tests/test_bridge.lua  (diario del puente)
 {
-  const luaPath = sh('bash', ['-lc', 'command -v lua5.1 || command -v lua || command -v luajit']).out.trim();
+  const luaPath = findOnPath(['lua5.1', 'lua', 'luajit']);
   if (!luaPath) {
     record('lua bridge', EXPECT_LUA, null, false, 'lua5.1/lua/luajit no encontrado en PATH');
   } else {
@@ -155,14 +178,20 @@ console.log(`raíz: ${ROOT}\n`);
   record('bundle-check', 'OK', ok ? 'OK' : 'FALLO', ok, ok ? `${bytes} bytes` : tail(r.out));
 }
 
-// 6) Suites navegador headless (Playwright prestado + Chromium propio).
-//    Cada suite imprime una línea JSON {pasadas, red, errores} al final.
+// 6) Suites navegador headless (dependencias fijadas del repo + Chromium de
+//    Playwright). Cada suite imprime una línea JSON {pasadas, red, errores}.
 {
-  const { pm, ch } = resolveBrowserEnv();
-  if (!pm || !ch) {
-    record('browser env', 'rutas', 'FALLO', false, `PLAYWRIGHT_MODULE=${pm} CHROMIUM_PATH=${ch}`);
+  const { pm, ch, havePlaywright } = resolveBrowserEnv();
+  if (!havePlaywright || !ch) {
+    record('browser env', 'deps', 'FALLO', false,
+      `playwright=${havePlaywright} chromium=${ch || 'falta'}; ` +
+      'corré `npm ci` en desktop/ y `npx playwright install chromium`');
   } else {
-    const env = { ...process.env, PLAYWRIGHT_MODULE: pm, CHROMIUM_PATH: ch };
+    const env = { ...process.env };
+    if (pm) env.PLAYWRIGHT_MODULE = pm;
+    if (ch) env.CHROMIUM_PATH = ch;
+    env.HERMES_DESKTOP_PKG = process.env.HERMES_DESKTOP_PKG ||
+      path.join(ROOT, 'desktop', 'package.json');
     let total = 0;
     for (const [suite, exp] of BROWSER) {
       const r = sh('node', [`test/${suite}.mjs`], path.join(ROOT, 'desktop'), env);

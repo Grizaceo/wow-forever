@@ -64,6 +64,15 @@ const PROCEDENCIA_PROF = [
     + ' / cmangos-1.12 ' + (D.profesiones.meta?.builds?.['cmangos-1.12'] || '?'),
 ]
 
+// El catálogo solo depende de items.json + dungeons.json, que son inmutables
+// durante la sesión. Calcularlo dentro del componente lo repetía en cada
+// montaje (cada cambio de pestaña). Cache perezosa: se paga una sola vez.
+let catalogoCache = null
+function catalogoLocal() {
+  if (!catalogoCache) catalogoCache = catalogoMercado(D.items, D.dungeons)
+  return catalogoCache
+}
+
 export function VistaProfesiones({ ctx, estado, perfil, lang, irA }) {
   const datos = D.profesiones.profesiones
   // Primero las profesiones del perfil (principales y luego secundarias), luego las demás.
@@ -138,7 +147,7 @@ export function VistaProfesiones({ ctx, estado, perfil, lang, irA }) {
     porZona.get(z).push(e)
   }
   const enPerfil = new Set([...(perfil.profesiones || []), ...(perfil.secundarias || [])])
-  const catalogo = useMemo(() => catalogoMercado(D.items, D.dungeons), [])
+  const catalogo = catalogoLocal()
   const resumenPerfil = useMemo(() => perfilParaAgente(perfil, D.personaje, NOMBRES_PROF, lang), [perfil, lang])
   // Receta seleccionada (su spell); si no hay ninguna, solo se adjunta la profesión y el skill.
   const recetaSel = useMemo(

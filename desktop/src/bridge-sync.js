@@ -13,8 +13,8 @@ import { BRIDGE_FILE, BRIDGE_MAX_BYTES, parseBridge, bridgeToSnapshot } from './
 import { sincronizarPersonagem } from './simc.js'
 import { sincronizarPawn, sincronizarCatalogoPawn } from './pawn.js'
 import { sincronizarPawnStats } from './item-stats.js'
+import { safeSyncPath as safePath } from './sync-path.js'
 
-const safePath = p => typeof p === 'string' && p.length <= 2048 && !p.includes('\\') && !/[\x00-\x1f]/.test(p) && p.split('/').every(s => s && s !== '.' && s !== '..' && !s.includes(':'))
 
 async function findBridge(files, folder, read) {
   if (typeof files.list !== 'function') return read(folder, BRIDGE_FILE)

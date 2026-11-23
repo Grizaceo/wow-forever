@@ -72064,6 +72064,21 @@ var ICONOS = {
 // src/ui.jsx
 import { Fragment as Fragment2, jsx, jsxs } from "react/jsx-runtime";
 var SPRITE_URL = `url("data:image/webp;base64,${ICONOS.sprite}")`;
+var hojaSprite = null;
+function asegurarSprite() {
+  if (typeof document === "undefined") return;
+  if (hojaSprite && hojaSprite.isConnected) return;
+  const existente = document.getElementById("wf-iconos-sprite");
+  if (existente) {
+    hojaSprite = existente;
+    return;
+  }
+  const el = document.createElement("style");
+  el.id = "wf-iconos-sprite";
+  el.textContent = `.wf-icono{display:inline-block;flex:0 0 auto;border-radius:3px;background-image:${SPRITE_URL};background-repeat:no-repeat}`;
+  (document.head || document.documentElement).appendChild(el);
+  hojaSprite = el;
+}
 function Tarjeta({ titulo, extra, children, estilo }) {
   return /* @__PURE__ */ jsxs("section", { style: { ...S.tarjeta, ...estilo }, children: [
     titulo ? /* @__PURE__ */ jsxs("div", { style: S.tarjetaTitulo, children: [
@@ -72098,20 +72113,17 @@ function IconoItem({ id, size = 24, titulo }) {
   if (celda == null) return /* @__PURE__ */ jsx("span", { "aria-hidden": "true", style: { width: size, height: size, flex: "0 0 auto", display: "inline-block" } });
   const col = celda % ICONOS.columnas;
   const fila = Math.floor(celda / ICONOS.columnas);
+  asegurarSprite();
   return /* @__PURE__ */ jsx(
     "span",
     {
       role: "img",
       "aria-label": titulo || "",
       title: titulo || void 0,
+      className: "wf-icono",
       style: {
         width: size,
         height: size,
-        flex: "0 0 auto",
-        display: "inline-block",
-        borderRadius: 3,
-        backgroundImage: SPRITE_URL,
-        backgroundRepeat: "no-repeat",
         backgroundSize: `${ICONOS.columnas * size}px ${ICONOS.filas * size}px`,
         backgroundPosition: `${-col * size}px ${-fila * size}px`
       }
@@ -76874,6 +76886,11 @@ var PROCEDENCIA_PROF = [
   "data/items.json",
   "builds: cliente-forever " + (D.profesiones.meta?.builds?.["cliente-forever"] || "?") + " / cmangos-1.12 " + (D.profesiones.meta?.builds?.["cmangos-1.12"] || "?")
 ];
+var catalogoCache = null;
+function catalogoLocal() {
+  if (!catalogoCache) catalogoCache = catalogoMercado(D.items, D.dungeons);
+  return catalogoCache;
+}
 function VistaProfesiones({ ctx, estado, perfil, lang, irA }) {
   const datos = D.profesiones.profesiones;
   const orden = useMemo10(() => {
@@ -76951,7 +76968,7 @@ function VistaProfesiones({ ctx, estado, perfil, lang, irA }) {
     porZona.get(z).push(e);
   }
   const enPerfil = /* @__PURE__ */ new Set([...perfil.profesiones || [], ...perfil.secundarias || []]);
-  const catalogo = useMemo10(() => catalogoMercado(D.items, D.dungeons), []);
+  const catalogo = catalogoLocal();
   const resumenPerfil = useMemo10(() => perfilParaAgente(perfil, D.personaje, NOMBRES_PROF2, lang), [perfil, lang]);
   const recetaSel = useMemo10(
     () => prof && sel == null ? null : prof ? prof.recetas.find((r) => r.spell === sel) || null : null,
@@ -77349,10 +77366,27 @@ SelectValue as SelectValue4 } from "@hermes/plugin-sdk";
 
 // src/auctionator.js
 var import_market_identity3 = __toESM(require_market_identity(), 1);
+
+// src/sync-path.js
+var SYNC_REL_PATH_MAX = 1024;
+var SYNC_SEGMENT_MAX = 255;
+function safeSyncPath(p) {
+  if (typeof p !== "string" || p.length === 0 || p.length > SYNC_REL_PATH_MAX) return false;
+  if (/[\x00-\x1f\x7f]/.test(p) || p.includes("\\")) return false;
+  return p.split("/").every(
+    (s) => s.length > 0 && s.length <= SYNC_SEGMENT_MAX && s !== "." && s !== ".." && s.toLowerCase() !== "..namedfork" && !s.includes(":")
+  );
+}
+function listingCompleta(result, maxEntries = 4e3) {
+  return !!(result?.ok === true && !result.truncated && Array.isArray(result.entries) && result.entries.length <= maxEntries);
+}
+
+// src/auctionator.js
 var AUCTION_FILE = "Auctionator.lua";
 var AUCTION_MARK = "AUCTIONATOR_PRICE_DATABASE";
 var WALK_DIRS = 80;
 var WALK_DEPTH = 4;
+var SKIP_DIRS = ["Interface", "Data", "Cache", "Logs", ".git"];
 var ACQUISITION_PROVENANCE = Object.freeze({
   method: "auctionator-raw",
   confidence: "unknown",
@@ -77400,6 +77434,7 @@ function contieneBytes(bytes, aguja) {
   return false;
 }
 async function readAuction(files, folder, rel) {
+  if (!safeSyncPath(rel)) return null;
   let bytes = null;
   if (typeof files.readDataUrl === "function") {
     const d = await files.readDataUrl(folder.id, rel);
@@ -77414,27 +77449,35 @@ async function readAuction(files, folder, rel) {
 }
 async function findInFolder(files, folder) {
   const direct = await readAuction(files, folder, AUCTION_FILE).catch(() => null);
-  if (direct) return direct;
-  const queue = [{ rel: "", depth: 0 }], found = [];
-  let seen = 0;
-  while (queue.length && seen < WALK_DIRS && found.length < 10) {
+  if (typeof files.list !== "function") return direct;
+  const found = /* @__PURE__ */ new Set();
+  if (direct) found.add(AUCTION_FILE);
+  const queue = [{ rel: "", depth: 0 }], seen = /* @__PURE__ */ new Set();
+  while (queue.length && seen.size < WALK_DIRS) {
     const { rel, depth } = queue.shift();
-    seen++;
+    if (seen.has(rel)) continue;
+    seen.add(rel);
     const l = await files.list(folder.id, rel).catch(() => null);
-    if (!l?.ok) continue;
-    for (const e of l.entries || []) {
+    if (!listingCompleta(l)) return { status: "error", error: "limit", message: "La carpeta es demasiado amplia o el listado está incompleto. Elegí WTF/Account/<tu cuenta>/SavedVariables." };
+    for (const e of l.entries) {
+      if (!safeSyncPath(e.path) || typeof e.name !== "string" || !e.name || rel && !e.path.startsWith(rel + "/") || e.path.split("/").at(-1) !== e.name)
+        return { status: "error", error: "invalid-path", message: "El listado del permiso devolvió una ruta no segura; no se leyó esa ruta." };
       if (e.isDirectory) {
-        if (depth < WALK_DEPTH) queue.push({ rel: e.path, depth: depth + 1 });
-      } else if (e.name === AUCTION_FILE) found.push(e.path);
+        if (SKIP_DIRS.includes(e.name)) continue;
+        if (depth >= WALK_DEPTH || queue.length + seen.size >= WALK_DIRS)
+          return { status: "error", error: "limit", message: "La carpeta es demasiado amplia. Elegí WTF/Account/<tu cuenta>/SavedVariables." };
+        queue.push({ rel: e.path, depth: depth + 1 });
+      } else if (e.name === AUCTION_FILE) found.add(e.path);
     }
   }
-  if (queue.length) return { status: "error", error: "limit", message: "La carpeta es demasiado amplia. Elegí WTF/Account/<tu cuenta>/SavedVariables." };
+  if (queue.length) return { status: "error", error: "limit", message: "La búsqueda no se completó dentro del permiso. Elegí WTF/Account/<tu cuenta>/SavedVariables." };
   const hits = [];
-  for (const rel of new Set(found)) {
-    const hit = await readAuction(files, folder, rel).catch(() => null);
+  for (const rel of found) {
+    const hit = rel === AUCTION_FILE && direct ? direct : await readAuction(files, folder, rel).catch(() => null);
     if (hit) hits.push(hit);
   }
-  if (hits.length > 1) return { status: "error", error: "ambiguous", message: "Hay varios Auctionator.lua. Elegí la carpeta SavedVariables de la cuenta que querés seguir." };
+  if (hits.length > 1) return { status: "error", error: "ambiguous", message: "Hay varios Auctionator.lua (incluida una copia en la raíz). Elegí la carpeta SavedVariables de la cuenta que querés segui\
+r." };
   return hits[0] || null;
 }
 async function leerAuctionatorRaw(ctx, req = {}) {
@@ -83604,7 +83647,6 @@ function App({ ctx, almacen, sincronizador, ventas, puente }) {
 
 // src/tsm-sync.js
 var TSM_FILE = "TradeSkillMaster.lua";
-var safePath = (p) => typeof p === "string" && p.length <= 2048 && !p.includes("\\") && !/[\x00-\x1f]/.test(p) && p.split("/").every((s) => s && s !== "." && s !== ".." && !s.includes(":"));
 async function findTsm(files, folder, read) {
   if (typeof files.list !== "function") return read(folder, TSM_FILE);
   const queue = [{ path: "", depth: 0 }], seen = /* @__PURE__ */ new Set(), found = /* @__PURE__ */ new Set();
@@ -83616,8 +83658,8 @@ async function findTsm(files, folder, read) {
     const result = await files.list(folder.id, path);
     if (!result?.ok || result.truncated || !Array.isArray(result.entries) || result.entries.length > 4e3) throw Error("TSM: no se pudo completar la búsqueda dentro del permiso.");
     for (const e of result.entries) {
-      if (!safePath(e.path) || path && !e.path.startsWith(path + "/") || e.path.slice(path ? path.length + 1 : 0).includes("/") || e.path.split("/").at(-1) !== e.name) throw Error("TSM: ruta de descub\
-rimiento inválida.");
+      if (!safeSyncPath(e.path) || path && !e.path.startsWith(path + "/") || e.path.slice(path ? path.length + 1 : 0).includes("/") || e.path.split("/").at(-1) !== e.name) throw Error("TSM: ruta de de\
+scubrimiento inválida.");
       if (e.isDirectory) {
         if (["Interface", "Data", "Cache", "Logs", ".git"].includes(e.name)) continue;
         if (depth >= 6 || queue.length + seen.size >= 120) throw Error("TSM: búsqueda incompleta; carpeta demasiado amplia.");
@@ -83632,7 +83674,7 @@ async function leerTsm(ctx, { pick = false, silent = false } = {}) {
   const files = ctx?.files;
   if (!files?.readText) return { status: "unavailable" };
   async function read(folder, path) {
-    if (!safePath(path) || path.split("/").at(-1) !== TSM_FILE) throw Error("TSM: ruta guardada inválida.");
+    if (!safeSyncPath(path) || path.split("/").at(-1) !== TSM_FILE) throw Error("TSM: ruta guardada inválida.");
     let bytes;
     if (files.readDataUrl) {
       const r = await files.readDataUrl(folder.id, path);
@@ -84012,7 +84054,6 @@ function bridgeToSnapshot(journal, { now = /* @__PURE__ */ new Date() } = {}) {
 }
 
 // src/bridge-sync.js
-var safePath2 = (p) => typeof p === "string" && p.length <= 2048 && !p.includes("\\") && !/[\x00-\x1f]/.test(p) && p.split("/").every((s) => s && s !== "." && s !== ".." && !s.includes(":"));
 async function findBridge(files, folder, read) {
   if (typeof files.list !== "function") return read(folder, BRIDGE_FILE);
   const queue = [{ path: "", depth: 0 }], seen = /* @__PURE__ */ new Set(), found = /* @__PURE__ */ new Set();
@@ -84024,8 +84065,8 @@ async function findBridge(files, folder, read) {
     const result = await files.list(folder.id, path);
     if (!result?.ok || result.truncated || !Array.isArray(result.entries) || result.entries.length > 4e3) throw Error("Puente: no se pudo completar la búsqueda dentro del permiso.");
     for (const e of result.entries) {
-      if (!safePath2(e.path) || path && !e.path.startsWith(path + "/") || e.path.slice(path ? path.length + 1 : 0).includes("/") || e.path.split("/").at(-1) !== e.name) throw Error("Puente: ruta de de\
-scubrimiento inválida.");
+      if (!safeSyncPath(e.path) || path && !e.path.startsWith(path + "/") || e.path.slice(path ? path.length + 1 : 0).includes("/") || e.path.split("/").at(-1) !== e.name) throw Error("Puente: ruta de\
+ descubrimiento inválida.");
       if (e.isDirectory) {
         if (["Interface", "Data", "Cache", "Logs", ".git"].includes(e.name)) continue;
         if (depth >= 6 || queue.length + seen.size >= 120) throw Error("Puente: búsqueda incompleta; carpeta demasiado amplia.");
@@ -84040,7 +84081,7 @@ async function leerBridge(ctx, { pick = false, silent = false } = {}) {
   const files = ctx?.files;
   if (!files?.readText) return { status: "unavailable" };
   async function read(folder, path) {
-    if (!safePath2(path) || path.split("/").at(-1) !== BRIDGE_FILE) throw Error("Puente: ruta guardada inválida.");
+    if (!safeSyncPath(path) || path.split("/").at(-1) !== BRIDGE_FILE) throw Error("Puente: ruta guardada inválida.");
     let bytes;
     if (files.readDataUrl) {
       const r = await files.readDataUrl(folder.id, path);

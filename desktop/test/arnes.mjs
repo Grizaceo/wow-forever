@@ -14,7 +14,9 @@ import { fileURLToPath } from 'node:url'
 
 const aqui = path.dirname(fileURLToPath(import.meta.url))
 const raiz = path.resolve(aqui, '..')
-const desktopPkg = process.env.HERMES_DESKTOP_PKG || path.join(process.env.HOME, '.hermes/hermes-agent/apps/desktop/package.json')
+// react/react-dom se resuelven desde las dependencias fijadas en desktop/package.json;
+// HERMES_DESKTOP_PKG permite apuntar a otro package.json (override de entorno/CI).
+const desktopPkg = process.env.HERMES_DESKTOP_PKG || path.join(raiz, 'package.json')
 const reqDesk = createRequire(desktopPkg)
 const reqLocal = createRequire(path.join(raiz, 'package.json'))
 export const PREF = 'hermes.plugin.wow-hunter-guide.'

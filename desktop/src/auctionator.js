@@ -7,7 +7,9 @@
 // The user should pick WTF/Account/<account>/SavedVariables; a bounded walk
 // inside the grant also finds the file if they picked a parent folder.
 const AUCTION_FILE='Auctionator.lua', AUCTION_MARK='AUCTIONATOR_PRICE_DATABASE', WALK_DIRS=80, WALK_DEPTH=4;
+const SKIP_DIRS=['Interface','Data','Cache','Logs','.git'];
 import HunterIdentity from '../../standalone/market-identity.js';
+import { safeSyncPath, listingCompleta } from './sync-path.js';
 
 /* Guard de adquisición: la topología de servidores NO está verificada (task 1).
    Ninguna ruta, nombre de cuenta, reino, región o facción puede promover un
@@ -44,6 +46,7 @@ export function contieneBytes(bytes,aguja){
 // («cbor trailing data»). readDataUrl returns the exact bytes (up to 16 MiB), so it
 // goes first; readText is only the fallback for a host without readDataUrl.
 export async function readAuction(files,folder,rel){
+  if(!safeSyncPath(rel))return null;
   let bytes=null;
   if(typeof files.readDataUrl==='function'){
     const d=await files.readDataUrl(folder.id,rel);
@@ -56,23 +59,43 @@ export async function readAuction(files,folder,rel){
   if(!bytes||!contieneBytes(bytes,MARK_BYTES))return null;
   return {status:'ok',bytes,path:folder.name+'/'+rel,byteSize:bytes.length};
 }
+// La lectura directa en la raíz es sólo UN candidato: no puede devolver antes
+// de completar el listado. Si no hay `list` (SDK antiguo), es el único modo y
+// se mantiene como fallback exacto sin caminar.
 async function findInFolder(files,folder){
   const direct=await readAuction(files,folder,AUCTION_FILE).catch(()=>null);
-  if(direct)return direct;
-  const queue=[{rel:'',depth:0}],found=[];let seen=0;
-  while(queue.length&&seen<WALK_DIRS&&found.length<10){
-    const {rel,depth}=queue.shift();seen++;
+  if(typeof files.list!=='function')return direct;
+  const found=new Set();
+  if(direct)found.add(AUCTION_FILE);
+  const queue=[{rel:'',depth:0}],seen=new Set();
+  while(queue.length&&seen.size<WALK_DIRS){
+    const {rel,depth}=queue.shift();
+    if(seen.has(rel))continue;
+    seen.add(rel);
     const l=await files.list(folder.id,rel).catch(()=>null);
-    if(!l?.ok)continue;
-    for(const e of l.entries||[]){
-      if(e.isDirectory){if(depth<WALK_DEPTH)queue.push({rel:e.path,depth:depth+1});}
-      else if(e.name===AUCTION_FILE)found.push(e.path);
+    if(!listingCompleta(l))return {status:'error',error:'limit',message:'La carpeta es demasiado amplia o el listado está incompleto. Elegí WTF/Account/<tu cuenta>/SavedVariables.'};
+    for(const e of l.entries){
+      if(!safeSyncPath(e.path)||typeof e.name!=='string'||!e.name||
+         (rel&&!e.path.startsWith(rel+'/'))||
+         e.path.split('/').at(-1)!==e.name)
+        return {status:'error',error:'invalid-path',message:'El listado del permiso devolvió una ruta no segura; no se leyó esa ruta.'};
+      if(e.isDirectory){
+        if(SKIP_DIRS.includes(e.name))continue;
+        if(depth>=WALK_DEPTH||queue.length+seen.size>=WALK_DIRS)
+          return {status:'error',error:'limit',message:'La carpeta es demasiado amplia. Elegí WTF/Account/<tu cuenta>/SavedVariables.'};
+        queue.push({rel:e.path,depth:depth+1});
+      }else if(e.name===AUCTION_FILE)found.add(e.path);
     }
   }
-  if(queue.length)return {status:'error',error:'limit',message:'La carpeta es demasiado amplia. Elegí WTF/Account/<tu cuenta>/SavedVariables.'};
+  if(queue.length)return {status:'error',error:'limit',message:'La búsqueda no se completó dentro del permiso. Elegí WTF/Account/<tu cuenta>/SavedVariables.'};
   const hits=[];
-  for(const rel of new Set(found)){const hit=await readAuction(files,folder,rel).catch(()=>null);if(hit)hits.push(hit);}
-  if(hits.length>1)return {status:'error',error:'ambiguous',message:'Hay varios Auctionator.lua. Elegí la carpeta SavedVariables de la cuenta que querés seguir.'};
+  for(const rel of found){
+    const hit=rel===AUCTION_FILE&&direct?direct:await readAuction(files,folder,rel).catch(()=>null);
+    if(hit)hits.push(hit);
+  }
+  // Un archivo suelto en la raíz no gana sobre una cuenta anidada: ambas
+  // opciones son candidatas y la ambigüedad se resuelve con otra concesión.
+  if(hits.length>1)return {status:'error',error:'ambiguous',message:'Hay varios Auctionator.lua (incluida una copia en la raíz). Elegí la carpeta SavedVariables de la cuenta que querés seguir.'};
   return hits[0]||null;
 }
 async function leerAuctionatorRaw(ctx,req={}){

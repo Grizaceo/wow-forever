@@ -1,10 +1,10 @@
 import { dataUrlBytes } from './auctionator.js'
 import { MAX_TSM_BYTES, parseTsm, validTsm } from './tsm.js'
+import { safeSyncPath as safePath } from './sync-path.js'
 
 // Discovery is confined to SDK grants. Only exact addon data filenames are read;
 // no Config.wtf, credentials, .bak files, raw filesystem bridge or background picker.
 const TSM_FILE = 'TradeSkillMaster.lua'
-const safePath = p => typeof p === 'string' && p.length <= 2048 && !p.includes('\\') && !/[\x00-\x1f]/.test(p) && p.split('/').every(s => s && s !== '.' && s !== '..' && !s.includes(':'))
 async function findTsm(files, folder, read) {
   // Even a root hit must be checked against nested accounts before reading/pinning.
   if (typeof files.list !== 'function') return read(folder, TSM_FILE)
