@@ -35158,9 +35158,9 @@ var ES = {
   "clase.menos": "Ver menos",
   "clase.hastaNivel": "hasta nivel",
   "clase.ninguno": "Nada nuevo que aprender en este rango.",
-  "davi.boton": "Preguntar a DAVI",
+  "davi.boton": "Preguntar al agente",
   "davi.botonAyuda": "Compone tu pregunta con el contexto seleccionado y la pasa al chat",
-  "davi.titulo": "Preguntar a DAVI — {seccion}",
+  "davi.titulo": "Preguntar al agente — {seccion}",
   "davi.pregunta": "Tu pregunta",
   "davi.preguntaAyuda": "Escribe qué quieres saber; el contexto de abajo se adjunta tal cual.",
   "davi.partes.perfil": "Incluir el perfil",
@@ -35250,9 +35250,9 @@ var EN = {
   "clase.menos": "Show less",
   "clase.hastaNivel": "up to level",
   "clase.ninguno": "Nothing new to learn in this range.",
-  "davi.boton": "Ask DAVI",
+  "davi.boton": "Ask the agent",
   "davi.botonAyuda": "Compose your question with the selected context and hand it to the chat",
-  "davi.titulo": "Ask DAVI — {seccion}",
+  "davi.titulo": "Ask the agent — {seccion}",
   "davi.pregunta": "Your question",
   "davi.preguntaAyuda": "Write what you want to know; the context below is attached as is.",
   "davi.partes.perfil": "Include the profile",
@@ -73146,7 +73146,7 @@ var txt = (n, lang) => {
 };
 var ETIQUETAS = {
   es: {
-    titulo: "Pregunta a DAVI",
+    titulo: "Pregunta al agente",
     seccion: "Sección",
     pregunta: "Pregunta",
     contexto: "Contexto seleccionado",
@@ -73204,7 +73204,7 @@ var ETIQUETAS = {
     nivelDeclarado: "Nivel de oficio declarado a mano en el plugin, no leído del juego."
   },
   en: {
-    titulo: "Ask DAVI",
+    titulo: "Ask the agent",
     seccion: "Section",
     pregunta: "Question",
     contexto: "Selected context",
@@ -84506,7 +84506,7 @@ var RUTA = "/wow-forever";
 var plugin_src_default = {
   id: "wow-hunter-guide",
   name: "WoW Forever",
-  version: "2.1.0",
+  version: "2.1.1",
   description: "Guía offline en inglés (español opcional) de WoW Forever para cualquier raza, clase y profesión, y mercado con precios de Auctionator, ventas TSM y el diario del puente, con miniaturas\
  por id de ítem. Lee los tres .lua declarados solo desde carpetas autorizadas; Pawn.lua solo con consentimiento explícito y revocable.",
   defaultEnabled: true,

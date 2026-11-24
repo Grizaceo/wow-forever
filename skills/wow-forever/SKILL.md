@@ -1,7 +1,7 @@
 ---
 name: wow-forever
 description: "Asiste a jugadores de World of Warcraft: Forever (juego oficial de Blizzard, cliente 1.60, basado en Classic) con los datos del plugin wow-forever de Hermes: entrenadores, hechizos y misiones de clase, zonas por nivel, profesiones (recetas, plan de subida, materiales), dungeons con jefes y botín, ítems, la guía curada del Cazador de la Horda, Legacy y el mercado local (Auctionator, contabilidad TSM y diario del puente WoWForeverBridge). Usar cuando el usuario juegue WoW Forever o pregunte por su personaje, dónde entrenar o subir de nivel, profesiones, drops, dungeons, precios o farmeo. Assists WoW Forever players (any race, class and faction) with the plugin's offline game data."
-version: 2.1.0
+version: 2.1.1
 author: Cristóbal Muñoz
 license: GPL-3.0-or-later
 metadata:
@@ -24,7 +24,7 @@ recetas nuevas, y el sistema Legacy. No es un servidor privado.
 
 El perfil vive en el almacenamiento de la página de Desktop y tú no lo ves. Consíguelo así:
 
-- Puede usar **Preguntar a DAVI** en **Personaje**, **Profesiones** o el detalle de un ítem en **Mercado**: revisa la pregunta y el contexto, elige incluir perfil/precios y confirma la inserción en el borrador del chat. No se envía automáticamente; si no hay compositor disponible, se copia para pegar o queda texto seleccionable. Trata ese contexto como una instantánea, no como lectura del juego en vivo.
+- Puede usar **Preguntar al agente** en **Personaje**, **Profesiones** o el detalle de un ítem en **Mercado**: revisa la pregunta y el contexto, elige incluir perfil/precios y confirma la inserción en el borrador del chat. No se envía automáticamente; si no hay compositor disponible, se copia para pegar o queda texto seleccionable. Trata ese contexto como una instantánea, no como lectura del juego en vivo.
 - Pide que pulse **Copiar perfil para el agente** en la pestaña **Personaje** de la guía y lo
   pegue. Llega como una línea así:
   `Mi personaje de WoW Forever (plugin wow-forever): Horda · No-muerto (Undead, raza 5) · Paladín (Paladin, clase 2) · nivel 24 · profesiones: Herrería (Blacksmithing, id 164)`

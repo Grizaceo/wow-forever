@@ -44,7 +44,7 @@ const txt = (n, lang) => {
 // ({es, en}) se resuelven con `txt` arriba.
 const ETIQUETAS = {
   es: {
-    titulo: 'Pregunta a DAVI',
+    titulo: 'Pregunta al agente',
     seccion: 'Sección',
     pregunta: 'Pregunta',
     contexto: 'Contexto seleccionado',
@@ -102,7 +102,7 @@ const ETIQUETAS = {
     nivelDeclarado: 'Nivel de oficio declarado a mano en el plugin, no leído del juego.',
   },
   en: {
-    titulo: 'Ask DAVI',
+    titulo: 'Ask the agent',
     seccion: 'Section',
     pregunta: 'Question',
     contexto: 'Selected context',

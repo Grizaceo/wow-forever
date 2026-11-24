@@ -39,7 +39,7 @@ minificar) desde `desktop/src/`. Hermes Desktop lo carga en la barra lateral com
 | `src/vistas/subasta-pawn.jsx` | sub-pestaña Subasta × Pawn dentro de Mercado |
 | `src/datos.js` | `data/*.json`, `drop-data`, guías curadas y ayudas |
 | `src/ui.jsx`, `src/estilos.js`, `src/i18n.js` | piezas, estilos y textos comunes |
-| `src/davi.js`, `src/davi-transporte.js` | «Preguntar a DAVI»: contexto puro (allowlist, acotes) y transporte insert → portapapeles → manual |
+| `src/davi.js`, `src/davi-transporte.js` | «Preguntar al agente»: contexto puro (allowlist, acotes) y transporte insert → portapapeles → manual |
 | `src/vistas/preguntar-davi.jsx` | botón + panel de las tres pestañas (pregunta, conmutadores, vista previa) |
 | `src/vistas/*.jsx` | una sección por archivo |
 | `../src/perfil.js` | validación del perfil (módulo puro, compartido con tests de Node) |
@@ -225,7 +225,7 @@ forzada al logout/quit; `/wfbp personagem` la fuerza a mano.
   (juego vs pegado), fecha y frescura (>7 días = desactualizado), stats, equipo por
   slot, talentos y profesiones, propuesta de perfil (nivel/reino/raza/facción/
   profesiones, solo si validan contra `personaje.json`) y pegado manual del export.
-- DAVI recibe solo un **resumen acotado** (identidad + stats primarios + conteo de
+- El agente recibe solo un **resumen acotado** (identidad + stats primarios + conteo de
   equipo + fecha de captura) como parte `simc` del contexto, con su límite
   declarado; el export crudo nunca se adjunta.
 
@@ -285,7 +285,7 @@ en cada salida. Por eso (v1.2.1):
   `Pawn.lua` hermano del diario como catálogo (`pawn-catalogo`).
 - La tarjeta «Escala Pawn» (solo en Mercado → Subasta × Pawn) muestra la escala, el chip de
   procedencia, la fecha, los pesos ordenados y el ilvl del equipo; sin captura
-  lo declara y explica `/wfbpawn`. DAVI recibe un resumen acotado como parte
+  lo declara y explica `/wfbpawn`. El agente recibe un resumen acotado como parte
   `pawn` del contexto, con el límite «pesos del juego, no simulación de DPS».
 
 Pruebas específicas:

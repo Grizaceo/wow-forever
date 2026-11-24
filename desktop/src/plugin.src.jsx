@@ -18,7 +18,7 @@ const RUTA = '/wow-forever'
 export default {
   id: 'wow-hunter-guide',
   name: 'WoW Forever',
-  version: '2.1.0',
+  version: '2.1.1',
   description: 'Guía offline en inglés (español opcional) de WoW Forever para cualquier raza, clase y profesión, y mercado con precios de Auctionator, ventas TSM y el diario del puente, con miniaturas por id de ítem. Lee los tres .lua declarados solo desde carpetas autorizadas; Pawn.lua solo con consentimiento explícito y revocable.',
   defaultEnabled: true,
   register(ctx) {
