@@ -94,7 +94,7 @@ curada activa en Desktop. Toda guía nueva debe pasar `tests/curado-datos.test.m
 - `minify:false` + `lineLimit:200`: el gate `tests/test_desktop.py::test_legible` rechaza
   líneas de código > 400 chars. **No minificar** es deliberado (legibilidad del bundle).
 - `charset:utf8`, `legalComments:'none'`, `sourcemap:false`, `jsx:automatic`.
-- Post-proceso: escapa caracteres invisibles (​‌‍⁠﻿) a `\uXXXX`
+- Post-proceso: escapa caracteres invisibles (U+200B, U+200C, U+200D, U+2060, U+FEFF) a `\uXXXX`
   porque el escáner del instalador los marca aunque estén en strings.
 - Escribe `BUNDLE.json` (sha256 + bytes + esbuild version + data_manifest). Dos builds
   con las mismas entradas dan los mismos bytes (`test_build_reproducible`).

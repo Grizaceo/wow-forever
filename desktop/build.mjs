@@ -41,7 +41,7 @@ const cabecera =
   '// (c) Blizzard Entertainment; ver LICENSE-DATA.md. No editar a mano.\n'
 let fuente = cabecera + result.outputFiles[0].text
 // El escáner del instalador marca caracteres invisibles aunque estén en strings.
-fuente = fuente.replace(/[​‌‍⁠﻿]/g, (c) =>
+fuente = fuente.replace(/[\u200B\u200C\u200D\u2060\uFEFF]/g, (c) =>
   '\\u' + c.codePointAt(0).toString(16).toUpperCase().padStart(4, '0'))
 writeFileSync(out, fuente)
 

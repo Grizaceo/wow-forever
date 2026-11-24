@@ -77,7 +77,7 @@ await p.getByText('Leído del juego', { exact: false }).first().waitFor()
 check('simc: chip «Leído del juego» para captura del addon', await p.getByText('Leído del juego').count() >= 1)
 check('simc: estado sembrado muestra nivel 35', await p.getByText('35').count() >= 1)
 // DAVI: la parte simc debe existir como opción en el panel.
-await p.getByRole('button', { name: 'Preguntar a DAVI', exact: true }).first().click()
+await p.getByRole('button', { name: 'Preguntar al agente', exact: true }).first().click()
 await p.getByText('Incluir estado SimC').waitFor()
 check('simc: DAVI ofrece «Incluir estado SimC»', await p.getByText('Incluir estado SimC').count() === 1)
 await p.getByRole('button', { name: 'Cerrar', exact: true }).click()

@@ -9,11 +9,12 @@ facción, con una skill para que tu agente responda con los mismos datos.
 
 ## Estado
 
-- Versión 2.1.0. El inglés es ahora el idioma por defecto de la interfaz, con español opcional.
+- Versión 2.1.1. El inglés es el idioma por defecto de la interfaz, con español opcional.
   El mercado muestra la miniatura de cada ítem, ligada a su id. La 2.0.0 añadió el mercado
   local, el planificador de profesiones y la skill del agente; la 1.0.0 solo cubría tres
   clases (Cazador, Guerrero y Chamán).
-- Todavía no está en el catálogo de plugins de Hermes. Probado en Linux con Hermes Agent
+- Enviado al catálogo de plugins de Hermes como `wow-forever`; cuando esté listado,
+  `hermes plugins search wow-forever` lo encuentra. Probado en Linux con Hermes Agent
   v0.23.0, que es la versión mínima.
 - WoW Forever es el juego oficial de Blizzard (producto `wowf`, cliente 1.60), no un servidor
   privado. Este proyecto no tiene afiliación con Blizzard.
@@ -29,9 +30,21 @@ facción, con una skill para que tu agente responda con los mismos datos.
 ## Instalación
 
 ```sh
-hermes plugins install Grizaceo/wow-forever --ref <commit de 40 caracteres>
+hermes plugins install wow-forever
 hermes plugins enable wow-forever
 ```
+
+El primer comando instala la entrada del catálogo, en el commit que el catálogo revisó. Mientras
+la entrada no esté listada, o si quieres seguir este repositorio directamente, instala desde
+GitHub:
+
+```sh
+hermes plugins install Grizaceo/wow-forever
+```
+
+Agrega `--ref <commit de 40 caracteres>` para fijar un commit. Las versiones anteriores a la
+2.1.1 traían caracteres invisibles en un doc, y por eso el escáner de instalación de Hermes
+detenía la instalación directa por Git hasta recibir `--force`; la 2.1.1 los quita.
 
 En Hermes Desktop, abre **Capabilities → Plugins**, busca **WoW Forever** y enciéndela: la
 página llega apagada aunque el plugin esté habilitado. Aparece en la barra lateral. La skill
@@ -117,9 +130,9 @@ Las filas del Mercado muestran una miniatura junto al nombre, elegida por el id 
 iconos de ítems de Blizzard; el plugin nunca descarga imágenes en tiempo de ejecución. Los
 ítems sin icono conocido dejan el espacio en blanco en vez de mostrar una imagen inventada.
 
-### Preguntar a DAVI
+### Preguntar al agente
 
-En **Personaje**, **Profesiones** y **Mercado** hay un botón **Preguntar a DAVI**. Abre un panel
+En **Personaje**, **Profesiones** y **Mercado** hay un botón **Preguntar al agente**. Abre un panel
 con tu pregunta (editable) y una vista previa del contexto que se adjuntará: solo lo elegido en
 esa pestaña. Dos conmutadores dejan fuera el **perfil** o los **precios**; la vista previa cambia
 al momento y se **congela** al abrir, así que editar la pregunta o la selección no la altera.

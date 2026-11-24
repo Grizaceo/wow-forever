@@ -9,12 +9,13 @@ faction, with a skill so your agent answers from the same data.
 
 ## Status
 
-- Version 2.1.0. English is now the default interface language, with Spanish optional. The
+- Version 2.1.1. English is the default interface language, with Spanish optional. The
   market shows each item's thumbnail, tied to its item id. Version 2.0.0 added the local
   market, professions planner and the agent skill; 1.0.0 covered three classes only (Hunter,
   Warrior and Shaman).
-- Not yet in the Hermes plugin catalog. Tested on Linux with Hermes Agent v0.23.0, which is
-  the minimum version.
+- Submitted to the Hermes plugin catalog as `wow-forever`; once it is listed,
+  `hermes plugins search wow-forever` finds it. Tested on Linux with Hermes Agent v0.23.0,
+  which is the minimum version.
 - WoW Forever is Blizzard's official game (product `wowf`, client 1.60), not a private
   server. This project is not affiliated with Blizzard.
 
@@ -29,9 +30,20 @@ faction, with a skill so your agent answers from the same data.
 ## Install
 
 ```sh
-hermes plugins install Grizaceo/wow-forever --ref <40-character commit>
+hermes plugins install wow-forever
 hermes plugins enable wow-forever
 ```
+
+The first command installs the catalog entry, at the commit the catalog reviewed. Until the
+entry is listed, or to follow this repository directly, install from GitHub instead:
+
+```sh
+hermes plugins install Grizaceo/wow-forever
+```
+
+Add `--ref <40-character commit>` to pin a commit. Versions before 2.1.1 carried invisible
+characters in a doc that made Hermes's install scanner stop a direct Git install until it got
+`--force`; 2.1.1 removes them.
 
 In Hermes Desktop, open **Capabilities → Plugins**, find **WoW Forever** and switch it on: the
 page arrives switched off even when the plugin is enabled. It then shows up in the sidebar. The
@@ -116,9 +128,9 @@ Market rows show a thumbnail next to each item name, selected by the item id in
 item icons; the plugin never downloads images at runtime. Items without a known icon leave the
 space blank rather than showing a made-up picture.
 
-### Ask DAVI
+### Ask the agent
 
-The **Ask DAVI** button on the **Character**, **Professions** and **Market** tabs opens a panel
+The **Ask the agent** button on the **Character**, **Professions** and **Market** tabs opens a panel
 with your question (editable) and a preview of the context that will be attached: only what you
 picked on that tab. Two toggles drop the **profile** or the **prices**; the preview updates right
 away and is **frozen** when the panel opens, so editing the question or the selection does not

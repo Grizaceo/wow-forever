@@ -71,7 +71,7 @@ check('pawn: no aparece en Ofertas', await p.locator('[data-testid="pawn-consent
 await p.click('[data-tab="personaje"]')
 await p.locator('#wf-raza').waitFor()
 check('pawn: Personaje no muestra tarjeta ni pesos', await p.locator('[data-testid="pawn-consent"], [data-pawn-fila]').count() === 0)
-await p.getByRole('button', { name: 'Preguntar a DAVI', exact: true }).first().click()
+await p.getByRole('button', { name: 'Preguntar al agente', exact: true }).first().click()
 await p.getByText('Incluir escala Pawn').waitFor()
 check('pawn: DAVI ofrece «Incluir escala Pawn»', await p.getByText('Incluir escala Pawn').count() === 1)
 await p.getByRole('button', { name: 'Cerrar', exact: true }).click()
