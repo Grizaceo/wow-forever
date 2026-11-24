@@ -3,6 +3,15 @@
  *
  * Núcleo puro en ../tsm-valoracion.js. Esta capa SOLO muestra lo que el núcleo
  * devuelve: mediana/cuartiles entre días, recuentos y motivo de insuficiencia.
+ *
+ * Dos niveles de texto:
+ *   · Fuera de los desplegables, el texto es de jugador: nada de códigos
+ *     internos ni de jerga estadística. Los motivos van en palabras y con su
+ *     número cuando el dato existe (días con ventas, días mínimos, edad de la
+ *     última venta).
+ *   · Dentro del desplegable de método queda el detalle técnico: versión del
+ *     método, reglas declaradas y los códigos internos de los motivos.
+ *
  * No estima precios futuros, no calcula beneficio ni demanda, no descuenta
  * comisiones y NO cruza TSM con Auctionator: TSM v1 no acredita identidad
  * económica ni equivalencia entre variantes de distintos formatos.
@@ -31,12 +40,47 @@ export function fechaSeg(seg) {
   return Number.isFinite(seg) && seg > 0 ? new Date(seg * 1000).toISOString().slice(0, 10) : '—'
 }
 
+// Días transcurridos desde un instante en SEGUNDOS epoch. `null` si no hay dato.
+export function diasDesde(seg, ahoraMs) {
+  if (!Number.isFinite(seg) || seg <= 0) return null
+  const base = Number.isFinite(ahoraMs) ? ahoraMs : Date.now()
+  return Math.max(0, Math.floor((base - seg * 1000) / DAY_MS))
+}
+
 export function edadSeg(seg, ahoraMs, lang) {
-  if (!Number.isFinite(seg) || seg <= 0) return cp(lang, 'sin fecha', 'no date')
-  const dias = Math.max(0, Math.floor(((Number.isFinite(ahoraMs) ? ahoraMs : Date.now()) - seg * 1000) / DAY_MS))
+  const dias = diasDesde(seg, ahoraMs)
+  if (dias == null) return cp(lang, 'sin fecha', 'no date')
   return lang === 'en'
     ? `${dias} day${dias === 1 ? '' : 's'} ago`
     : `hace ${dias} día${dias === 1 ? '' : 's'}`
+}
+
+/**
+ * Motivo explicado en palabras de jugador, con el número cuando el dato existe
+ * en la valoración. NUNCA devuelve el código interno: esto se muestra fuera del
+ * desplegable de método, que es donde quedan los códigos.
+ */
+export function motivoVisible(code, v, ahoraMs, lang) {
+  const w = v?.window || {}
+  const cfg = v?.config || {}
+  const en = lang === 'en'
+  if (code === 'insufficient-days') {
+    const dias = Number.isFinite(w.days) ? w.days : null
+    const min = Number.isFinite(cfg.minDays) ? cfg.minDays : null
+    if (dias == null || min == null) return cp(lang, 'faltan días con ventas', 'not enough days with sales')
+    return en ? `sales on ${dias} of the ${min} days needed` : `ventas en ${dias} de los ${min} días necesarios`
+  }
+  if (code === 'stale') {
+    const dias = diasDesde(w.lastSale, ahoraMs)
+    const max = Number.isFinite(cfg.staleDays) ? cfg.staleDays : null
+    if (dias == null || max == null) return cp(lang, 'última venta antigua', 'last sale too old')
+    return en
+      ? `last sale ${dias} day${dias === 1 ? '' : 's'} ago (max ${max})`
+      : `última venta hace ${dias} día${dias === 1 ? '' : 's'} (máximo ${max})`
+  }
+  if (code === 'wide-dispersion') return cp(lang, 'precios muy dispersos', 'prices too spread out')
+  if (code === 'no-sales') return cp(lang, 'sin ventas en subasta', 'no auction sales')
+  return cp(lang, 'pocos datos', 'not enough data')
 }
 
 const detalleStyle = { ...S.sub, fontSize: 11, marginTop: 6 }
@@ -61,22 +105,30 @@ export function ValoracionPersonal({ valoracion: v, lang, ahoraMs, id = 'valorac
         <code style={{ color: C.texto3, fontSize: 11 }}>{v?.itemString}</code>
         {suficiente ? (
           <span style={{ color: C.verde }} data-testid="valoracion-tipico">
-            {cp(lang, 'típico observado', 'observed typical')} <Dinero cobre={w.medianCopper} />
+            {cp(lang, 'Precio típico de tus ventas:', 'Typical price of your sales:')} <Dinero cobre={w.medianCopper} />
           </span>
         ) : (
-          <span data-testid="valoracion-insuficiente" style={{ ...S.chip, color: C.amarillo }}>
-            {cp(lang, 'sin evidencia suficiente', 'insufficient evidence')}
-            {' · '}{razones.map((r) => `${r} (${razonTexto(r, lang)})`).join(', ')}
-          </span>
+          <>
+            <span data-testid="valoracion-insuficiente" style={{ ...S.chip, color: C.amarillo }}>
+              {cp(lang, 'Pocos datos', 'Not enough data')}
+            </span>
+            {razones.length ? (
+              <span data-testid="valoracion-motivos" style={{ color: C.texto2 }}>
+                {' · '}{razones.map((r) => motivoVisible(r, v, ahoraMs, lang)).join(' · ')}
+              </span>
+            ) : null}
+          </>
         )}
         {!suficiente && w.medianCopper != null ? (
-          <span data-testid="valoracion-descriptivo">{cp(lang, 'mediana descriptiva disponible', 'available descriptive median')} <Dinero cobre={w.medianCopper} /></span>
+          <span data-testid="valoracion-descriptivo">
+            {cp(lang, 'Referencia con pocos datos (no es un precio fiable):', 'Reference with little data (not a reliable price):')} <Dinero cobre={w.medianCopper} />
+          </span>
         ) : null}
       </div>
       <div style={{ ...S.sub, display: 'flex', gap: 12, flexWrap: 'wrap' }}>
         <span>{cp(lang, 'unidades', 'units')} <b data-testid="tsm-unidades">{w.units ?? 0}</b></span>
         <span>{cp(lang, 'registros', 'records')} <b>{w.records ?? 0}</b></span>
-        <span>{cp(lang, 'días', 'days')} <b>{w.days ?? 0}</b></span>
+        <span>{cp(lang, 'días con ventas', 'days with sales')} <b>{w.days ?? 0}</b></span>
         <span data-testid="tsm-ultima-venta">
           {cp(lang, 'última venta', 'last sale')} {fechaSeg(w.lastSale)} · {edadSeg(w.lastSale, ahoraMs, lang)}
         </span>
@@ -85,12 +137,12 @@ export function ValoracionPersonal({ valoracion: v, lang, ahoraMs, id = 'valorac
       <details data-testid="valoracion-metodo" style={{ width: '100%' }}>
         <summary style={resumenStyle}>{cp(lang, 'Método y límites', 'Method and limits')}</summary>
         <div style={detalleStyle}>
-          <div>{METODO_TSM} · {cp(lang, 'modo histórico/ventana: solo ventas Auction ya registradas, sin estimar precios futuros', 'history/window mode: recorded Auction sales only, no future price estimate')}</div>
-          <div>{cp(lang, 'Políticas declaradas (no calibradas): ventana', 'Declared, uncalibrated policies: window')} {cfg.windowDays ?? 28} {cp(lang, 'días', 'days')} · {cp(lang, 'mínimo', 'minimum')} {cfg.minDays ?? 5} {cp(lang, 'días distintos', 'distinct days')} · {cp(lang, 'antigüedad máxima', 'max age')} {cfg.staleDays ?? 7} {cp(lang, 'días', 'days')} · {cp(lang, 'dispersión IQR/mediana', 'IQR/median dispersion')} ≤ {String(cfg.dispersionLimit ?? 0.5).replace('.', ',')}</div>
-          <div>{cp(lang, 'Se toma cada mediana diaria ponderada por unidades (primer precio con al menos la mitad de unidades; empate hacia abajo). Después, cada día tiene el mismo peso: mediana convencional entre días, cuartiles Q1/Q3 interpolados tipo 7. No se quitan extremos.', 'Each daily median is unit-weighted (first price reaching half the units; ties down). Then every day has equal weight: conventional median across days, type-7 interpolated Q1/Q3. Extremes are not removed.')}</div>
-          <div>{cp(lang, 'Este resumen describe los días con ventas registradas; no es el precio de mercado ni confianza estadística. Días distintos no garantizan independencia.', 'This summary describes days with recorded sales; it is not the market price or statistical confidence. Different days do not guarantee independence.')}</div>
+          <div>{METODO_TSM} · {cp(lang, 'solo ventas de subasta ya registradas; no estima precios futuros', 'recorded auction sales only; it does not estimate future prices')}</div>
+          <div>{cp(lang, 'Reglas fijas, no calibradas', 'Fixed rules, not calibrated')}: {cp(lang, 'ventana', 'window')} {cfg.windowDays ?? 28} {cp(lang, 'días', 'days')} · {cp(lang, 'mínimo', 'minimum')} {cfg.minDays ?? 5} {cp(lang, 'días con ventas', 'days with sales')} · {cp(lang, 'antigüedad máxima', 'max age')} {cfg.staleDays ?? 7} {cp(lang, 'días', 'days')} · {cp(lang, 'dispersión', 'dispersion')} ≤ {String(cfg.dispersionLimit ?? 0.5).replace('.', lang === 'en' ? '.' : ',')}</div>
+          <div>{cp(lang, 'Cada día se resume con la mediana ponderada por unidades (primer precio que alcanza la mitad de las unidades; empate hacia abajo). Después todos los días tienen el mismo peso y se calculan los cuartiles Q1/Q3 interpolados tipo 7. No se quitan extremos.', 'Each day is summarised with the unit-weighted median (first price reaching half the units; ties down). Then all days have the same weight and the Q1/Q3 quartiles are interpolated type 7. Extremes are not removed.')}</div>
+          <div>{cp(lang, 'Describe solo los días con ventas registradas: no es el precio de mercado. Días distintos no garantizan independencia.', 'It describes only days with recorded sales: it is not the market price. Different days do not guarantee independence.')}</div>
           <div style={{ color: C.amarillo }}>
-            {cp(lang, 'TSM registra importes que pueden ya descontar la comisión en ventas por correo; la versión instalada no está verificada. Nunca se vuelve a descontar aquí, ni se calcula beneficio.', 'TSM recorded amounts may already deduct the mail-sale commission; the installed version is unverified. Nothing is deducted again here, and no profit is computed.')}
+            {cp(lang, 'TSM puede haber descontado ya la comisión en ventas por correo; la versión instalada no está verificada. Aquí no se vuelve a descontar ni se calcula beneficio.', 'TSM may have already deducted the mail-sale commission; the installed version is unverified. Nothing is deducted again here and no profit is computed.')}
           </div>
           {!suficiente && razones.length
             ? <div>{cp(lang, 'Motivos', 'Reasons')}: {razones.map((r) => `${r} (${razonTexto(r, lang)})`).join(' · ')}</div>
@@ -150,7 +202,7 @@ export function ConsultaValoracionTsm({ snapshot, lang, ahoraMs }) {
       </summary>
       <div style={detalleStyle}>
         <div style={{ color: C.amarillo }}>
-          {cp(lang, 'Sin compatibilidad acreditada: TSM v1 no identifica unidades económicas ni variantes equivalentes a Auctionator. Elegir una variante aquí no crea equivalencia con el ítem abierto ni cruza sus cifras.', 'No accredited compatibility: TSM v1 does not identify economic units or variants equivalent to Auctionator. Choosing a variant here creates no equivalence with the open item and does not cross its figures.')}
+          {cp(lang, 'Compatibilidad no verificada: TSM v1 no identifica unidades económicas ni variantes equivalentes a Auctionator. Elegir una variante aquí no crea equivalencia con el ítem abierto ni cruza sus cifras.', 'Unverified compatibility: TSM v1 does not identify economic units or variants equivalent to Auctionator. Choosing a variant here creates no equivalence with the open item and does not cross its figures.')}
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 6 }}>
           <label style={S.campo}>

@@ -43,7 +43,21 @@ const AUCTION = 'AUCTIONATOR_PRICE_DATABASE={__dbversion=8,["Prueba"]={version=2
 const a = await iniciar()
 const { check } = a
 const filas = (p) => p.locator('[data-testid="valoracion-fila"]')
-const texto = (p) => p.evaluate(() => document.body.innerText)
+
+// Texto que el jugador ve SIN desplegar nada: todo lo que no está dentro de un
+// <details>. Sirve para comprobar que ahí no aparece ningún código interno.
+const textoVisible = (loc) => loc.evaluate((el) => {
+  const partes = []
+  for (const n of el.querySelectorAll('*')) {
+    if (n.closest('details')) continue
+    if (n.children.length) continue
+    const t = (n.textContent || '').trim()
+    if (t) partes.push(t)
+  }
+  return partes.join(' ')
+})
+
+const CODIGOS_INTERNOS = /insufficient-days|wide-dispersion|no-sales|\bstale\b/
 
 async function abrirMercado(tema, idioma) {
   const { p, cerrar } = await a.abrir(tema, { perfil: PERFILES.cazadorHorda, idioma })
@@ -81,9 +95,12 @@ for (const tema of ['claro', 'oscuro']) {
       !/\b999c\b|\b9s 99c\b/.test(txt) && !/\b500\b/.test(txt))
     check(`${tema}/${idioma}: sin predicción ni beneficio`,
       !/predicción|prediction|beneficio|profit|demanda|demand/i.test(txt))
-    check(`${tema}/${idioma}: importe registrado sin segundo descuento de comisión`,
+    check(`${tema}/${idioma}: precio típico de tus ventas con el importe exacto, sin segundo descuento de comisión`,
       await primera.locator('[data-testid="valoracion-tipico"]').innerText() ===
-        (en ? 'observed typical 1s 40c' : 'típico observado 1p 40c'))
+        (en ? 'Typical price of your sales: 1s 40c' : 'Precio típico de tus ventas: 1p 40c'))
+    check(`${tema}/${idioma}: con evidencia suficiente no hay chip de pocos datos ni códigos internos`,
+      await primera.locator('[data-testid="valoracion-insuficiente"]').count() === 0 &&
+      !CODIGOS_INTERNOS.test(await textoVisible(primera)))
 
     // Método y fuente nacen cerrados; se abren por teclado.
     const metodo = p.locator('[data-testid="valoracion-metodo"]').first()
@@ -116,6 +133,39 @@ for (const tema of ['claro', 'oscuro']) {
       /se muestran por separado|shown separately/i.test(await panel.innerText()))
     await cerrar()
   }
+}
+
+// ---------------------------------------- pocos días: motivos en palabras, ES y EN
+for (const idioma of ['es', 'en']) {
+  const en = idioma === 'en'
+  const { p, cerrar, panel } = await abrirMercado('claro', idioma)
+  await importar(p, panel)
+  await filas(p).first().waitFor()
+  // Recorte de un día: quedan 4 días con ventas de los 5 que el método exige.
+  await p.evaluate((tsm) => { window.carpetaConcedida.files['TradeSkillMaster.lua'] = tsm }, fixtureTSM({ saltarDia: 26 }))
+  await panel.getByRole('button', { name: /Leer TradeSkillMaster\.lua|Read TradeSkillMaster\.lua/ }).first().click()
+  await p.waitForFunction(() => /Importación TSM guardada|TSM import saved/.test(document.body.innerText))
+  await p.waitForFunction(() => /Pocos datos|Not enough data/.test(document.body.innerText))
+  const fila = filas(p).first()
+  check(`${idioma}: chip de pocos datos en lugar de jerga`,
+    await fila.locator('[data-testid="valoracion-insuficiente"]').innerText() ===
+      (en ? 'Not enough data' : 'Pocos datos'))
+  check(`${idioma}: motivo en palabras con sus números (4 de 5 días)`,
+    (en ? /sales on 4 of the 5 days needed/ : /ventas en 4 de los 5 días necesarios/)
+      .test(await fila.locator('[data-testid="valoracion-motivos"]').innerText()))
+  check(`${idioma}: sin códigos internos fuera del desplegable de método`,
+    !CODIGOS_INTERNOS.test(await textoVisible(fila)))
+  check(`${idioma}: referencia con pocos datos, marcada como no fiable`,
+    await fila.locator('[data-testid="valoracion-descriptivo"]').innerText() ===
+      (en ? 'Reference with little data (not a reliable price): 1s 50c'
+        : 'Referencia con pocos datos (no es un precio fiable): 1p 50c'))
+  // El código interno sigue existiendo, pero solo dentro del desplegable de método.
+  const metodo = fila.locator('[data-testid="valoracion-metodo"]')
+  await metodo.locator('summary').click()
+  check(`${idioma}: el código interno queda solo en el desplegable de método`,
+    /insufficient-days/.test(await metodo.innerText()) &&
+    !CODIGOS_INTERNOS.test(await textoVisible(fila)))
+  await cerrar()
 }
 
 // ---------------------------------------- búsqueda, paginación y ancho estrecho
@@ -157,15 +207,17 @@ for (const tema of ['claro', 'oscuro']) {
   await p.waitForFunction(() => /1p 60c/.test(document.querySelector('[data-testid="valoracion-fila"]').innerText))
   check('corrección de precio recalcula la mediana descriptiva', /1p 60c/.test(await filas(p).first().innerText()))
 
-  // Recorte: cuatro días distintos → evidencia insuficiente con motivo explícito.
+  // Recorte: cuatro días distintos → pocos datos con motivo en palabras.
   await p.evaluate((tsm) => { window.carpetaConcedida.files['TradeSkillMaster.lua'] = tsm }, fixtureTSM({ saltarDia: 26, precioDia: 300, qtyUltimo: 70 }))
   await panel.getByRole('button', { name: 'Leer TradeSkillMaster.lua', exact: true }).click()
-  await p.waitForFunction(() => /sin evidencia suficiente/.test(document.body.innerText))
-  check('recorte a 4 días marca insuficiente y muestra reason',
-    /sin evidencia suficiente/.test(await filas(p).first().innerText()) &&
-    /insufficient-days/.test(await filas(p).first().innerText()))
+  await p.waitForFunction(() => /Pocos datos/.test(document.body.innerText))
+  check('recorte a 4 días marca pocos datos y explica el motivo en palabras',
+    /Pocos datos/.test(await filas(p).first().innerText()) &&
+    /ventas en 4 de los 5 días necesarios/.test(await filas(p).first().innerText()) &&
+    !CODIGOS_INTERNOS.test(await textoVisible(filas(p).first())))
 
-  check('muestra insuficiente conserva mediana descriptiva disponible',
+  check('pocos datos conserva la referencia de precio, marcada como no fiable',
+    /Referencia con pocos datos \(no es un precio fiable\)/.test(await filas(p).first().innerText()) &&
     /1p 70c/.test(await filas(p).first().innerText()))
   const metodo = filas(p).first().locator('[data-testid="valoracion-metodo"]')
   await metodo.locator('summary').click()
@@ -200,7 +252,9 @@ for (const tema of ['claro', 'oscuro']) {
   const despues = await filas(p).first().innerText()
   check('fecha/antigüedad se refrescan sin nueva importación', /hace 9 días/.test(despues))
   check('avance de reloj no reimporta', await p.evaluate((n) => window.lecturas.length === n, lecturasAntes))
-  check('ventana vencida explica reason stale', /stale/.test(despues) && /sin evidencia suficiente/.test(despues))
+  check('ventana vencida explica en palabras que la última venta es vieja, sin código interno',
+    /última venta hace 9 días \(máximo 7\)/.test(despues) &&
+    !CODIGOS_INTERNOS.test(await textoVisible(filas(p).first())))
   await cerrar()
 }
 
@@ -217,10 +271,12 @@ for (const tema of ['claro', 'oscuro']) {
   await detalle.waitFor()
   check('detalle declara que TSM y Auctionator van por separado',
     /se muestran por separado/i.test(await detalle.innerText()))
-  check('detalle muestra fecha/antigüedad y oferta máxima diaria, no stock',
-    /2027-01-12|12\/01\/2027/.test(await texto(p)) && /oferta máxima diaria/i.test(await texto(p)) &&
-    /\b30\b/.test(await texto(p)))
-  check('detalle anuncia que son anuncios, no ventas', /anuncios, no ventas/.test(await texto(p)))
+  const anuncios = p.locator('[data-testid="detalle-anuncios"]')
+  check('detalle muestra el último día visto, el máximo anunciado y que no es stock',
+    /2027-01-12|12\/01\/2027/.test(await anuncios.innerText()) &&
+    /Máximo anunciado ese día: 30 unidades/.test(await anuncios.innerText()))
+  check('detalle anuncia que son anuncios, no ventas ni existencias actuales',
+    /anuncios, no ventas ni existencias actuales/.test(await anuncios.innerText()))
   const consulta = p.locator('[data-testid="detalle-tsm-consulta"]')
   check('consulta TSM separada cerrada por defecto', (await consulta.getAttribute('open')) === null)
   const antesDetalle = await detalle.innerText()

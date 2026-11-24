@@ -7,10 +7,10 @@ import { S } from '../../estilos.js'
 import { D, nombre } from '../../datos.js'
 import { t } from '../../i18n.js'
 import { Dinero, Hueco, Origen, Tarjeta } from '../../ui.jsx'
-import { HunterHistory, Farm, fuentesItem, fuentesDropData, nombreItem, fmtDia } from '../../mercado-logica.js'
+import { HunterHistory, Farm, fuentesItem, fuentesDropData, nombreItem, fmtDia, fechaDe, EPOCH } from '../../mercado-logica.js'
 import { GraficoPrecios } from './grafico.jsx'
 import { RutaFarmeo } from './ruta-farmeo.jsx'
-import { ConsultaValoracionTsm, edadSeg, fechaSeg } from './valoracion-personal.jsx'
+import { ConsultaValoracionTsm, edadSeg } from './valoracion-personal.jsx'
 
 const TENDENCIA = { sube: 'mercado.tend.sube', baja: 'mercado.tend.baja', estable: 'mercado.tend.estable', 'sin-datos': 'mercado.tend.pocos' }
 const KIND_DROP = { mob: '', skin: 'Piel: ', pick: 'Pillosidad: ', object: 'Objeto: ' }
@@ -33,6 +33,12 @@ export function DetalleItem({ item, lang, catalogo, metrica, deal, onCerrar, tsm
     ? [...metrica.sources].sort((a, b) => Number(b.eligible) - Number(a.eligible) || (b.gph || 0) - (a.gph || 0)).slice(0, 10)
     : []), [metrica])
   const historial = useMemo(() => (item?.history || []).slice().sort((a, b) => b.day - a.day), [item])
+  // El historial de Auctionator usa días del EPOCH de la app (2020-01-01), no
+  // días unix: se fecha con los mismos helpers que la tabla diaria de abajo.
+  const diaObs = historial[0]?.day
+  const diaObsFecha = Number.isSafeInteger(diaObs) ? fechaDe(diaObs) : null
+  const diaObsSeg = Number.isSafeInteger(diaObs) ? EPOCH / 1000 + diaObs * 86400 : null
+  const ofertaMax = historial[0]?.available ?? null
   if (!item) return null
   const nombreVisible = nombreItem(item, D.items, catalogo, lang) || item.sourceKey
   const esVariante = item.itemId == null
@@ -52,10 +58,13 @@ export function DetalleItem({ item, lang, catalogo, metrica, deal, onCerrar, tsm
       </p>
 
       <p style={S.sub} data-testid="detalle-anuncios">
-        {lang === 'en' ? 'Date' : 'Fecha'} {fechaSeg(historial[0]?.day != null ? historial[0].day * 86400 : null)}
-        {' · '}{edadSeg(historial[0]?.day != null ? historial[0].day * 86400 : null, ahoraMs, lang)}
-        {' · '}{lang === 'en' ? 'daily maximum offer' : 'oferta máxima diaria'} {historial[0]?.available ?? '—'}
-        {' — '}{lang === 'en' ? 'listings, not sales; not current stock' : 'anuncios, no ventas; no es stock actual'}.
+        {diaObsFecha == null
+          ? (lang === 'en' ? 'Last day seen by Auctionator: no data' : 'Último día visto por Auctionator: sin datos')
+          : `${lang === 'en' ? 'Last day seen by Auctionator' : 'Último día visto por Auctionator'}: ${diaObsFecha} · ${edadSeg(diaObsSeg, ahoraMs, lang)}`}
+        {'. '}{lang === 'en' ? 'Highest listed that day' : 'Máximo anunciado ese día'}: {ofertaMax == null
+          ? (lang === 'en' ? 'no data' : 'sin datos')
+          : `${ofertaMax} ${lang === 'en' ? 'units' : 'unidades'}`}
+        {lang === 'en' ? '. Listings, not sales or current stock.' : '. Son anuncios, no ventas ni existencias actuales.'}
       </p>
 
       {stats?.diasMuestra > 0 && (
