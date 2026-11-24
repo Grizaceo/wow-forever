@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Button, Checkbox } from '@hermes/plugin-sdk'
 import { item, nombre } from '../../datos.js'
 import { C, S } from '../../estilos.js'
-import { Tarjeta } from '../../ui.jsx'
+import { Dinero, NombreItem, Tarjeta } from '../../ui.jsx'
 import { resumenTsm } from '../../tsm.js'
 import { listarValoracionesTsm } from '../../tsm-valoracion.js'
 import { ValoracionPersonal } from './valoracion-personal.jsx'
@@ -14,6 +14,25 @@ import { ValoracionPersonal } from './valoracion-personal.jsx'
  * canceladas) queda plegada y etiquetada como "todos los canales", fuera de la
  * referencia de precio de cada fila.
  */
+function Contabilidad({ c, tr }) {
+  return <details data-testid="tsm-contabilidad" style={{ marginTop: 4 }}>
+    <summary style={{ ...S.sub, cursor: 'pointer', fontSize: 11 }}>
+      {tr('Contabilidad previa · todos los canales · expiradas ', 'Earlier accounting · all channels · expired ')}<b>{c.expired}</b>
+      {` · ${tr('compradas', 'bought')} ${c.bought} · ${tr('canceladas', 'cancelled')} ${c.cancelled}`}
+    </summary>
+    <div style={{ ...S.sub, marginTop: 4 }}>
+      {tr('Vendidas', 'Sold')} {c.sold} · {tr('Ingresos registrados', 'Recorded revenue')} <Dinero cobre={Math.round(c.saleCopper)} />
+      {c.avgSale === null ? null : <> · {tr('media/u', 'avg/unit')} <Dinero cobre={Math.round(c.avgSale)} /></>}
+      {` · ${tr('compras', 'purchases')} `}<Dinero cobre={Math.round(c.buyCopper)} />
+      {c.avgBuy === null ? null : <> · {tr('media compra/u', 'avg buy/unit')} <Dinero cobre={Math.round(c.avgBuy)} /></>}
+      {` · ${tr('fuentes', 'sources')} ${c.sources.join(', ')}`}
+      <div style={{ color: C.texto3, marginTop: 2 }}>
+        {tr('Estos importes no entran en la referencia de precio de arriba: son contabilidad de todos los canales, no ventas de la variante en Auctionator.', 'These amounts do not feed the price reference above: they are all-channel accounting, not Auctionator-variant sales.')}
+      </div>
+    </div>
+  </details>
+}
+
 export function MisVentas({ ventas, auctionSnapshot, perfil, lang }) {
   const [state, setState] = useState(() => ventas?.getState() || { status: 'unavailable', enabled: false, snapshot: null })
   const [busy, setBusy] = useState(false), [confirm, setConfirm] = useState(false)
@@ -30,16 +49,24 @@ export function MisVentas({ ventas, auctionSnapshot, perfil, lang }) {
   const snap = state.snapshot
   const realms = snap?.realms || []
   const realm = realms.some(r => r.name === selected) ? selected : realms.some(r => r.name === perfil?.reino) ? perfil.reino : realms[0]?.name || ''
-  const valoraciones = useMemo(() => listarValoracionesTsm(snap, realm, { nowMs }), [snap, realm, nowMs])
+  const valoraciones = useMemo(() => realm ? listarValoracionesTsm(snap, realm, { nowMs }) : [], [snap, realm, nowMs])
+  const resumen = useMemo(() => resumenTsm(snap, realm), [snap, realm])
   const contabilidad = useMemo(() => {
     const map = new Map()
-    for (const r of resumenTsm(snap, realm)) map.set(r.itemString, r)
+    for (const r of resumen) map.set(r.itemString, r)
     return map
-  }, [snap, realm])
-  const filtered = useMemo(() => valoraciones.filter(v => {
-    const n = nombre(item(v.itemId)?.n, lang) || ''
-    return `${n} ${v.itemString}`.toLocaleLowerCase().includes(search.trim().toLocaleLowerCase())
-  }), [valoraciones, search, lang])
+  }, [resumen])
+  const filas = useMemo(() => {
+    const conValoracion = new Set(valoraciones.map(v => v.itemString))
+    return [
+      ...valoraciones.map(v => ({ itemId: v.itemId, itemString: v.itemString, valoracion: v })),
+      ...resumen.filter(c => !conValoracion.has(c.itemString)).map(c => ({ itemId: c.itemId, itemString: c.itemString, contabilidad: c })),
+    ]
+  }, [valoraciones, resumen])
+  const filtered = useMemo(() => filas.filter(f => {
+    const n = nombre(item(f.itemId)?.n, lang) || ''
+    return `${n} ${f.itemString}`.toLocaleLowerCase().includes(search.trim().toLocaleLowerCase())
+  }), [filas, search, lang])
   useEffect(() => setPage(0), [search, realm, snap])
   const safePage = Math.min(page, Math.max(0, Math.ceil(filtered.length / 25) - 1))
   const range = useMemo(() => {
@@ -91,29 +118,22 @@ export function MisVentas({ ventas, auctionSnapshot, perfil, lang }) {
           {tr('TSM y Auctionator se muestran por separado: aquí ves solo tus ventas registradas por TSM, sin mezclarlas con los precios anunciados en Auctionator.', 'TSM and Auctionator are shown separately: here you see only your sales recorded by TSM, not mixed with Auctionator listing prices.')}
         </p>
         <div data-testid="tsm-lista" style={{ overflowX: 'auto', display: 'grid', gap: 8 }}>
-          {filtered.slice(safePage * 25, (safePage + 1) * 25).map(v => {
-            const c = contabilidad.get(v.itemString)
-            return <div key={v.itemString} style={{ ...S.tarjeta, gap: 4 }}>
-              <ValoracionPersonal valoracion={v} lang={lang} ahoraMs={nowMs} />
-              {c ? <details data-testid="tsm-contabilidad" style={{ marginTop: 4 }}>
-                <summary style={{ ...S.sub, cursor: 'pointer', fontSize: 11 }}>
-                  {tr('Contabilidad previa · todos los canales · expiradas ', 'Earlier accounting · all channels · expired ')}<b>{c.expired}</b>
-                  {` · ${tr('compradas', 'bought')} ${c.bought} · ${tr('canceladas', 'cancelled')} ${c.cancelled}`}
-                </summary>
-                <div style={{ ...S.sub, marginTop: 4 }}>
-                  {tr('Vendidas', 'Sold')} {c.sold} · {tr('Ingresos registrados', 'Recorded revenue')} <span style={{ color: C.texto }}>{Math.round(c.saleCopper)}c</span>
-                  {c.avgSale === null ? null : ` · ${tr('media/u', 'avg/unit')} ${Math.round(c.avgSale)}c`}
-                  {` · ${tr('compras', 'purchases')} ${c.buyCopper}c`}
-                  {c.avgBuy === null ? null : ` · ${tr('media compra/u', 'avg buy/unit')} ${Math.round(c.avgBuy)}c`}
-                  {` · ${tr('fuentes', 'sources')} ${c.sources.join(', ')}`}
-                  <div style={{ color: C.texto3, marginTop: 2 }}>
-                    {tr('Estos importes no entran en la referencia de precio de arriba: son contabilidad de todos los canales, no ventas de la variante en Auctionator.', 'These amounts do not feed the price reference above: they are all-channel accounting, not Auctionator-variant sales.')}
-                  </div>
-                </div>
-              </details> : null}
+          {filtered.slice(safePage * 25, (safePage + 1) * 25).map(f => f.valoracion ? (
+            <div key={f.itemString} style={{ ...S.tarjeta, gap: 4 }}>
+              <ValoracionPersonal valoracion={f.valoracion} lang={lang} ahoraMs={nowMs} />
+              {contabilidad.get(f.itemString) ? <Contabilidad c={contabilidad.get(f.itemString)} tr={tr} /> : null}
             </div>
-          })}
-          {!filtered.length && <p style={S.sub}>{tr('Sin valoraciones para esta selección.', 'No valuations for this selection.')}</p>}
+          ) : (
+            <div key={f.itemString} data-testid="tsm-solo-contabilidad" style={{ ...S.tarjeta, gap: 4 }}>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', minWidth: 0 }}>
+                <NombreItem id={f.itemId} lang={lang} />
+                <code style={{ color: C.texto3, fontSize: 11 }}>{f.itemString}</code>
+              </div>
+              <div style={S.sub}>{tr('Sin ventas de subasta registradas: sin valoración.', 'No recorded auction sales: no valuation.')}</div>
+              <Contabilidad c={f.contabilidad} tr={tr} />
+            </div>
+          ))}
+          {!filtered.length && <p style={S.sub}>{tr('Sin operaciones para esta selección.', 'No transactions for this selection.')}</p>}
         </div>
         {filtered.length > 25 && <div style={{ display: 'flex', gap: 8 }}><Button variant="outline" disabled={safePage === 0} onClick={() => setPage(safePage - 1)}>{tr('Anterior', 'Previous')}</Button><span>{safePage + 1} / {Math.ceil(filtered.length / 25)}</span><Button variant="outline" disabled={(safePage + 1) * 25 >= filtered.length} onClick={() => setPage(safePage + 1)}>{tr('Siguiente', 'Next')}</Button></div>}
       </>}

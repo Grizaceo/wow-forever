@@ -2,7 +2,7 @@
 import { iniciar, exportarEstado, PERFILES, PREF } from './arnes.mjs'
 const tx='itemString,stackSize,quantity,price,otherPlayer,player,time,source'
 const ex='itemString,stackSize,quantity,player,time'
-const fix=(qty=40)=>`TradeSkillMasterDB={ ["r@Prueba@internalData@csvSales"]=${JSON.stringify(tx+'\ni:2589,20,'+qty+',120,PRIVATE_BUYER,PRIVATE_PLAYER,1794800000,Auction')},["r@Prueba@internalData@csvBuys"]=${JSON.stringify(tx+'\ni:2589,10,10,80,PRIVATE_SELLER,PRIVATE_PLAYER,1794700000,Auction')},["r@Prueba@internalData@csvExpired"]=${JSON.stringify(ex+'\ni:2589,20,60,PRIVATE_PLAYER,1794900000')} }`
+const fix=(qty=40)=>`TradeSkillMasterDB={ ["r@Prueba@internalData@csvSales"]=${JSON.stringify(tx+'\ni:2589,20,'+qty+',120,PRIVATE_BUYER,PRIVATE_PLAYER,1794800000,Auction')},["r@Prueba@internalData@csvBuys"]=${JSON.stringify(tx+'\ni:2589,10,10,80,PRIVATE_SELLER,PRIVATE_PLAYER,1794700000,Auction'+'\ni:2592,10,5,55,PRIVATE_SELLER,PRIVATE_PLAYER,1794600000,Auction')},["r@Prueba@internalData@csvExpired"]=${JSON.stringify(ex+'\ni:2589,20,60,PRIVATE_PLAYER,1794900000'+'\ni:2592,10,7,PRIVATE_PLAYER,1794800000')} }`
 const auction='AUCTIONATOR_PRICE_DATABASE={__dbversion=8,["Prueba"]={version=2,["2589"]={m=140,h={["2500"]=140},a={["2500"]=5}}}}'
 const a=await iniciar(); const {check}=a
 let saved
@@ -21,6 +21,21 @@ for(const theme of ['claro','oscuro']){
   await p.waitForFunction(()=>/Importación guardada/.test(document.body.innerText))
   check(theme+': TSM y Auctionator se muestran por separado',/se muestran por separado/i.test(await panel.innerText()))
   check(theme+': Auctionator no cruza cifras en la fila TSM',!/1p 40c/.test(await panel.innerText()))
+  const listaTsm=panel.locator('[data-testid="tsm-lista"]')
+  const fila2592=listaTsm.locator('[data-testid="tsm-solo-contabilidad"]').filter({hasText:'i:2592'})
+  check(theme+': objeto sin ventas Auction sigue en la lista',await fila2592.count()===1)
+  const cont2592=await fila2592.locator('[data-testid="tsm-contabilidad"]').textContent()
+  check(theme+': compra de i:2592 formateada por Dinero',/2p 75c/.test(cont2592||''))
+  const cont2589=await p.evaluate(()=>{
+    const fila=[...document.querySelectorAll('[data-testid="valoracion-fila"]')].find(e=>e.textContent.includes('i:2589'))
+    return fila?.parentElement?.querySelector('[data-testid="tsm-contabilidad"]')?.textContent||''
+  })
+  check(theme+': contabilidad de i:2589 sin cobre en bruto',!/4800c/.test(cont2589)&&/48p/.test(cont2589))
+  check(theme+': contador cuenta la lista combinada',/2 objetos · ventana de 28 días/.test(await panel.innerText()))
+  await panel.locator('input[aria-label="Buscar valoraciones"]').fill('2592')
+  await panel.getByText('1 objetos · ventana de 28 días').waitFor()
+  check(theme+': búsqueda por 2592 deja solo ese objeto',await listaTsm.locator('[data-testid="valoracion-fila"]').count()===0&&await fila2592.count()===1)
+  await panel.locator('input[aria-label="Buscar valoraciones"]').fill('')
   await p.setViewportSize({ width: 1440, height: 900 })
   const auctionPanel = p.locator('[data-testid="auctionator-panel"]')
   let left = await auctionPanel.boundingBox(), right = await panel.boundingBox()
