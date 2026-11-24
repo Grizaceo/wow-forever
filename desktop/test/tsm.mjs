@@ -19,7 +19,7 @@ for(const theme of ['claro','oscuro']){
   check(theme+': privacidad sin compradores ni personajes',! /PRIVATE/.test(await panel.innerText()))
   await p.getByRole('button',{name:'Leer Auctionator.lua',exact:true}).click()
   await p.waitForFunction(()=>/Importación guardada/.test(document.body.innerText))
-  check(theme+': sin compatibilidad acreditada con Auctionator',/sin compatibilidad acreditada/i.test(await panel.innerText()))
+  check(theme+': TSM y Auctionator se muestran por separado',/se muestran por separado/i.test(await panel.innerText()))
   check(theme+': Auctionator no cruza cifras en la fila TSM',!/1p 40c/.test(await panel.innerText()))
   await p.setViewportSize({ width: 1440, height: 900 })
   const auctionPanel = p.locator('[data-testid="auctionator-panel"]')

@@ -112,8 +112,8 @@ for (const tema of ['claro', 'oscuro']) {
     await p.keyboard.press('Enter')
     check(`${tema}/${idioma}: compras/expiradas/canceladas bajo todos los canales`,
       /todos los canales|all channels/.test(await contab.innerText()) && /60/.test(await contab.innerText()))
-    check(`${tema}/${idioma}: sin compatibilidad acreditada con Auctionator`,
-      /sin compatibilidad acreditada|no accredited compatibility/i.test(await panel.innerText()))
+    check(`${tema}/${idioma}: TSM y Auctionator se muestran por separado`,
+      /se muestran por separado|shown separately/i.test(await panel.innerText()))
     await cerrar()
   }
 }
@@ -215,8 +215,8 @@ for (const tema of ['claro', 'oscuro']) {
   await p.getByText('Último mínimo anunciado').first().waitFor()
   const detalle = p.locator('[data-testid="detalle-tsm"]')
   await detalle.waitFor()
-  check('detalle declara sin compatibilidad acreditada',
-    /sin compatibilidad acreditada/i.test(await detalle.innerText()))
+  check('detalle declara que TSM y Auctionator van por separado',
+    /se muestran por separado/i.test(await detalle.innerText()))
   check('detalle muestra fecha/antigüedad y oferta máxima diaria, no stock',
     /2027-01-12|12\/01\/2027/.test(await texto(p)) && /oferta máxima diaria/i.test(await texto(p)) &&
     /\b30\b/.test(await texto(p)))

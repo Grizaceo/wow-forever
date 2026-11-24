@@ -88,7 +88,7 @@ export function MisVentas({ ventas, auctionSnapshot, perfil, lang }) {
           {`${filtered.length} ${tr('objetos · ventana de 28 días', 'items · 28-day window')}`}
         </div>
         <p data-testid="tsm-incompatibilidad" style={{ ...S.aviso, borderColor: C.azul, margin: 0 }}>
-          {tr('Sin compatibilidad acreditada: TSM v1 no identifica unidades económicas ni variantes equivalentes a Auctionator. Cada fila describe solo su propia fuente y no se cruzan sus cifras con anuncios ajenos.', 'No accredited compatibility: TSM v1 does not identify economic units or variants equivalent to Auctionator. Each row describes only its own source; its figures are never crossed with outside listings.')}
+          {tr('TSM y Auctionator se muestran por separado: aquí ves solo tus ventas registradas por TSM, sin mezclarlas con los precios anunciados en Auctionator.', 'TSM and Auctionator are shown separately: here you see only your sales recorded by TSM, not mixed with Auctionator listing prices.')}
         </p>
         <div data-testid="tsm-lista" style={{ overflowX: 'auto', display: 'grid', gap: 8 }}>
           {filtered.slice(safePage * 25, (safePage + 1) * 25).map(v => {

@@ -183,8 +183,8 @@ export function DetalleItem({ item, lang, catalogo, metrica, deal, onCerrar, tsm
         </h4>
         <p style={S.sub}>
           {lang === 'en'
-            ? 'No accredited compatibility: TSM v1 does not certify economic identity or equivalent variants. This Auctionator item is not linked by realm name or base ID, and TSM figures are not crossed into its row. The daily maximum offer above is listings, not sales.'
-            : 'Sin compatibilidad acreditada: TSM v1 no certifica identidad económica ni variantes equivalentes. Este ítem de Auctionator no se asocia por nombre de reino ni ID base, y sus cifras TSM no se cruzan en su fila. La oferta máxima diaria de arriba son anuncios, no ventas.'}
+            ? 'TSM and Auctionator are shown separately: this Auctionator item is not linked to your TSM sales, and their figures are not mixed. The daily maximum offer above counts listings, not sales.'
+            : 'TSM y Auctionator se muestran por separado: este objeto de Auctionator no se enlaza con tus ventas TSM ni se mezclan sus cifras. La oferta máxima diaria de arriba son anuncios, no ventas.'}
         </p>
         <ConsultaValoracionTsm snapshot={tsmSnapshot} lang={lang} ahoraMs={ahoraMs} />
       </div>
