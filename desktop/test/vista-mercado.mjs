@@ -194,4 +194,33 @@ const parcial=await exportar(p)
 const hp=parcial.storage['market-v2-pointer']
 check('histórico intacto en disco', JSON.stringify(hp)===JSON.stringify(previo.storage['market-v2-pointer']) && parcial.archivos[`market-v2-${hp.slot}.json`]===previo.archivos[`market-v2-${hp.slot}.json`])
 await cerrar()
+
+// ---------- Detalle con análisis de oferta: JSX real, no texto literal ----------
+// i:2589 tiene 3 días de mínimos diarios (200/220/240 → mediana 220, mínimo 200)
+// y precio actual 120: oferta ≥20% bajo la mediana. i:7777 tiene un día futuro,
+// calculado desde el reloj real (la suite no fija la hora): hoy + 30 días del EPOCH 2020-01-01.
+const DIA_FUTURO = Math.floor((Date.now() - Date.UTC(2020, 0, 1)) / 86400000) + 30
+const FIXTURE_DEAL = 'AUCTIONATOR_PRICE_DATABASE={__dbversion=8,["Prueba"]={version=2,' +
+  '["2589"]={m=120,h={["2140"]=200,["2141"]=220,["2142"]=240},l={["2140"]=200,["2141"]=220,["2142"]=240},a={["2142"]=30}},' +
+  `["7777"]={m=50000,h={["${DIA_FUTURO}"]=60000},a={["${DIA_FUTURO}"]=3}}}}`
+;({ p, cerrar } = await a.abrir('claro', { perfil: PERFILES.cazadorHorda }))
+await p.click('[data-tab="mercado"]')
+await p.getByText('Todavía no importaste precios').first().waitFor()
+await p.evaluate((fix) => { window.carpetaConcedida = { name: 'SavedVariables', files: { 'Auctionator.lua': fix } } }, FIXTURE_DEAL)
+await p.getByRole('button', { name: 'Leer Auctionator.lua' }).first().click()
+await esperar(p, /Importación guardada/)
+await p.getByRole('button', { name: 'Paño de lino' }).first().click()
+await p.getByText('Último mínimo anunciado').first().waitFor()
+const analisis = p.locator('p').filter({ hasText: 'Análisis de oferta' }).first()
+await analisis.waitFor()
+const analisisTxt = await analisis.innerText()
+check('análisis de oferta muestra mediana y mínimo formateados, sin JSX literal',
+  /2p 20c/.test(analisisTxt) && /mínimo 2p\b/.test(analisisTxt) && !/Dinero|cobre=/.test(analisisTxt), analisisTxt)
+await p.getByRole('button', { name: 'Cerrar' }).first().click()
+await p.getByRole('button', { name: '#7777' }).first().click()
+await p.getByText('Último mínimo anunciado').first().waitFor()
+const anunciosFuturo = await p.locator('[data-testid="detalle-anuncios"]').innerText()
+check('día observado futuro se anuncia como fecha futura, no hace 0 días',
+  /fecha futura/.test(anunciosFuturo) && !/hace 0 días/.test(anunciosFuturo), anunciosFuturo)
+await cerrar()
 await a.terminar('mercado')

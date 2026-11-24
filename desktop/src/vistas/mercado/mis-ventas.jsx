@@ -14,7 +14,7 @@ import { ValoracionPersonal } from './valoracion-personal.jsx'
  * canceladas) queda plegada y etiquetada como "todos los canales", fuera de la
  * referencia de precio de cada fila.
  */
-function Contabilidad({ c, tr }) {
+function Contabilidad({ c, tr, conValoracion }) {
   return <details data-testid="tsm-contabilidad" style={{ marginTop: 4 }}>
     <summary style={{ ...S.sub, cursor: 'pointer', fontSize: 11 }}>
       {tr('Contabilidad previa · todos los canales · expiradas ', 'Earlier accounting · all channels · expired ')}<b>{c.expired}</b>
@@ -27,7 +27,9 @@ function Contabilidad({ c, tr }) {
       {c.avgBuy === null ? null : <> · {tr('media compra/u', 'avg buy/unit')} <Dinero cobre={Math.round(c.avgBuy)} /></>}
       {` · ${tr('fuentes', 'sources')} ${c.sources.join(', ')}`}
       <div style={{ color: C.texto3, marginTop: 2 }}>
-        {tr('Estos importes no entran en la referencia de precio de arriba: son contabilidad de todos los canales, no ventas de la variante en Auctionator.', 'These amounts do not feed the price reference above: they are all-channel accounting, not Auctionator-variant sales.')}
+        {conValoracion
+          ? tr('Estos importes no entran en la referencia de precio de arriba: son contabilidad de todos los canales, no ventas de la variante en Auctionator.', 'These amounts do not feed the price reference above: they are all-channel accounting, not Auctionator-variant sales.')
+          : tr('Estos importes no generan una referencia de precio: son contabilidad de todos los canales.', 'These amounts do not produce a price reference: they are all-channel accounting.')}
       </div>
     </div>
   </details>
@@ -112,7 +114,7 @@ export function MisVentas({ ventas, auctionSnapshot, perfil, lang }) {
           <label>{tr('Buscar valoraciones', 'Search valuations')} <input type="text" aria-label={tr('Buscar valoraciones', 'Search valuations')} value={search} onChange={e => setSearch(e.target.value)} /></label>
         </div>
         <div style={S.sub}>
-          {`${filtered.length} ${tr('objetos · ventana de 28 días', 'items · 28-day window')}`}
+          {`${filtered.length} ${filtered.length === 1 ? tr('objeto', 'item') : tr('objetos', 'items')} · ${tr('referencia de precio: últimos 28 días', 'price reference: last 28 days')}`}
         </div>
         <p data-testid="tsm-incompatibilidad" style={{ ...S.aviso, borderColor: C.azul, margin: 0 }}>
           {tr('TSM y Auctionator se muestran por separado: aquí ves solo tus ventas registradas por TSM, sin mezclarlas con los precios anunciados en Auctionator.', 'TSM and Auctionator are shown separately: here you see only your sales recorded by TSM, not mixed with Auctionator listing prices.')}
@@ -121,7 +123,7 @@ export function MisVentas({ ventas, auctionSnapshot, perfil, lang }) {
           {filtered.slice(safePage * 25, (safePage + 1) * 25).map(f => f.valoracion ? (
             <div key={f.itemString} style={{ ...S.tarjeta, gap: 4 }}>
               <ValoracionPersonal valoracion={f.valoracion} lang={lang} ahoraMs={nowMs} />
-              {contabilidad.get(f.itemString) ? <Contabilidad c={contabilidad.get(f.itemString)} tr={tr} /> : null}
+              {contabilidad.get(f.itemString) ? <Contabilidad c={contabilidad.get(f.itemString)} tr={tr} conValoracion /> : null}
             </div>
           ) : (
             <div key={f.itemString} data-testid="tsm-solo-contabilidad" style={{ ...S.tarjeta, gap: 4 }}>
@@ -130,7 +132,7 @@ export function MisVentas({ ventas, auctionSnapshot, perfil, lang }) {
                 <code style={{ color: C.texto3, fontSize: 11 }}>{f.itemString}</code>
               </div>
               <div style={S.sub}>{tr('Sin ventas de subasta registradas: sin valoración.', 'No recorded auction sales: no valuation.')}</div>
-              <Contabilidad c={f.contabilidad} tr={tr} />
+              <Contabilidad c={f.contabilidad} tr={tr} conValoracion={false} />
             </div>
           ))}
           {!filtered.length && <p style={S.sub}>{tr('Sin operaciones para esta selección.', 'No transactions for this selection.')}</p>}

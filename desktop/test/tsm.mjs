@@ -26,14 +26,16 @@ for(const theme of ['claro','oscuro']){
   check(theme+': objeto sin ventas Auction sigue en la lista',await fila2592.count()===1)
   const cont2592=await fila2592.locator('[data-testid="tsm-contabilidad"]').textContent()
   check(theme+': compra de i:2592 formateada por Dinero',/2p 75c/.test(cont2592||''))
+  check(theme+': contabilidad sin valoración no remite a la referencia de arriba',/no generan una referencia de precio: son contabilidad de todos los canales/.test(cont2592||'') && !/de arriba/.test(cont2592||''))
   const cont2589=await p.evaluate(()=>{
     const fila=[...document.querySelectorAll('[data-testid="valoracion-fila"]')].find(e=>e.textContent.includes('i:2589'))
     return fila?.parentElement?.querySelector('[data-testid="tsm-contabilidad"]')?.textContent||''
   })
   check(theme+': contabilidad de i:2589 sin cobre en bruto',!/4800c/.test(cont2589)&&/48p/.test(cont2589))
-  check(theme+': contador cuenta la lista combinada',/2 objetos · ventana de 28 días/.test(await panel.innerText()))
+  check(theme+': contabilidad con valoración sigue remitiendo a la referencia de arriba',/referencia de precio de arriba/.test(cont2589) && !/no generan una referencia/.test(cont2589))
+  check(theme+': contador cuenta la lista combinada',/2 objetos · referencia de precio: últimos 28 días/.test(await panel.innerText()))
   await panel.locator('input[aria-label="Buscar valoraciones"]').fill('2592')
-  await panel.getByText('1 objetos · ventana de 28 días').waitFor()
+  await panel.getByText('1 objeto · referencia de precio: últimos 28 días').waitFor()
   check(theme+': búsqueda por 2592 deja solo ese objeto',await listaTsm.locator('[data-testid="valoracion-fila"]').count()===0&&await fila2592.count()===1)
   await panel.locator('input[aria-label="Buscar valoraciones"]').fill('')
   await p.setViewportSize({ width: 1440, height: 900 })

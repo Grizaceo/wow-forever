@@ -33,7 +33,7 @@ function fixtureTSM({ saltarDia = null, precioDia = null, qtyUltimo = 50 } = {})
     `["r@Prueba@internalData@csvBuys"]=${csv(TX, [venta('i:2589', 10, 80, NOW_S - 4 * DAY, 'Auction')])},` +
     `["r@Prueba@internalData@csvExpired"]=${csv(EX, [`i:2589,20,60,PRIVATE_PLAYER,${NOW_S - 4 * DAY}`])},` +
     `["r@Prueba@internalData@csvCancelled"]=${csv(EX, [`i:2589,20,7,PRIVATE_PLAYER,${NOW_S - 4 * DAY}`])},` +
-    `["r@Otro@internalData@csvSales"]=${csv(TX, [venta('i:2589', 99, 777, NOW_S - 2 * DAY)])}}`
+    `["r@Otro@internalData@csvSales"]=${csv(TX, [venta('i:2589', 99, 777, NOW_S - 2 * DAY), venta('i:7777', 5, 640, NOW_S - 60 * DAY)])}}`
 }
 
 const AUCTION = 'AUCTIONATOR_PRICE_DATABASE={__dbversion=8,["Prueba"]={version=2,' +
@@ -316,6 +316,26 @@ for (const idioma of ['es', 'en']) {
     await p.locator('[data-testid="detalle-tsm-valoracion"]').count() === 0 &&
     await p.locator('[data-testid="detalle-tsm-reino"]').inputValue() === '' &&
     await p.locator('[data-testid="detalle-tsm-item"]').inputValue() === '')
+  await cerrar()
+}
+
+// ---------------------------------------- venta fuera de ventana: última venta del histórico
+for (const idioma of ['es', 'en']) {
+  const en = idioma === 'en'
+  const { p, cerrar, panel } = await abrirMercado('claro', idioma)
+  await importar(p, panel)
+  await filas(p).first().waitFor()
+  const selectorReino = panel.locator('select').first()
+  await selectorReino.locator('option', { hasText: 'Otro' }).waitFor({ state: 'attached' })
+  await selectorReino.selectOption('Otro')
+  const fila7777 = filas(p).filter({ hasText: 'i:7777' })
+  await fila7777.waitFor()
+  const uv = await fila7777.locator('[data-testid="tsm-ultima-venta"]').innerText()
+  check(`${idioma}: venta de hace 60 días fuera de ventana muestra la fecha del histórico`,
+    uv.includes('2026-11-16') && (en ? /60 days ago/.test(uv) : /hace 60 días/.test(uv)) && !/sin fecha|no date/.test(uv), uv)
+  check(`${idioma}: motivo no-sales explica ventas válidas en los últimos 28 días`,
+    (en ? /no valid auction sales in the last 28 days/ : /sin ventas de subasta válidas en los últimos 28 días/)
+      .test(await fila7777.locator('[data-testid="valoracion-motivos"]').innerText()))
   await cerrar()
 }
 

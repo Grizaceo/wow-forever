@@ -80,8 +80,8 @@ export function DetalleItem({ item, lang, catalogo, metrica, deal, onCerrar, tsm
       {verdict && (
         <p style={S.sub}>
           {t(lang, 'mercado.det.analisis')}: <b>{verdict}</b>
-          {deal?.medianaLow != null ? ` — ${t(lang, 'mercado.det.mediana')} <Dinero cobre={deal.medianaLow} />` : ''}
-          {deal?.minLow != null ? ` · ${t(lang, 'mercado.det.minimo')} <Dinero cobre={deal.minLow} />` : ''}
+          {deal?.medianaLow != null ? <> — {t(lang, 'mercado.det.mediana')} <Dinero cobre={deal.medianaLow} /></> : null}
+          {deal?.minLow != null ? <> · {t(lang, 'mercado.det.minimo')} <Dinero cobre={deal.minLow} /></> : null}
           {deal?.days ? ` · ${deal.days}d` : ''}
           {deal?.available != null ? ` · ${deal.available} ${t(lang, 'mercado.det.ofertas')}` : ''}.
           {(deal?.reasons || []).length ? ` ${deal.reasons.join(' ')}` : ''}

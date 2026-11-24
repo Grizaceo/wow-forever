@@ -94,6 +94,12 @@ con el fuente. Lo que siguió, en la rama `agent/claude-code/tsm-valoracion`:
   contra una referencia independiente, sin discrepancias. Dos observaciones de contrato quedaron
   aclaradas en `docs/TSM-VALORACION.md`: `excluded` cuenta solo filas de venta `Auction`, y
   `no-sales` excluye los demás motivos. El núcleo no cambió.
+- Segunda revisión de OpenCode, sobre la interfaz integrada: seis textos falsos o contradictorios,
+  corregidos por Devin. El más serio venía de antes de la 2.2.0: el «Análisis de oferta» del detalle
+  mostraba `<Dinero cobre={deal.medianaLow} />` como texto literal. Los demás: «sin ventas» con filas
+  descartadas, «última venta — · sin fecha» con un histórico fechado, un contador que decía «ventana
+  de 28 días» para objetos fuera de ella, fechas futuras como «hace 0 días», y «la referencia de
+  arriba» en filas sin valoración.
 - Gates completos **con Lua**; los conteos y el resultado están en la descripción del PR.
 
 Sigue pendiente lo mismo que antes: validación con el `TradeSkillMaster.lua` real y despliegue.

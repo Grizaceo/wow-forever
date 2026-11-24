@@ -48,6 +48,9 @@ export function diasDesde(seg, ahoraMs) {
 }
 
 export function edadSeg(seg, ahoraMs, lang) {
+  if (Number.isFinite(seg) && seg > 0 && Number.isFinite(ahoraMs) && seg * 1000 > ahoraMs) {
+    return cp(lang, 'fecha futura', 'future date')
+  }
   const dias = diasDesde(seg, ahoraMs)
   if (dias == null) return cp(lang, 'sin fecha', 'no date')
   return lang === 'en'
@@ -84,7 +87,7 @@ export function motivoVisible(code, v, ahoraMs, lang) {
   if (code === 'wide-dispersion') return cp(lang, 'precios muy dispersos', 'prices too spread out')
   if (code === 'no-sales') {
     const n = Number.isFinite(cfg.windowDays) ? cfg.windowDays : 28
-    return en ? `no auction sales in the last ${n} days` : `sin ventas de subasta en los últimos ${n} días`
+    return en ? `no valid auction sales in the last ${n} days` : `sin ventas de subasta válidas en los últimos ${n} días`
   }
   return cp(lang, 'pocos datos', 'not enough data')
 }
@@ -104,6 +107,7 @@ export function ValoracionPersonal({ valoracion: v, lang, ahoraMs, id = 'valorac
   const h = v?.history || {}
   const d = v?.window?.daily || []
   const excl = v?.excluded || {}
+  const ultimaVenta = w.lastSale ?? h.lastSale
   return (
     <div data-testid={id} style={{ ...S.fila, flexWrap: 'wrap', gap: 6 }}>
       <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', minWidth: 0 }}>
@@ -136,7 +140,7 @@ export function ValoracionPersonal({ valoracion: v, lang, ahoraMs, id = 'valorac
         <span>{cp(lang, 'registros', 'records')} <b>{w.records ?? 0}</b></span>
         <span>{cp(lang, 'días con ventas', 'days with sales')} <b>{w.days ?? 0}</b></span>
         <span data-testid="tsm-ultima-venta">
-          {cp(lang, 'última venta', 'last sale')} {fechaSeg(w.lastSale)} · {edadSeg(w.lastSale, ahoraMs, lang)}
+          {cp(lang, 'última venta', 'last sale')} {fechaSeg(ultimaVenta)} · {edadSeg(ultimaVenta, ahoraMs, lang)}
         </span>
       </div>
 
