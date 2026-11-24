@@ -295,7 +295,7 @@ for (const idioma of ['es', 'en']) {
   check('consulta explícita muestra solo la variante elegida',
     /i:2589:1:2/.test(await p.locator('[data-testid="detalle-tsm-valoracion"]').innerText()) &&
     !/1p 40c/.test(await p.locator('[data-testid="detalle-tsm-valoracion"]').innerText()))
-  check('la consulta no crea equivalencia', /no crea equivalencia|sin equivalencia/.test(await consulta.innerText()))
+  check('la consulta no crea equivalencia', /no la enlaza con el objeto abierto ni mezcla sus cifras/.test(await consulta.innerText()))
   const anuncioAntes = await p.locator('[data-testid="detalle-anuncios"]').innerText()
   const lecturasAntes = await p.evaluate(() => window.lecturas.length)
   await p.clock.fastForward(8 * DAY * 1000)
