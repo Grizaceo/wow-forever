@@ -76,3 +76,24 @@ Primera entrega implementada y probada con fixtures sintéticas; no validada con
 ## Cierre verificable
 
 Los criterios de aceptación son las reglas y casos anteriores, no únicamente completar esta lista. El build debe corresponder al fuente; pruebas de integración deben usar el bundle real. Lua queda sin ejecutar por instrucción explícita. Validación con Cristóbal, profesión piloto, estimador y diario prospectivo están fuera de esta entrega; cualquier persistencia adicional requiere acuerdo separado.
+
+## Integración sobre 2.1.1 y correcciones de revisión (Claude Code, 2026-11-24)
+
+El registro de arriba describe la primera entrega tal como se hizo sobre `fa20b89`. Su sha del
+bundle (`1d79dd…`) ya no correspondía al bundle del árbol de trabajo (`f688e4…`), que sí coincidía
+con el fuente. Lo que siguió, en la rama `agent/claude-code/tsm-valoracion`:
+
+- Importación sobre `da4c1e8` (2.1.1): siete conflictos triviales (versión 2.2.0; el README conserva
+  la instalación por catálogo).
+- Regresiones de Mis ventas, corregidas por Devin con encargo cerrado: los objetos sin ventas de
+  subasta desaparecían de la lista, y la contabilidad mostraba cobre en bruto en vez de `<Dinero>`.
+- Textos en lenguaje de jugador, corregidos por MiniMax Code: sin códigos internos fuera de «Método
+  y límites». También corrigió la fecha de la línea de anuncios del detalle, que trataba el día de
+  Auctionator (EPOCH 2020-01-01) como día Unix.
+- Revisión adversarial del núcleo por OpenCode: 37 comprobaciones a mano y 24.000 casos aleatorios
+  contra una referencia independiente, sin discrepancias. Dos observaciones de contrato quedaron
+  aclaradas en `docs/TSM-VALORACION.md`: `excluded` cuenta solo filas de venta `Auction`, y
+  `no-sales` excluye los demás motivos. El núcleo no cambió.
+- Gates completos **con Lua**; los conteos y el resultado están en la descripción del PR.
+
+Sigue pendiente lo mismo que antes: validación con el `TradeSkillMaster.lua` real y despliegue.

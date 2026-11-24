@@ -49,13 +49,13 @@ Ventana móvil inclusiva `[nowMs - 28 * 86400000, nowMs]`; el histórico disponi
 | Última venta hace más de 7 días | `stale` | Política explícita de cautela por antigüedad. |
 | `(Q3 - Q1) / mediana > 0.5` | `wide-dispersion` | Dispersión amplia entre días. |
 
-Los motivos se acumulan cuando corresponden. Con cualquiera de ellos se muestra **sin evidencia suficiente**, conservando los descriptivos existentes. No hay confianza alta/media/baja. Aunque no haya motivos, la suficiencia es **descriptiva**, nunca permiso para predecir.
+Los motivos se acumulan cuando corresponden, salvo `no-sales`, que excluye los demás: sin ventas en la ventana no hay días, antigüedad ni dispersión que evaluar dentro de ella (la última venta anterior sigue visible en el histórico). Con cualquiera de ellos se muestra **sin evidencia suficiente**, conservando los descriptivos existentes. No hay confianza alta/media/baja. Aunque no haya motivos, la suficiencia es **descriptiva**, nunca permiso para predecir.
 
 Las reglas se aprobaron como punto de partida explicable: cuatro semanas, cinco días, una semana de antigüedad y dispersión relativa de la mitad. **No están calibradas ni validadas empíricamente.** No cambiarlas para aparentar mejor cobertura o convertirlas en afirmaciones económicas.
 
 ### Exclusiones
 
-`excluded` cuenta **filas**, no unidades ni transacciones:
+`excluded` cuenta **filas** de venta `Auction` de la variante consultada, no unidades ni transacciones. Las compras, expiradas, cancelaciones y ventas por otros canales quedan fuera del alcance por definición: no son exclusiones y se ven en la contabilidad de Mis ventas.
 
 - `future`: fecha posterior a la evaluación. No se corrige al presente.
 - `zero`: precio cero o cantidad cero; no aporta al resumen de precios ni a las unidades positivas resumidas. El parser normalizado ya exige cantidad positiva.
@@ -68,7 +68,7 @@ El snapshot normalizado no se modifica para excluirlos. Muchos registros de un m
 
 TSM v1 guarda reino y variante, pero **no acredita identidad económica**. El mismo nombre de reino o ID base no demuestra región, pool, reglas, ámbito de subasta ni equivalencia de variantes entre formatos.
 
-Por ello se retiró el cruce implícito por nombre/ID en Mis ventas. La UI muestra **sin compatibilidad acreditada**, sin delta económico ni asociación de variantes. Las fuentes siguen consultables separadas. No se introduce una pantalla de acreditación ni una equivalencia ad hoc como atajo en esta entrega.
+Por ello se retiró el cruce implícito por nombre/ID en Mis ventas. La UI lo dice en llano («TSM y Auctionator se muestran por separado»), sin delta económico ni asociación de variantes. Las fuentes siguen consultables separadas. No se introduce una pantalla de acreditación ni una equivalencia ad hoc como atajo en esta entrega.
 
 Auctionator aporta anuncios, **no ventas**:
 

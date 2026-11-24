@@ -157,14 +157,18 @@ ni persistencia nueva: [método, límites y contrato](TSM-VALORACION.md).
   precio típico diario, unidades positivas resumidas, registros contables, días distintos,
   período de ventas registradas y motivos de evidencia insuficiente. La contabilidad de
   todos los canales permanece en un desplegable, separada de la referencia personal.
+  Los objetos con registros TSM pero sin ventas de subasta (solo compras, expiradas,
+  canceladas o ventas por correo) siguen en la lista, después de las valoraciones, con su
+  contabilidad y el aviso «sin valoración». Los importes se muestran con `<Dinero>`.
   Expiraciones/cancelaciones pueden repetir unidades: no son ventas perdidas ni tasa de venta.
 - La atribución preexistente a `Ledger/Mail.lua` de `floor((bid - ahcut) / quantity + 0.5)`
   no verifica la versión instalada: el importe de correo puede ya descontar comisión y
   redondear por unidad. Presentamos **importe registrado**; no reconstruimos bruto ni
   descontamos comisión de nuevo. Tampoco inferimos beneficio, fabricación o depósitos.
 - No se cruza TSM–Auctionator por nombre de reino o ID base. TSM v1 no acredita identidad
-  económica ni equivalencia de variantes entre formatos; se declara **sin compatibilidad
-  acreditada** y se mantienen fuentes consultables por separado, sin delta económico.
+  económica ni equivalencia de variantes entre formatos. La UI lo dice en llano («TSM y
+  Auctionator se muestran por separado») y mantiene las fuentes consultables por separado,
+  sin delta económico.
   Auctionator sigue mostrando anuncios, no operaciones ejecutadas. No se envía
   contabilidad a chat/red. Método y límites: [TSM-VALORACION.md](TSM-VALORACION.md).
 

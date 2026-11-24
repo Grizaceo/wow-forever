@@ -74,12 +74,18 @@ export function motivoVisible(code, v, ahoraMs, lang) {
     const dias = diasDesde(w.lastSale, ahoraMs)
     const max = Number.isFinite(cfg.staleDays) ? cfg.staleDays : null
     if (dias == null || max == null) return cp(lang, 'última venta antigua', 'last sale too old')
+    // El núcleo marca «stale» con edad > max días en ms; el piso puede dar justo
+    // max (p. ej. 7,5 días → 7). Entonces se dice «más de max» y no «hace 7 (máximo 7)».
+    if (dias <= max) return en ? `last sale more than ${max} days ago` : `última venta hace más de ${max} días`
     return en
       ? `last sale ${dias} day${dias === 1 ? '' : 's'} ago (max ${max})`
       : `última venta hace ${dias} día${dias === 1 ? '' : 's'} (máximo ${max})`
   }
   if (code === 'wide-dispersion') return cp(lang, 'precios muy dispersos', 'prices too spread out')
-  if (code === 'no-sales') return cp(lang, 'sin ventas en subasta', 'no auction sales')
+  if (code === 'no-sales') {
+    const n = Number.isFinite(cfg.windowDays) ? cfg.windowDays : 28
+    return en ? `no auction sales in the last ${n} days` : `sin ventas de subasta en los últimos ${n} días`
+  }
   return cp(lang, 'pocos datos', 'not enough data')
 }
 
@@ -202,7 +208,7 @@ export function ConsultaValoracionTsm({ snapshot, lang, ahoraMs }) {
       </summary>
       <div style={detalleStyle}>
         <div style={{ color: C.amarillo }}>
-          {cp(lang, 'Compatibilidad no verificada: TSM v1 no identifica unidades económicas ni variantes equivalentes a Auctionator. Elegir una variante aquí no crea equivalencia con el ítem abierto ni cruza sus cifras.', 'Unverified compatibility: TSM v1 does not identify economic units or variants equivalent to Auctionator. Choosing a variant here creates no equivalence with the open item and does not cross its figures.')}
+          {cp(lang, 'Elegir aquí una variante de TSM no la enlaza con el objeto abierto ni mezcla sus cifras con las de Auctionator.', 'Choosing a TSM variant here does not link it to the open item or mix its figures with Auctionator figures.')}
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 6 }}>
           <label style={S.campo}>
