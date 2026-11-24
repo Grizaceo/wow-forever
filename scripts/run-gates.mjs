@@ -5,6 +5,7 @@
  * Uso (desde la raíz del repo):
  *   node scripts/run-gates.mjs               # corre todo, reporta conteos, exit 0/1
  *   node scripts/run-gates.mjs --keep-going  # no corta al primer fallo
+ *   node scripts/run-gates.mjs --no-lua      # excluye Lua explícitamente; no es el gate completo
  *
  * Corre los cuatro harnesses canónicos + build/check y compara los conteos con
  * los esperados (ver docs/TESTING.md). Incluye standalone/tests/*.cjs: su
@@ -28,6 +29,7 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const KEEP_GOING = process.argv.includes('--keep-going');
+const NO_LUA = process.argv.includes('--no-lua');
 
 // Conteos canónicos: detectan tests que desaparecen o se saltan silenciosamente.
 // Overrides opcionales WOW_GATES_EXPECT_{NODE,PY,LUA,CJS}=N para ramas en las
@@ -38,7 +40,7 @@ function expected(name, fallback) {
   const n = Number(raw);
   return Number.isInteger(n) && n >= 0 ? n : fallback;
 }
-const EXPECT_NODE = expected('NODE', 388);
+const EXPECT_NODE = expected('NODE', 413);
 const EXPECT_PY = expected('PY', 122);
 const EXPECT_LUA = expected('LUA', 180);
 // Tests unitarios del motor en standalone/tests/*.cjs (node:test). Los «real
@@ -48,7 +50,7 @@ const EXPECT_CJS = expected('CJS', 123);
 const BROWSER = [
   ['navegador', process.env.HERMES_SDK_TABS === '1' ? 68 : 67], ['vista-clase', 23],
   ['mercado-auto', 14], ['mercado-procedencia', 24],
-  ['tsm', 38], ['vista-mercado', 57], ['vista-davi', 50], ['vista-guia', 28],
+  ['tsm', 40], ['tsm-valoracion', 90], ['vista-mercado', 57], ['vista-davi', 50], ['vista-guia', 28],
   ['vista-profesiones', 41], ['vista-ruta-dungeons', 31], ['bridge', 19],
   ['vista-personaje-simc', 11], ['vista-pawn', 15], ['vista-subasta-pawn', 28],
   ['farm-routing', 11], ['tab-performance', 14],
@@ -111,7 +113,7 @@ function finish() {
   console.log('\n' + '='.repeat(64));
   console.log(`GATES: ${results.length - bad.length}/${results.length} verdes`);
   if (bad.length) { console.log('FALLARON: ' + bad.map(b => b.name).join(', ')); process.exit(1); }
-  console.log('TODO VERDE ✓');
+  console.log(NO_LUA ? 'GATES EJECUTADOS VERDES ✓ — Lua excluido; no es verificación completa' : 'TODO VERDE ✓');
   process.exit(0);
 }
 
@@ -150,7 +152,9 @@ console.log(`raíz: ${ROOT}\n`);
 }
 
 // 3) lua addon/tests/test_bridge.lua  (diario del puente)
-{
+if (NO_LUA) {
+  console.log('— lua bridge: NO EJECUTADO por --no-lua (excluido del total de gates)');
+} else {
   const luaPath = findOnPath(['lua5.1', 'lua', 'luajit']);
   if (!luaPath) {
     record('lua bridge', EXPECT_LUA, null, false, 'lua5.1/lua/luajit no encontrado en PATH');

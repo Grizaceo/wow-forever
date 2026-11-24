@@ -9,7 +9,13 @@ cubre cada uno, y el estado del harness legado de `standalone/`.
 ```sh
 node scripts/run-gates.mjs               # todo, reporta conteos, exit 0/1
 node scripts/run-gates.mjs --keep-going  # no corta al primer fallo
+node scripts/run-gates.mjs --no-lua      # todos los gates salvo Lua; exclusión explícita
 ```
+
+`--no-lua` no descubre ni ejecuta un intérprete Lua, excluye ese gate del total y
+rotula el cierre como verificación parcial. El comportamiento predeterminado de CI
+sigue siendo ejecutar todos los gates. Para esta entrega TSM se usa `--no-lua`
+por instrucción explícita; no presentar ese resultado como prueba del addon Lua.
 
 Corre los gates canónicos en orden, parsea los conteos y los compara con los
 esperados. Si un conteo difiere (p. ej. se añadieron tests), lo marca como fallo
@@ -21,22 +27,22 @@ byte-idéntico si no hay cambios en `desktop/src/`).
 
 | Harness | Comando | Esperado | Qué cubre |
 |---|---|---|---|
-| `tests/` (node) | `node scripts/test-node.mjs` | **388** pass, 0 fail | lógica de `desktop/src/` + motor: mercado v2/atómico/sync/migración, puente (`bridge*.test.mjs`), TSM, ROI, ruta/maxeo, guía, perfil, recetas propias, niveles de oficio, personaje SimC (`simc.test.mjs`), escala Pawn (`pawn.test.mjs`), catálogo de stats de ítems y equipo por slot (`item-stats.test.mjs`), puntuador Subasta × Pawn (`subasta-pawn.test.mjs`), unificación de etiquetas de reino y presupuesto del histórico (`market-reino-unificado.test.mjs`), techos del parser Lua (`parser-limites.test.mjs`), preguntar-davi, referencias-skill, claves heredadas |
+| `tests/` (node) | `node scripts/test-node.mjs` | **413** pass, 0 fail | lógica de `desktop/src/` + motor: mercado v2/atómico/sync/migración, puente (`bridge*.test.mjs`), TSM, ROI, ruta/maxeo, guía, perfil, recetas propias, niveles de oficio, personaje SimC (`simc.test.mjs`), escala Pawn (`pawn.test.mjs`), catálogo de stats de ítems y equipo por slot (`item-stats.test.mjs`), puntuador Subasta × Pawn (`subasta-pawn.test.mjs`), unificación de etiquetas de reino y presupuesto del histórico (`market-reino-unificado.test.mjs`), techos del parser Lua (`parser-limites.test.mjs`), preguntar-davi, referencias-skill, claves heredadas |
 | `tests/` (python) | `python3 -m unittest discover -s tests` | **122** OK | datos (`test_datos`, catálogo reproducible), desktop (`test_desktop`), maxeo, ROI, skill (`consultar.py`), perfil (`test_perfil.py`, incluye instalación sintética del agente-half y CLI real con `data/`), reproducibilidad de `data/`+drops+bundle |
 | `addon/tests/` (lua) | `lua5.1 addon/tests/test_bridge.lua` | **180** checks, 0 fallos | diario del puente WoWForeverBridge (captura, poda, retención, epoch) + captura SimC de `Personaje.lua` (eventos, `/wfbp`, `personagemErro`, conservación del export bueno) + captura Pawn de `Pawn.lua` (escala por ClassID/SpecID, pesos, `equipo.ilvl`, `pawnErro`, `/wfbpawn`, wrapper `/wfbp pawn`, captura final en `PLAYER_LEAVING_WORLD`, silencio cuando Pawn ya desinicializó sus proveedores, reintento acotado del equipo) + cosecha del catálogo de stats (`idsDaFonte`, lote por frames, cursor/vuelta, poda) |
-| `desktop/test/` (navegador) | 16 suites, ver abajo | **471** checks, red 0, errores 0 | bundle real en Chromium headless con dobles del SDK |
+| `desktop/test/` (navegador) | 17 suites, ver abajo | **563** checks, red 0, errores 0 | bundle real en Chromium headless con dobles del SDK |
 | build | `cd desktop && node build.mjs` | OK | bundle esbuild reproducible |
 | bundle-check | `python3 scripts/check_desktop_bundle.py desktop/plugin.js` | OK | tamaño/líneas/contratos del bundle |
 
 Los defaults viven en `scripts/run-gates.mjs`. Si una rama incorpora tests nuevos
 antes de actualizarlos, se pueden sobreescribir temporalmente con
 `WOW_GATES_EXPECT_NODE`, `WOW_GATES_EXPECT_PY`, `WOW_GATES_EXPECT_LUA` y
-`WOW_GATES_EXPECT_CJS` (p. ej. `WOW_GATES_EXPECT_NODE=388 node scripts/run-gates.mjs`).
+`WOW_GATES_EXPECT_CJS` (p. ej. `WOW_GATES_EXPECT_NODE=413 node scripts/run-gates.mjs`).
 CI no los define: usa los defaults versionados.
 
-### Suites navegador (471; 472 con `HERMES_SDK_TABS=1`)
+### Suites navegador (563; 564 con `HERMES_SDK_TABS=1`)
 
-`navegador 67 · vista-clase 23 · mercado-auto 14 · mercado-procedencia 24 · tsm 38 · vista-mercado 57 ·
+`navegador 67 · vista-clase 23 · mercado-auto 14 · mercado-procedencia 24 · tsm 40 · tsm-valoracion 90 · vista-mercado 57 ·
 vista-davi 50 · vista-guia 28 · vista-profesiones 41 · vista-ruta-dungeons 31 ·
 vista-personaje-simc 11 · vista-pawn 15 · vista-subasta-pawn 28 · bridge 19 · farm-routing 11 · tab-performance 14`
 

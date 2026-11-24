@@ -9,7 +9,9 @@ facción, con una skill para que tu agente responda con los mismos datos.
 
 ## Estado
 
-- Versión 2.1.1. El inglés es el idioma por defecto de la interfaz, con español opcional.
+- Versión 2.2.0: resumen descriptivo de ventas propias TSM, con límites de evidencia y sin
+  comparación implícita con Auctionator. Probado con fixtures sintéticas, no validado con
+  una cuenta real. Interfaz en inglés por defecto, con español opcional.
   El mercado muestra la miniatura de cada ítem, ligada a su id. La 2.0.0 añadió el mercado
   local, el planificador de profesiones y la skill del agente; la 1.0.0 solo cubría tres
   clases (Cazador, Guerrero y Chamán).
@@ -49,6 +51,13 @@ detenía la instalación directa por Git hasta recibir `--force`; la 2.1.1 los q
 En Hermes Desktop, abre **Capabilities → Plugins**, busca **WoW Forever** y enciéndela: la
 página llega apagada aunque el plugin esté habilitado. Aparece en la barra lateral. La skill
 `wow-forever:wow-forever` funciona en cualquier superficie de Hermes.
+
+**Repositorio privado:** tu cuenta GitHub necesita acceso y Git autenticado (por ejemplo,
+`gh auth login`). Instalar directamente desde Git no requiere aprobación del catálogo.
+Para actualizar, usa `hermes plugins update wow-forever`. Si instalaste con
+`--ref <commit de 40 caracteres>`, queda fijado: reinstala explícitamente en el commit
+deseado. Las instalaciones desde catálogo, cuando estén disponibles, siguen el commit
+revisado del catálogo, no necesariamente la última versión de la rama.
 
 **Si vienes de la 1.0.0:** corre `hermes plugins update wow-forever`. Hermes Desktop carga la
 página nueva tras **Rescan** en **Capabilities → Plugins** («Volver a buscar» si Hermes está

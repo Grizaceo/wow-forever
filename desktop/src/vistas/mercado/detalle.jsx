@@ -2,7 +2,7 @@
 // análisis de oferta, gráfico SVG, historial diario, fuentes documentadas del
 // catálogo (dungeons.json), fuentes del dataset de drops (drop-data.js) y
 // fuentes de farmeo del motor. Port de paintDetail de market-ui.js.
-import { useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { S } from '../../estilos.js'
 import { D, nombre } from '../../datos.js'
 import { t } from '../../i18n.js'
@@ -10,13 +10,21 @@ import { Dinero, Hueco, Origen, Tarjeta } from '../../ui.jsx'
 import { HunterHistory, Farm, fuentesItem, fuentesDropData, nombreItem, fmtDia } from '../../mercado-logica.js'
 import { GraficoPrecios } from './grafico.jsx'
 import { RutaFarmeo } from './ruta-farmeo.jsx'
+import { ConsultaValoracionTsm, edadSeg, fechaSeg } from './valoracion-personal.jsx'
 
 const TENDENCIA = { sube: 'mercado.tend.sube', baja: 'mercado.tend.baja', estable: 'mercado.tend.estable', 'sin-datos': 'mercado.tend.pocos' }
 const KIND_DROP = { mob: '', skin: 'Piel: ', pick: 'Pillosidad: ', object: 'Objeto: ' }
 
 function fmtPct(v) { return v == null ? '—' : `${Math.round(v * 100)}%` }
 
-export function DetalleItem({ item, lang, catalogo, metrica, deal, onCerrar }) {
+export function DetalleItem({ item, lang, catalogo, metrica, deal, onCerrar, tsmSnapshot = null, ahoraMs: relojExterno }) {
+  const [relojLocal, setRelojLocal] = useState(() => Date.now())
+  useEffect(() => {
+    if (relojExterno != null) return
+    const id = setInterval(() => setRelojLocal(Date.now()), 60_000)
+    return () => clearInterval(id)
+  }, [relojExterno])
+  const ahoraMs = relojExterno ?? relojLocal
   const stats = useMemo(() => HunterHistory.priceStats(item), [item])
   const catEntry = useMemo(() => (item?.itemId != null ? catalogo?.items?.[String(item.itemId)] : null), [item, catalogo])
   const fuentes = useMemo(() => (catEntry ? fuentesItem(catEntry, D.dungeons) : []), [catEntry])
@@ -41,6 +49,13 @@ export function DetalleItem({ item, lang, catalogo, metrica, deal, onCerrar }) {
         {t(lang, 'mercado.det.ultimo')}: <Dinero cobre={item.unitPriceCopper} />. {t(lang, 'mercado.det.aviso')}
         {metrica?.doubtful ? ` ${t(lang, 'mercado.det.dudoso')}` : ''}
         {esVariante ? ` ${t(lang, 'mercado.det.variante')}` : ''}
+      </p>
+
+      <p style={S.sub} data-testid="detalle-anuncios">
+        {lang === 'en' ? 'Date' : 'Fecha'} {fechaSeg(historial[0]?.day != null ? historial[0].day * 86400 : null)}
+        {' · '}{edadSeg(historial[0]?.day != null ? historial[0].day * 86400 : null, ahoraMs, lang)}
+        {' · '}{lang === 'en' ? 'daily maximum offer' : 'oferta máxima diaria'} {historial[0]?.available ?? '—'}
+        {' — '}{lang === 'en' ? 'listings, not sales; not current stock' : 'anuncios, no ventas; no es stock actual'}.
       </p>
 
       {stats?.diasMuestra > 0 && (
@@ -161,6 +176,18 @@ export function DetalleItem({ item, lang, catalogo, metrica, deal, onCerrar }) {
           </ul>
         </div>
       )}
+
+      <div data-testid="detalle-tsm" style={{ marginTop: 10 }}>
+        <h4 style={{ ...S.titulo, fontSize: 12, margin: '4px 0' }}>
+          {lang === 'en' ? 'My TSM sales · separate source' : 'Mis ventas TSM · fuente separada'}
+        </h4>
+        <p style={S.sub}>
+          {lang === 'en'
+            ? 'No accredited compatibility: TSM v1 does not certify economic identity or equivalent variants. This Auctionator item is not linked by realm name or base ID, and TSM figures are not crossed into its row. The daily maximum offer above is listings, not sales.'
+            : 'Sin compatibilidad acreditada: TSM v1 no certifica identidad económica ni variantes equivalentes. Este ítem de Auctionator no se asocia por nombre de reino ni ID base, y sus cifras TSM no se cruzan en su fila. La oferta máxima diaria de arriba son anuncios, no ventas.'}
+        </p>
+        <ConsultaValoracionTsm snapshot={tsmSnapshot} lang={lang} ahoraMs={ahoraMs} />
+      </div>
 
       <p style={S.sub}>
         {t(lang, 'mercado.det.cobertura', { addon: catalogo?.source?.addon || t(lang, 'mercado.det.sinCatalogo') })}
