@@ -267,6 +267,12 @@
   "nota": "Oro/h estimado farmeando cada sitio 1 h, con tus precios (mediana de 14 días) y el tope de venta; drops de Classic 1.12 salvo lo observado en tus sesiones.",
   "ranking": [
    {
+    "concentrado": {
+     "itemId": 7069,
+     "nombre": "Elemental Air",
+     "cuotaPct": 94.4
+    },
+    "vistoMuertes": 0,
     "zona": "Desolace",
     "tipo": "solo",
     "mobs": [
@@ -312,6 +318,12 @@
     ]
    },
    {
+    "concentrado": {
+     "itemId": 7069,
+     "nombre": "Elemental Air",
+     "cuotaPct": 95.2
+    },
+    "vistoMuertes": 335,
     "zona": "Desolace",
     "tipo": "solo",
     "mobs": [
@@ -357,6 +369,12 @@
     ]
    },
    {
+    "concentrado": {
+     "itemId": 7069,
+     "nombre": "Elemental Air",
+     "cuotaPct": 97.1
+    },
+    "vistoMuertes": 0,
     "zona": "Desolace",
     "tipo": "solo",
     "mobs": [
@@ -402,6 +420,12 @@
     ]
    },
    {
+    "concentrado": {
+     "itemId": 7069,
+     "nombre": "Elemental Air",
+     "cuotaPct": 97.2
+    },
+    "vistoMuertes": 0,
     "zona": "Thousand Needles",
     "tipo": "solo",
     "mobs": [
@@ -447,6 +471,8 @@
     ]
    },
    {
+    "concentrado": null,
+    "vistoMuertes": 0,
     "zona": "Arathi Highlands",
     "tipo": "solo",
     "mobs": [
@@ -501,6 +527,12 @@
      37
     ],
     "pos": 1,
+    "concentrado": {
+     "itemId": 7069,
+     "nombre": "Elemental Air",
+     "cuotaPct": 94.4
+    },
+    "vistoMuertes": 0,
     "zona": "Desolace",
     "tipo": "solo",
     "mobs": [
@@ -553,6 +585,12 @@
      34
     ],
     "pos": 2,
+    "concentrado": {
+     "itemId": 7069,
+     "nombre": "Elemental Air",
+     "cuotaPct": 95.2
+    },
+    "vistoMuertes": 335,
     "zona": "Desolace",
     "tipo": "solo",
     "mobs": [
@@ -605,6 +643,12 @@
      34
     ],
     "pos": 3,
+    "concentrado": {
+     "itemId": 7069,
+     "nombre": "Elemental Air",
+     "cuotaPct": 97.1
+    },
+    "vistoMuertes": 0,
     "zona": "Desolace",
     "tipo": "solo",
     "mobs": [
@@ -657,6 +701,12 @@
      34
     ],
     "pos": 4,
+    "concentrado": {
+     "itemId": 7069,
+     "nombre": "Elemental Air",
+     "cuotaPct": 97.2
+    },
+    "vistoMuertes": 0,
     "zona": "Thousand Needles",
     "tipo": "solo",
     "mobs": [
@@ -709,6 +759,8 @@
      39
     ],
     "pos": 5,
+    "concentrado": null,
+    "vistoMuertes": 0,
     "zona": "Arathi Highlands",
     "tipo": "solo",
     "mobs": [
@@ -761,6 +813,8 @@
      34
     ],
     "pos": 6,
+    "concentrado": null,
+    "vistoMuertes": 0,
     "zona": "Silverpine Forest",
     "tipo": "solo",
     "mobs": [
@@ -813,6 +867,8 @@
      41
     ],
     "pos": 7,
+    "concentrado": null,
+    "vistoMuertes": 0,
     "zona": "Swamp of Sorrows",
     "tipo": "solo",
     "mobs": [
@@ -865,6 +921,8 @@
      40
     ],
     "pos": 8,
+    "concentrado": null,
+    "vistoMuertes": 0,
     "zona": "Badlands",
     "tipo": "solo",
     "mobs": [
@@ -917,6 +975,8 @@
      39
     ],
     "pos": 9,
+    "concentrado": null,
+    "vistoMuertes": 0,
     "zona": "Arathi Highlands",
     "tipo": "solo",
     "mobs": [
@@ -969,6 +1029,8 @@
      42
     ],
     "pos": 10,
+    "concentrado": null,
+    "vistoMuertes": 0,
     "zona": "Feralas",
     "tipo": "solo",
     "mobs": [
@@ -1021,6 +1083,8 @@
      37
     ],
     "pos": 11,
+    "concentrado": null,
+    "vistoMuertes": 0,
     "zona": "Swamp of Sorrows",
     "tipo": "solo",
     "mobs": [
@@ -1073,6 +1137,8 @@
      31
     ],
     "pos": 12,
+    "concentrado": null,
+    "vistoMuertes": 0,
     "zona": "Stranglethorn Vale",
     "tipo": "solo",
     "mobs": [
@@ -1125,6 +1191,12 @@
      27
     ],
     "pos": 13,
+    "concentrado": {
+     "itemId": 3402,
+     "nombre": "Soft Patch of Fur",
+     "cuotaPct": 87.8
+    },
+    "vistoMuertes": 0,
     "zona": "Thousand Needles",
     "tipo": "solo",
     "mobs": [
@@ -1177,6 +1249,8 @@
      34
     ],
     "pos": 14,
+    "concentrado": null,
+    "vistoMuertes": 0,
     "zona": "Tanaris",
     "tipo": "solo",
     "mobs": [
@@ -1229,6 +1303,8 @@
      35
     ],
     "pos": 15,
+    "concentrado": null,
+    "vistoMuertes": 0,
     "zona": "Desolace",
     "tipo": "solo",
     "mobs": [
@@ -1281,6 +1357,8 @@
      39
     ],
     "pos": 16,
+    "concentrado": null,
+    "vistoMuertes": 0,
     "zona": "Badlands",
     "tipo": "solo",
     "mobs": [
@@ -1333,6 +1411,8 @@
      39
     ],
     "pos": 17,
+    "concentrado": null,
+    "vistoMuertes": 0,
     "zona": "Arathi Highlands",
     "tipo": "solo",
     "mobs": [
@@ -1385,6 +1465,8 @@
      39
     ],
     "pos": 18,
+    "concentrado": null,
+    "vistoMuertes": 0,
     "zona": "Arathi Highlands",
     "tipo": "solo",
     "mobs": [
@@ -1437,6 +1519,8 @@
      39
     ],
     "pos": 19,
+    "concentrado": null,
+    "vistoMuertes": 0,
     "zona": "Badlands",
     "tipo": "solo",
     "mobs": [
@@ -1489,6 +1573,8 @@
      37
     ],
     "pos": 20,
+    "concentrado": null,
+    "vistoMuertes": 0,
     "zona": "Swamp of Sorrows",
     "tipo": "solo",
     "mobs": [
@@ -1541,6 +1627,8 @@
      42
     ],
     "pos": 21,
+    "concentrado": null,
+    "vistoMuertes": 0,
     "zona": "Stranglethorn Vale",
     "tipo": "solo",
     "mobs": [
@@ -1593,6 +1681,8 @@
      36
     ],
     "pos": 22,
+    "concentrado": null,
+    "vistoMuertes": 0,
     "zona": "Desolace",
     "tipo": "solo",
     "mobs": [
@@ -1645,6 +1735,12 @@
      29
     ],
     "pos": 23,
+    "concentrado": {
+     "itemId": 3402,
+     "nombre": "Soft Patch of Fur",
+     "cuotaPct": 86.5
+    },
+    "vistoMuertes": 0,
     "zona": "Thousand Needles",
     "tipo": "solo",
     "mobs": [
@@ -1697,6 +1793,8 @@
      41
     ],
     "pos": 24,
+    "concentrado": null,
+    "vistoMuertes": 0,
     "zona": "Tanaris",
     "tipo": "solo",
     "mobs": [
@@ -1749,6 +1847,8 @@
      31
     ],
     "pos": 25,
+    "concentrado": null,
+    "vistoMuertes": 0,
     "zona": "Desolace",
     "tipo": "solo",
     "mobs": [
@@ -1801,6 +1901,8 @@
      41
     ],
     "pos": 26,
+    "concentrado": null,
+    "vistoMuertes": 0,
     "zona": "Tanaris",
     "tipo": "solo",
     "mobs": [
@@ -1853,6 +1955,8 @@
      40
     ],
     "pos": 27,
+    "concentrado": null,
+    "vistoMuertes": 0,
     "zona": "Stranglethorn Vale",
     "tipo": "solo",
     "mobs": [
@@ -1905,6 +2009,8 @@
      31
     ],
     "pos": 28,
+    "concentrado": null,
+    "vistoMuertes": 0,
     "zona": "Stranglethorn Vale",
     "tipo": "solo",
     "mobs": [
@@ -1957,6 +2063,8 @@
      39
     ],
     "pos": 29,
+    "concentrado": null,
+    "vistoMuertes": 0,
     "zona": "The Barrens",
     "tipo": "solo",
     "mobs": [
@@ -2009,6 +2117,8 @@
      32
     ],
     "pos": 30,
+    "concentrado": null,
+    "vistoMuertes": 0,
     "zona": "Desolace",
     "tipo": "solo",
     "mobs": [
@@ -2061,6 +2171,8 @@
      38
     ],
     "pos": 31,
+    "concentrado": null,
+    "vistoMuertes": 0,
     "zona": "The Barrens",
     "tipo": "solo",
     "mobs": [
@@ -2113,6 +2225,8 @@
      40
     ],
     "pos": 32,
+    "concentrado": null,
+    "vistoMuertes": 0,
     "zona": "Badlands",
     "tipo": "solo",
     "mobs": [
@@ -2165,6 +2279,8 @@
      41
     ],
     "pos": 33,
+    "concentrado": null,
+    "vistoMuertes": 0,
     "zona": "Stranglethorn Vale",
     "tipo": "solo",
     "mobs": [
@@ -2217,6 +2333,8 @@
      33
     ],
     "pos": 34,
+    "concentrado": null,
+    "vistoMuertes": 0,
     "zona": "Arathi Highlands",
     "tipo": "solo",
     "mobs": [
@@ -2269,6 +2387,8 @@
      33
     ],
     "pos": 35,
+    "concentrado": null,
+    "vistoMuertes": 0,
     "zona": "Thousand Needles",
     "tipo": "solo",
     "mobs": [
@@ -2321,6 +2441,8 @@
      35
     ],
     "pos": 36,
+    "concentrado": null,
+    "vistoMuertes": 0,
     "zona": "Tanaris",
     "tipo": "solo",
     "mobs": [
@@ -2373,6 +2495,8 @@
      36
     ],
     "pos": 37,
+    "concentrado": null,
+    "vistoMuertes": 0,
     "zona": "Stranglethorn Vale",
     "tipo": "solo",
     "mobs": [
@@ -2425,6 +2549,8 @@
      41
     ],
     "pos": 38,
+    "concentrado": null,
+    "vistoMuertes": 0,
     "zona": "Feralas",
     "tipo": "solo",
     "mobs": [
@@ -2477,6 +2603,8 @@
      36
     ],
     "pos": 39,
+    "concentrado": null,
+    "vistoMuertes": 0,
     "zona": "Badlands",
     "tipo": "solo",
     "mobs": [
@@ -2529,6 +2657,8 @@
      37
     ],
     "pos": 40,
+    "concentrado": null,
+    "vistoMuertes": 0,
     "zona": "Stranglethorn Vale",
     "tipo": "solo",
     "mobs": [

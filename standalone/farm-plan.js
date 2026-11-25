@@ -37,6 +37,7 @@ const STYLE_DEFAULT = Object.freeze({
   uncertainty: 0.2,   // ± relativo de ritmo para el rango pesimista/optimista
   source: 'default',
 });
+const CONC_SHARE = 0.8;  // aviso «depende de un solo ítem» (describe)
 const PARAMS = Object.freeze({ kappa: 0.05, windowDays: 14, maxUp: 2, maxDown: 15, minCampShare: 0.8 });
 
 let D = null, IDX = null;
@@ -334,7 +335,10 @@ function describe(f, ctx) {
   const top = [...h.parts].sort((a, b) => b[1].gold - a[1].gold).slice(0, 4)
     .map(([iid, p]) => ({ itemId: iid, name: itemName(iid), share: tot > 0 ? p.gold / tot : 0, perKill: f.units.get(iid) || 0,
       units: p.units, ahUnits: p.ahUnits }));
-  return { id: f.id, kind: f.kind, zoneKey: f.zoneKey, zone: f.zone, names: f.names, members: f.members, spawns: f.spawns,
+  // Un solo ítem sostiene ≥ 80 % del oro: si su precio o su drop real en Forever
+  // difieren de Classic, el oro/h cambia casi en la misma proporción.
+  const concentrated = top[0] && top[0].share >= CONC_SHARE ? { itemId: top[0].itemId, name: top[0].name, share: top[0].share } : null;
+  return { id: f.id, kind: f.kind, zoneKey: f.zoneKey, zone: f.zone, names: f.names, members: f.members, spawns: f.spawns, concentrated,
     mapX: f.mapX ?? null, mapY: f.mapY ?? null, nnYards: f.nnYards, rate: f.rate, fightSec: f.fightSec,
     gph: h.gph, coinsShare: tot > 0 ? h.coins / tot : 0, ahShare: tot > 0 ? h.ahGold / tot : 0, vendorShare: tot > 0 ? h.vendorGold / tot : 0,
     ammoPerHour: h.ammo, bagTrips: h.bagTrips, riskLevel: f.riskLevel, top };
@@ -431,7 +435,7 @@ function goal(best, target, have = 0) {
 }
 
 const api = { configure, marketModel, sellCaps, farms, hourly, plan, ranking, evaluate, priceInfo, goal, itemFarms, itemIndex, mixFarm, unitValue, softRate,
-  STYLE_DEFAULT, PARAMS, AH_CUT, THIN_MAX_AVAIL, N0_DROPS, N0_COINS, ammoCost,
+  STYLE_DEFAULT, PARAMS, AH_CUT, THIN_MAX_AVAIL, N0_DROPS, N0_COINS, CONC_SHARE, ammoCost,
   zoneName, itemName, sellOf,
   _reset() { FARMS_KEY = null; FARMS = null; IDX = null; IIDX_KEY = null; IIDX = null; } };
 module.exports = api;

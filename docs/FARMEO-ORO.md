@@ -160,6 +160,18 @@ Desde las sesiones (`desktop/src/farm-sesiones.js`, puro):
   las capturas (`IsFishingLoot`; `fishing`, `fishItems`) y Desktop marca la sesión como
   `tipo: 'pesca'` con capturas/h y su oro/h medido.
 
+## Confianza en el dato (2.4.0)
+
+- **Visto por ti en Forever**: los spawns y drops son de Classic 1.12; la única
+  verificación en Forever que tiene el plugin son las sesiones del jugador. Cada
+  campamento del ranking dice «visto por ti en Forever (N muertes)» si alguna sesión de
+  WoWForeverFarm mató a uno de sus mobs, o «sin verificar»; el export lo lleva en
+  `vistoMuertes` y `farmeo-mob` lo cita. No se usa ninguna base comunitaria de spawns.
+- **Depende de un solo ítem**: si un ítem sostiene ≥ 80 % del oro del campamento
+  (`CONC_SHARE`, `describe().concentrated`), la fila y `farmeo-mob` lo avisan: un cambio
+  de su precio o de su drop real mueve el oro/h casi en la misma proporción (p. ej. los
+  Whirlwind de Desolace, ~95 % Elemental Air).
+
 ## Capa agéntica
 
 - Desktop escribe `data/farmeo-agente.json` (schema 1) cuando cambian las sesiones,

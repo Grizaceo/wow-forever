@@ -245,5 +245,16 @@ class TestFarmeoCli(unittest.TestCase):
         finally:
             shutil.rmtree(tmp)
 
+    def test_mob_visto_por_ti_y_dependencia_de_un_item(self):
+        code, txt = correr('farmeo-mob', 'Whirlwind Shredder', '--archivo', FIX)
+        self.assertEqual(code, 0)
+        self.assertIn('[tus sesiones] Visto en Forever: 335 muertes en tus sesiones medidas.', txt)
+        self.assertIn('Ojo: el 95% del oro sale de Elemental Air', txt)
+        code, txt = correr('farmeo-mob', 'Burning Exile', '--archivo', FIX)
+        self.assertIn('Sin verificar en Forever: ninguna de tus sesiones lo mató', txt)
+        self.assertNotIn('Ojo:', txt)
+        code, txt = correr('farmeo-ranking', '--max', '2', '--archivo', FIX)
+        self.assertIn('Ojo: el', txt)
+
 if __name__ == '__main__':
     unittest.main()

@@ -5,7 +5,7 @@ import test from 'node:test'
 import { createRequire } from 'node:module'
 import {
   parseFarm, normalizarSesion, fusionarSesiones, metricasSesion, perfilJugador, observados,
-  ventasPorDia, exportAgente, FARM_FILE,
+  ventasPorDia, exportAgente, vistosEnSesiones, FARM_FILE,
 } from '../desktop/src/farm-sesiones.js'
 const require = createRequire(import.meta.url)
 const FarmPlan = require('../standalone/farm-plan.js')
@@ -293,4 +293,19 @@ test('sesión de pesca: capturas por hora, lo pescado se valora y no hay predicc
   assert.deepEqual([ag.sesiones[0].tipo, ag.sesiones[0].pescas, ag.sesiones[0].pescasH], ['pesca', 300, 300])
   const sinPesca = metricasSesion(parseFarm(lua(SV2)).sessions[0], null, DATASET)
   assert.deepEqual([sinPesca.tipo, sinPesca.pescas], ['mobs', 0], 'las sesiones 0.2.0 siguen siendo de mobs')
+})
+
+test('vistosEnSesiones y export: «visto por ti» y dependencia de un solo ítem', () => {
+  const ses = [{ kills: { 11578: 95, 4127: 3 } }, { kills: { 11578: 5, x: 2, 0: 4 } }, { kills: null }, null]
+  const v = vistosEnSesiones(ses)
+  assert.deepEqual([...v.entries()].sort((a, b) => a[0] - b[0]), [[4127, 3], [11578, 100]], 'ids inválidos fuera')
+  const mob = (npcId, share) => ({ kind: 'target', npcId, name: 'M' + npcId, lvl: [32, 34], pos: 1, zone: 'Desolace', names: ['M' + npcId],
+    members: [{ npcId, name: 'M' + npcId, spawns: 13 }], gph: 140400, rate: 96.8, spawns: 13, coinsShare: 0, ahShare: 0.8, vendorShare: 0.2,
+    concentrated: share >= 0.8 ? { itemId: 7069, name: 'Elemental Air', share } : null, top: [{ itemId: 7069, name: 'Elemental Air', share, units: 1, ahUnits: 1 }] })
+  const ev = { totalMobs: 2, ranking: [], mobs: [mob(11578, 0.948), mob(2760, 0.46)], items: new Map() }
+  const e = exportAgente({ evaluacion: ev, vistos: v })
+  const [a, b] = e.evaluacion.mobs
+  assert.equal(a.vistoMuertes, 100); assert.deepEqual(a.concentrado, { itemId: 7069, nombre: 'Elemental Air', cuotaPct: 94.8 })
+  assert.equal(b.vistoMuertes, 0); assert.equal(b.concentrado, null)
+  assert.equal(exportAgente({ evaluacion: ev }).evaluacion.mobs[0].vistoMuertes, 0, 'sin sesiones, nada visto')
 })

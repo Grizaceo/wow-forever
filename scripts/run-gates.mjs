@@ -40,8 +40,8 @@ function expected(name, fallback) {
   const n = Number(raw);
   return Number.isInteger(n) && n >= 0 ? n : fallback;
 }
-const EXPECT_NODE = expected('NODE', 440);
-const EXPECT_PY = expected('PY', 147);
+const EXPECT_NODE = expected('NODE', 442);
+const EXPECT_PY = expected('PY', 148);
 const EXPECT_LUA = expected('LUA', 180);
 const EXPECT_LUA_FARM = expected('LUA_FARM', 204);
 // Tests unitarios del motor en standalone/tests/*.cjs (node:test). Los «real

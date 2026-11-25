@@ -271,6 +271,11 @@ Hermes Desktop; lo lees con las órdenes `farmeo-*` (§2). Diseño y fórmulas: 
 - **Hierbas y minería.** «Por tu profesión» filtra los nodos por el skill que el jugador
   escribió en Profesiones (Herboristería 182, Minería 186); sin ese dato supone los nodos
   de su nivel. Si recomiendas nodos, pregúntale su skill.
+- **¿Existe en Forever?** Los spawns y drops del plugin son de Classic 1.12. La única
+  verificación en Forever es la del propio jugador: `farmeo-mob` dice «Visto en Forever»
+  si alguna de sus sesiones mató a ese mob, o «Sin verificar». Antes de mandarlo lejos a
+  un campamento sin verificar, dilo. Si avisa «el N % del oro sale de un solo ítem», ese
+  número es frágil: cualquier cambio de precio o de drop lo mueve casi igual.
 - **Si cita una guía, un video o un foro** («dicen que los Burning Exile dan 14 o/h»): corre
   `farmeo-mob "<mob>"` (o `farmeo-zona`) y compara **el precio usado aquí** con el que supone la
   fuente. Las guías usan precios de otros reinos y otras fechas; en el reino del jugador el ítem

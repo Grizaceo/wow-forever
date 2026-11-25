@@ -32,7 +32,8 @@ export function Composicion({ f, lang }) {
 }
 
 // Tarjeta compacta de un campamento (ranking y detalle).
-export function FilaCampamento({ f, lang, itemShare = null, itemPerHour = null, testid = 'farm-campamento' }) {
+export function FilaCampamento({ f, lang, itemShare = null, itemPerHour = null, testid = 'farm-campamento', vistos = null }) {
+  const muertesVistas = vistos ? (f.members || []).reduce((n, m) => n + (vistos.get(Number(m.npcId)) || 0), 0) : null
   return (
     <li data-testid={testid} style={{ marginBottom: 4, overflowWrap: 'anywhere' }}>
       <b>~{oro(f.gph)}/h</b> · <NombreCampamento f={f} lang={lang} />
@@ -45,6 +46,16 @@ export function FilaCampamento({ f, lang, itemShare = null, itemPerHour = null, 
         {f.top?.length ? ` · ${f.top.slice(0, 3).map((t) => `${t.name} ${pct(t.share)}`).join(', ')}` : ''}
         {f.riskLevel && f.riskLevel !== 'baja' ? <span style={{ color: f.riskLevel === 'alta' ? C.rojo : C.amarillo }}> · {cp(lang, 'riesgo', 'risk')} {f.riskLevel}</span> : null}
       </div>
+      {(f.concentrated || muertesVistas != null) && (
+        <div style={S.etiqueta}>
+          {muertesVistas != null && (muertesVistas > 0
+            ? <span data-testid="farm-visto" style={{ color: C.verde }}>{cp(lang, `visto por ti en Forever (${muertesVistas} muertes)`, `seen by you in Forever (${muertesVistas} kills)`)}</span>
+            : <span data-testid="farm-sin-verificar">{cp(lang, 'sin verificar en Forever: ninguna sesión tuya lo mató', 'unverified in Forever: none of your sessions killed it')}</span>)}
+          {f.concentrated && <span data-testid="farm-concentrado" style={{ color: C.amarillo }}>{muertesVistas != null ? ' · ' : ''}{cp(lang,
+            `${pct(f.concentrated.share)} sale de ${f.concentrated.name}: si su precio o su drop en Forever cambian, el oro/h cambia casi igual`,
+            `${pct(f.concentrated.share)} comes from ${f.concentrated.name}: if its price or Forever drop rate differ, gold/h moves almost the same`)}</span>}
+        </div>
+      )}
     </li>
   )
 }

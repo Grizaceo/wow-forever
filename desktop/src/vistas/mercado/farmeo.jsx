@@ -10,7 +10,7 @@ import { D, guiaCurada } from '../../datos.js'
 import { t } from '../../i18n.js'
 import { Tarjeta } from '../../ui.jsx'
 import { Farm, FarmPlan, perfilMotor, hubZonesDe, fechaDe } from '../../mercado-logica.js'
-import { metricasSesion, exportAgente } from '../../farm-sesiones.js'
+import { metricasSesion, exportAgente, vistosEnSesiones } from '../../farm-sesiones.js'
 import { exportarAgente, ARCHIVO_AGENTE } from '../../farm-sync.js'
 import { construirContextoFarmeo } from '../../davi.js'
 import { leerNiveles, nivelDe } from '../../oficios.js'
@@ -169,6 +169,8 @@ export function Farmeo({ ctx, items, perfil, settings, onSettings, lang, planCtx
     if (!items?.length || !planCtx) return []
     try { return FarmPlan.ranking(planCtx, 8) } catch { return [] }
   }, [items, planCtx])
+  // Mobs que ya mataste en tus sesiones: verificación propia de que existen en Forever.
+  const vistos = useMemo(() => vistosEnSesiones(sesiones), [sesiones])
   // Meta de oro del jugador (oro entero en ajustes; el motor trabaja en cobre).
   const meta = useMemo(() => (plan?.best && settings.meta > 0
     ? FarmPlan.goal(plan.best, settings.meta * 10000, (settings.tengo || 0) * 10000) : null), [plan, settings.meta, settings.tengo])
@@ -213,14 +215,14 @@ export function Farmeo({ ctx, items, perfil, settings, onSettings, lang, planCtx
   const ultimo = useRef('')
   useEffect(() => {
     if (!ctx?.files?.writeText || (!metricas.length && !plan)) return
-    const payload = exportAgente({ sesiones, metricas, estilo, plan, perfil, evaluacion, meta })
+    const payload = exportAgente({ sesiones, metricas, estilo, plan, perfil, evaluacion, meta, vistos })
     const firma = JSON.stringify({ ...payload, generado: null })
     if (firma === ultimo.current) return
     const h = setTimeout(async () => {
       if (await exportarAgente(ctx, payload)) { ultimo.current = firma; setExportado(new Date().toLocaleTimeString(lang === 'en' ? 'en' : 'es')) }
     }, 1500)
     return () => clearTimeout(h)
-  }, [ctx, sesiones, metricas, estilo, plan, perfil, evaluacion, meta, lang])
+  }, [ctx, sesiones, metricas, estilo, plan, perfil, evaluacion, meta, vistos, lang])
 
   const snapshotDavi = useMemo(() => construirContextoFarmeo({ plan, estilo, metricas, resumenPerfil, lang,
     procedencia: ['WoWForeverFarm.lua (sesiones medidas)', 'CMaNGOS classic-db 1.12 (drops)', 'Auctionator / puente (precios)'] }), [plan, estilo, metricas, resumenPerfil, lang])
@@ -259,7 +261,7 @@ export function Farmeo({ ctx, items, perfil, settings, onSettings, lang, planCtx
             <div>
               <h4 style={{ ...S.titulo, fontSize: 13, margin: '6px 0 2px' }}>{cp(lang, 'Mejores campamentos (1 h, cada uno solo)', 'Best camps (1 h, each on its own)')}</h4>
               <ul style={{ margin: 0, paddingLeft: 18, fontSize: 12 }}>
-                {ranking.map((f) => <FilaCampamento key={f.id} f={f} lang={lang} />)}
+                {ranking.map((f) => <FilaCampamento key={f.id} f={f} lang={lang} vistos={vistos} />)}
               </ul>
             </div>
           )}

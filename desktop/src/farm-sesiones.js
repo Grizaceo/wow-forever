@@ -303,9 +303,14 @@ const aportesDe = (top) => (top || []).map((t) => ({ itemId: t.itemId, nombre: t
 
 // Evaluación del motor (FarmPlan.evaluate) en la forma del archivo del agente:
 // ranking de campamentos, cada mob elegible farmeado solo y los precios usados.
-function evaluacionAgente(ev) {
+function evaluacionAgente(ev, vistos = null) {
   if (!ev || !Array.isArray(ev.mobs)) return null
+  // Muertes en tus sesiones de WoWForeverFarm: la única verificación en Forever
+  // que tiene el plugin (los spawns y drops son de Classic 1.12).
+  const visto = (npcId) => (vistos && vistos.get ? vistos.get(Number(npcId)) || 0 : 0)
   const campo = (d) => ({
+    concentrado: d.concentrated ? { itemId: d.concentrated.itemId, nombre: d.concentrated.name, cuotaPct: pct(d.concentrated.share) } : null,
+    vistoMuertes: (d.members || []).reduce((n, m) => n + visto(m.npcId), 0),
     zona: d.zone, tipo: d.kind === 'clear' ? 'limpiar' : d.kind === 'target' ? 'solo' : d.kind, mobs: d.names,
     oroH: oro(d.gph), muertesH: r1(d.rate), spawns: d.spawns, riesgo: d.riskLevel || null,
     mapa: d.mapX != null ? [d.mapX, d.mapY] : null,
@@ -328,7 +333,7 @@ function evaluacionAgente(ev) {
 
 // Contexto para el agente (data/farmeo-agente.json). Solo agregados: sin
 // nombres de personaje, reino ni ruta de posiciones.
-export function exportAgente({ sesiones = [], metricas = [], estilo = null, plan = null, perfil = null, evaluacion = null, meta = null, ahora = new Date() } = {}) {
+export function exportAgente({ sesiones = [], metricas = [], estilo = null, plan = null, perfil = null, evaluacion = null, meta = null, vistos = null, ahora = new Date() } = {}) {
   const ses = metricas.slice(-50).map((m) => ({
     id: m.id, inicio: new Date(m.start * 1000).toISOString(), minutos: Math.round(m.activo / 60), pausaMin: Math.round(m.pausa / 60),
     zona: m.zona, combatePct: pct(m.combatePct), saqueoPct: pct(m.saqueoPct), restoPct: pct(m.restoPct),
@@ -366,8 +371,20 @@ export function exportAgente({ sesiones = [], metricas = [], estilo = null, plan
       meta: meta ? { metaOro: oro(meta.target), tengoOro: oro(meta.have), faltaOro: oro(meta.falta),
         horas: r1(meta.horas), horasRango: [r1(meta.horasMin), r1(meta.horasMax)] } : null,
     } : null,
-    evaluacion: evaluacionAgente(evaluacion),
+    evaluacion: evaluacionAgente(evaluacion, vistos),
   }
+}
+
+// npcId -> muertes en todas tus sesiones medidas (para «visto por ti en Forever»).
+export function vistosEnSesiones(sesiones) {
+  const m = new Map()
+  for (const s of Array.isArray(sesiones) ? sesiones : []) {
+    for (const [e, n] of Object.entries(s?.kills || {})) {
+      const id = Number(e)
+      if (Number.isSafeInteger(id) && id > 0 && Number.isFinite(n) && n > 0) m.set(id, (m.get(id) || 0) + n)
+    }
+  }
+  return m
 }
 
 export const _test = { conteo, conteo2, unidades, zonaPrincipal, mediana, DAY_MS, evaluacionAgente }

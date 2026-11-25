@@ -1696,6 +1696,18 @@ def linea_campo(c, out, prefijo="  "):
         f"monedas {pct_txt(c.get('monedasPct'))}")
 
 
+def avisos_campo(c, out, prefijo="  "):
+    co = c.get("concentrado")
+    if co:
+        out(f"{prefijo}Ojo: el {pct_txt(co.get('cuotaPct'))} del oro sale de {co.get('nombre')}. Si su precio o su drop "
+            "real en Forever difieren de Classic, el oro/h cambia casi en la misma proporción.")
+    if "vistoMuertes" in c:
+        if c.get("vistoMuertes"):
+            out(f"{prefijo}[tus sesiones] Visto en Forever: {c['vistoMuertes']} muertes en tus sesiones medidas.")
+        else:
+            out(f"{prefijo}Sin verificar en Forever: ninguna de tus sesiones lo mató (spawns y drops de Classic 1.12).")
+
+
 def lineas_aportes(c, precios, out, n=4):
     for x in (c.get("aportes") or [])[:n]:
         pr = precios.get(str(x.get("itemId"))) or {}
@@ -1751,6 +1763,7 @@ def cmd_farmeo_mob(D, a, out):
             linea_campo(m, out)
             out("  Aportes:")
             lineas_aportes(m, precios, out)
+            avisos_campo(m, out)
             camps = [(i + 1, c) for i, c in enumerate(ev.get("ranking") or []) if m.get("nombre") in (c.get("mobs") or [])]
             for i, c in camps[:3]:
                 out(f"  En el ranking: #{i} {c.get('tipo')} {', '.join(c.get('mobs') or [])} · {c.get('zona')} ≈{oro_txt(c.get('oroH'))}/h")
@@ -1809,6 +1822,7 @@ def cmd_farmeo_ranking(D, a, out):
     for i, c in enumerate((ev.get("ranking") or [])[:a.max]):
         out(f"{i + 1:>2}. {c.get('zona')} · {c.get('tipo')} {', '.join(c.get('mobs') or [])}")
         linea_campo(c, out, prefijo="    ")
+        avisos_campo(c, out, prefijo="    ")
         ap = c.get("aportes") or []
         if ap:
             out("    Aporta: " + ", ".join(

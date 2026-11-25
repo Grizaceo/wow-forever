@@ -245,3 +245,16 @@ test('goal: horas hasta la meta con el oro/h central y el rango del plan', () =>
   assert.equal(P.goal(null, 1000000, 0), null, 'sin plan')
   assert.equal(P.goal({ gph: 0, low: 0, high: 0 }, 1000000, 0).horas, null, 'un plan que no rinde no da horas')
 })
+
+test('describe: avisa cuando un solo ítem sostiene ≥ 80 % del oro', () => {
+  const P = fresh()
+  P.configure({ HunterDropData: dataset() })
+  const market = P.marketModel([hist(900, [3500], 500), hist(901, [2000], 500)])
+  const ctx = { profile: profile(), market, caps: P.sellCaps(market, null, { kappa: 10 }), settings: { pvp: false } }
+  const ev = P.evaluate(ctx)
+  const aire = ev.mobs.find(m => m.npcId === 10)
+  assert.equal(aire.concentrated.itemId, 900, 'el aire es 100 % un ítem')
+  assert.ok(aire.concentrated.share >= P.CONC_SHARE)
+  const mixto = ev.ranking.find(d => d.kind === 'clear')
+  assert.ok(mixto.top[0].share < P.CONC_SHARE ? mixto.concentrated === null : mixto.concentrated !== null, 'coherente con su reparto')
+})

@@ -17726,6 +17726,7 @@ var require_farm_plan = __commonJS({
       // ± relativo de ritmo para el rango pesimista/optimista
       source: "default"
     });
+    var CONC_SHARE = 0.8;
     var PARAMS = Object.freeze({ kappa: 0.05, windowDays: 14, maxUp: 2, maxDown: 15, minCampShare: 0.8 });
     var D2 = null;
     var IDX = null;
@@ -18077,6 +18078,7 @@ var require_farm_plan = __commonJS({
         units: p.units,
         ahUnits: p.ahUnits
       }));
+      const concentrated = top[0] && top[0].share >= CONC_SHARE ? { itemId: top[0].itemId, name: top[0].name, share: top[0].share } : null;
       return {
         id: f.id,
         kind: f.kind,
@@ -18085,6 +18087,7 @@ var require_farm_plan = __commonJS({
         names: f.names,
         members: f.members,
         spawns: f.spawns,
+        concentrated,
         mapX: f.mapX ?? null,
         mapY: f.mapY ?? null,
         nnYards: f.nnYards,
@@ -18221,6 +18224,7 @@ var require_farm_plan = __commonJS({
       THIN_MAX_AVAIL,
       N0_DROPS,
       N0_COINS,
+      CONC_SHARE,
       ammoCost,
       zoneName,
       itemName,
@@ -82383,7 +82387,8 @@ function Composicion({ f, lang }) {
     pct2(f.vendorShare)
   ] });
 }
-function FilaCampamento({ f, lang, itemShare = null, itemPerHour = null, testid = "farm-campamento" }) {
+function FilaCampamento({ f, lang, itemShare = null, itemPerHour = null, testid = "farm-campamento", vistos = null }) {
+  const muertesVistas = vistos ? (f.members || []).reduce((n, m) => n + (vistos.get(Number(m.npcId)) || 0), 0) : null;
   return /* @__PURE__ */ jsxs17("li", { "data-testid": testid, style: { marginBottom: 4, overflowWrap: "anywhere" }, children: [
     /* @__PURE__ */ jsxs17("b", { children: [
       "~",
@@ -82413,6 +82418,19 @@ function FilaCampamento({ f, lang, itemShare = null, itemPerHour = null, testid 
         " ",
         f.riskLevel
       ] }) : null
+    ] }),
+    (f.concentrated || muertesVistas != null) && /* @__PURE__ */ jsxs17("div", { style: S.etiqueta, children: [
+      muertesVistas != null && (muertesVistas > 0 ? /* @__PURE__ */ jsx17("span", { "data-testid": "farm-visto", style: { color: C.verde }, children: cp(lang, `visto por ti en Forever (${muertesVistas}\
+ muertes)`, `seen by you in Forever (${muertesVistas} kills)`) }) : /* @__PURE__ */ jsx17("span", { "data-testid": "farm-sin-verificar", children: cp(lang, "sin verificar en Forever: ninguna sesión tu\
+ya lo mató", "unverified in Forever: none of your sessions killed it") })),
+      f.concentrated && /* @__PURE__ */ jsxs17("span", { "data-testid": "farm-concentrado", style: { color: C.amarillo }, children: [
+        muertesVistas != null ? " · " : "",
+        cp(
+          lang,
+          `${pct2(f.concentrated.share)} sale de ${f.concentrated.name}: si su precio o su drop en Forever cambian, el oro/h cambia casi igual`,
+          `${pct2(f.concentrated.share)} comes from ${f.concentrated.name}: if its price or Forever drop rate differ, gold/h moves almost the same`
+        )
+      ] })
     ] })
   ] });
 }
@@ -83494,9 +83512,12 @@ var aportesDe = (top) => (top || []).map((t2) => ({
   unidadesH: r1(t2.units),
   subastaH: r1(t2.ahUnits)
 }));
-function evaluacionAgente(ev) {
+function evaluacionAgente(ev, vistos = null) {
   if (!ev || !Array.isArray(ev.mobs)) return null;
+  const visto = (npcId) => vistos && vistos.get ? vistos.get(Number(npcId)) || 0 : 0;
   const campo = (d) => ({
+    concentrado: d.concentrated ? { itemId: d.concentrated.itemId, nombre: d.concentrated.name, cuotaPct: pct3(d.concentrated.share) } : null,
+    vistoMuertes: (d.members || []).reduce((n, m) => n + visto(m.npcId), 0),
     zona: d.zone,
     tipo: d.kind === "clear" ? "limpiar" : d.kind === "target" ? "solo" : d.kind,
     mobs: d.names,
@@ -83534,7 +83555,7 @@ function evaluacionAgente(ev) {
     precios
   };
 }
-function exportAgente({ sesiones = [], metricas = [], estilo = null, plan = null, perfil = null, evaluacion = null, meta = null, ahora = /* @__PURE__ */ new Date() } = {}) {
+function exportAgente({ sesiones = [], metricas = [], estilo = null, plan = null, perfil = null, evaluacion = null, meta = null, vistos = null, ahora = /* @__PURE__ */ new Date() } = {}) {
   const ses = metricas.slice(-50).map((m) => ({
     id: m.id,
     inicio: new Date(m.start * 1e3).toISOString(),
@@ -83615,8 +83636,18 @@ function exportAgente({ sesiones = [], metricas = [], estilo = null, plan = null
         horasRango: [r1(meta.horasMin), r1(meta.horasMax)]
       } : null
     } : null,
-    evaluacion: evaluacionAgente(evaluacion)
+    evaluacion: evaluacionAgente(evaluacion, vistos)
   };
+}
+function vistosEnSesiones(sesiones) {
+  const m = /* @__PURE__ */ new Map();
+  for (const s of Array.isArray(sesiones) ? sesiones : []) {
+    for (const [e, n] of Object.entries(s?.kills || {})) {
+      const id = Number(e);
+      if (Number.isSafeInteger(id) && id > 0 && Number.isFinite(n) && n > 0) m.set(id, (m.get(id) || 0) + n);
+    }
+  }
+  return m;
 }
 
 // src/farm-sync.js
@@ -84043,6 +84074,7 @@ function Farmeo({ ctx, items, perfil, settings, onSettings, lang, planCtx, sesio
       return [];
     }
   }, [items, planCtx]);
+  const vistos = useMemo16(() => vistosEnSesiones(sesiones), [sesiones]);
   const meta = useMemo16(() => plan?.best && settings.meta > 0 ? FarmPlan.goal(plan.best, settings.meta * 1e4, (settings.tengo || 0) * 1e4) : null, [plan, settings.meta, settings.tengo]);
   const evaluacion = useMemo16(() => {
     if (!items?.length || !planCtx) return null;
@@ -84099,7 +84131,7 @@ function Farmeo({ ctx, items, perfil, settings, onSettings, lang, planCtx, sesio
   const ultimo = useRef2("");
   useEffect7(() => {
     if (!ctx?.files?.writeText || !metricas.length && !plan) return;
-    const payload = exportAgente({ sesiones, metricas, estilo, plan, perfil, evaluacion, meta });
+    const payload = exportAgente({ sesiones, metricas, estilo, plan, perfil, evaluacion, meta, vistos });
     const firma = JSON.stringify({ ...payload, generado: null });
     if (firma === ultimo.current) return;
     const h = setTimeout(async () => {
@@ -84109,7 +84141,7 @@ function Farmeo({ ctx, items, perfil, settings, onSettings, lang, planCtx, sesio
       }
     }, 1500);
     return () => clearTimeout(h);
-  }, [ctx, sesiones, metricas, estilo, plan, perfil, evaluacion, meta, lang]);
+  }, [ctx, sesiones, metricas, estilo, plan, perfil, evaluacion, meta, vistos, lang]);
   const snapshotDavi = useMemo16(() => construirContextoFarmeo({
     plan,
     estilo,
@@ -84172,7 +84204,7 @@ urself: /wff start, fish (the first catch starts the clock), /wff stop and /relo
           ) }),
           ranking.length > 0 && /* @__PURE__ */ jsxs20("div", { children: [
             /* @__PURE__ */ jsx20("h4", { style: { ...S.titulo, fontSize: 13, margin: "6px 0 2px" }, children: cp3(lang, "Mejores campamentos (1 h, cada uno solo)", "Best camps (1 h, each on its own)") }),
-            /* @__PURE__ */ jsx20("ul", { style: { margin: 0, paddingLeft: 18, fontSize: 12 }, children: ranking.map((f) => /* @__PURE__ */ jsx20(FilaCampamento, { f, lang }, f.id)) })
+            /* @__PURE__ */ jsx20("ul", { style: { margin: 0, paddingLeft: 18, fontSize: 12 }, children: ranking.map((f) => /* @__PURE__ */ jsx20(FilaCampamento, { f, lang, vistos }, f.id)) })
           ] })
         ] }),
         /* @__PURE__ */ jsx20("h4", { style: { ...S.titulo, fontSize: 13, margin: "6px 0 0" }, children: cp3(lang, "Mis sesiones (WoWForeverFarm)", "My sessions (WoWForeverFarm)") }),
