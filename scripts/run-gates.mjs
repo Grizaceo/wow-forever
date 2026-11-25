@@ -46,7 +46,7 @@ const EXPECT_LUA = expected('LUA', 180);
 // Tests unitarios del motor en standalone/tests/*.cjs (node:test). Los «real
 // fixture» son stat-only por defecto; WOW_FOREVER_REAL_FIXTURE=1 los hace leer
 // contenido de SavedVariables (solo para diagnóstico manual, nunca en gates).
-const EXPECT_CJS = expected('CJS', 123);
+const EXPECT_CJS = expected('CJS', 129);
 const BROWSER = [
   ['navegador', process.env.HERMES_SDK_TABS === '1' ? 68 : 67], ['vista-clase', 23],
   ['mercado-auto', 14], ['mercado-procedencia', 24],

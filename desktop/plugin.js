@@ -12582,6 +12582,7 @@ var require_market_farm = __commonJS({
       const GATHER_SEC = 10, TRAVEL_SEC = { mob: 15, object: 45 };
       const RARE_K = 0.2, RARE_ZONE_MAX = 1, CHEST_OPEN_RATE = 0.05, CHEST_ZONE_MAX = 4;
       const OUTLIER_VENDOR_MULT = 50, OUTLIER_MAX_AVAIL = 2;
+      const THIN_MAX_AVAIL = 5, PRICE_WINDOW_DAYS = 14;
       const COMP = { low: 1, med: 0.75, high: 0.45 }, COMP_ORDER2 = ["low", "med", "high"];
       const COMP_LABEL2 = { low: "baja", med: "media", high: "alta" };
       const CLASS_BIT = { warrior: 1, hunter: 4, shaman: 64 };
@@ -12602,14 +12603,16 @@ var require_market_farm = __commonJS({
       const pctF = (c) => c >= 0.095 ? `${Math.round(c * 100)}%` : `${(c * 100).toFixed(1).replace(/\.0$/, "")}%`;
       const MODEL = {
         risk: { heuristic: true, basis: "facción + PvP; sin datos de población" },
-        competition: { heuristic: true, basis: "selección manual + hub/horario pico; sin datos de población" },
+        competition: { heuristic: true, basis: "selección manual + hub de tu ruta de nivel; sin datos de población (la hora del reloj no cuenta)" },
         travel: { heuristic: true, basis: "flight paths Classic 1.12 aproximados + duración de sesión" },
         liquidity: { heuristic: true, basis: "proxy de profundidad de oferta anunciada; no mide volumen vendido" },
         outlier: { heuristic: true, basis: `freno conservador: ≤${OUTLIER_MAX_AVAIL} ofertas y >${OUTLIER_VENDOR_MULT}× vendedor; legitimidad no verificable offline` },
-        usefulBonus: { heuristic: true, basis: "conteo de ítems útiles, aplicado sólo a AH; sin valoración marginal" },
+        usefulBonus: { heuristic: true, basis: "conteo de ítems útiles; solo información, no entra al puntaje (objetivo: oro)" },
+        price: { heuristic: false, basis: `mediana de mínimos diarios de los últimos ${PRICE_WINDOW_DAYS} días; sin historial, último mínimo` },
+        thin: { heuristic: true, basis: `≤${THIN_MAX_AVAIL} ofertas: sin canal de subasta, solo vendedor` },
         rare: { heuristic: true, basis: "RARE_K=0,2/h sólo si falta respawn; con dato se usa la cota física" },
         roi: { heuristic: false, basis: "retorno/coste unitario con coste imputado por tiempo; NO ROI sobre capital" },
-        itemMetrics: { liquidityApplied: false, basis: "métricas por ítem no integran L" },
+        itemMetrics: { liquidityApplied: true, basis: "L se aplica igual que en la vía de zona; SIN DATOS = sin ajuste" },
         zoneEntry: { liquidityApplied: true, basis: "L se aplica en la vía de zona; SIN DATOS = sin ajuste" }
       };
       function validCampWeights(w) {
@@ -13030,18 +13033,45 @@ ah", chance: s[2] / 100, avgCount: (s[3] + s[4]) / 2, objKind: o[1], origin: "cm
       function rate(src, level) {
         return rateInfo(src, level).rate;
       }
+      function windowPrice(it) {
+        const hist = Array.isArray(it?.history) ? it.history : [], end = Number.isSafeInteger(it?.observedDay) ? it.observedDay : null;
+        const lows = [];
+        for (const h of hist) {
+          if (!h || !Number.isSafeInteger(h.low) || h.low <= 0 || !Number.isSafeInteger(h.day)) continue;
+          if (end != null && (h.day > end || h.day <= end - PRICE_WINDOW_DAYS)) continue;
+          lows.push(h.low);
+        }
+        if (!lows.length) return { price: it?.unitPriceCopper || 0, days: 0, basis: "último mínimo" };
+        lows.sort((a, b) => a - b);
+        const m = lows.length >> 1, med = lows.length % 2 ? lows[m] : Math.round((lows[m - 1] + lows[m]) / 2);
+        return { price: med, days: lows.length, basis: "mediana de la ventana" };
+      }
       function refPrice(it) {
         const h = Array.isArray(it?.history) ? it.history.find((x) => x.day === it.observedDay) : null;
         const avail = h?.available ?? null;
-        const sell = it?.sellPriceCopper || IX.items[String(it?.itemId)]?.[9] || 0, price = it?.unitPriceCopper || 0;
-        const c = clampOutlier(price, sell, avail);
-        return { price: c.price, sell, doubtful: c.doubtful, clamped: c.clamped, rule: c.rule, vendorFloor: c.price <= 0 && sell > 0 };
+        const sell = it?.sellPriceCopper || IX?.items?.[String(it?.itemId)]?.[9] || 0, wp = windowPrice(it);
+        const c = clampOutlier(wp.price, sell, avail);
+        const thin = Number.isFinite(avail) && avail >= 0 && avail <= THIN_MAX_AVAIL;
+        const ahNet = thin ? 0 : Math.floor(c.price * (1 - AH_CUT));
+        const vendorFloor = sell > 0 && ahNet <= sell;
+        return {
+          price: c.price,
+          sell,
+          doubtful: c.doubtful,
+          clamped: c.clamped,
+          rule: c.rule,
+          vendorFloor,
+          thin,
+          ahNet,
+          priceDays: wp.days,
+          priceBasis: wp.basis
+        };
       }
       function metrics(src, it, settings, level) {
         const ri = rateInfo(src, level), K = ri.rate, u = src.chance * (src.avgCount || 1);
         const rp = refPrice(it);
         const vendorFloor = rp.vendorFloor;
-        const net = vendorFloor ? rp.sell : Math.floor(rp.price * (1 - AH_CUT));
+        const net = vendorFloor ? rp.sell : rp.ahNet;
         const gph = K * u * net, denom = K * u;
         const farmCost = denom > 0 ? (settings.gph || 5) * 1e4 / denom : Infinity;
         const margin = net - farmCost;
@@ -13068,6 +13098,8 @@ ah", chance: s[2] / 100, avgCount: (s[3] + s[4]) / 2, objKind: o[1], origin: "cm
           clamped: rp.clamped,
           clampRule: rp.rule,
           vendorFloor,
+          thin: rp.thin,
+          priceDays: rp.priceDays,
           liquidityApplied: MODEL.itemMetrics.liquidityApplied,
           model: MODEL.roi
         };
@@ -13270,7 +13302,7 @@ un'goro crater", "dustwallow": "dustwallow marsh" };
           sources: [],
           roiLabel: "retorno/coste",
           roiNote: MODEL.roi.basis,
-          liquidityApplied: false,
+          liquidityApplied: true,
           model: MODEL.roi
         };
         index();
@@ -13280,8 +13312,11 @@ un'goro crater", "dustwallow": "dustwallow marsh" };
         profile = profile || {};
         const level = profile.level || 12, st = normalizeSettings(settings);
         const targetCopper = st.gph * 1e4;
+        const liq = liquidityInfo(scanItem, today()), L = liq.factor == null ? 1 : liq.factor;
+        out.liquidity = liq;
         const all = normSources(String(id)).map((src) => {
-          const e = eligible(src, profile, st), camp = metrics(src, scanItem, st, level);
+          const e = eligible(src, profile, st), camp0 = metrics(src, scanItem, st, level);
+          const camp = camp0.vendorFloor || L === 1 ? camp0 : { ...camp0, gph: camp0.gph * L };
           const z = IX.zones[src.zoneKey];
           const travel = travelFor(z?.[0], profile.fac, profile.hubZones, st.session);
           const risk = riskFor(z?.[2], profile, st);
@@ -13391,9 +13426,9 @@ un'goro crater", "dustwallow": "dustwallow marsh" };
         const ov = settings.zoneComp[zk];
         if (ov) return { comp: ov, why: "manual para esta zona", heuristic: true, basis: MODEL.competition.basis };
         if (settings.comp !== "auto") return { comp: settings.comp, why: "manual global", heuristic: true, basis: MODEL.competition.basis };
-        const hour = (/* @__PURE__ */ new Date()).getHours(), hub = zoneInHub(zname, profile.hubZones), peak = hour >= 18 && hour <= 23;
-        const comp = COMP_ORDER2[Math.min(2, 1 + (hub ? 1 : 0) + (peak ? 1 : 0))];
-        const why = "auto" + (hub && peak ? " (hub de tu guía + horario pico)" : hub ? " (hub de tu guía)" : peak ? " (horario pico)" : "");
+        const hub = zoneInHub(zname, profile.hubZones);
+        const comp = COMP_ORDER2[hub ? 2 : 1];
+        const why = "auto" + (hub ? " (hub de tu guía)" : "");
         return { comp, why, heuristic: true, basis: MODEL.competition.basis };
       }
       function riskFor(zfac, profile, settings) {
@@ -13569,7 +13604,7 @@ un'goro crater", "dustwallow": "dustwallow marsh" };
           iid)?.history || [], price: sess.scan.get(iid)?.unitPriceCopper });
         }
         useful.sort((a, b) => b.v - a.v || Number(b.isRare) - Number(a.isRare) || a.name.localeCompare(b.name));
-        const ub = usefulBonusFor(useful.length), usefulBonus = ub.factor;
+        const ub = usefulBonusFor(useful.length), usefulBonus = 0;
         for (const c of camps) c.value = c.ah + c.vendor;
         camps.sort((a, b) => b.value - a.value);
         const weights = settings.campMode === "rotation" && validCampWeights(settings.campWeights) ? settings.campWeights : [1, 0, 0];
@@ -13582,8 +13617,8 @@ un'goro crater", "dustwallow": "dustwallow marsh" };
         const total = ahTotal + vendorValue;
         const risk = riskFor(zfac, profile, settings), comp = compFor(zk, zname, settings, profile);
         const travel = travelFor(zname, profile.fac, profile.hubZones, settings.session);
-        const score = (ahTotal * (1 + usefulBonus) + vendorValue) * risk.mult * COMP[comp.comp] * travel.factor;
-        const scoreNoBonus = total * risk.mult * COMP[comp.comp] * travel.factor;
+        const score = total * risk.mult * COMP[comp.comp] * travel.factor;
+        const scoreNoBonus = score;
         if (!(score > 0) || !isFinite(score)) return null;
         const topItems = [...itemZone.entries()].filter(([, a]) => a.v > 0).sort((a, b) => b[1].v - a[1].v).slice(0, 3).map(([iid, a]) => {
           const inf = sess.info.get(iid), scanIt = sess.scan.get(iid);
@@ -13597,8 +13632,7 @@ un'goro crater", "dustwallow": "dustwallow marsh" };
 multaneidad asumida`);
         if (rares.size) reasons.push(`${rares.size} rareza${rares.size > 1 ? "s" : ""} en zona (${rareScan} con ítems de tu scan)${rareApprox ? " — tasa 0,2/h aproximada sin respawn" : ""}`);
         if (chestSpots) reasons.push(`${chestSpots} puntos de cofre conocidos (no simultáneos)`);
-        if (useful.length) reasons.push(`${useful.length} ítem${useful.length > 1 ? "s" : ""} útil${useful.length > 1 ? "es" : ""} para ${clsName} · bonus +${pctF(usefulBonus)} heurístico (conteo, \
-sólo AH)`);
+        if (useful.length) reasons.push(`${useful.length} ítem${useful.length > 1 ? "s" : ""} útil${useful.length > 1 ? "es" : ""} para ${clsName} (información; no suma al oro estimado)`);
         if (liqUnknown) reasons.push(`Liquidez SIN DATOS en ${liqUnknown} drops: sin ajuste; available es oferta, no venta`);
         reasons.push(risk.note || (isInst ? "Riesgo bajo: instancia" : "Riesgo bajo: territorio propio"));
         reasons.push(`Riesgo y competencia: heurísticos, sin datos de población (${risk.level}, ${COMP_LABEL2[comp.comp]}) — ${comp.why}`);
