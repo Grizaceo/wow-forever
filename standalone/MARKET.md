@@ -221,9 +221,12 @@ generados offline. Nada se consulta en red ni en el juego.
   marcas/derechos de Blizzard Entertainment: uso no comercial, sin afiliación.
   **Spawns de evento excluidos** (2.2.1): los que solo existen mientras corre un
   evento del mundo (`game_event_creature`/`game_event_gameobject` con evento
-  positivo: guerra de AQ, invasiones elementales, festividades) no entran. Se
-  conservan los eventos que se repiten cada día (`occurence` ≤ 1440 min, p. ej.
-  «Nights»: Leprithus y los Ghoul de Westfall salen todas las noches). Antes,
+  positivo: guerra de AQ, invasiones elementales, festividades) no entran, ni los
+  grupos de spawns que solo aparecen con el world state de la guerra de AQ (2099,
+  p. ej. el asedio de Cenarion Hold) o del Fishing Extravaganza (6035). Se
+  conservan los eventos que se repiten cada día por sí solos (`occurence` ≤ 1440
+  min y sin evento padre, p. ej. «Nights»: Leprithus y los Ghoul de Westfall
+  salen todas las noches); los subeventos diarios de Hallow's End no. Antes,
   la élite de la invasión de AQ en Thousand Needles (Lesser Anubisath
   Warbringer) salía primera en el ranking a nivel 40.
 - **Privada — `drop-data-private.js` → `window.HunterDropDataPrivate`**
@@ -435,7 +438,7 @@ todas las capas: 3014 (67.3%). IDs exclusivos de Forever (>25000): 622, de
 los cuales 81 tienen cobertura. La fracción del valor listado (precio ×
 cantidad ofertada) con cobertura es 76.5%. Esas cifras se midieron con el
 dataset anterior a 2.2.1 (5424 ítems, 2477 mobs, 183 objetos); sin los spawns
-de evento contiene 5398 ítems, 2460 mobs, 173 objetos y 72 zonas. La capa
+de evento contiene 5401 ítems, 2460 mobs, 173 objetos y 72 zonas. La capa
 privada: 484 rares y 52 contenedores.
 
 ## Seguridad, persistencia y recuperación
