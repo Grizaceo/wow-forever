@@ -43,6 +43,7 @@ function expected(name, fallback) {
 const EXPECT_NODE = expected('NODE', 425);
 const EXPECT_PY = expected('PY', 129);
 const EXPECT_LUA = expected('LUA', 180);
+const EXPECT_LUA_FARM = expected('LUA_FARM', 88);
 // Tests unitarios del motor en standalone/tests/*.cjs (node:test). Los «real
 // fixture» son stat-only por defecto; WOW_FOREVER_REAL_FIXTURE=1 los hace leer
 // contenido de SavedVariables (solo para diagnóstico manual, nunca en gates).
@@ -165,6 +166,12 @@ if (NO_LUA) {
     const fallos = num(/(\d+) fallos/, r.out);
     const ok = r.code === 0 && fallos === 0 && checks === EXPECT_LUA;
     record('lua bridge', EXPECT_LUA, checks, ok, ok ? `fallos=${fallos}` : `fallos=${fallos}\n${tail(r.out)}`);
+    // 3b) contador de sesiones WoWForeverFarm (addon hermano)
+    const rf = sh(luaPath, ['addon/tests/test_farm.lua']);
+    const cf = num(/(\d+) checks/, rf.out);
+    const ff = num(/(\d+) fallos/, rf.out);
+    const okf = rf.code === 0 && ff === 0 && cf === EXPECT_LUA_FARM;
+    record('lua farm', EXPECT_LUA_FARM, cf, okf, okf ? `fallos=${ff}` : `fallos=${ff}\n${tail(rf.out)}`);
   }
 }
 

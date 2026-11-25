@@ -1,0 +1,11 @@
+## Interface: 120100, 120105, 16001, 50504, 38000, 20506, 11508, 11509
+## Title: WoW Forever Farm
+## Notes: Farming session counter for the WoW Forever Hermes plugin: time, combat, looting, kills, loot per mob and money. Nothing leaves your PC.
+## Notes-esES: Contador de sesiones de farmeo para el plugin WoW Forever de Hermes: tiempo, combate, saqueo, muertes, botín por mob y dinero. Nada sale de tu PC.
+## Author: DAVI + Cristóbal
+## Version: 0.1.0
+## SavedVariables: WoWForeverFarmDB
+## OptionalDeps: Auctionator
+
+Logic.lua
+Farm.lua
