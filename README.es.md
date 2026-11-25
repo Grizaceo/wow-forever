@@ -9,7 +9,10 @@ facción, con una skill para que tu agente responda con los mismos datos.
 
 ## Estado
 
-- Versión 2.2.0: resumen descriptivo de ventas propias TSM, con límites de evidencia y sin
+- Versión 2.4.0: farmeo para ganar oro, con un plan de sesión que puntúa el oro que de verdad
+  te queda por hora (el valor completo de cada muerte, un tope de venta por ítem, campamentos
+  reales) y el addon WoWForeverFarm para medir tus sesiones en el juego, aún no verificado en
+  el cliente de Forever. La 2.2.0 añadió un resumen descriptivo de ventas propias TSM, con límites de evidencia y sin
   comparación implícita con Auctionator. Probado con fixtures sintéticas, no validado con
   una cuenta real. Interfaz en inglés por defecto, con español opcional.
   El mercado muestra la miniatura de cada ítem, ligada a su id. La 2.0.0 añadió el mercado

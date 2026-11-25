@@ -9,7 +9,10 @@ faction, with a skill so your agent answers from the same data.
 
 ## Status
 
-- Version 2.2.0 adds a descriptive summary of personal TSM auction sales, with explicit
+- Version 2.4.0 adds farming for gold: a session plan scored by the gold you actually keep per
+  hour (the full value of each kill, a sell cap per item, real camps), and the companion
+  WoWForeverFarm addon to measure your sessions in-game, not yet verified on the Forever
+  client. Version 2.2.0 added a descriptive summary of personal TSM auction sales, with explicit
   evidence limits and no implicit Auctionator comparison. Tested with synthetic fixtures,
   not validated against a live player account. English is the default UI, Spanish optional. The
   market shows each item's thumbnail, tied to its item id. Version 2.0.0 added the local
