@@ -65,7 +65,8 @@ test('parseFarm: normaliza sesiones válidas y separa la abierta', () => {
   assert.equal(s.kills['4127'], 60)
   assert.equal(s.skinItems['4127']['4234'], 50)
   assert.equal(s.money.merchant, 20000)
-  assert.deepEqual(s.killBy, { target: 70, cleu: 0, loot: 10 })
+  assert.deepEqual(s.killBy, { party: 0, died: 0, xp: 0, slain: 0, dies: 0, target: 70, loot: 10, cleu: 0 })
+  assert.equal(s.killsAnon, 0); assert.equal(s.travel, 0); assert.deepEqual(s.got, {})
   assert.equal(s.methods.target, true)
   assert.equal(s.methods.cleu, false)
   assert.equal(s.open, false)
@@ -179,4 +180,49 @@ test('exportAgente: agregados en oro, sin nombres ni ruta', () => {
   assert.ok(!txt.includes('NO-DEBE-SALIR'))
   assert.ok(!txt.includes('1443:50.0'), 'la ruta de posiciones no sale')
   assert.equal(e.plan, null)
+})
+
+// Addon 0.2.0: sin registro de combate (Forever lo cierra). Muertes por PARTY_KILL,
+// XP y cadáveres; algunas sin mob conocido; botín recibido según el chat; viaje.
+const SV2 = `WoWForeverFarmDB = {
+["version"] = 1,
+["sessions"] = {
+{
+["v"] = 1, ["start"] = 1795700000, ["stop"] = 1795703700, ["level"] = 40, ["class"] = "HUNTER",
+["active"] = 3600, ["travel"] = 240, ["deadTime"] = 90, ["xp"] = 24000, ["paused"] = 0,
+["combat"] = 1800, ["looting"] = 300, ["fights"] = 80, ["deaths"] = 1,
+["kills"] = { [4127] = 70, }, ["killsAnon"] = 10,
+["killBy"] = { ["party"] = 72, ["xp"] = 3, ["loot"] = 5, ["raro"] = 9, },
+["signals"] = { ["party"] = 80, ["party_oculto"] = 10, ["xp"] = 75, ["otro"] = 1, },
+["corpses"] = { [4127] = 70, }, ["items"] = { [4127] = { [2589] = 20, }, },
+["got"] = { [2589] = 18, [4234] = 40, },
+["skins"] = {}, ["skinItems"] = {}, ["gather"] = {}, ["gatherItems"] = {}, ["other"] = {},
+["money"] = { ["loot"] = 4000, ["merchant"] = 0, ["other"] = 0, }, ["coinsBy"] = {}, ["zones"] = { [1443] = 3600, },
+["methods"] = { ["party"] = true, ["xp"] = true, ["loot"] = true, ["lootchat"] = true, ["secretos"] = true, },
+},
+},
+["ui"] = {},
+}
+`
+
+test('sesión 0.2.0: muertes sin mob, botín recibido, viaje, XP y avisos', () => {
+  const [s] = parseFarm(lua(SV2)).sessions
+  assert.equal(s.killsAnon, 10)
+  assert.equal(s.killBy.party, 72); assert.equal(s.killBy.raro, undefined, 'métodos desconocidos fuera')
+  assert.deepEqual(s.signals, { party: 80, party_oculto: 10, xp: 75 })
+  assert.equal(s.travel, 240); assert.equal(s.deadTime, 90); assert.equal(s.xp, 24000)
+  assert.equal(s.methods.party, true); assert.equal(s.methods.lootchat, true)
+  const m = metricasSesion(s, null, DATASET)
+  assert.equal(m.muertes, 80, 'las muertes sin mob cuentan en el total')
+  assert.equal(m.metodoMuertes, 'directo')
+  assert.equal(m.botinDe, 'chat')
+  assert.equal(m.items.find((x) => x.itemId === 2589).unidades, 18, 'manda lo recibido, no la ventana')
+  assert.equal(m.items.find((x) => x.itemId === 4234).unidades, 40)
+  assert.equal(m.viajeS, 240); assert.equal(m.muertoS, 90); assert.equal(Math.round(m.xpH), 24000)
+  // 10 de 80 sin mob (12,5 %) > 10 %: no se usa para tasas de drop por mob
+  assert.equal(observados([s]).sesiones, 0)
+  const casi = { ...s, killsAnon: 5 }
+  assert.equal(observados([casi]).sesiones, 1, 'con ≤10 % sin mob sí se usa')
+  const ag = exportAgente({ sesiones: [s], metricas: [m] })
+  assert.equal(ag.sesiones[0].viajeMin, 4); assert.equal(ag.sesiones[0].muertesSinMob, 10); assert.equal(ag.sesiones[0].botinDe, 'chat')
 })

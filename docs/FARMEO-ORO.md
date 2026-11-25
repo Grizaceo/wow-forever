@@ -90,10 +90,24 @@ total con rango (pesimista/central/optimista) y alternativas dentro del rango.
 
 ## Contador de sesión (WoWForeverFarm)
 
-En el juego: `/wff` muestra u oculta la ventana; `/wff start|pause|stop|reset`.
-Ventana: tiempo activo, % en combate, % saqueando, muertes y muertes/h, monedas y
-valor del botín (vendedor y subasta estimada vía la API pública de Auctionator si
-está), oro/h en vivo.
+En el juego: `/wff` muestra u oculta la ventana; `/wff start|ya|pause|resume|stop|reset|status|test`.
+Ventana: reloj, viaje, % en combate, % saqueando, muertes y muertes/h, monedas,
+valor de los objetos (vendedor y subasta estimada vía la API pública de Auctionator
+si está), oro/h en vivo y la **lista del botín recibido** (icono, cantidad y valor).
+
+**Reloj (como el registro de mazmorras de DungeonJournal):** `/wff start` arma la
+sesión y el reloj arranca al comienzo de la primera pelea con muerte (o del primer
+saqueo/recolección); el camino previo queda como `travel`. Así el ritmo medido es
+el del campamento, comparable con el que predice el motor; el viaje del plan se
+compara aparte.
+
+**Sin registro de combate.** Forever cierra `COMBAT_LOG_EVENT_*` a los addons. El
+addon de la comunidad DungeonJournal (Exehn) ya registra muertes en Forever con
+`PARTY_KILL`, `UNIT_DIED` y las líneas de chat de XP y de muerte, ignorando lo que
+llega como valor secreto; WoWForeverFarm sigue el mismo enfoque (código propio). Cada
+aviso de una misma muerte se junta en una sola (`Logic.killSignal`, ventana de 3 s);
+una muerte cuyo GUID llega oculto cuenta sin mob (`killsAnon`) y el saqueo posterior
+le pone mob.
 
 Eventos (solo API pública; todo protegido con `pcall` y detección de funciones):
 
@@ -102,15 +116,18 @@ Eventos (solo API pública; todo protegido con `pcall` y detección de funciones
 | Combate | `PLAYER_REGEN_DISABLED/ENABLED` |
 | Saqueo, botín y origen | `LOOT_READY`/`LOOT_OPENED`/`LOOT_CLOSED`, `GetLootSlotInfo/Link/Type`, `GetLootSourceInfo` (GUID → npcId/objeto) |
 | Desuello / recolección | segundo saqueo del mismo GUID de criatura / GUID de objeto |
-| Muertes | GUIDs muertos vistos por objetivo (`UnitIsDead`), `PARTY_KILL` si el registro de combate está disponible, y GUIDs saqueados; se guarda qué método funcionó |
+| Muertes | `PARTY_KILL` (GUID o, si es secreto, muerte sin mob), `UNIT_DIED` de un mob que peleaba contigo (amenaza), `CHAT_MSG_COMBAT_XP_GAIN` y `CHAT_MSG_COMBAT_HOSTILE_DEATH` («Has matado X», nombre), cadáver visto (objetivo, mouseover, placas; no ajeno) y saqueado; `killBy` = método que la vio primero, `signals` = todos los avisos |
+| Botín recibido | `CHAT_MSG_LOOT` con `LOOT_ITEM_SELF(_MULTIPLE)` en el idioma del cliente (`got`); si no llega, lo de las ventanas de botín |
+| Tu muerte | `PLAYER_DEAD` → `PLAYER_ALIVE`/`PLAYER_UNGHOST` (`deadTime`) |
 | Monedas | `PLAYER_MONEY` (delta) dentro y fuera del saqueo, y ventas a vendedor (`MERCHANT_SHOW/CLOSED`) |
-| Muertes del jugador | `PLAYER_DEAD` |
 | Lugar | `C_Map.GetBestMapForUnit` + `C_Map.GetPlayerMapPosition` cada 10 s (si existe) |
 | Munición y bolsas | cuenta del slot de munición; casillas libres al inicio y al final |
 
 **Sin probar en Forever.** La API es Mainline 12.1.5 con restricciones de Midnight
-(valores secretos en combate). Lo que falle se degrada: el contador sigue midiendo
-tiempo y monedas, y la sesión guarda `metodos` para que el plugin sepa qué confiar.
+(valores secretos). Lo que falle se degrada: el contador sigue midiendo tiempo y
+monedas, y la sesión guarda `methods` y `signals` para que el plugin sepa qué confiar
+(`/wff test` muestra en el juego qué ve el contador). Las sesiones con más de 10 %
+de muertes sin mob no ajustan los drops por mob.
 Checklist de verificación en el juego: ver `addon/WoWForeverFarm/VERIFICAR.md`.
 
 ## Calibración y estilo del jugador

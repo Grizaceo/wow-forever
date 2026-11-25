@@ -130,18 +130,145 @@ local n = 0
 for kk in pairs(big.other) do if kk ~= '__n' then n = n + 1 end end
 eq(n, L.MAX_KEYS, 'tope de claves por tabla')
 
+
+-- ===== líneas de chat en el idioma del cliente
+local EN = {
+  lootMulti = L.pattern('You receive loot: %sx%d.', true),
+  loot = L.pattern('You receive loot: %s.', true),
+  xp = L.pattern('%s dies, you gain %d experience.', false),
+  slain = L.pattern('You have slain %s!', true),
+  dies = L.pattern('%s dies.', true),
+}
+local AIR = '|cffffffff|Hitem:7069::::::::40:::::|h[Elemental Air]|h|r'
+local iid, q = L.parseLoot('You receive loot: ' .. AIR .. 'x3.', EN)
+eq(iid, 7069, 'botín múltiple: ítem'); eq(q, 3, 'botín múltiple: cantidad')
+iid, q = L.parseLoot('You receive loot: ' .. AIR .. '.', EN)
+eq(iid, 7069, 'botín simple: ítem'); eq(q, 1, 'botín simple: 1')
+iid = L.parseLoot('[Loot]: You receive loot: ' .. AIR .. '.', EN)
+eq(iid, 7069, 'botín con etiqueta antepuesta')
+eq(L.parseLoot('Grommash receives loot: ' .. AIR .. '.', EN), nil, 'botín de otro jugador no cuenta')
+local xn, xa = L.parseXP('Whirlwind Shredder dies, you gain 120 experience. (+60 exp Rested bonus)', EN.xp)
+eq(xn, 'Whirlwind Shredder', 'XP: nombre'); eq(xa, 120, 'XP: cantidad sin el bonus')
+xn, xa = L.parseXP('Rock Elemental dies, you gain 1,234 experience.', EN.xp)
+eq(xa, 1234, 'XP con separador de miles')
+eq(L.match(EN.slain, 'You have slain Ridge Huntress!')[1], 'Ridge Huntress', '«Has matado»')
+eq(L.match(EN.dies, 'Ridge Huntress dies.')[1], 'Ridge Huntress', '«X muere.»')
+local pos = L.match(L.pattern('%2$s gana %1$d.', true), 'Ana gana 5.')
+eq(pos and pos[2], 'Ana', 'formato posicional: segundo argumento'); eq(pos and pos[1], '5', 'formato posicional: primero')
+eq(L.pattern(nil), nil, 'sin formato no hay patrón'); eq(L.match(nil, 'x'), nil, 'sin patrón no hay coincidencia')
+
+-- ===== muertes sin registro de combate: avisos de una misma muerte se juntan
+local GA, GB = 'Creature-0-1-1-1-2732-A', 'Creature-0-1-1-1-2732-B'
+local w = L.newSession(0, {})
+ok(L.killSignal(w, 10, { how = 'party', guid = GA }), 'PARTY_KILL con GUID cuenta')
+ok(not L.killSignal(w, 10, { how = 'died', guid = GA }), 'UNIT_DIED del mismo GUID no duplica')
+ok(not L.killSignal(w, 11, { how = 'xp', name = 'Ridge Huntress', xp = 300 }), 'la línea de XP de esa muerte se junta')
+eq(w.kills[2732], 1, 'una muerte'); eq(w.xp, 300, 'XP sumada'); eq(w.killBy.party, 1, 'vista primero por PARTY_KILL')
+ok(L.killSignal(w, 12, { how = 'party', guid = GB }), 'otro GUID al mismo tiempo es otra muerte')
+-- dos PARTY_KILL ocultos a la vez (área) y sus dos líneas de XP
+ok(L.killSignal(w, 20, { how = 'party', hidden = true }), 'PARTY_KILL oculto cuenta')
+ok(L.killSignal(w, 20, { how = 'party', hidden = true }), 'segundo PARTY_KILL oculto cuenta')
+eq(w.killsAnon, 2, 'dos muertes sin mob conocido')
+ok(not L.killSignal(w, 20, { how = 'xp', name = 'Ridge Huntress', npc = 2732, xp = 300 }), 'XP pone nombre a la primera')
+ok(not L.killSignal(w, 21, { how = 'xp', name = 'Ridge Huntress', npc = 2732, xp = 300 }), 'XP pone nombre a la segunda')
+eq(w.killsAnon, 0, 'ninguna anónima'); eq(w.kills[2732], 4, 'cuatro muertes del mob')
+eq(w.signals.party, 4, 'avisos PARTY_KILL'); eq(w.signals.party_oculto, 2, 'avisos ocultos')
+-- muerte anónima y su cadáver saqueado más tarde: se le pone mob, no se duplica
+ok(L.killSignal(w, 30, { how = 'party', hidden = true }), 'otra oculta')
+ok(not L.killSignal(w, 45, { how = 'loot', guid = 'Creature-0-1-1-1-4127-C' }), 'el saqueo identifica la muerte oculta')
+eq(w.killsAnon, 0, 'ya no anónima'); eq(w.kills[4127], 1, 'era del mob 4127')
+-- muerte por nombre (sin GUID) y su cadáver saqueado
+ok(L.killSignal(w, 50, { how = 'xp', name = 'Ridge Huntress', npc = 2732, xp = 300 }), 'muerte solo por XP')
+ok(not L.killSignal(w, 60, { how = 'loot', guid = 'Creature-0-1-1-1-2732-D' }), 'su saqueo no la duplica')
+eq(w.kills[2732], 5, 'cinco del mob 2732')
+-- cadáver de una muerte que ningún aviso vio: cuenta
+ok(L.killSignal(w, 70, { how = 'loot', guid = 'Creature-0-1-1-1-4127-E' }), 'saqueo sin aviso previo cuenta')
+eq(w.killBy.loot, 1, 'vista primero por saqueo')
+ok(not L.killSignal(w, 71, { how = 'party', guid = 'Player-1-ABC' }), 'un jugador muerto no cuenta')
+eq(L.summary(w, 100, nil).kills, 7, 'resumen: total de muertes')
+-- «X muere.» de otra muerte en la ventana de fusión no se confunde con un nombre distinto
+local z = L.newSession(0, {})
+L.killSignal(z, 5, { how = 'party', guid = GA, name = 'Ridge Huntress' })
+ok(L.killSignal(z, 5, { how = 'slain', name = 'Rock Elemental' }), 'otro nombre en la ventana = otra muerte')
+ok(not L.killSignal(z, 6, { how = 'slain', name = 'Ridge Huntress' }), 'el mismo nombre se junta')
+
+-- ===== reloj: arranca en la primera pelea con muerte; lo anterior es viaje
+local a = L.newSession(100, {}, { armed = true })
+L.beat(a, 110)
+L.combatStart(a, 120)
+eq(L.summary(a, 122, nil).active, 0, 'armado: el reloj no corre')
+ok(L.killSignal(a, 125, { how = 'party', guid = GA }), 'primera muerte')
+L.combatEnd(a, 130)
+local as = L.summary(a, 160, nil)
+eq(as.armed, false, 'ya no espera'); eq(as.travel, 20, 'viaje hasta el comienzo de la pelea')
+eq(as.active, 40, 'reloj desde el comienzo de la pelea'); eq(as.combat, 10, 'la pelea cuenta entera'); eq(as.fights, 1, 'una pelea')
+local a2 = L.newSession(0, {}, { armed = true })
+L.combatStart(a2, 10); L.combatEnd(a2, 20)
+eq(L.summary(a2, 25, nil).combat, 0, 'pelea sin muerte antes de empezar no cuenta')
+L.loot(a2, { { guid = 'Creature-0-1-1-1-4127-F', itemId = 2589, qty = 1 } }, nil, 100)
+local a2s = L.summary(a2, 100, nil)
+eq(a2s.travel, 100, 'una pelea vieja no adelanta el reloj'); eq(a2s.fights, 0, 'ni suma peleas')
+local a3 = L.newSession(0, {}, { armed = true })
+L.loot(a3, { { guid = 'GameObject-0-1-1-1-1731-Z', itemId = 2770, qty = 1 } }, nil, 50)
+eq(L.summary(a3, 80, nil).active, 30, 'recolectar también arranca el reloj')
+local a4 = L.newSession(0, {}, { armed = true })
+ok(L.engage(a4, 40), '/wff ya arranca el reloj'); ok(not L.engage(a4, 50), 'solo una vez')
+eq(L.summary(a4, 60, nil).active, 20, 'reloj desde /wff ya')
+
+-- ===== lo recibido manda sobre la ventana; lista ordenada por valor
+local gotS = L.newSession(0, {})
+L.loot(gotS, { { guid = g1, itemId = 7069, qty = 2 }, { guid = g1, itemId = 2589, qty = 4 } })
+local pr = function(i) if i == 7069 then return 400, 5000 end if i == 2589 then return 10, nil end return 0, nil end
+local gs = L.summary(gotS, 3600, pr)
+eq(gs.itemsFrom, 'ventana', 'sin chat: ventanas de botín'); eq(gs.items[1].id, 7069, 'el más valioso primero')
+L.received(gotS, 7069, 1); L.received(gotS, 2589, 4)
+gs = L.summary(gotS, 3600, pr)
+eq(gs.itemsFrom, 'chat', 'con chat: lo recibido'); eq(gs.items[1].q, 1, 'solo 1 Aire entró (bolsas llenas)')
+eq(gs.lootAH, 5040, 'valor de lo recibido'); eq(#gs.items, 2, 'dos ítems en la lista')
+
+-- ===== tu muerte: tiempo de vuelta al cadáver
+local d = L.newSession(0, {})
+L.playerDead(d, 100); L.playerAlive(d, 160)
+local ds = L.summary(d, 200, nil)
+eq(ds.deaths, 1, 'una muerte tuya'); eq(ds.dead, 60, '60 s muerto')
+L.playerDead(d, 300)
+eq(L.summary(d, 330, nil).dead, 90, 'muerte abierta cuenta en vivo')
+eq(L.finish(d, 340).deadTime, 100, 'al cerrar se suma')
+
+-- ===== una sesión abierta con la versión 0.1.0 sigue funcionando
+local old = L.newSession(0, {})
+old.recent, old.noGuid, old.got, old.signals, old.killsAnon, old.travel, old.deadTime, old.xp = nil, nil, nil, nil, nil, nil, nil, nil
+old.killBy = { target = 0, cleu = 0, loot = 0 }
+local odb = L.ensure({ version = 1, sessions = {}, current = old })
+ok(L.killSignal(odb.current, 5, { how = 'party', guid = GA }), 'sesión vieja acepta avisos nuevos')
+ok(L.received(odb.current, 7069, 2), 'y botín recibido')
+eq(L.summary(odb.current, 10, nil).kills, 1, 'y resume')
+
 -- ===== Pegamento Farm.lua con API de WoW mockeada
 local nowValue = 5000
-local frames, handlers = {}, {}
+local frames = {}
+local SECRET = setmetatable({}, { __tostring = function() return 'secreto' end })
+_G.issecretvalue = function(v) return v == SECRET end
+local function newObj()
+  local o = { text = '', shown = true }
+  function o:SetPoint() end function o:SetSize() end function o:SetJustifyH() end function o:ClearAllPoints() end
+  function o:SetText(t) self.text = t end function o:SetTexture(t) self.tex = t end
+  function o:Show() self.shown = true end function o:Hide() self.shown = false end
+  return o
+end
 local function newFrame()
   local fr = { events = {}, scripts = {}, shown = false }
   function fr:RegisterEvent(ev) if ev == 'COMBAT_LOG_EVENT_UNFILTERED' then error('forbidden') end self.events[ev] = true end
   function fr:SetScript(name, fn) self.scripts[name] = fn end
   function fr:SetSize() end function fr:SetPoint() end function fr:SetMovable() end function fr:EnableMouse() end
   function fr:RegisterForDrag() end function fr:SetBackdrop() end function fr:SetBackdropColor() end
+  function fr:ClearAllPoints() end function fr:StopMovingOrSizing() end function fr:StartMoving() end
+  function fr:GetPoint() return 'TOPLEFT', nil, 'TOPLEFT', 12, -34 end
+  function fr:SetHeight(h) self.height = h end
   function fr:Show() self.shown = true end function fr:Hide() self.shown = false end function fr:IsShown() return self.shown end
   function fr:SetText(t) self.text = t end
-  function fr:CreateFontString() local fs = { text = '' } function fs:SetPoint() end function fs:SetJustifyH() end function fs:SetText(t) self.text = t end return fs end
+  function fr:CreateFontString() return newObj() end
+  function fr:CreateTexture() return newObj() end
   frames[#frames + 1] = fr
   return fr
 end
@@ -151,13 +278,28 @@ _G.time = function() return nowValue end
 local chatLog = {}
 _G.DEFAULT_CHAT_FRAME = { AddMessage = function(_, msg) chatLog[#chatLog + 1] = msg end }
 _G.SlashCmdList = {}
+_G.LOOT_ITEM_SELF = 'You receive loot: %s.'
+_G.LOOT_ITEM_SELF_MULTIPLE = 'You receive loot: %sx%d.'
+_G.COMBATLOG_XPGAIN_FIRSTPERSON = '%s dies, you gain %d experience.'
+_G.SELFKILLOTHER = 'You have slain %s!'
+_G.UNITDIESOTHER = '%s dies.'
 local money = 10000
 _G.GetMoney = function() return money end
 _G.UnitClass = function() return 'Cazador', 'HUNTER', 3 end
 _G.UnitFactionGroup = function() return 'Horde' end
 _G.UnitLevel = function() return 40 end
 _G.UnitAffectingCombat = function() return false end
-_G.GetItemInfo = function(iid) return 'x', nil, 1, 1, 1, 'x', 'x', 20, 'x', 'x', iid == 4234 and 60 or 10 end
+local target = nil   -- { guid=, name=, dead=, threat=, tapDenied= }
+_G.UnitExists = function(u) return u == 'target' and target ~= nil end
+_G.UnitIsPlayer = function() return false end
+_G.UnitGUID = function(u) return u == 'target' and target and target.guid or nil end
+_G.UnitName = function(u) return u == 'target' and target and target.name or nil end
+_G.UnitIsDead = function(u) return u == 'target' and target and target.dead or false end
+_G.UnitIsTapDenied = function(u) return u == 'target' and target and target.tapDenied or false end
+_G.UnitThreatSituation = function(who, u) return (who == 'player' and u == 'target' and target and target.threat) or nil end
+_G.UnitIsDeadOrGhost = function() return false end
+_G.GetItemInfo = function(iid) return 'Item' .. iid, nil, 1, 1, 1, 'x', 'x', 20, 'x', 'x', iid == 4234 and 60 or 10 end
+_G.ITEM_QUALITY_COLORS = { [1] = { hex = '|cffffffff' } }
 local lootWin = {}
 _G.GetNumLootItems = function() return #lootWin end
 _G.GetLootSlotType = function(i) return lootWin[i].money and 2 or 1 end
@@ -168,47 +310,96 @@ _G.GetLootSourceInfo = function(i) return lootWin[i].guid, 1 end
 dofile('addon/WoWForeverFarm/Farm.lua')
 local ev = frames[1].scripts.OnEvent
 local upd = frames[1].scripts.OnUpdate
+local win = frames[2]
 ok(type(SlashCmdList['WOWFOREVERFARM']) == 'function', 'registra /wff')
 ok(frames[1].events.LOOT_READY, 'escucha LOOT_READY')
-ok(not frames[1].events.COMBAT_LOG_EVENT_UNFILTERED, 'registro de combate prohibido no rompe la carga')
+ok(frames[1].events.PARTY_KILL and frames[1].events.UNIT_DIED, 'escucha PARTY_KILL y UNIT_DIED')
+ok(frames[1].events.CHAT_MSG_LOOT and frames[1].events.CHAT_MSG_COMBAT_XP_GAIN, 'escucha botín y XP del chat')
+ok(not frames[1].events.COMBAT_LOG_EVENT_UNFILTERED, 'no usa el registro de combate (cerrado en Forever)')
 ev(nil, 'PLAYER_ENTERING_WORLD')
 SlashCmdList['WOWFOREVERFARM']('start')
 local cur = WoWForeverFarmDB.current
 ok(cur ~= nil and cur.state == 'running', 'start abre sesión')
+ok(cur.armed, 'el reloj espera la primera pelea')
 eq(cur.level, 40, 'guarda nivel'); eq(cur.class, 'HUNTER', 'guarda clase')
 ok(cur.methods.auctionator == false, 'sin Auctionator se anota')
+ok(cur.methods.secretos == true, 'anota que el cliente tiene valores secretos')
+upd(nil, 1.2)
+ok(string.find(win.title.text, 'esperando') ~= nil, 'ventana: esperando el primer mob')
 nowValue = 5010; ev(nil, 'PLAYER_REGEN_DISABLED')
 nowValue = 5030; ev(nil, 'PLAYER_REGEN_ENABLED')
 lootWin = { { guid = 'Creature-0-1-1-1-4127-K1', itemId = 4234, qty = 1 }, { guid = 'Creature-0-1-1-1-4127-K1', money = true } }
 nowValue = 5031; ev(nil, 'LOOT_READY'); ev(nil, 'LOOT_OPENED')
+ok(not cur.armed, 'el primer saqueo arranca el reloj')
 money = 10125; ev(nil, 'PLAYER_MONEY')
+ev(nil, 'CHAT_MSG_LOOT', 'You receive loot: |cffffffff|Hitem:4234::::|h[Heavy Leather]|h|r.')
 nowValue = 5033; ev(nil, 'LOOT_CLOSED')
 eq(cur.corpses[4127], 1, 'LOOT_READY + LOOT_OPENED cuentan un solo cadáver')
 eq(cur.items[4127][4234], 1, 'ítem del cadáver')
+eq(cur.got[4234], 1, 'ítem recibido según el chat')
 eq(cur.money.loot, 125, 'monedas en saqueo')
 eq(cur.coinsBy[4127], 125, 'monedas atribuidas al único origen')
-eq(cur.combat, 20, 'combate desde eventos')
+eq(cur.combat, 20, 'la pelea previa al saqueo cuenta')
+eq(cur.travel, 10, 'viaje antes de la pelea')
 eq(cur.looting, 2, 'saqueo desde eventos')
+-- PARTY_KILL con GUID visible, con GUID secreto, y la XP del chat
+nowValue = 5040; ev(nil, 'PARTY_KILL', 'Player-1-ME', 'Creature-0-1-1-1-2732-P1')
+eq(cur.kills[2732], 1, 'PARTY_KILL con GUID')
+ev(nil, 'CHAT_MSG_COMBAT_XP_GAIN', 'Ridge Huntress dies, you gain 300 experience.')
+eq(cur.xp, 300, 'XP del chat'); eq(cur.kills[2732], 1, 'la XP de esa muerte no la duplica')
+nowValue = 5050; ev(nil, 'PARTY_KILL', SECRET, SECRET)
+eq(cur.killsAnon, 1, 'PARTY_KILL con GUID secreto cuenta sin mob')
+eq(cur.signals.party_oculto, 1, 'y se anota como oculto')
+ev(nil, 'UNIT_DIED', 'Creature-0-1-1-1-3000-OTRO')
+eq(cur.kills[3000], nil, 'UNIT_DIED de un mob que no peleaba contigo no cuenta')
+target = { guid = 'Creature-0-1-1-1-2732-T1', name = 'Ridge Huntress', threat = 1 }
+nowValue = 5060; ev(nil, 'PLAYER_TARGET_CHANGED')
+ev(nil, 'UNIT_DIED', 'Creature-0-1-1-1-2732-T1')
+eq(cur.kills[2732], 2, 'UNIT_DIED de tu objetivo en pelea cuenta')
+target.dead = true; upd(nil, 0.6); upd(nil, 0.6)
+eq(cur.kills[2732], 2, 'su cadáver visto no la duplica')
+eq(cur.signals.target, 1, 'el cadáver se avisa una sola vez')
+target = { guid = 'Creature-0-1-1-1-2732-T2', name = 'Ridge Huntress', dead = true, tapDenied = true }
+ev(nil, 'PLAYER_TARGET_CHANGED')
+eq(cur.kills[2732], 2, 'cadáver de otro jugador no cuenta')
+ev(nil, 'CHAT_MSG_COMBAT_HOSTILE_DEATH', 'You have slain Rock Elemental!')
+eq(cur.killsAnon, 2, '«Has matado» de un mob desconocido cuenta sin mob')
+upd(nil, 1.2)
+ok(string.find(win.title.text, 'en curso') ~= nil, 'ventana: en curso')
+ok(string.find(win.rows[1].name.text, '1× ', 1, true) ~= nil, 'ventana: fila de botín ' .. tostring(win.rows[1].name.text))
+ok(string.find(win.lootTitle.text, 'Botín') ~= nil, 'ventana: título del botín')
 ev(nil, 'MERCHANT_SHOW'); money = 12125; ev(nil, 'PLAYER_MONEY'); ev(nil, 'MERCHANT_CLOSED')
 eq(cur.money.merchant, 2000, 'venta al vendedor')
-upd(nil, 1.2)   -- refresco de la ventana sin errores
+nowValue = 5070; ev(nil, 'PLAYER_DEAD')
+nowValue = 5100; ev(nil, 'PLAYER_UNGHOST')
+eq(cur.deadTime, 30, 'tiempo muerto hasta revivir')
 SlashCmdList['WOWFOREVERFARM']('pause'); eq(cur.state, 'paused', '/wff pause')
-nowValue = 5100; SlashCmdList['WOWFOREVERFARM']('resume'); eq(cur.state, 'running', '/wff resume')
-nowValue = 5200; SlashCmdList['WOWFOREVERFARM']('stop')
+nowValue = 5150; SlashCmdList['WOWFOREVERFARM']('resume'); eq(cur.state, 'running', '/wff resume')
+target = { guid = SECRET, name = SECRET }
+SlashCmdList['WOWFOREVERFARM']('test')
+local testLog = table.concat(chatLog, '\n')
+ok(string.find(testLog, 'guid=SECRETO', 1, true) ~= nil, '/wff test muestra valores secretos')
+ok(string.find(testLog, 'party_oculto 1', 1, true) ~= nil, '/wff test lista los avisos')
+nowValue = 5250; SlashCmdList['WOWFOREVERFARM']('stop')
 eq(WoWForeverFarmDB.current, nil, 'stop cierra')
 eq(#WoWForeverFarmDB.sessions, 1, 'stop guarda la sesión')
 local saved = WoWForeverFarmDB.sessions[1]
-eq(saved.active, 133, 'tiempo activo sin la pausa')
+eq(saved.active, 190, 'reloj desde la primera pelea, sin la pausa')
+eq(saved.recent, nil, 'sin auxiliares de fusión al guardar')
 ok(string.find(chatLog[#chatLog], 'sesión cerrada') ~= nil, 'resumen en el chat')
--- reload a mitad de sesión: la sesión abierta sobrevive
+-- reload a mitad de sesión: la sesión abierta sobrevive; /wff ya arranca el reloj
 SlashCmdList['WOWFOREVERFARM']('start')
 nowValue = 5260
 ev(nil, 'PLAYER_ENTERING_WORLD')
 ok(WoWForeverFarmDB.current ~= nil and WoWForeverFarmDB.current.state == 'running', 'reload conserva la sesión abierta')
+SlashCmdList['WOWFOREVERFARM']('ya')
+ok(not WoWForeverFarmDB.current.armed, '/wff ya arranca el reloj')
 SlashCmdList['WOWFOREVERFARM']('status')
-ok(string.find(chatLog[#chatLog], 'Registro de combate: no') ~= nil, 'status informa el registro de combate')
+ok(string.find(chatLog[#chatLog], 'Avisos de muerte') ~= nil, 'status informa los avisos')
 SlashCmdList['WOWFOREVERFARM']('reset')
 eq(WoWForeverFarmDB.current, nil, 'reset descarta la abierta')
+win.scripts.OnDragStop(win)
+eq(WoWForeverFarmDB.ui.point[1], 'TOPLEFT', 'la ventana recuerda su posición')
 
 print(string.format('farm: %d checks, %d fallos', checks, failures))
 if failures > 0 then os.exit(1) end

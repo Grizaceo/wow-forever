@@ -86,8 +86,8 @@ function MisSesiones({ metricas, abierta, lectura, onLeer, estilo, exportado, la
       </div>
       {!metricas.length ? (
         <p style={S.sub}>{cp(lang,
-          'Instala el addon WoWForeverFarm (carpeta addon/WoWForeverFarm del plugin), escribe /wff start antes de farmear y /wff stop al terminar; después /reload. Cada sesión mide tiempo, combate, saqueo, muertes y botín por mob, y el plan aprende de tu forma de jugar.',
-          'Install the WoWForeverFarm addon (the plugin\'s addon/WoWForeverFarm folder), type /wff start before farming and /wff stop when done, then /reload. Each session measures time, combat, looting, kills and loot per mob, and the plan learns from how you play.')}</p>
+          'Instala el addon WoWForeverFarm (carpeta addon/WoWForeverFarm del plugin), escribe /wff start al salir a farmear (el reloj arranca en tu primera pelea) y /wff stop al terminar; después /reload. Cada sesión mide tiempo, combate, saqueo, muertes, monedas y el botín que entró a tus bolsas, y el plan aprende de tu forma de jugar.',
+          'Install the WoWForeverFarm addon (the plugin\'s addon/WoWForeverFarm folder), type /wff start when you head out (the clock starts at your first fight) and /wff stop when done, then /reload. Each session measures time, combat, looting, kills, coins and the loot that reached your bags, and the plan learns from how you play.')}</p>
       ) : (
         <div style={{ overflowX: 'auto' }}>
           <table style={{ ...S.tabla, fontSize: 12 }}>
@@ -100,9 +100,9 @@ function MisSesiones({ metricas, abierta, lectura, onLeer, estilo, exportado, la
               {[...metricas].reverse().slice(0, 12).map((m) => (
                 <tr key={m.id} data-testid="farm-sesion-fila">
                   <td style={S.td}>{fechaSesion(m.start)}</td>
-                  <td style={S.td}>{Math.round(m.activo / 60)}</td>
+                  <td style={S.td}>{Math.round(m.activo / 60)}{m.viajeS >= 60 ? <div style={S.etiqueta}>+{Math.round(m.viajeS / 60)} {cp(lang, 'viaje', 'travel')}</div> : null}</td>
                   <td style={S.td}>{m.zona ? FarmPlan.zoneName(m.zona) : '?'}</td>
-                  <td style={S.td}>{Math.round(m.muertesH)}{m.metodoMuertes === 'solo-saqueo' ? '*' : ''}</td>
+                  <td style={S.td}>{Math.round(m.muertesH)}{m.metodoMuertes === 'solo-saqueo' ? '*' : ''}{m.muertesSinMob > 0.1 * m.muertes ? '†' : ''}</td>
                   <td style={S.td}>{m.peleaS == null ? '?' : `${Math.round(m.peleaS)} s`}</td>
                   <td style={S.td}>{pct(m.combatePct)} · {pct(m.saqueoPct)} · {pct(m.restoPct)}</td>
                   <td style={S.td}><b>{oro(m.oroHSubasta)}</b><div style={S.etiqueta}>{cp(lang, 'vend.', 'vend.')} {oro(m.oroHVendedor)}</div></td>
@@ -113,6 +113,7 @@ function MisSesiones({ metricas, abierta, lectura, onLeer, estilo, exportado, la
             </tbody>
           </table>
           {metricas.some((m) => m.metodoMuertes === 'solo-saqueo') && <p style={S.sub}>{cp(lang, '* Muertes contadas solo por saqueo: los mobs sin botín no cuentan.', '* Kills counted from looting only: mobs without loot are missed.')}</p>}
+          {metricas.some((m) => m.muertesSinMob > 0.1 * m.muertes) && <p style={S.sub}>{cp(lang, '† El juego ocultó de qué mob era parte de las muertes: cuentan en el ritmo, pero esa sesión no ajusta los drops por mob.', '† The game hid which mob some kills were: they count toward pace, but that session does not adjust per-mob drops.')}</p>}
         </div>
       )}
       <p style={S.sub} data-testid="farm-estilo">

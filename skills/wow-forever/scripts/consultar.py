@@ -1536,6 +1536,19 @@ def cmd_farmeo_sesion(D, a, out):
     out("Mobs: " + ", ".join(f"{m.get('nombre')} ×{m.get('muertes')}" for m in s.get("mobs", [])))
     out("Botín principal: " + ", ".join(f"{i.get('nombre')} ×{i.get('unidades')} ({oro_txt(i.get('valorOro'))})" for i in s.get("items", [])))
     out(f"Muertes contadas por: {s.get('metodoMuertes')}" + (" (los mobs sin botín no cuentan)" if s.get("metodoMuertes") == "solo-saqueo" else ""))
+    extra = []
+    if s.get("viajeMin"):
+        extra.append(f"viaje hasta la primera pelea {s.get('viajeMin')} min (fuera del reloj)")
+    if s.get("muertoMin"):
+        extra.append(f"{s.get('muertoMin')} min muerto o volviendo al cadáver")
+    if s.get("muertesSinMob"):
+        extra.append(f"{s.get('muertesSinMob')} muertes sin mob conocido (el juego ocultó el GUID)")
+    if s.get("xpH"):
+        extra.append(f"{s.get('xpH')} XP/h")
+    if s.get("botinDe") == "chat":
+        extra.append("botín = lo que entró a tus bolsas")
+    if extra:
+        out("Además: " + " · ".join(extra))
     return 0
 
 
@@ -1612,7 +1625,8 @@ def cmd_farmeo_diagnostico(D, a, out):
         if p.get("errorBotinPct") is not None and p["errorBotinPct"] <= -30:
             hall.append(f"cada muerte rindió {pct_txt(p['errorBotinPct'], True)} menos de lo esperado: drops de Forever menores que Classic o precios que bajaron")
         if (s.get("muertesJugador") or 0) >= 2:
-            hall.append(f"moriste {s.get('muertesJugador')} veces: cada muerte cuesta caminata y reparación")
+            hall.append(f"moriste {s.get('muertesJugador')} veces: cada muerte cuesta caminata y reparación"
+                        + (f" ({s.get('muertoMin')} min muerto)" if s.get("muertoMin") else ""))
         if s.get("metodoMuertes") == "solo-saqueo":
             hall.append("las muertes se contaron solo por saqueo (el juego no expuso el objetivo muerto): el ritmo real es algo mayor")
         out(f"- {s.get('id')} ({(s.get('inicio') or '?')[:10]}, {s.get('minutos')} min, {oro_txt(s.get('oroHSubasta'))}/h):")

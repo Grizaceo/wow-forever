@@ -234,10 +234,13 @@ página escribe un resumen para ti, `farmeo-agente.json`, en la carpeta de datos
 Hermes Desktop; lo lees con las órdenes `farmeo-*` (§2). Diseño y fórmulas: `docs/FARMEO-ORO.md`.
 
 - **Medir una sesión** (lo hace el jugador, no tú): instalar `addon/WoWForeverFarm` del plugin en
-  `Interface/AddOns` (la primera vez, reiniciar el cliente), `/wff start` antes de farmear,
-  `/wff stop` al terminar y `/reload`. La ventana del addon muestra tiempo, % de combate y saqueo,
-  muertes/h y oro/h en vivo. El contador **no está probado en Forever**; si las muertes salen en
-  0 o los números son raros, pídele seguir `addon/WoWForeverFarm/VERIFICAR.md`.
+  `Interface/AddOns` (la primera vez, reiniciar el cliente), `/wff start` al salir a farmear
+  (el reloj arranca en la primera pelea con muerte; el camino previo es «viaje»), `/wff stop` al
+  terminar y `/reload`. La ventana muestra reloj, % de combate y saqueo, muertes/h, oro/h y la
+  lista del botín recibido en vivo. Forever cierra el registro de combate a los addons: las
+  muertes llegan por `PARTY_KILL`, XP y cadáveres, y algunas pueden quedar «sin mob conocido»
+  (`muertesSinMob`). El contador **no está probado en Forever**; si las muertes salen en 0 o los
+  números son raros, pídele `/wff test` y `/wff status` y seguir `addon/WoWForeverFarm/VERIFICAR.md`.
 - **Qué significa cada número.** Combate/saqueo/resto: reparto del tiempo activo (el resto es
   caminar, comer y buscar). «Predicho»: el modelo base del plugin (drops de Classic, estilo por
   defecto) para los mismos mobs; «ritmo» y «botín» dicen cuánto se aparta el jugador de ese modelo.

@@ -2,8 +2,12 @@
 
 El contador está probado con la API de WoW simulada (`addon/tests/test_farm.lua`),
 **no en el cliente de Forever**. Forever usa la API Mainline 12.1.5 con las
-restricciones de Midnight (valores secretos en combate), así que hay que confirmar
-qué funciona. Nada de esto envía entradas al juego: lo juegas tú.
+restricciones de Midnight: cierra el registro de combate (`COMBAT_LOG_EVENT_*`) a los
+addons y entrega algunos valores como «secretos». Por eso el contador cuenta igual que
+el registro de mazmorras de DungeonJournal, que ya funciona en Forever: `PARTY_KILL`,
+`UNIT_DIED`, las líneas de XP y de «Has matado», y los cadáveres vistos o saqueados.
+Hay que confirmar qué de eso llega **en el mundo abierto**. Nada de esto envía
+entradas al juego: lo juegas tú.
 
 ## Instalar
 
@@ -12,20 +16,32 @@ qué funciona. Nada de esto envía entradas al juego: lo juegas tú.
 2. La primera vez **reinicia el cliente** (un addon nuevo no aparece con `/reload`).
 3. En la lista de addons del personaje, marca **WoW Forever Farm**.
 
+## Cómo mide
+
+- **Reloj:** `/wff start` (o **Iniciar**) arma la sesión; el reloj arranca al comienzo
+  de tu **primera pelea con muerte** (o tu primer saqueo o recolección). El camino
+  hasta ahí se anota aparte como «viaje». **Empezar ya** (`/wff ya`) arranca el
+  reloj en el acto.
+- **Botín:** la lista de la ventana sale de las líneas «Recibes botín: …» (lo que de
+  verdad entró a tus bolsas); las monedas, del cambio de tu dinero mientras saqueas.
+- **Muertes:** cada aviso de una misma muerte se junta en una sola. Si el juego oculta
+  de qué mob era, la muerte cuenta igual (sin mob) y el saqueo le pone nombre después.
+
 ## Checklist (10 minutos)
 
 | # | Haz esto | Debería pasar | Si no pasa, anota |
 |---|---|---|---|
 | 1 | `/wff` | Aparece la ventana «Farmeo · sin sesión» | ¿error de Lua? (copia el texto) |
-| 2 | Pulsa **Iniciar** | Estado «en curso», el tiempo avanza | — |
-| 3 | Mata un mob y saquéalo | Muertes sube a 1; «Monedas» y «botín» suben | ¿Muertes sigue en 0? |
-| 4 | Pelea varias veces | «Combate %» sube durante la pelea | — |
-| 5 | Desuella un cadáver (si tienes Desollar) | El botín sube; las muertes no se duplican | ¿cuenta dos muertes? |
-| 6 | Mata un mob que no suelte nada | Muertes sube igual | Si no sube: el objetivo muerto no se detecta |
-| 7 | `/wff status` | Dice «Registro de combate: sí/no» | Anota sí o no |
-| 8 | **Pausar**, espera 1 min, **Seguir** | El tiempo activo no cuenta el minuto | — |
-| 9 | Vende algo a un vendedor | No cambia «Monedas» (se guarda aparte) | — |
-| 10 | **Terminar**, luego `/reload` | El chat resume la sesión y dice «Guardada» | — |
+| 2 | Pulsa **Iniciar** y camina hacia los mobs | «esperando el primer mob»; el reloj sigue en 0:00 y a la derecha sube «viaje» | — |
+| 3 | Mata un mob | El reloj arranca (desde el comienzo de esa pelea); Muertes = 1 | ¿sigue «esperando»? |
+| 4 | Saquéalo | Aparece en «Botín» con su icono, cantidad y valor; «Monedas» sube | ¿lista vacía? |
+| 5 | Pon un mob de objetivo y escribe `/wff test` | Dice si el GUID y el nombre del objetivo son visibles o «SECRETO» | Copia las 4 líneas |
+| 6 | Mata 5 mobs más y escribe `/wff status` | «Avisos de muerte: party N, xp N…» | Copia la línea: dice qué avisos llegan |
+| 7 | Desuella un cadáver (si tienes Desollar) | El cuero sale en «Botín»; las muertes no se duplican | ¿cuenta dos muertes? |
+| 8 | Mata un mob que no suelte nada | Muertes sube igual | Si no sube: anota el `/wff status` |
+| 9 | **Pausar**, espera 1 min, **Seguir** | El reloj no cuenta el minuto | — |
+| 10 | Vende algo a un vendedor | No cambia «Monedas» (se guarda aparte) | — |
+| 11 | **Terminar**, luego `/reload` | El chat resume la sesión y dice «Guardada» | — |
 
 Después del `/reload`, en Hermes → WoW Forever → **Mercado → Farmeo → Mis sesiones**
 la sesión aparece con sus métricas (el plugin lee `WoWForeverFarm.lua` desde la
@@ -33,9 +49,13 @@ misma carpeta SavedVariables que ya concediste).
 
 ## Qué mirar si algo falla
 
-- **Las muertes quedan en 0 aunque saquees:** `GetLootSourceInfo` no entrega el GUID
-  (o llega como valor secreto). La sesión guarda `methods.loot`.
-- **Mobs sin botín no cuentan:** ni el objetivo muerto (`UnitIsDead`) ni el registro
-  de combate funcionan; las tasas de drop salen algo altas. El plugin lo avisa.
+- **`/wff status` dice «party_oculto»:** el juego oculta de qué mob era cada muerte
+  (pasa dentro de mazmorras). Las muertes cuentan; las que no saquees quedan sin mob
+  y el plugin no usa esa sesión para ajustar drops por mob.
+- **Ningún aviso de muerte (ni party, ni xp, ni target):** solo quedan los cadáveres
+  saqueados; los mobs sin botín no cuentan y el plugin lo marca con *.
+- **La lista de botín dice «(ventanas)»:** las líneas «Recibes botín» no llegaron; la
+  lista sale de lo que mostraban las ventanas de botín (si tus bolsas se llenan, puede
+  incluir cosas que no tomaste).
 - **Sin zona en la sesión:** `C_Map.GetBestMapForUnit` no está; las muertes se
   asignan igual por el id del mob.

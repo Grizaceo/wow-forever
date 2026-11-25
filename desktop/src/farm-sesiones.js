@@ -43,6 +43,11 @@ function conteo2(o) {
   }
   return out
 }
+// Métodos con que el addon ve una muerte (0.2.0: sin registro de combate en
+// Forever). «Directos» = ven también a los mobs que no sueltan nada.
+const METODOS = ['party', 'died', 'xp', 'slain', 'dies', 'target', 'loot', 'cleu']
+const DIRECTOS = ['party', 'died', 'xp', 'slain', 'dies', 'target', 'cleu']
+const LECTURAS = [...METODOS, 'position', 'auctionator', 'ammo', 'bags', 'lootchat', 'secretos']
 const texto = (s, max = 40) => (typeof s === 'string' && s.length <= max && !/[\x00-\x1f]/.test(s) ? s : null)
 
 export function normalizarSesion(s) {
@@ -59,8 +64,13 @@ export function normalizarSesion(s) {
     fights: int(s.fights, 0, 1e6) ? s.fights : 0,
     deaths: int(s.deaths, 0, 1e5) ? s.deaths : 0,
     kills: conteo(s.kills), corpses: conteo(s.corpses), skins: conteo(s.skins), gather: conteo(s.gather),
-    killBy: conteo({ 1: s.killBy?.target, 2: s.killBy?.cleu, 3: s.killBy?.loot }),
+    killsAnon: int(s.killsAnon, 0, 1e6) ? s.killsAnon : 0,
+    killBy: {}, signals: {},
+    travel: num(s.travel, 0, 7 * 86400) ? Math.round(s.travel) : 0,
+    deadTime: num(s.deadTime, 0, 7 * 86400) ? Math.round(s.deadTime) : 0,
+    xp: num(s.xp, 0, 1e9) ? Math.round(s.xp) : 0,
     items: conteo2(s.items), skinItems: conteo2(s.skinItems), gatherItems: conteo2(s.gatherItems), other: conteo(s.other),
+    got: conteo(s.got),
     money: {
       loot: num(s.money?.loot, -1e10, 1e10) ? Math.round(s.money.loot) : 0,
       merchant: num(s.money?.merchant, -1e10, 1e10) ? Math.round(s.money.merchant) : 0,
@@ -73,9 +83,13 @@ export function normalizarSesion(s) {
     methods: {},
     open: !stop,
   }
-  out.killBy = { target: out.killBy[1] || 0, cleu: out.killBy[2] || 0, loot: out.killBy[3] || 0 }
-  for (const k of ['loot', 'target', 'cleu', 'position', 'auctionator', 'ammo', 'bags']) out.methods[k] = s.methods?.[k] === true
+  for (const k of METODOS) {
+    out.killBy[k] = int(s.killBy?.[k], 0, 1e6) ? s.killBy[k] : 0
+    for (const sk of [k, `${k}_oculto`]) if (int(s.signals?.[sk], 1, 1e7)) out.signals[sk] = s.signals[sk]
+  }
+  for (const k of LECTURAS) out.methods[k] = s.methods?.[k] === true
   if (out.combat > out.active) out.combat = out.active
+  if (out.deadTime > out.active) out.deadTime = out.active
   return out
 }
 
@@ -106,8 +120,19 @@ export function fusionarSesiones(prev, nuevas) {
 
 /* --------------------------------------------------------------- métricas */
 const suma = (o) => Object.values(o || {}).reduce((s, v) => s + v, 0)
+const muertesDe = (s) => suma(s.kills) + (s.killsAnon || 0)
+const directo = (s) => DIRECTOS.some((k) => s.methods?.[k])
+// Sesión apta para tasas de drop por mob: muertes vistas directamente y casi
+// todas con su mob conocido (si no, las tasas por mob saldrían infladas).
+const aptaObs = (s) => directo(s) && (s.killsAnon || 0) <= 0.1 * Math.max(1, muertesDe(s))
+// Unidades por ítem: lo que entró a las bolsas según el chat («Recibes botín»)
+// si el addon lo vio; si no, lo que mostraron las ventanas de botín.
 function unidades(s) {
   const u = new Map()
+  if (Object.keys(s.got || {}).length) {
+    for (const [iid, q] of Object.entries(s.got)) u.set(Number(iid), q)
+    return u
+  }
   const add = (bag) => { for (const per of Object.values(bag || {})) for (const [iid, q] of Object.entries(per)) u.set(Number(iid), (u.get(Number(iid)) || 0) + q) }
   add(s.items); add(s.skinItems); add(s.gatherItems)
   for (const [iid, q] of Object.entries(s.other || {})) u.set(Number(iid), (u.get(Number(iid)) || 0) + q)
@@ -127,7 +152,7 @@ function zonaPrincipal(s, dataset) {
 // precios actuales y predecir lo mismo que se farmeó.
 export function metricasSesion(s, ctx = null, dataset = null) {
   const h = s.active / 3600
-  const kills = suma(s.kills), corpses = suma(s.corpses), skins = suma(s.skins), gathers = suma(s.gather)
+  const kills = muertesDe(s), corpses = suma(s.corpses), skins = suma(s.skins), gathers = suma(s.gather)
   const u = unidades(s)
   let vend = 0, ah = 0
   for (const [iid, q] of u) {
@@ -146,7 +171,9 @@ export function metricasSesion(s, ctx = null, dataset = null) {
     monedas: coins, valorVendedor: vend, valorSubasta: ah,
     oroHVendedor: h > 0 ? (coins + vend) / h : 0, oroHSubasta: h > 0 ? (coins + ah) / h : 0,
     vendedorNeto: s.money.merchant, zona: zonaPrincipal(s, dataset),
-    metodoMuertes: s.methods.target || s.methods.cleu ? 'directo' : s.methods.loot ? 'solo-saqueo' : 'sin-dato',
+    metodoMuertes: directo(s) ? 'directo' : s.methods.loot ? 'solo-saqueo' : 'sin-dato',
+    muertesSinMob: s.killsAnon || 0, viajeS: s.travel || 0, muertoS: s.deadTime || 0,
+    xp: s.xp || 0, xpH: h > 0 ? (s.xp || 0) / h : 0, botinDe: Object.keys(s.got || {}).length ? 'chat' : 'ventana',
     mobs: Object.entries(s.kills).sort((a, b) => b[1] - a[1]).slice(0, 6).map(([e, n]) => ({ npcId: Number(e), nombre: dataset?.mobs?.[e]?.[0] || `#${e}`, muertes: n })),
     items: [...u].map(([iid, q]) => {
       const v = ctx ? FarmPlan.unitValue(iid, ctx) : { ah: 0, vendor: dataset?.items?.[String(iid)]?.[9] || 0 }
@@ -184,14 +211,14 @@ const mediana = (a) => { if (!a.length) return null; const s = [...a].sort((x, y
 // Devuelve parámetros para FarmPlan (style) con la fuente y el tamaño de muestra.
 export function perfilJugador(sesiones, dataset, { nivel = null } = {}) {
   const base = { ...FarmPlan.STYLE_DEFAULT }
-  const usadas = (sesiones || []).filter((s) => suma(s.kills) >= 5 && s.active >= 300 && (!nivel || !s.level || Math.abs(s.level - nivel) <= 5))
-  const muertes = usadas.reduce((n, s) => n + suma(s.kills), 0)
+  const usadas = (sesiones || []).filter((s) => muertesDe(s) >= 5 && s.active >= 300 && (!nivel || !s.level || Math.abs(s.level - nivel) <= 5))
+  const muertes = usadas.reduce((n, s) => n + muertesDe(s), 0)
   if (!dataset?.mobX || muertes < MIN_MUERTES_ESTILO) {
     return { ...base, source: 'default', muertes, sesiones: usadas.length }
   }
   const dps = [], loot = [], down = []
   for (const s of usadas) {
-    const k = suma(s.kills), L = s.level || nivel || 1
+    const k = muertesDe(s), L = s.level || nivel || 1
     let hp = 0, nn = 0, n = 0
     for (const [e, c] of Object.entries(s.kills)) { const x = dataset.mobX[e]; if (x) { hp += c * x[0]; nn += c * x[4]; n += c } }
     if (!n) continue
@@ -216,13 +243,14 @@ export function perfilJugador(sesiones, dataset, { nivel = null } = {}) {
 }
 
 // Drops y monedas observados por mob, para FarmPlan (ctx.observed). Solo
-// sesiones con muertes vistas directamente (objetivo o registro): con "solo
-// saqueo" los mobs sin botín no cuentan y la tasa saldría inflada.
+// sesiones con muertes vistas directamente (PARTY_KILL, XP, cadáver visto…) y
+// casi todas con su mob conocido: con "solo saqueo" los mobs sin botín no
+// cuentan y la tasa saldría inflada.
 export function observados(sesiones) {
   const mobs = new Map()
   let usadas = 0
   for (const s of sesiones || []) {
-    if (!(s.methods?.target || s.methods?.cleu)) continue
+    if (!aptaObs(s)) continue
     usadas++
     for (const [e, k] of Object.entries(s.kills || {})) {
       let o = mobs.get(e)
@@ -236,7 +264,7 @@ export function observados(sesiones) {
       }
     }
   }
-  const key = usadas ? `obs:${(sesiones || []).filter((s) => s.methods?.target || s.methods?.cleu).map((s) => s.id).join(',')}` : null
+  const key = usadas ? `obs:${(sesiones || []).filter(aptaObs).map((s) => s.id).join(',')}` : null
   return { mobs, sesiones: usadas, key }
 }
 
@@ -272,6 +300,8 @@ export function exportAgente({ sesiones = [], metricas = [], estilo = null, plan
     zona: m.zona, combatePct: pct(m.combatePct), saqueoPct: pct(m.saqueoPct), restoPct: pct(m.restoPct),
     muertes: m.muertes, muertesH: r1(m.muertesH), peleaS: r1(m.peleaS), saqueoS: r1(m.saqueoS), segPorMuerte: r1(m.segPorMuerte),
     muertesJugador: m.muertesJugador, metodoMuertes: m.metodoMuertes,
+    viajeMin: r1((m.viajeS || 0) / 60), muertoMin: r1((m.muertoS || 0) / 60), muertesSinMob: m.muertesSinMob || 0,
+    xpH: Math.round(m.xpH || 0), botinDe: m.botinDe,
     monedasOro: oro(m.monedas), valorVendedorOro: oro(m.valorVendedor), valorSubastaOro: oro(m.valorSubasta),
     oroHVendedor: oro(m.oroHVendedor), oroHSubasta: oro(m.oroHSubasta),
     prediccion: m.prediccion && {

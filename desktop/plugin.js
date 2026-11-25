@@ -83154,6 +83154,9 @@ function conteo2(o) {
   }
   return out;
 }
+var METODOS = ["party", "died", "xp", "slain", "dies", "target", "loot", "cleu"];
+var DIRECTOS = ["party", "died", "xp", "slain", "dies", "target", "cleu"];
+var LECTURAS = [...METODOS, "position", "auctionator", "ammo", "bags", "lootchat", "secretos"];
 var texto2 = (s, max = 40) => typeof s === "string" && s.length <= max && !/[\x00-\x1f]/.test(s) ? s : null;
 function normalizarSesion(s) {
   if (!s || typeof s !== "object" || s.v !== 1 || !int2(s.start, 1)) return null;
@@ -83175,11 +83178,17 @@ function normalizarSesion(s) {
     corpses: conteo(s.corpses),
     skins: conteo(s.skins),
     gather: conteo(s.gather),
-    killBy: conteo({ 1: s.killBy?.target, 2: s.killBy?.cleu, 3: s.killBy?.loot }),
+    killsAnon: int2(s.killsAnon, 0, 1e6) ? s.killsAnon : 0,
+    killBy: {},
+    signals: {},
+    travel: num7(s.travel, 0, 7 * 86400) ? Math.round(s.travel) : 0,
+    deadTime: num7(s.deadTime, 0, 7 * 86400) ? Math.round(s.deadTime) : 0,
+    xp: num7(s.xp, 0, 1e9) ? Math.round(s.xp) : 0,
     items: conteo2(s.items),
     skinItems: conteo2(s.skinItems),
     gatherItems: conteo2(s.gatherItems),
     other: conteo(s.other),
+    got: conteo(s.got),
     money: {
       loot: num7(s.money?.loot, -1e10, 1e10) ? Math.round(s.money.loot) : 0,
       merchant: num7(s.money?.merchant, -1e10, 1e10) ? Math.round(s.money.merchant) : 0,
@@ -83193,9 +83202,13 @@ function normalizarSesion(s) {
     methods: {},
     open: !stop
   };
-  out.killBy = { target: out.killBy[1] || 0, cleu: out.killBy[2] || 0, loot: out.killBy[3] || 0 };
-  for (const k of ["loot", "target", "cleu", "position", "auctionator", "ammo", "bags"]) out.methods[k] = s.methods?.[k] === true;
+  for (const k of METODOS) {
+    out.killBy[k] = int2(s.killBy?.[k], 0, 1e6) ? s.killBy[k] : 0;
+    for (const sk of [k, `${k}_oculto`]) if (int2(s.signals?.[sk], 1, 1e7)) out.signals[sk] = s.signals[sk];
+  }
+  for (const k of LECTURAS) out.methods[k] = s.methods?.[k] === true;
   if (out.combat > out.active) out.combat = out.active;
+  if (out.deadTime > out.active) out.deadTime = out.active;
   return out;
 }
 function parseFarm(bytes) {
@@ -83219,8 +83232,15 @@ function fusionarSesiones(prev, nuevas) {
   return [...m.values()].sort((a, b) => a.start - b.start).slice(-MAX_SESIONES);
 }
 var suma = (o) => Object.values(o || {}).reduce((s, v) => s + v, 0);
+var muertesDe = (s) => suma(s.kills) + (s.killsAnon || 0);
+var directo = (s) => DIRECTOS.some((k) => s.methods?.[k]);
+var aptaObs = (s) => directo(s) && (s.killsAnon || 0) <= 0.1 * Math.max(1, muertesDe(s));
 function unidades(s) {
   const u = /* @__PURE__ */ new Map();
+  if (Object.keys(s.got || {}).length) {
+    for (const [iid, q] of Object.entries(s.got)) u.set(Number(iid), q);
+    return u;
+  }
   const add = (bag) => {
     for (const per of Object.values(bag || {})) for (const [iid, q] of Object.entries(per)) u.set(Number(iid), (u.get(Number(iid)) || 0) + q);
   };
@@ -83242,7 +83262,7 @@ function zonaPrincipal(s, dataset) {
 }
 function metricasSesion(s, ctx = null, dataset = null) {
   const h = s.active / 3600;
-  const kills = suma(s.kills), corpses = suma(s.corpses), skins = suma(s.skins), gathers = suma(s.gather);
+  const kills = muertesDe(s), corpses = suma(s.corpses), skins = suma(s.skins), gathers = suma(s.gather);
   const u = unidades(s);
   let vend = 0, ah = 0;
   for (const [iid, q] of u) {
@@ -83276,7 +83296,13 @@ function metricasSesion(s, ctx = null, dataset = null) {
     oroHSubasta: h > 0 ? (coins + ah) / h : 0,
     vendedorNeto: s.money.merchant,
     zona: zonaPrincipal(s, dataset),
-    metodoMuertes: s.methods.target || s.methods.cleu ? "directo" : s.methods.loot ? "solo-saqueo" : "sin-dato",
+    metodoMuertes: directo(s) ? "directo" : s.methods.loot ? "solo-saqueo" : "sin-dato",
+    muertesSinMob: s.killsAnon || 0,
+    viajeS: s.travel || 0,
+    muertoS: s.deadTime || 0,
+    xp: s.xp || 0,
+    xpH: h > 0 ? (s.xp || 0) / h : 0,
+    botinDe: Object.keys(s.got || {}).length ? "chat" : "ventana",
     mobs: Object.entries(s.kills).sort((a, b) => b[1] - a[1]).slice(0, 6).map(([e, n]) => ({ npcId: Number(e), nombre: dataset?.mobs?.[e]?.[0] || `#${e}`, muertes: n })),
     items: [...u].map(([iid, q]) => {
       const v = ctx ? import_farm_plan2.default.unitValue(iid, ctx) : { ah: 0, vendor: dataset?.items?.[String(iid)]?.[9] || 0 };
@@ -83311,14 +83337,14 @@ var mediana = (a) => {
 };
 function perfilJugador(sesiones, dataset, { nivel = null } = {}) {
   const base = { ...import_farm_plan2.default.STYLE_DEFAULT };
-  const usadas = (sesiones || []).filter((s) => suma(s.kills) >= 5 && s.active >= 300 && (!nivel || !s.level || Math.abs(s.level - nivel) <= 5));
-  const muertes = usadas.reduce((n, s) => n + suma(s.kills), 0);
+  const usadas = (sesiones || []).filter((s) => muertesDe(s) >= 5 && s.active >= 300 && (!nivel || !s.level || Math.abs(s.level - nivel) <= 5));
+  const muertes = usadas.reduce((n, s) => n + muertesDe(s), 0);
   if (!dataset?.mobX || muertes < MIN_MUERTES_ESTILO) {
     return { ...base, source: "default", muertes, sesiones: usadas.length };
   }
   const dps = [], loot = [], down = [];
   for (const s of usadas) {
-    const k = suma(s.kills), L = s.level || nivel || 1;
+    const k = muertesDe(s), L = s.level || nivel || 1;
     let hp = 0, nn = 0, n = 0;
     for (const [e, c] of Object.entries(s.kills)) {
       const x = dataset.mobX[e];
@@ -83353,7 +83379,7 @@ function observados(sesiones) {
   const mobs = /* @__PURE__ */ new Map();
   let usadas = 0;
   for (const s of sesiones || []) {
-    if (!(s.methods?.target || s.methods?.cleu)) continue;
+    if (!aptaObs(s)) continue;
     usadas++;
     for (const [e, k] of Object.entries(s.kills || {})) {
       let o = mobs.get(e);
@@ -83371,7 +83397,7 @@ function observados(sesiones) {
       }
     }
   }
-  const key = usadas ? `obs:${(sesiones || []).filter((s) => s.methods?.target || s.methods?.cleu).map((s) => s.id).join(",")}` : null;
+  const key = usadas ? `obs:${(sesiones || []).filter(aptaObs).map((s) => s.id).join(",")}` : null;
   return { mobs, sesiones: usadas, key };
 }
 function ventasPorDia(tsmSnapshot, { ahora = Date.now(), dias = 30 } = {}) {
@@ -83411,6 +83437,11 @@ function exportAgente({ sesiones = [], metricas = [], estilo = null, plan = null
     segPorMuerte: r1(m.segPorMuerte),
     muertesJugador: m.muertesJugador,
     metodoMuertes: m.metodoMuertes,
+    viajeMin: r1((m.viajeS || 0) / 60),
+    muertoMin: r1((m.muertoS || 0) / 60),
+    muertesSinMob: m.muertesSinMob || 0,
+    xpH: Math.round(m.xpH || 0),
+    botinDe: m.botinDe,
     monedasOro: oro2(m.monedas),
     valorVendedorOro: oro2(m.valorVendedor),
     valorSubastaOro: oro2(m.valorSubasta),
@@ -83736,10 +83767,10 @@ function MisSesiones({ metricas, abierta, lectura, onLeer, estilo, exportado, la
     ] }),
     !metricas.length ? /* @__PURE__ */ jsx20("p", { style: S.sub, children: cp3(
       lang,
-      "Instala el addon WoWForeverFarm (carpeta addon/WoWForeverFarm del plugin), escribe /wff start antes de farmear y /wff stop al terminar; después /reload. Cada sesión mide tiempo, combate, saqueo\
-, muertes y botín por mob, y el plan aprende de tu forma de jugar.",
-      "Install the WoWForeverFarm addon (the plugin's addon/WoWForeverFarm folder), type /wff start before farming and /wff stop when done, then /reload. Each session measures time, combat, looting, k\
-ills and loot per mob, and the plan learns from how you play."
+      "Instala el addon WoWForeverFarm (carpeta addon/WoWForeverFarm del plugin), escribe /wff start al salir a farmear (el reloj arranca en tu primera pelea) y /wff stop al terminar; después /reload.\
+ Cada sesión mide tiempo, combate, saqueo, muertes, monedas y el botín que entró a tus bolsas, y el plan aprende de tu forma de jugar.",
+      "Install the WoWForeverFarm addon (the plugin's addon/WoWForeverFarm folder), type /wff start when you head out (the clock starts at your first fight) and /wff stop when done, then /reload. Each\
+ session measures time, combat, looting, kills, coins and the loot that reached your bags, and the plan learns from how you play."
     ) }) : /* @__PURE__ */ jsxs20("div", { style: { overflowX: "auto" }, children: [
       /* @__PURE__ */ jsxs20("table", { style: { ...S.tabla, fontSize: 12 }, children: [
         /* @__PURE__ */ jsx20("thead", { children: /* @__PURE__ */ jsx20("tr", { children: [
@@ -83755,11 +83786,20 @@ ills and loot per mob, and the plan learns from how you play."
         ].map((h) => /* @__PURE__ */ jsx20("th", { style: S.th, children: h }, h)) }) }),
         /* @__PURE__ */ jsx20("tbody", { children: [...metricas].reverse().slice(0, 12).map((m) => /* @__PURE__ */ jsxs20("tr", { "data-testid": "farm-sesion-fila", children: [
           /* @__PURE__ */ jsx20("td", { style: S.td, children: fechaSesion(m.start) }),
-          /* @__PURE__ */ jsx20("td", { style: S.td, children: Math.round(m.activo / 60) }),
+          /* @__PURE__ */ jsxs20("td", { style: S.td, children: [
+            Math.round(m.activo / 60),
+            m.viajeS >= 60 ? /* @__PURE__ */ jsxs20("div", { style: S.etiqueta, children: [
+              "+",
+              Math.round(m.viajeS / 60),
+              " ",
+              cp3(lang, "viaje", "travel")
+            ] }) : null
+          ] }),
           /* @__PURE__ */ jsx20("td", { style: S.td, children: m.zona ? FarmPlan.zoneName(m.zona) : "?" }),
           /* @__PURE__ */ jsxs20("td", { style: S.td, children: [
             Math.round(m.muertesH),
-            m.metodoMuertes === "solo-saqueo" ? "*" : ""
+            m.metodoMuertes === "solo-saqueo" ? "*" : "",
+            m.muertesSinMob > 0.1 * m.muertes ? "†" : ""
           ] }),
           /* @__PURE__ */ jsx20("td", { style: S.td, children: m.peleaS == null ? "?" : `${Math.round(m.peleaS)} s` }),
           /* @__PURE__ */ jsxs20("td", { style: S.td, children: [
@@ -83782,7 +83822,9 @@ ills and loot per mob, and the plan learns from how you play."
         ] }, m.id)) })
       ] }),
       metricas.some((m) => m.metodoMuertes === "solo-saqueo") && /* @__PURE__ */ jsx20("p", { style: S.sub, children: cp3(lang, "* Muertes contadas solo por saqueo: los mobs sin botín no cuentan.", "\
-* Kills counted from looting only: mobs without loot are missed.") })
+* Kills counted from looting only: mobs without loot are missed.") }),
+      metricas.some((m) => m.muertesSinMob > 0.1 * m.muertes) && /* @__PURE__ */ jsx20("p", { style: S.sub, children: cp3(lang, "† El juego ocultó de qué mob era parte de las muertes: cuentan en el ri\
+tmo, pero esa sesión no ajusta los drops por mob.", "† The game hid which mob some kills were: they count toward pace, but that session does not adjust per-mob drops.") })
     ] }),
     /* @__PURE__ */ jsxs20("p", { style: S.sub, "data-testid": "farm-estilo", children: [
       estilo?.source === "sesiones" ? cp3(

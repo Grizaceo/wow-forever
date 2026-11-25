@@ -40,10 +40,10 @@ function expected(name, fallback) {
   const n = Number(raw);
   return Number.isInteger(n) && n >= 0 ? n : fallback;
 }
-const EXPECT_NODE = expected('NODE', 433);
-const EXPECT_PY = expected('PY', 137);
+const EXPECT_NODE = expected('NODE', 434);
+const EXPECT_PY = expected('PY', 138);
 const EXPECT_LUA = expected('LUA', 180);
-const EXPECT_LUA_FARM = expected('LUA_FARM', 88);
+const EXPECT_LUA_FARM = expected('LUA_FARM', 187);
 // Tests unitarios del motor en standalone/tests/*.cjs (node:test). Los «real
 // fixture» son stat-only por defecto; WOW_FOREVER_REAL_FIXTURE=1 los hace leer
 // contenido de SavedVariables (solo para diagnóstico manual, nunca en gates).

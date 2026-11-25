@@ -97,6 +97,25 @@ class TestFarmeoCli(unittest.TestCase):
         finally:
             shutil.rmtree(tmp)
 
+    def test_sesion_con_campos_del_addon_020(self):
+        # Addon 0.2.0: viaje fuera del reloj, tiempo muerto, muertes sin mob y botín recibido.
+        d = json.load(open(FIX, encoding='utf-8'))
+        d['sesiones'][-1].update(viajeMin=4.0, muertoMin=1.5, muertesSinMob=3, xpH=12000, botinDe='chat')
+        tmp = tempfile.mkdtemp()
+        try:
+            p = os.path.join(tmp, 'f.json')
+            with open(p, 'w', encoding='utf-8') as f:
+                json.dump(d, f)
+            code, txt = correr('farmeo-sesion', '1', '--archivo', p)
+            self.assertEqual(code, 0)
+            self.assertIn('viaje hasta la primera pelea 4.0 min', txt)
+            self.assertIn('3 muertes sin mob conocido', txt)
+            self.assertIn('botín = lo que entró a tus bolsas', txt)
+            code2, txt2 = correr('farmeo-sesion', '1', '--archivo', FIX)
+            self.assertNotIn('Además:', txt2)
+        finally:
+            shutil.rmtree(tmp)
+
     def test_el_fixture_no_trae_nombres_ni_ruta(self):
         d = json.load(open(FIX, encoding='utf-8'))
         txt = json.dumps(d, ensure_ascii=False)
