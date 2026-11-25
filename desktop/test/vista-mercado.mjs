@@ -44,7 +44,7 @@ check('realm Prueba seleccionado', await p.locator('select[aria-label="Realm de 
 const tabla = await texto(p)
 check('nombres en español (Paño de lino)', /Paño de lino/.test(tabla))
 check(' Venomstrike visible', /Venomstrike/.test(tabla))
-check('precio en cobre visible', /12s|1s 20c|120c/.test(tabla) || /12s/.test(tabla))
+check('precio en cobre visible', /1p 20c|1s 20c|120c/.test(tabla))
 check('miniatura local por id en la tabla', await p.evaluate(() =>
   [...document.querySelectorAll('[role="img"]')].some((e) => getComputedStyle(e).backgroundImage.startsWith('url("data:image/webp;base64,'))))
 check('aviso de datos antiguos (>3 días)', await p.getByText('Los precios tienen más de 3 días').count() === 1)
@@ -76,19 +76,19 @@ check('detalle muestra fuentes documentadas', await p.getByText('Fuentes documen
 check('detalle muestra fuentes de drop', await p.getByText('Fuentes de drop (dataset)').count() === 1)
 await p.getByRole('button', { name: 'Cerrar' }).first().click()
 
-// Recomendador de farmeo con Cazador de la Horda nv 30.
-check('sección de farmeo visible', await p.getByText('Farmeo recomendado').count() === 1)
-check('tarjetas de zona con métricas approx', await p.getByText(/antes de multiplicadores/).count() > 0)
-check('cobertura del scan informada', await p.getByText(/Cobertura del scan/).count() === 1)
-check('estimaciones marcadas como approx', await p.getByText(/Estimaciones aproximadas/).count() === 1)
-check('nivel y facción del perfil', await p.getByText(/vos nv 30/).count() > 0)
-
-const campControl = p.getByRole('combobox', { name: 'Campamentos' })
-await campControl.selectOption('rotation')
-const rotacion = (await exportar(p)).storage['farm-settings']
-check('rotación aplica y guarda los pesos por defecto sin editar campos',
-  rotacion?.campMode === 'rotation' && JSON.stringify(rotacion.campWeights) === '[0.5,0.3,0.2]', rotacion)
-await campControl.selectOption('single')
+// Farmeo v2 (plan de sesión) con Cazador de la Horda nv 30.
+check('sección de farmeo visible', await p.getByText('Farmeo · oro por sesión').count() === 1)
+await p.locator('[data-testid="farm-plan-total"]').first().waitFor({ timeout: 15000 })
+check('plan de sesión con total, rango y tramos', /rango/.test(await p.locator('[data-testid="farm-plan-total"]').innerText())
+  && await p.locator('[data-testid="farm-plan-tramo"]').count() >= 1)
+check('mejores campamentos listados', await p.locator('[data-testid="farm-campamento"]').count() > 0)
+check('supuestos declarados visibles', /Supuestos por defecto/.test(await p.locator('[data-testid="farm-supuestos"]').first().innerText()))
+check('sin addon: explica cómo medir sesiones', /\/wff start/.test(await p.locator('[data-testid="farm-sesiones"]').innerText()))
+await p.getByRole('combobox', { name: 'Tope de venta' }).selectOption('k10')
+await p.waitForTimeout(200)
+const ajustesFarmGuardados = (await exportar(p)).storage['farm-settings']
+check('el tope de venta elegido se guarda', ajustesFarmGuardados?.tope === 'k10', ajustesFarmGuardados)
+await p.getByRole('combobox', { name: 'Tope de venta' }).selectOption('k5')
 
 const previo = await exportar(p)
 const vp=previo.storage['market-v2-pointer']
@@ -129,7 +129,7 @@ check('importación manual desde archivo .lua', await p.getByText('Importación 
 await p.waitForFunction(() => document.querySelector('select[aria-label="Realm de subasta"]')?.value === 'Manual', null, { timeout: 10000 })
 check('realm Manual queda seleccionado', await p.locator('select[aria-label="Realm de subasta"]').inputValue() === 'Manual')
 check('el scan nuevo muestra su propio realm', /1 de 1 claves/.test(await texto(p)))
-check('precio manual 200c = 2s', /2s/.test(await texto(p)))
+check('precio manual 200c = 2p (2s)', /(^|\s)2[ps](\s|$)/.test(await texto(p)))
 
 // Fallo de escritura: se conserva lo anterior.
 await p.evaluate(() => { window.fallarEscritura = true })

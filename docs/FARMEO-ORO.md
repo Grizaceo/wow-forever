@@ -1,7 +1,8 @@
 # Farmeo para maximizar oro — diseño
 
-Estado: **en implementación** (rama `agent/claude-code/farmeo-oro`). Aprobado por el
-mantenedor el 2026-11-25. Reemplaza el puntaje heurístico de `market-farm.js` por un
+Estado: **implementado** en la rama `agent/claude-code/farmeo-oro` (F0–F4); el contador
+WoWForeverFarm **falta verificarlo en el cliente Forever** (`addon/WoWForeverFarm/VERIFICAR.md`).
+Aprobado por el mantenedor el 2026-11-25. Reemplaza el puntaje heurístico de `market-farm.js` por un
 modelo de oro realizado, con un contador de sesión en el juego y herramientas para
 el agente.
 

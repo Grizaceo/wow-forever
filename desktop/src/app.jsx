@@ -87,7 +87,7 @@ function perfilInicial(guardado, build) {
   return { perfil: m.perfil, ok: validarPerfil(m.perfil, D.personaje).ok, errores: [], razaSupuesta: m.razaSupuesta }
 }
 
-export function App({ ctx, almacen, sincronizador, ventas, puente }) {
+export function App({ ctx, almacen, sincronizador, ventas, puente, farmeo }) {
   const [estado, setEstado] = useState(null)
   const [error, setError] = useState('')
   const [perfil, setPerfil] = useState(null)
@@ -167,7 +167,7 @@ export function App({ ctx, almacen, sincronizador, ventas, puente }) {
           <div><Button size="xs" onClick={() => cambiarPestana('personaje')}>{t(lang, 'tab.personaje')}</Button></div>
         </div>
       : <Contencion>
-          <Vista ctx={ctx} almacen={almacen} sincronizador={sincronizador} ventas={ventas} puente={puente} estado={estado} recargar={recargar} perfil={perfil}
+          <Vista ctx={ctx} almacen={almacen} sincronizador={sincronizador} ventas={ventas} puente={puente} farmeo={farmeo} estado={estado} recargar={recargar} perfil={perfil}
             guardarPerfil={guardarPerfil} razaSupuesta={razaSupuesta} lang={lang} irA={cambiarPestana} />
         </Contencion>}
   </div>

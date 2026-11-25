@@ -54,8 +54,16 @@ Auctionator/TSM/puente.
 ### MOTOR COMPARTIDO — los módulos que el bundle Desktop inlinea
 
 `market.js` · `market-history.js` · `market-identity.js` · `market-source.js` ·
-`market-compare.js` · `market-deals.js` · `market-farm.js` · `market-chart.js` ·
+`market-compare.js` · `market-deals.js` · `market-farm.js` · `farm-plan.js` · `market-chart.js` ·
 `drop-data.js` · `guide-hunter.js` · `guide-legacy.js`
+
+`farm-plan.js` es el motor de farmeo v2 (oro realizado por sesión, `docs/FARMEO-ORO.md`):
+lo usan `desktop/src/mercado-logica.js` (contexto), `farm-sesiones.js` (predicho vs real) y
+las vistas `mercado/farmeo.jsx` y la columna de Mercado. `market-farm.js` queda para «Por tu
+profesión» (nodos de hierbas y minería) y su API heredada. Las sesiones del addon hermano
+`addon/WoWForeverFarm` entran por `desktop/src/farm-sync.js` (lectura acotada de
+`WoWForeverFarm.lua`, sondeo de 30 s a nivel de plugin) y salen hacia el agente como
+`farmeo-agente.json` en la carpeta de datos del plugin (`consultar.py farmeo-*`).
 
 Son la lógica de mercado reutilizable + datos generados/curados. `desktop/src/` los
 importa; `tests/` los cubre. **No son código muerto.**

@@ -40,8 +40,8 @@ function expected(name, fallback) {
   const n = Number(raw);
   return Number.isInteger(n) && n >= 0 ? n : fallback;
 }
-const EXPECT_NODE = expected('NODE', 425);
-const EXPECT_PY = expected('PY', 129);
+const EXPECT_NODE = expected('NODE', 433);
+const EXPECT_PY = expected('PY', 137);
 const EXPECT_LUA = expected('LUA', 180);
 const EXPECT_LUA_FARM = expected('LUA_FARM', 88);
 // Tests unitarios del motor en standalone/tests/*.cjs (node:test). Los «real
@@ -54,7 +54,7 @@ const BROWSER = [
   ['tsm', 54], ['tsm-valoracion', 108], ['vista-mercado', 59], ['vista-davi', 50], ['vista-guia', 28],
   ['vista-profesiones', 41], ['vista-ruta-dungeons', 31], ['bridge', 19],
   ['vista-personaje-simc', 11], ['vista-pawn', 15], ['vista-subasta-pawn', 28],
-  ['farm-routing', 11], ['tab-performance', 14],
+  ['farm-routing', 11], ['farm-sesiones', 13], ['tab-performance', 14],
 ];
 const EXPECT_BROWSER_TOTAL = BROWSER.reduce((n, [, c]) => n + c, 0);
 

@@ -42,7 +42,8 @@ script de solo lectura de esta skill con la terminal:
 python3 ${HERMES_SKILL_DIR}/scripts/consultar.py <orden> [opciones]
 ```
 
-(Si `python3` no existe, usa `python`. El script solo lee `data/` del plugin, sin red y sin
+(Si `python3` no existe, usa `python`. El script solo lee `data/` del plugin y, para las órdenes
+`farmeo-*`, el resumen `farmeo-agente.json` que escribe la página; sin red y sin
 escribir nada. `--en` pone los nombres en inglés primero, y `--max N` cambia cuántas filas
 muestra, 15 por defecto.)
 
@@ -61,6 +62,9 @@ muestra, 15 por defecto.)
 | Buscar una misión y sus recompensas | `mision "call of water" --faccion horda` (o un id) |
 | ¿Qué datos faltan? | `huecos --tema entrenadores` |
 | ¿De dónde salen los datos? | `fuentes` |
+| ¿Cómo me fue farmeando? (sesiones medidas) | `farmeo-sesiones` · detalle: `farmeo-sesion 1` |
+| ¿Dónde está mi cuello de botella farmeando? | `farmeo-diagnostico` · estilo: `farmeo-estilo` |
+| ¿Qué farmeo para ganar más oro? | `farmeo-plan` |
 
 Razas, clases, facciones y profesiones se aceptan en español o inglés, con o sin tildes, o por
 ID. Si el script dice que un nombre es ambiguo (por ejemplo, «cielonato» sin facción), pasa
@@ -164,7 +168,7 @@ tres fuentes locales: **Auctionator** (precios anunciados), la **contabilidad TS
   son el intervalo de sondeo, no una promesa de nueva revisión sin datos nuevos.
 - Si el usuario te pega números de la página: `m` es el último mínimo unitario observado, en
   cobre (1 oro = 10000), no una venta. Oro por hora, ROI y ofertas son **estimaciones** con
-  drops de Classic 1.12 y sin datos de población.
+  drops de Classic 1.12 y sin datos de población. El farmeo tiene su propia sección (§7).
 
 ## 6. Mis ventas · contabilidad TSM
 
@@ -220,6 +224,38 @@ tres fuentes locales: **Auctionator** (precios anunciados), la **contabilidad TS
   promesas bloqueadas, fallo tras commit del índice, readback corrupto, importación repetida,
   cantidades mutables, restauración y Chromium claro/oscuro. No confundir esto con validación
   de una cuenta real. Diseño y límites en `docs/DESKTOP.md`.
+
+## 7. Farmeo: plan, sesiones y cómo aconsejar
+
+El objetivo del farmeo en el plugin es uno: **el oro que el jugador termina ganando por hora de
+sesión**. Mercado → Farmeo muestra un plan de sesión (campamentos reales, minutos y rango), los
+mejores campamentos y las sesiones que el jugador midió con el addon **WoWForeverFarm**. La
+página escribe un resumen para ti, `farmeo-agente.json`, en la carpeta de datos del plugin de
+Hermes Desktop; lo lees con las órdenes `farmeo-*` (§2). Diseño y fórmulas: `docs/FARMEO-ORO.md`.
+
+- **Medir una sesión** (lo hace el jugador, no tú): instalar `addon/WoWForeverFarm` del plugin en
+  `Interface/AddOns` (la primera vez, reiniciar el cliente), `/wff start` antes de farmear,
+  `/wff stop` al terminar y `/reload`. La ventana del addon muestra tiempo, % de combate y saqueo,
+  muertes/h y oro/h en vivo. El contador **no está probado en Forever**; si las muertes salen en
+  0 o los números son raros, pídele seguir `addon/WoWForeverFarm/VERIFICAR.md`.
+- **Qué significa cada número.** Combate/saqueo/resto: reparto del tiempo activo (el resto es
+  caminar, comer y buscar). «Predicho»: el modelo base del plugin (drops de Classic, estilo por
+  defecto) para los mismos mobs; «ritmo» y «botín» dicen cuánto se aparta el jugador de ese modelo.
+  El estilo calibrado (DPS efectivo, saqueo, pausas) sale de sus sesiones con ≥ 30 muertes y el
+  plan lo usa si tiene activo «Usar mis métricas». El oro/h de una sesión valora el botín al
+  precio de subasta actual: **no es lo vendido**.
+- **Tope de venta.** El plan solo cuenta a precio de subasta lo que se puede vender por sesión:
+  sus ventas TSM si las hay (`ventas-propias`), si no una fracción declarada de lo publicado
+  (`kappa-ofertas`, 5 % por defecto); con ≤ 5 ofertas, solo vendedor. Por eso un ítem caro y
+  escaso (por ejemplo, Elemental Air) puede perder frente a un campamento con botín variado.
+- **Cómo aconsejar.** Corre primero `farmeo-diagnostico` y `farmeo-estilo`; cita cada número con
+  su origen (`[tus sesiones]` o `[estimación]`). Ata cada consejo a un cuello de botella medido:
+  mucho «resto» → campamento más denso del plan o menos pausas; saqueo > 3 s → autosaqueo;
+  ritmo muy bajo frente a lo predicho → competencia o spawns dispersos; botín bajo → drops de
+  Forever menores que Classic o precios que bajaron. Si el plan recomienda otra zona que la que
+  farmea, explícalo con `farmeo-plan` (minutos, aportes y tope). Sin sesiones, explica cómo
+  medir una; no inventes métricas del jugador.
+- Tú no juegas por el jugador ni envías entradas al juego: solo lees lo exportado y explicas.
 
 ## Reglas
 

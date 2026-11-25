@@ -1,0 +1,266 @@
+{
+ "schema": 1,
+ "generado": "2026-11-25T12:00:00.000Z",
+ "nota": "Generado por el plugin WoW Forever (Mercado → Farmeo). Valores en oro; estimaciones con drops de Classic 1.12 salvo lo observado en tus sesiones.",
+ "personaje": {
+  "nivel": 40,
+  "clase": 3,
+  "faccion": "horda"
+ },
+ "estilo": {
+  "fuente": "sesiones",
+  "muertes": 335,
+  "sesiones": 4,
+  "dpsK": 1.7,
+  "saqueoS": 2.7,
+  "pausasPct": 33.9,
+  "velocidad": 9,
+  "incertidumbrePct": 8
+ },
+ "sesiones": [
+  {
+   "id": "s1795000000",
+   "inicio": "2026-11-18T11:06:40.000Z",
+   "minutos": 60,
+   "pausaMin": 1,
+   "zona": "1443",
+   "combatePct": 41.7,
+   "saqueoPct": 4.9,
+   "restoPct": 53.5,
+   "muertes": 70,
+   "muertesH": 70,
+   "peleaS": 21.4,
+   "saqueoS": 2.7,
+   "segPorMuerte": 51.4,
+   "muertesJugador": 1,
+   "metodoMuertes": "directo",
+   "monedasOro": 0,
+   "valorVendedorOro": 2.24,
+   "valorSubastaOro": 18.62,
+   "oroHVendedor": 2.24,
+   "oroHSubasta": 18.62,
+   "prediccion": {
+    "oroH": 23.68,
+    "muertesH": 82.2,
+    "errorOroPct": -21.4,
+    "errorRitmoPct": -14.9,
+    "errorBotinPct": -8.6
+   },
+   "mobs": [
+    {
+     "nombre": "Whirlwind Shredder",
+     "npcId": 11578,
+     "muertes": 70
+    }
+   ],
+   "items": [
+    {
+     "nombre": "Elemental Air",
+     "itemId": 7069,
+     "unidades": 56,
+     "valorOro": 18.62
+    }
+   ]
+  },
+  {
+   "id": "s1795100000",
+   "inicio": "2026-11-19T14:53:20.000Z",
+   "minutos": 60,
+   "pausaMin": 1,
+   "zona": "1443",
+   "combatePct": 41.7,
+   "saqueoPct": 5.6,
+   "restoPct": 52.8,
+   "muertes": 80,
+   "muertesH": 80,
+   "peleaS": 18.8,
+   "saqueoS": 2.7,
+   "segPorMuerte": 45,
+   "muertesJugador": 2,
+   "metodoMuertes": "directo",
+   "monedasOro": 0,
+   "valorVendedorOro": 2.48,
+   "valorSubastaOro": 20.62,
+   "oroHVendedor": 2.48,
+   "oroHSubasta": 20.62,
+   "prediccion": {
+    "oroH": 23.68,
+    "muertesH": 82.2,
+    "errorOroPct": -12.9,
+    "errorRitmoPct": -2.7,
+    "errorBotinPct": -11.4
+   },
+   "mobs": [
+    {
+     "nombre": "Whirlwind Shredder",
+     "npcId": 11578,
+     "muertes": 80
+    }
+   ],
+   "items": [
+    {
+     "nombre": "Elemental Air",
+     "itemId": 7069,
+     "unidades": 62,
+     "valorOro": 20.62
+    }
+   ]
+  },
+  {
+   "id": "s1795200000",
+   "inicio": "2026-11-20T18:40:00.000Z",
+   "minutos": 60,
+   "pausaMin": 1,
+   "zona": "1443",
+   "combatePct": 43.1,
+   "saqueoPct": 6.3,
+   "restoPct": 50.7,
+   "muertes": 90,
+   "muertesH": 90,
+   "peleaS": 17.2,
+   "saqueoS": 2.6,
+   "segPorMuerte": 40,
+   "muertesJugador": 0,
+   "metodoMuertes": "directo",
+   "monedasOro": 0,
+   "valorVendedorOro": 2.8,
+   "valorSubastaOro": 23.28,
+   "oroHVendedor": 2.8,
+   "oroHSubasta": 23.28,
+   "prediccion": {
+    "oroH": 23.68,
+    "muertesH": 82.2,
+    "errorOroPct": -1.7,
+    "errorRitmoPct": 9.4,
+    "errorBotinPct": -11.1
+   },
+   "mobs": [
+    {
+     "nombre": "Whirlwind Shredder",
+     "npcId": 11578,
+     "muertes": 90
+    }
+   ],
+   "items": [
+    {
+     "nombre": "Elemental Air",
+     "itemId": 7069,
+     "unidades": 70,
+     "valorOro": 23.28
+    }
+   ]
+  },
+  {
+   "id": "s1795300000",
+   "inicio": "2026-11-21T22:26:40.000Z",
+   "minutos": 60,
+   "pausaMin": 1,
+   "zona": "1443",
+   "combatePct": 41.7,
+   "saqueoPct": 6.6,
+   "restoPct": 51.7,
+   "muertes": 95,
+   "muertesH": 95,
+   "peleaS": 15.8,
+   "saqueoS": 2.6,
+   "segPorMuerte": 37.9,
+   "muertesJugador": 1,
+   "metodoMuertes": "directo",
+   "monedasOro": 0,
+   "valorVendedorOro": 2.88,
+   "valorSubastaOro": 23.94,
+   "oroHVendedor": 2.88,
+   "oroHSubasta": 23.94,
+   "prediccion": {
+    "oroH": 23.68,
+    "muertesH": 82.2,
+    "errorOroPct": 1.1,
+    "errorRitmoPct": 15.5,
+    "errorBotinPct": -13.4
+   },
+   "mobs": [
+    {
+     "nombre": "Whirlwind Shredder",
+     "npcId": 11578,
+     "muertes": 95
+    }
+   ],
+   "items": [
+    {
+     "nombre": "Elemental Air",
+     "itemId": 7069,
+     "unidades": 72,
+     "valorOro": 23.94
+    }
+   ]
+  }
+ ],
+ "totalSesiones": 4,
+ "plan": {
+  "horas": 2,
+  "oroH": 7.51,
+  "rango": [
+   7.15,
+   7.82
+  ],
+  "zonas": [
+   "Desolace"
+  ],
+  "viajeMin": 22,
+  "tramos": [
+   {
+    "minutos": 60,
+    "zona": "Desolace",
+    "tipo": "solo",
+    "mobs": [
+     "Bonepaw Hyena"
+    ],
+    "oro": 6.47,
+    "mapa": null
+   },
+   {
+    "minutos": 30,
+    "zona": "Desolace",
+    "tipo": "solo",
+    "mobs": [
+     "Whirlwind Shredder"
+    ],
+    "oro": 8.55,
+    "mapa": null
+   }
+  ],
+  "aportes": [
+   {
+    "nombre": "Elemental Air",
+    "oro": 8.38,
+    "tope": "kappa-ofertas"
+   },
+   {
+    "nombre": "Soft Patch of Fur",
+    "oro": 3.47,
+    "tope": "sin-ofertas"
+   },
+   {
+    "nombre": "Soft Bushy Tail",
+    "oro": 1.94,
+    "tope": "sin-ofertas"
+   },
+   {
+    "nombre": "Medium Leather",
+    "oro": 0.42,
+    "tope": "sin-ofertas"
+   },
+   {
+    "nombre": "Heavy Leather",
+    "oro": 0.32,
+    "tope": "sin-ofertas"
+   },
+   {
+    "nombre": "Red Wolf Meat",
+    "oro": 0.17,
+    "tope": "sin-ofertas"
+   }
+  ],
+  "alternativas": []
+ }
+}

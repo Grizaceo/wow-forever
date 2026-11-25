@@ -80,8 +80,14 @@ permiso de carpeta. La ruta pasa de `/wow-hunter-guide` a `/wow-forever`.
 - **Dungeons**: jefes en orden con su botín, filtro de lo que tu clase puede usar, y los 9
   dungeons nuevos de Forever con sus jefes.
 - **Mercado**: importa tu `Auctionator.lua`, la contabilidad TSM y el diario del puente
-  WoWForeverBridge; acumula el historial, marca ofertas, muestra la miniatura de cada ítem
-  desde su id y recomienda dónde farmear.
+  WoWForeverBridge; acumula el historial, marca ofertas y muestra la miniatura de cada ítem
+  desde su id.
+- **Farmeo para ganar oro**: un plan de sesión que maximiza el oro que realmente terminas
+  ganando por hora (campamentos reales, muertes/h según la vida del mob y la distancia entre
+  spawns, el valor completo de cada muerte y un tope de venta desde tus ventas TSM o lo
+  publicado), los mejores campamentos y las sesiones que mides en el juego con el addon
+  compañero **WoWForeverFarm** (tiempo, combate, saqueo, muertes y botín por mob), comparadas con
+  lo predicho y usadas para calibrar el plan a tu forma de jugar.
 - **Guía curada** del Cazador de la Horda y **Legacy**. Un test las compara con los datos generados
   (ítems, botín, misiones, hechizos, razas); las demás clases usan solo los datos generados.
 - **Skill del agente**: responde preguntas como «soy Paladín no-muerto nivel 24, ¿dónde
@@ -122,6 +128,13 @@ ejecutadas, no precios anunciados, y se mantienen separadas del mercado Auctiona
 (`WoWForeverBridge.lua`) que sobrevive la poda de ~21 días del propio Auctionator. La
 retención se configura en el juego con `/wfb days N`. El puente es un transporte, no un
 exportador verificado: los precios que trae se etiquetan con procedencia **UNKNOWN** por diseño.
+
+**Sesiones WoWForeverFarm** — un segundo addon compañero (`addon/WoWForeverFarm`, SavedVariables
+`WoWForeverFarmDB`, con su propio `WoWForeverFarm.lua` pequeño) cuenta una sesión de farmeo en el
+juego: `/wff start`, `/wff stop` y después `/reload`. Mercado → Farmeo lo lee desde la misma
+carpeta concedida y escribe un resumen de agregados, `farmeo-agente.json`, en la carpeta de datos
+del plugin para las órdenes `consultar.py farmeo-*` de la skill. **Todavía no está verificado en el
+cliente Forever**: ver `addon/WoWForeverFarm/VERIFICAR.md`. Diseño: `docs/FARMEO-ORO.md`.
 
 **Sondeo automático** — las tres fuentes se sondean cada 30 s mientras Hermes esté abierto y
 el plugin habilitado, aunque Mercado no esté montado. Concede la carpeta SavedVariables una
@@ -165,8 +178,8 @@ deshabilita para no insertar dos veces, y no se escribe nada nuevo en el almacen
 
 ## Qué lee, qué guarda y qué ejecuta
 
-- **Lee** únicamente `Auctionator.lua`, `TradeSkillMaster.lua` y `WoWForeverBridge.lua` dentro
-  de la carpeta que concedes con el selector de Hermes (búsqueda acotada de subcarpetas), y
+- **Lee** únicamente `Auctionator.lua`, `TradeSkillMaster.lua`, `WoWForeverBridge.lua` y
+  `WoWForeverFarm.lua` dentro de la carpeta que concedes con el selector de Hermes (búsqueda acotada de subcarpetas), y
   sus propios `data/`. Cada archivo se interpreta como datos: nunca se ejecuta Lua.
 - **Guarda** tu perfil, el progreso de la guía y los precios normalizados en el almacenamiento
   propio del plugin, en tu máquina. Precios e historial usan el almacén v2 (`market-v2-*`,

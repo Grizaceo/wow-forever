@@ -9,7 +9,7 @@ import { t } from '../../i18n.js'
 import { Dinero, Hueco, Origen, Tarjeta } from '../../ui.jsx'
 import { HunterHistory, Farm, fuentesItem, fuentesDropData, nombreItem, fmtDia, fechaDe, EPOCH } from '../../mercado-logica.js'
 import { GraficoPrecios } from './grafico.jsx'
-import { RutaFarmeo } from './ruta-farmeo.jsx'
+import { FilaCampamento } from './campamento.jsx'
 import { ConsultaValoracionTsm, edadSeg } from './valoracion-personal.jsx'
 
 const TENDENCIA = { sube: 'mercado.tend.sube', baja: 'mercado.tend.baja', estable: 'mercado.tend.estable', 'sin-datos': 'mercado.tend.pocos' }
@@ -29,9 +29,8 @@ export function DetalleItem({ item, lang, catalogo, metrica, deal, onCerrar, tsm
   const catEntry = useMemo(() => (item?.itemId != null ? catalogo?.items?.[String(item.itemId)] : null), [item, catalogo])
   const fuentes = useMemo(() => (catEntry ? fuentesItem(catEntry, D.dungeons) : []), [catEntry])
   const drops = useMemo(() => fuentesDropData(item?.itemId, D.dropData), [item])
-  const fss = useMemo(() => (metrica?.sources?.length
-    ? [...metrica.sources].sort((a, b) => Number(b.eligible) - Number(a.eligible) || (b.gph || 0) - (a.gph || 0)).slice(0, 10)
-    : []), [metrica])
+  // Campamentos del motor v2 donde cae el ítem (hasta 3, por oro/h del campamento completo).
+  const fss = useMemo(() => (Array.isArray(metrica?.farms) ? metrica.farms : []), [metrica])
   const historial = useMemo(() => (item?.history || []).slice().sort((a, b) => b.day - a.day), [item])
   // El historial de Auctionator usa días del EPOCH de la app (2020-01-01), no
   // días unix: se fecha con los mismos helpers que la tabla diaria de abajo.
@@ -172,16 +171,7 @@ export function DetalleItem({ item, lang, catalogo, metrica, deal, onCerrar, tsm
             <Origen f="cmangos-1.12" lang={lang} />
           </h4>
           <ul style={{ margin: 0, paddingLeft: 18, fontSize: 12 }}>
-            {fss.map((s, i) => (
-              <li key={i}>
-                {fmt.srcLabel ? fmt.srcLabel(s) : `${s.name || '#' + s.id}`}
-                {s.zoneKey != null && fmt.zoneName ? ` · ${fmt.zoneName(s.zoneKey)}` : ''}
-                {s.eligible
-                  ? ` · ${fmt.pct ? fmt.pct(s.chance) : fmtPct(s.chance)} · ~${fmt.gph ? fmt.gph(s.gph) : s.gph}/h${s.roi != null ? ` · ${lang === 'en' ? 'Margin vs target gold/h' : 'Margen frente al oro/h objetivo'} ${s.roi >= 0 ? '+' : ''}${Math.round(s.roi * 100)}%` : ''}`
-                  : ` — ${s.reason || t(lang, 'mercado.det.noElegible')}`}
-                <RutaFarmeo fuente={s} fmt={fmt} lang={lang} />
-              </li>
-            ))}
+            {fss.map((f) => <FilaCampamento key={f.id} f={f} lang={lang} itemShare={f.itemShare} itemPerHour={f.itemPerHour} testid="detalle-campamento" />)}
           </ul>
         </div>
       )}

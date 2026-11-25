@@ -8,12 +8,17 @@ import HunterHistory from '../../standalone/market-history.js'
 import HunterDeals from '../../standalone/market-deals.js'
 import HunterChart from '../../standalone/market-chart.js'
 import FarmModule from '../../standalone/market-farm.js'
+import FarmPlanModule from '../../standalone/farm-plan.js'
 import HunterIdentity from '../../standalone/market-identity.js'
 import HunterSource from '../../standalone/market-source.js'
 import HunterCompare from '../../standalone/market-compare.js'
 
 export { HunterMarket, HunterHistory, HunterDeals, HunterChart, HunterIdentity, HunterSource, HunterCompare }
 export const Farm = FarmModule
+// Motor v2 (oro realizado por sesión): docs/FARMEO-ORO.md. Se configura con el
+// dataset en la vista (mercado.jsx), igual que el motor heredado.
+export const FarmPlan = FarmPlanModule
+export const TOPES = { k2: 0.02, k5: 0.05, k10: 0.1, libre: 1e9 }
 
 export const PAGE_SIZE = 50
 // El snapshot persistido conserva solo una ventana reciente por ítem. El
@@ -448,6 +453,7 @@ export function ajustesBase(perfil) {
     prof: { skin: p.has(393), herb: p.has(182), mine: p.has(186) },
     group: false, pvp: true, n: 5, session: 2,
     campMode: 'single', campWeights: null,
+    horas: 2, tope: 'k5', miEstilo: true, montura: false,
   }
 }
 
@@ -473,7 +479,30 @@ export function normalizarAjustes(s) {
     session: [1, 2, 4].includes(+s.session) ? +s.session : 2,
     // H2: rotación sólo con pesos de tiempo declarados (canonicalizado en el motor).
     campMode, campWeights: valid ? [...weights] : campMode === 'rotation' ? [0.5, 0.3, 0.2] : null,
+    // Motor v2: horas de sesión, tope de venta, estilo calibrado y montura.
+    horas: [1, 2, 3, 4].includes(+s.horas) ? +s.horas : [1, 2, 4].includes(+s.session) ? +s.session : 2,
+    tope: Object.hasOwn(TOPES, s.tope) ? s.tope : 'k5',
+    miEstilo: s.miEstilo !== false,
+    montura: !!s.montura,
   }
+}
+
+// Contexto del motor v2 a partir de lo que ya tiene la vista. `marketKey`
+// identifica el snapshot (importación + reino) para las cachés del motor.
+export function contextoFarmeo({ perfil, settings, items, ventas = null, estilo = null, observados = null, marketKey = '' }) {
+  const market = FarmPlan.marketModel(items || [])
+  const kappa = TOPES[settings?.tope] ?? TOPES.k5
+  const caps = FarmPlan.sellCaps(market, ventas, { kappa })
+  const base = estilo && settings?.miEstilo !== false && estilo.source === 'sesiones' ? estilo : { ...FarmPlan.STYLE_DEFAULT }
+  const style = { ...base, ...(settings?.montura ? { speed: 14 } : {}) }
+  const observed = settings?.miEstilo !== false && observados?.sesiones ? observados : null
+  const profile = {
+    level: perfil?.nivel || 12, fac: perfil?.faccion === 'alianza' ? 'alliance' : 'horde',
+    cls: CLASE_MOTOR[perfil?.clase] || 'otro', prof: { skin: !!settings?.prof?.skin }, group: !!settings?.group,
+  }
+  const ajustes = { pvp: settings?.pvp !== false, zoneComp: settings?.zoneComp || {} }
+  const cacheKey = JSON.stringify([marketKey, (items || []).length, profile, ajustes, kappa, style, observed?.key || null])
+  return { profile, market, caps, style, observed, settings: ajustes, kappa, cacheKey }
 }
 
 // Ajustes efectivos: defaults del personaje + lo guardado por el usuario en

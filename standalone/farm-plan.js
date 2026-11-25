@@ -144,12 +144,28 @@ function zoneOk(zk, ctx) {
   return true;
 }
 
-// Unidades por muerte de un mob (directo + desuello si corresponde).
+// Unidades por muerte de un mob (directo + desuello si corresponde). Con
+// sesiones propias (ctx.observed) cada ítem se ajusta con un prior desde
+// CMaNGOS de peso N0 muertes: (N0·prior + unidades vistas) / (N0 + muertes).
+const N0_DROPS = 50, N0_COINS = 20;
 function killUnits(e, ctx) {
   const ix = index(), out = new Map();
   for (const [iid, u] of ix.units.get(e) || []) out.set(iid, u);
   if (ctx.profile?.prof?.skin) for (const [iid, u] of ix.skin.get(e) || []) out.set(iid, (out.get(iid) || 0) + u);
+  const obs = ctx.observed?.mobs?.get(String(e));
+  if (obs && obs.kills > 0) {
+    const ids = new Set([...out.keys(), ...obs.items.keys()]);
+    for (const iid of ids) {
+      if (!ctx.profile?.prof?.skin && obs.skinOnly?.has(iid)) continue;
+      out.set(iid, (N0_DROPS * (out.get(iid) || 0) + (obs.items.get(iid) || 0)) / (N0_DROPS + obs.kills));
+    }
+  }
   return out;
+}
+function killCoins(e, ctx) {
+  const prior = D.mobX[e][1], obs = ctx.observed?.mobs?.get(String(e));
+  if (!obs || !(obs.corpses > 0) || !Number.isFinite(obs.coins)) return prior;
+  return (N0_COINS * prior + obs.coins) / (N0_COINS + obs.corpses);
 }
 
 function softRate(cycle, cap) { return cap > 0 && cycle > 0 ? Math.pow(Math.pow(cycle, -2) + Math.pow(cap, -2), -0.5) : 0; }
@@ -164,7 +180,7 @@ function buildFarm(kind, id, zk, members, nnYards, ctx, extra) {
     const w = c / n, x = D.mobX[e], m = D.mobs[e];
     fight += w * x[0] / dps;
     handle += w * (st.lootSec + (skinOn && x[5] ? st.skinSec : 0));
-    coins += w * x[1]; rest += w * x[3];
+    coins += w * killCoins(e, ctx); rest += w * x[3];
     cap += c * 3600 / Math.max(30, m[6] || 300);
     for (const [iid, u] of killUnits(e, ctx)) units.set(iid, (units.get(iid) || 0) + w * u);
   }
@@ -184,7 +200,7 @@ let FARMS_KEY = null, FARMS = null;
 function farms(ctx) {
   if (!index().ok) return [];
   const p = ctx.profile || {}, st = style(ctx);
-  const key = JSON.stringify([p.level, p.fac, !!p.prof?.skin, !!p.group, !!ctx.allLevels, ctx.settings?.pvp !== false, ctx.settings?.zoneComp || {}, st]);
+  const key = JSON.stringify([p.level, p.fac, !!p.prof?.skin, !!p.group, !!ctx.allLevels, ctx.settings?.pvp !== false, ctx.settings?.zoneComp || {}, st, ctx.observed?.key || null]);
   if (FARMS_KEY === key && FARMS) return FARMS;
   const out = [];
   // Limpiar un campamento espacial: todos los mobs elegibles del grupo.
@@ -326,6 +342,43 @@ function ranking(ctx, n = 15) {
     .sort((a, b) => b.g - a.g).slice(0, n).map(x => describe(x.f, ctx));
 }
 
+// Campamento "a medida" con la mezcla de mobs que mató el jugador en una
+// sesión: sirve para comparar lo predicho con lo observado. members = [[npcId, muertes]].
+function mixFarm(members, zoneKey, ctx) {
+  if (!index().ok) return null;
+  const ms = (members || []).map(([e, c]) => [String(e), c]).filter(([e, c]) => D.mobs[e] && D.mobX[e] && c > 0);
+  if (!ms.length) return null;
+  let n = 0, nn = 0;
+  for (const [e, c] of ms) { n += c; nn += c * D.mobX[e][4]; }
+  // Spawns del campamento: los de cada mob en su zona principal (cota de respawn).
+  const spawnMembers = ms.map(([e]) => [e, Math.max(1, D.mobs[e][5] || 1)]);
+  const f = buildFarm('mix', 'mix', zoneKey || D.mobs[ms[0][0]][4], spawnMembers, nn / n, ctx, {});
+  // La composición por muertes manda en el valor por muerte (no los spawns).
+  const byKill = buildFarm('mix', 'mix', zoneKey || D.mobs[ms[0][0]][4], ms, nn / n, ctx, {});
+  return { ...f, fightSec: byKill.fightSec, handleSec: byKill.handleSec, coins: byKill.coins, rest: byKill.rest, units: byKill.units };
+}
+
+// Índice ítem -> campamentos (una pasada por todos): para la columna de Mercado.
+let IIDX_KEY = null, IIDX = null;
+function itemIndex(ctx) {
+  const key = ctx.cacheKey || null;
+  if (key && IIDX_KEY === key && IIDX) return IIDX;
+  const c2 = ctx.allLevels ? ctx : { ...ctx, allLevels: true };
+  const out = new Map();
+  for (const f of farms(c2)) {
+    const h = hourly(f, c2); if (!(h.gph > 0)) continue;
+    const tot = h.coins + h.ahGold + h.vendorGold;
+    for (const [iid, p] of h.parts) {
+      let a = out.get(iid); if (!a) { a = []; out.set(iid, a); }
+      a.push({ f, gph: h.gph, itemShare: tot > 0 ? p.gold / tot : 0, itemPerHour: f.rate * f.riskMult * (f.units.get(iid) || 0) });
+    }
+  }
+  for (const a of out.values()) { a.sort((x, y) => y.gph - x.gph); a.length = Math.min(a.length, 3); }
+  const res = { get(iid) { const a = out.get(Number(iid)); return a ? a.map(x => ({ ...describe(x.f, c2), itemShare: x.itemShare, itemPerHour: x.itemPerHour })) : [] }, size: out.size };
+  if (key) { IIDX_KEY = key; IIDX = res; }
+  return res;
+}
+
 // Campamentos donde cae un ítem, ordenados por el oro/h del campamento completo.
 function itemFarms(itemId, ctx, n = 3) {
   const iid = Number(itemId), out = [];
@@ -341,6 +394,8 @@ function itemFarms(itemId, ctx, n = 3) {
   return out.slice(0, n).map(x => ({ ...describe(x.farm, c2), itemPerHour: x.itemPerHour, itemShare: x.itemShare }));
 }
 
-const api = { configure, marketModel, sellCaps, farms, hourly, plan, ranking, itemFarms, unitValue, softRate,
-  STYLE_DEFAULT, PARAMS, AH_CUT, THIN_MAX_AVAIL, _reset() { FARMS_KEY = null; FARMS = null; IDX = null; } };
+const api = { configure, marketModel, sellCaps, farms, hourly, plan, ranking, itemFarms, itemIndex, mixFarm, unitValue, softRate,
+  STYLE_DEFAULT, PARAMS, AH_CUT, THIN_MAX_AVAIL, N0_DROPS, N0_COINS, ammoCost,
+  zoneName, itemName, sellOf,
+  _reset() { FARMS_KEY = null; FARMS = null; IDX = null; IIDX_KEY = null; IIDX = null; } };
 module.exports = api;
