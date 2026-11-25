@@ -24,6 +24,8 @@ entradas al juego: lo juegas tú.
   reloj en el acto.
 - **Botín:** la lista de la ventana sale de las líneas «Recibes botín: …» (lo que de
   verdad entró a tus bolsas); las monedas, del cambio de tu dinero mientras saqueas.
+- **Pesca (0.3.0):** cada ventana de botín de pesca (`IsFishingLoot`) es una captura;
+  la primera arranca el reloj. El corcho no cuenta como recolección.
 - **Muertes:** cada aviso de una misma muerte se junta en una sola. Si el juego oculta
   de qué mob era, la muerte cuenta igual (sin mob) y el saqueo le pone nombre después.
 
@@ -42,6 +44,7 @@ entradas al juego: lo juegas tú.
 | 9 | **Pausar**, espera 1 min, **Seguir** | El reloj no cuenta el minuto | — |
 | 10 | Vende algo a un vendedor | No cambia «Monedas» (se guarda aparte) | — |
 | 11 | **Terminar**, luego `/reload` | El chat resume la sesión y dice «Guardada» | — |
+| 12 | (0.3.0, si pescas) **Iniciar**, lanza la caña y saca 3 capturas | El reloj arranca con la primera captura; la ventana dice «Pesca N capturas · N/h» y lo pescado sale en «Botín» | ¿sigue «esperando»? Entonces Forever no expone `IsFishingLoot`: `/wff ya` arranca el reloj y lo pescado cuenta igual, pero como recolección |
 
 Después del `/reload`, en Hermes → WoW Forever → **Mercado → Farmeo → Mis sesiones**
 la sesión aparece con sus métricas (el plugin lee `WoWForeverFarm.lua` desde la

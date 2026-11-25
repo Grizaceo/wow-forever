@@ -58,6 +58,23 @@ ok(not L.kill(m, 'Player-1-2', 'target'), 'jugadores no cuentan')
 eq(m.kills[11578], 2, 'dos muertes del npc 11578')
 eq(m.killBy.target, 1, 'método objetivo'); eq(m.killBy.cleu, 1, 'método registro')
 
+-- ===== pesca: capturas por IsFishingLoot; arrancan el reloj y no son recolección
+local fz = L.newSession(0, {}, { armed = true })
+ok(L.fishLoot(fz, { { guid = 'GameObject-0-1-1-1-35591-F1', itemId = 6308, qty = 1 } }, 30), 'captura de pesca')
+ok(not fz.armed, 'la primera captura arranca el reloj')
+eq(fz.fishing, 1, 'una captura')
+eq(fz.fishItems[6308], 1, 'lo pescado se cuenta aparte')
+eq(next(fz.gather), nil, 'el corcho no cuenta como recolección')
+L.fishLoot(fz, { { itemId = 6308, qty = 1 }, { itemId = 13875, qty = 1 } }, 50)
+eq(fz.fishing, 2, 'dos capturas'); eq(fz.fishItems[13875], 1, 'cofre pescado')
+eq(L.units(fz)[6308], 2, 'las unidades incluyen lo pescado')
+local fsm = L.summary(fz, 3630, nil)
+eq(fsm.fishing, 2, 'resumen: capturas'); ok(fsm.fishingPerHour > 1.9 and fsm.fishingPerHour < 2.1, 'resumen: capturas por hora')
+local vieja = { state = 'running', methods = {}, kills = {} }
+ok(L.fishLoot(vieja, { { itemId = 6308 } }, 0), 'sesión de 0.2.0 sin campos de pesca')
+eq(vieja.fishing, 1, 'upgrade crea el contador')
+ok(not L.fishLoot(nil, {}, 0), 'sin sesión no cuenta')
+
 -- ===== botín: cadáver, desuello, recolección y sin origen
 local b = L.newSession(0, {})
 local g1, g2 = 'Creature-0-1-1-1-4127-X1', 'Creature-0-1-1-1-4127-X2'
@@ -342,6 +359,15 @@ eq(cur.coinsBy[4127], 125, 'monedas atribuidas al único origen')
 eq(cur.combat, 20, 'la pelea previa al saqueo cuenta')
 eq(cur.travel, 10, 'viaje antes de la pelea')
 eq(cur.looting, 2, 'saqueo desde eventos')
+-- una captura de pesca: IsFishingLoot manda, el corcho no es recolección
+_G.IsFishingLoot = function() return true end
+lootWin = { { guid = 'GameObject-0-1-1-1-35591-F1', itemId = 6308, qty = 1 } }
+nowValue = 5034; ev(nil, 'LOOT_OPENED'); ev(nil, 'LOOT_CLOSED')
+eq(cur.fishing, 1, 'LOOT_OPENED de pesca cuenta una captura')
+eq(cur.fishItems[6308], 1, 'pescado en fishItems')
+eq(cur.gather[35591], nil, 'el corcho no suma recolección')
+ok(cur.methods.pesca == true, 'anota que vio IsFishingLoot')
+_G.IsFishingLoot = function() return false end
 -- PARTY_KILL con GUID visible, con GUID secreto, y la XP del chat
 nowValue = 5040; ev(nil, 'PARTY_KILL', 'Player-1-ME', 'Creature-0-1-1-1-2732-P1')
 eq(cur.kills[2732], 1, 'PARTY_KILL con GUID')

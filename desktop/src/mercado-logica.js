@@ -454,6 +454,7 @@ export function ajustesBase(perfil) {
     group: false, pvp: true, n: 5, session: 2,
     campMode: 'single', campWeights: null,
     horas: 2, tope: 'k5', miEstilo: true, montura: false,
+    meta: 0, tengo: 0,
   }
 }
 
@@ -484,7 +485,13 @@ export function normalizarAjustes(s) {
     tope: Object.hasOwn(TOPES, s.tope) ? s.tope : 'k5',
     miEstilo: s.miEstilo !== false,
     montura: !!s.montura,
+    // Meta de oro y oro actual, en oro entero (0 = sin meta). Los escribe el jugador.
+    meta: oroEntero(s.meta), tengo: oroEntero(s.tengo),
   }
+}
+function oroEntero(v) {
+  const n = Math.floor(Number(v))
+  return Number.isSafeInteger(n) && n > 0 ? Math.min(n, 1000000) : 0
 }
 
 // Contexto del motor v2 a partir de lo que ya tiene la vista. `marketKey`

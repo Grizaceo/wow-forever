@@ -417,3 +417,27 @@ test('F0: los ítems útiles se informan pero no suben el puntaje', () => {
   assert.equal(z.score, z.scoreNoBonus);
   assert.match(F.MODEL.usefulBonus.basis, /no entra al puntaje/);
 });
+
+test('recolección: con tu skill, los nodos que piden más no cuentan; sin skill queda el proxy de iLvl', () => {
+  const F = fresh();
+  F.configure({ HunterDropData: {
+    zones: { '1': ['Westfall', 'horde', 'horde', 1, 10] },
+    mobs: {},
+    objects: { '700': ['Hierba fácil', 'herb', '1', 10, 300], '701': ['Hierba difícil', 'herb', '1', 10, 300] },
+    objSkill: { '701': 150 },
+    items: {
+      '510': ['Hoja', 1, 7, 0, 0, 0, 5, 0, -1, 100, [['o', 700, 100, 1, 1]]],
+      '511': ['Flor', 1, 7, 0, 0, 0, 15, 0, -1, 100, [['o', 701, 100, 1, 1]]],
+    },
+  } });
+  const sc = [{ itemId: 510, unitPriceCopper: 1000, observedDay: 0, history: [] },
+    { itemId: 511, unitPriceCopper: 5000, observedDay: 0, history: [] }];
+  const zona = (extra) => F.profRecommendations(sc, prof, { prof: { herb: true }, campMode: 'single', ...extra })[0]?.zones[0];
+  const sin = zona({}), bajo = zona({ skill: { herb: 100 } }), alto = zona({ skill: { herb: 200 } });
+  assert.deepEqual([...sin.items].sort(), ['Flor', 'Hoja'], 'sin skill: el proxy de iLvl deja pasar ambas');
+  assert.deepEqual(bajo.items, ['Hoja'], 'skill 100 < 150: la Flor no se recolecta');
+  assert.deepEqual([...alto.items].sort(), ['Flor', 'Hoja']);
+  assert.ok(bajo.gph < alto.gph, 'sin el nodo caro rinde menos');
+  assert.equal(sin.gph, alto.gph);
+  assert.equal(zona({ skill: { herb: 'x' } }).gph, sin.gph, 'un skill inválido se ignora');
+});

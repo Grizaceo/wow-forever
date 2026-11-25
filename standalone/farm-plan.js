@@ -421,7 +421,16 @@ function evaluate(ctx, opt = {}) {
   return { ranking, mobs, totalMobs: targets.length, items };
 }
 
-const api = { configure, marketModel, sellCaps, farms, hourly, plan, ranking, evaluate, priceInfo, itemFarms, itemIndex, mixFarm, unitValue, softRate,
+// Horas hasta una meta de oro (montura, dual spec…) con el plan elegido: valor
+// central y rango con el oro/h pesimista y optimista del mismo plan. En cobre.
+function goal(best, target, have = 0) {
+  if (!best || !(target > 0)) return null;
+  const falta = Math.max(0, target - Math.max(0, Number(have) || 0));
+  const h = g => (falta === 0 ? 0 : g > 0 ? falta / g : null);
+  return { target, have: Math.max(0, Number(have) || 0), falta, horas: h(best.gph), horasMin: h(best.high), horasMax: h(best.low) };
+}
+
+const api = { configure, marketModel, sellCaps, farms, hourly, plan, ranking, evaluate, priceInfo, goal, itemFarms, itemIndex, mixFarm, unitValue, softRate,
   STYLE_DEFAULT, PARAMS, AH_CUT, THIN_MAX_AVAIL, N0_DROPS, N0_COINS, ammoCost,
   zoneName, itemName, sellOf,
   _reset() { FARMS_KEY = null; FARMS = null; IDX = null; IIDX_KEY = null; IIDX = null; } };

@@ -1496,7 +1496,8 @@ def cmd_farmeo_sesiones(D, a, out):
             f"{pct_txt(s.get('combatePct'))}·{pct_txt(s.get('saqueoPct'))}·{pct_txt(s.get('restoPct')):<8}"
             f"{oro_txt(s.get('oroHSubasta')):>9}{oro_txt(p.get('oroH')) if p else '—':>10}"
             f"{pct_txt(p.get('errorRitmoPct'), True) if p else '—':>7}{pct_txt(p.get('errorBotinPct'), True) if p else '—':>7}"
-            + ("  *muertes solo por saqueo" if s.get("metodoMuertes") == "solo-saqueo" else ""))
+            + ("  *muertes solo por saqueo" if s.get("metodoMuertes") == "solo-saqueo" else "")
+            + (f"  [pesca: {s.get('pescasH') or 0:.0f} capturas/h]" if s.get("tipo") == "pesca" else ""))
     horas = sum((s.get("minutos") or 0) for s in d["sesiones"]) / 60
     oro_total = sum((s.get("oroHSubasta") or 0) * (s.get("minutos") or 0) / 60 for s in d["sesiones"])
     out(f"Total: {horas:.1f} h medidas · ≈{oro_total:.1f} oro (botín a precio de subasta actual + monedas).")
@@ -1526,14 +1527,20 @@ def cmd_farmeo_sesion(D, a, out):
     p = s.get("prediccion") or {}
     out(f"[tus sesiones] Sesión {s.get('id')} · {s.get('inicio')} · {s.get('minutos')} min activos (+{s.get('pausaMin', 0)} en pausa)")
     out(f"Tiempo: combate {pct_txt(s.get('combatePct'))} · saqueo {pct_txt(s.get('saqueoPct'))} · resto (caminar, comer, buscar) {pct_txt(s.get('restoPct'))}")
-    out(f"Ritmo: {s.get('muertes')} muertes ({(s.get('muertesH') or 0):.0f}/h) · pelea {s.get('peleaS')} s por muerte · "
-        f"saqueo {s.get('saqueoS')} s · {s.get('segPorMuerte')} s por muerte en total · muertes propias {s.get('muertesJugador', 0)}")
+    if s.get("tipo") == "pesca":
+        out(f"Pesca: {s.get('pescas')} capturas ({(s.get('pescasH') or 0):.0f}/h) · saqueo {s.get('saqueoS')} s por captura"
+            + (f" · además {s.get('muertes')} muertes" if s.get("muertes") else "")
+            + ". El plugin no predice la pesca: este oro/h es lo medido.")
+    else:
+        out(f"Ritmo: {s.get('muertes')} muertes ({(s.get('muertesH') or 0):.0f}/h) · pelea {s.get('peleaS')} s por muerte · "
+            f"saqueo {s.get('saqueoS')} s · {s.get('segPorMuerte')} s por muerte en total · muertes propias {s.get('muertesJugador', 0)}")
     out(f"Oro: monedas {oro_txt(s.get('monedasOro'))} · botín a vendedor {oro_txt(s.get('valorVendedorOro'))} · a subasta {oro_txt(s.get('valorSubastaOro'))} "
         f"→ {oro_txt(s.get('oroHSubasta'))}/h (vendedor {oro_txt(s.get('oroHVendedor'))}/h)")
     if p:
         out(f"[estimación] Predicho para los mismos mobs: {oro_txt(p.get('oroH'))}/h · {p.get('muertesH')} muertes/h · "
             f"diferencia oro {pct_txt(p.get('errorOroPct'), True)}, ritmo {pct_txt(p.get('errorRitmoPct'), True)}, botín por muerte {pct_txt(p.get('errorBotinPct'), True)}")
-    out("Mobs: " + ", ".join(f"{m.get('nombre')} ×{m.get('muertes')}" for m in s.get("mobs", [])))
+    if s.get("mobs"):
+        out("Mobs: " + ", ".join(f"{m.get('nombre')} ×{m.get('muertes')}" for m in s.get("mobs", [])))
     out("Botín principal: " + ", ".join(f"{i.get('nombre')} ×{i.get('unidades')} ({oro_txt(i.get('valorOro'))})" for i in s.get("items", [])))
     out(f"Muertes contadas por: {s.get('metodoMuertes')}" + (" (los mobs sin botín no cuentan)" if s.get("metodoMuertes") == "solo-saqueo" else ""))
     extra = []
@@ -1595,6 +1602,15 @@ def cmd_farmeo_plan(D, a, out):
         out("  Aportan: " + ", ".join(f"{x.get('nombre')} {oro_txt(x.get('oro'))} [{x.get('tope')}]" for x in pl["aportes"]))
     if pl.get("alternativas"):
         out("  Alternativas dentro del rango: " + "; ".join(" + ".join(x.get("zonas", [])) + f" ≈{oro_txt(x.get('oroH'))}/h" for x in pl["alternativas"]))
+    mt = pl.get("meta")
+    if mt:
+        if not mt.get("faltaOro"):
+            out(f"  Meta {oro_txt(mt.get('metaOro'))}: ya la tiene ({oro_txt(mt.get('tengoOro'))}).")
+        else:
+            lo, hi = (mt.get("horasRango") or [None, None])[:2]
+            fh = lambda h: "?" if h is None else f"{h:.1f} h"
+            out(f"  Meta {oro_txt(mt.get('metaOro'))} (tiene {oro_txt(mt.get('tengoOro'))}): faltan {oro_txt(mt.get('faltaOro'))} "
+                f"→ ≈{fh(mt.get('horas'))} con este plan (rango {fh(lo)}–{fh(hi)}), sin contar lo que gaste.")
     out("Tope de venta: «ventas-propias» = tus ventas TSM; «kappa-ofertas» = fracción declarada de lo publicado; "
         "«mercado-delgado» = solo vendedor; «sin-ofertas» = no está en tu escaneo, se valora a vendedor. "
         "Drops de Classic 1.12 salvo lo observado en tus sesiones.")

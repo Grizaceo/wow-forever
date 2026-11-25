@@ -336,9 +336,11 @@ function normalizeSettings(s){
   s=s||{};const zc={};
   if(s.zoneComp&&typeof s.zoneComp==='object')for(const k of Object.keys(s.zoneComp))if(COMP_ORDER.includes(s.zoneComp[k]))zc[k]=s.zoneComp[k];
   const p=s.prof||{},n=Number(s.n);
+  // Skill de recolección del jugador (Profesiones → skill-182/186); null = no lo sabemos.
+  const sk=s.skill||{},skv=v=>Number.isInteger(v)&&v>=0&&v<=300?v:null;
   return{comp:COMP_ORDER.includes(s.comp)?s.comp:'auto',zoneComp:zc,
     gph:Number.isFinite(+s.gph)&&+s.gph>0?Math.min(1000,+s.gph):5,
-    prof:{skin:!!p.skin,herb:!!p.herb,mine:!!p.mine},group:!!s.group,pvp:s.pvp!==false,
+    prof:{skin:!!p.skin,herb:!!p.herb,mine:!!p.mine},skill:{herb:skv(sk.herb),mine:skv(sk.mine)},group:!!s.group,pvp:s.pvp!==false,
     n:Number.isInteger(n)&&n>=3&&n<=8?n:5,
     session:[1,2,4].includes(+s.session)?+s.session:2,
     // H2: por defecto un sitio a la vez; rotación sólo con pesos explícitos.
@@ -445,17 +447,22 @@ function vendorCamps(zk,level,profile,settings,sess){
    es el mejor canal real: AH neto si está en tu scan, si no el sellPrice. */
 const PROF_KINDS={skin:'Piel',herb:'Hierbas',mine:'Minería'};
 function profGph(zk,kind,level,profile,settings,sess){
-  const key='pf|'+[zk,kind,level,profile.fac||'',settings.group?1:0,settings.campMode||'single',(settings.campWeights||[]).join(',')].join('|');
+  const rawSkill=kind==='herb'||kind==='mine'?settings.skill?.[kind]:null;
+  const mySkill=Number.isInteger(rawSkill)&&rawSkill>=0&&rawSkill<=300?rawSkill:null;
+  const key='pf|'+[zk,kind,level,profile.fac||'',settings.group?1:0,settings.campMode||'single',(settings.campWeights||[]).join(','),mySkill??''].join('|');
   const hit=sess.profCache.get(key);if(hit!=null)return hit;
   const wantObj=kind==='herb'?'herb':kind==='mine'?'ore':null;
   const vals=[],itemVal=new Map();
   const addEnt=(id,isObj)=>{
+    // Con tu skill conocido, el nodo que pide más skill no se recolecta (Lock.csv);
+    // sin él queda el proxy de iLvl ≤ nivel+10 de abajo.
+    if(isObj&&mySkill!=null&&(ENV.HunterDropData?.objSkill?.[id]||0)>mySkill)return;
     const per=new Map();let anySrc=null;
     for(const iid of (isObj?IX.objItems[id]:IX.mobItems[id])||[]){
       const dd=IX.items[iid],sell=dd?.[9]||0;if(sell<=0)continue;
       // Los nodos de hierbas/menas no tienen nivel propio: el iLvl del material
       // es el proxy del tier que tu personaje puede recolectar a su nivel.
-      if((dd?.[6]||0)>level+10)continue;
+      if(!(isObj&&mySkill!=null)&&(dd?.[6]||0)>level+10)continue;
       const it=sess.scan.get(iid),rp=it?refPrice(it):null;
       const ah=rp&&rp.price>0?Math.floor(rp.price*(1-AH_CUT)):0;
       const unit=Math.max(ah,sell);if(unit<=0)continue;

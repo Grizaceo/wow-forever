@@ -255,7 +255,15 @@ local function readLoot()
     end
   end
   L.mark(session, 'loot', n > 0)
-  L.loot(session, slots, nil, now())
+  -- IsFishingLoot existe en Classic; si Forever no la expone, la pesca queda
+  -- como botín de objeto (recolección) y methods.pesca no se marca.
+  local fishing = type(IsFishingLoot) == 'function' and plain(safe(IsFishingLoot)) == true
+  if fishing then
+    L.mark(session, 'pesca', true)
+    L.fishLoot(session, slots, now())
+  else
+    L.loot(session, slots, nil, now())
+  end
   lootSources = sources
   lootSources.__count = distinct
   lootMoneyBase = safe(GetMoney)
@@ -481,16 +489,21 @@ refreshUI = function()
   end
   local pct = function(x) return s.active > 0 and math.floor(100 * x / s.active + 0.5) or 0 end
   if s.state ~= 'running' then ui.title:SetText('Farmeo · en pausa')
-  elseif s.armed then ui.title:SetText('Farmeo · esperando el primer mob')
+  elseif s.armed then ui.title:SetText('Farmeo · esperando el primer mob o captura')
   else ui.title:SetText('Farmeo · en curso') end
   ui.clock:SetText(L.clock(s.active))
   local side = {}
   if s.travel >= 1 then side[#side + 1] = 'viaje ' .. L.clock(s.travel) end
   if s.paused >= 1 then side[#side + 1] = 'pausa ' .. L.clock(s.paused) end
   ui.side:SetText(table.concat(side, ' · '))
-  lines[1]:SetText(string.format('Muertes %d · %d/h%s%s', s.kills, math.floor(s.killsPerHour + 0.5),
-    s.fightPerKill and string.format(' · pelea %ds', math.floor(s.fightPerKill + 0.5)) or '',
-    s.deaths > 0 and string.format(' · tú %d (%s)', s.deaths, L.clock(s.dead)) or ''))
+  if s.fishing > 0 and s.fishing >= s.kills then
+    lines[1]:SetText(string.format('Pesca %d capturas · %d/h%s', s.fishing, math.floor(s.fishingPerHour + 0.5),
+      s.kills > 0 and string.format(' · muertes %d', s.kills) or ''))
+  else
+    lines[1]:SetText(string.format('Muertes %d · %d/h%s%s', s.kills, math.floor(s.killsPerHour + 0.5),
+      s.fightPerKill and string.format(' · pelea %ds', math.floor(s.fightPerKill + 0.5)) or '',
+      s.deaths > 0 and string.format(' · tú %d (%s)', s.deaths, L.clock(s.dead)) or ''))
+  end
   lines[2]:SetText(string.format('Combate %d%% · Saqueo %d%% · Resto %d%%', pct(s.combat), pct(s.looting), pct(s.rest)))
   lines[3]:SetText('Monedas ' .. L.money2(s.coins) .. ' · objetos ≈ ' .. L.money2(s.lootAH))
   lines[4]:SetText('Oro/h ≈ ' .. L.money2(s.goldPerHourAH) .. ' (vendedor ' .. L.money2(s.goldPerHourVendor) .. ')')

@@ -4,7 +4,7 @@
 // Diseño: docs/FARMEO-ORO.md. El motor heredado (market-farm.js) solo queda para
 // «Por tu profesión» (nodos de hierbas y minería).
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Button, Checkbox, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@hermes/plugin-sdk'
+import { Button, Checkbox, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@hermes/plugin-sdk'
 import { C, S } from '../../estilos.js'
 import { D, guiaCurada } from '../../datos.js'
 import { t } from '../../i18n.js'
@@ -13,6 +13,7 @@ import { Farm, FarmPlan, perfilMotor, hubZonesDe, fechaDe } from '../../mercado-
 import { metricasSesion, exportAgente } from '../../farm-sesiones.js'
 import { exportarAgente, ARCHIVO_AGENTE } from '../../farm-sync.js'
 import { construirContextoFarmeo } from '../../davi.js'
+import { leerNiveles, nivelDe } from '../../oficios.js'
 import { PreguntarDavi } from '../preguntar-davi.jsx'
 import { FilaCampamento, NombreCampamento, Supuestos, oro, pct } from './campamento.jsx'
 
@@ -32,13 +33,33 @@ function Opcion({ etiqueta, value, onChange, opciones }) {
     </label>
   )
 }
+function CampoOro({ etiqueta, value, onChange, id }) {
+  return (
+    <label style={S.campo} htmlFor={id}>
+      <span style={S.etiqueta}>{etiqueta}</span>
+      <Input id={id} type="number" min={0} max={1000000} step={1} value={value ? String(value) : ''} placeholder="0"
+        style={{ width: 90 }} onChange={(e) => onChange(e.target.value)} />
+    </label>
+  )
+}
+const horasTxt = (h) => (h == null ? '?' : h < 1 ? `${Math.max(1, Math.round(h * 60))} min` : `${(Math.round(h * 10) / 10).toLocaleString('es')} h`)
+function MetaOro({ meta, lang }) {
+  if (!meta) return null
+  if (meta.falta === 0) return <div data-testid="farm-plan-meta" style={S.etiqueta}>{cp(lang, 'Meta', 'Goal')} {oro(meta.target)}: {cp(lang, 'ya la tienes', 'already reached')}</div>
+  return (
+    <div data-testid="farm-plan-meta" style={{ fontSize: 12 }}>
+      {cp(lang, 'Meta', 'Goal')} {oro(meta.target)}: {cp(lang, 'faltan', 'missing')} {oro(meta.falta)} → <b>~{horasTxt(meta.horas)}</b>
+      {' '}<span style={S.etiqueta}>({horasTxt(meta.horasMin)}–{horasTxt(meta.horasMax)}) {cp(lang, 'con este plan, sin contar lo que gastes', 'with this plan, not counting what you spend')}</span>
+    </div>
+  )
+}
 function Marca({ checked, onChange, children, disabled = false }) {
   return <label style={{ display: 'inline-flex', gap: 6, alignItems: 'center', fontSize: 12 }}>
     <Checkbox checked={!!checked} disabled={disabled} onCheckedChange={(v) => onChange(!!v)} />{children}
   </label>
 }
 
-function PlanSesion({ plan, planCtx, lang }) {
+function PlanSesion({ plan, planCtx, meta, lang }) {
   if (!plan?.best) return <p style={S.sub} data-testid="farm-plan-vacio">{cp(lang, 'Sin plan: falta un escaneo de mercado o no hay campamentos elegibles para tu nivel y facción.', 'No plan: a market scan is missing or no camp is eligible for your level and faction.')}</p>
   const b = plan.best
   return (
@@ -49,6 +70,7 @@ function PlanSesion({ plan, planCtx, lang }) {
         {' · '}{cp(lang, 'viaje', 'travel')} {Math.round(b.travelMin)} min
         {b.bagTrips ? ` · ${b.bagTrips} ${cp(lang, 'viaje(s) por bolsas llenas', 'trip(s) for full bags')}` : ''}
       </div>
+      <MetaOro meta={meta} lang={lang} />
       <ol style={{ margin: 0, paddingLeft: 20, fontSize: 12 }}>
         {b.legs.map((l, i) => (
           <li key={i} data-testid="farm-plan-tramo" style={{ overflowWrap: 'anywhere' }}>
@@ -102,7 +124,9 @@ function MisSesiones({ metricas, abierta, lectura, onLeer, estilo, exportado, la
                   <td style={S.td}>{fechaSesion(m.start)}</td>
                   <td style={S.td}>{Math.round(m.activo / 60)}{m.viajeS >= 60 ? <div style={S.etiqueta}>+{Math.round(m.viajeS / 60)} {cp(lang, 'viaje', 'travel')}</div> : null}</td>
                   <td style={S.td}>{m.zona ? FarmPlan.zoneName(m.zona) : '?'}</td>
-                  <td style={S.td}>{Math.round(m.muertesH)}{m.metodoMuertes === 'solo-saqueo' ? '*' : ''}{m.muertesSinMob > 0.1 * m.muertes ? '†' : ''}</td>
+                  <td style={S.td}>{m.tipo === 'pesca'
+                    ? <span data-testid="farm-sesion-pesca">{Math.round(m.pescasH)} <span style={S.etiqueta}>{cp(lang, 'capturas', 'catches')}</span></span>
+                    : <>{Math.round(m.muertesH)}{m.metodoMuertes === 'solo-saqueo' ? '*' : ''}{m.muertesSinMob > 0.1 * m.muertes ? '†' : ''}</>}</td>
                   <td style={S.td}>{m.peleaS == null ? '?' : `${Math.round(m.peleaS)} s`}</td>
                   <td style={S.td}>{pct(m.combatePct)} · {pct(m.saqueoPct)} · {pct(m.restoPct)}</td>
                   <td style={S.td}><b>{oro(m.oroHSubasta)}</b><div style={S.etiqueta}>{cp(lang, 'vend.', 'vend.')} {oro(m.oroHVendedor)}</div></td>
@@ -145,6 +169,9 @@ export function Farmeo({ ctx, items, perfil, settings, onSettings, lang, planCtx
     if (!items?.length || !planCtx) return []
     try { return FarmPlan.ranking(planCtx, 8) } catch { return [] }
   }, [items, planCtx])
+  // Meta de oro del jugador (oro entero en ajustes; el motor trabaja en cobre).
+  const meta = useMemo(() => (plan?.best && settings.meta > 0
+    ? FarmPlan.goal(plan.best, settings.meta * 10000, (settings.tengo || 0) * 10000) : null), [plan, settings.meta, settings.tengo])
   // Evaluación completa para el agente (ranking + cada mob elegible + precios usados).
   const evaluacion = useMemo(() => {
     if (!items?.length || !planCtx) return null
@@ -154,27 +181,46 @@ export function Farmeo({ ctx, items, perfil, settings, onSettings, lang, planCtx
     try { return (sesiones || []).map((s) => metricasSesion(s, items?.length ? planCtx : null, D.dropData)) } catch { return [] }
   }, [sesiones, planCtx, items])
 
+  // Skill de Herboristería (182) y Minería (186): lo que el jugador escribió en
+  // Profesiones (`skill-<id>`) o, si no, lo declarado en `niveles-oficio`.
+  const [skillOficio, setSkillOficio] = useState({ herb: null, mine: null })
+  useEffect(() => {
+    let vivo = true
+    ;(async () => {
+      let niveles = null
+      try { niveles = (await leerNiveles(ctx)).niveles } catch { niveles = null }
+      const r = {}
+      for (const [k, id] of [['herb', 182], ['mine', 186]]) {
+        let v = null
+        try { v = await ctx?.storage?.get?.('skill-' + id, null) } catch { v = null }
+        r[k] = Number.isInteger(v) && v >= 0 && v <= 300 ? v : nivelDe(niveles, id, null)
+      }
+      if (vivo) setSkillOficio(r)
+    })()
+    return () => { vivo = false }
+  }, [ctx])
+
   // Motor heredado solo para recolección (nodos de hierbas/minería).
   const guia = useMemo(() => guiaCurada(perfil), [perfil])
   const perfilViejo = useMemo(() => perfilMotor(perfil, hubZonesDe(perfil?.nivel || 12, guia?.datos?.routes, D.zonas, perfil?.faccion)), [perfil, guia])
   const profs = useMemo(() => {
     if (!items?.length || !(settings.prof?.herb || settings.prof?.mine)) return []
-    try { return Farm.profRecommendations(items, perfilViejo, { ...settings, prof: { ...settings.prof, skin: false } }) } catch { return [] }
-  }, [items, perfilViejo, settings])
+    try { return Farm.profRecommendations(items, perfilViejo, { ...settings, prof: { ...settings.prof, skin: false }, skill: skillOficio }) } catch { return [] }
+  }, [items, perfilViejo, settings, skillOficio])
 
   // Contexto del agente: se reescribe cuando cambian sesiones, estilo o plan.
   const [exportado, setExportado] = useState(null)
   const ultimo = useRef('')
   useEffect(() => {
     if (!ctx?.files?.writeText || (!metricas.length && !plan)) return
-    const payload = exportAgente({ sesiones, metricas, estilo, plan, perfil, evaluacion })
+    const payload = exportAgente({ sesiones, metricas, estilo, plan, perfil, evaluacion, meta })
     const firma = JSON.stringify({ ...payload, generado: null })
     if (firma === ultimo.current) return
     const h = setTimeout(async () => {
       if (await exportarAgente(ctx, payload)) { ultimo.current = firma; setExportado(new Date().toLocaleTimeString(lang === 'en' ? 'en' : 'es')) }
     }, 1500)
     return () => clearTimeout(h)
-  }, [ctx, sesiones, metricas, estilo, plan, perfil, evaluacion, lang])
+  }, [ctx, sesiones, metricas, estilo, plan, perfil, evaluacion, meta, lang])
 
   const snapshotDavi = useMemo(() => construirContextoFarmeo({ plan, estilo, metricas, resumenPerfil, lang,
     procedencia: ['WoWForeverFarm.lua (sesiones medidas)', 'CMaNGOS classic-db 1.12 (drops)', 'Auctionator / puente (precios)'] }), [plan, estilo, metricas, resumenPerfil, lang])
@@ -188,6 +234,8 @@ export function Farmeo({ ctx, items, perfil, settings, onSettings, lang, planCtx
         <Opcion etiqueta={cp(lang, 'Tope de venta', 'Sell cap')} value={settings.tope} onChange={(v) => cambiar({ tope: v })}
           opciones={[['k2', cp(lang, '2 % de lo publicado', '2% of listings')], ['k5', cp(lang, '5 % de lo publicado', '5% of listings')],
             ['k10', cp(lang, '10 % de lo publicado', '10% of listings')], ['libre', cp(lang, 'sin tope (optimista)', 'no cap (optimistic)')]]} />
+        <CampoOro id="wf-farm-meta" etiqueta={cp(lang, 'Meta (oro)', 'Goal (gold)')} value={settings.meta} onChange={(v) => cambiar({ meta: v })} />
+        <CampoOro id="wf-farm-tengo" etiqueta={cp(lang, 'Tengo (oro)', 'I have (gold)')} value={settings.tengo} onChange={(v) => cambiar({ tengo: v })} />
       </div>
       <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
         <Marca checked={settings.prof?.skin} onChange={(v) => cambiarProf('skin', v)}>{t(lang, 'mercado.farm.prof.skin')}</Marca>
@@ -202,7 +250,10 @@ export function Farmeo({ ctx, items, perfil, settings, onSettings, lang, planCtx
       {!items?.length ? <p style={S.sub}>{t(lang, 'mercado.farm.sinScan')}</p> : (
         <>
           <h4 style={{ ...S.titulo, fontSize: 13, margin: '6px 0 0' }}>{cp(lang, 'Plan de sesión', 'Session plan')}</h4>
-          <PlanSesion plan={plan} planCtx={planCtx} lang={lang} />
+          <PlanSesion plan={plan} planCtx={planCtx} meta={meta} lang={lang} />
+          <p style={S.sub} data-testid="farm-pesca-nota">{cp(lang,
+            'Pesca: el plugin no la estima. La base de Classic que usa no trae los bancos de peces ni los restos de naufragio (donde salen los cofres), y la pesca en agua abierta casi no deja oro. Mídela tú: /wff start, pesca (la primera captura arranca el reloj), /wff stop y /reload; tu oro/h real aparece en Mis sesiones.',
+            'Fishing: the plugin does not estimate it. Its Classic database lacks fish pools and floating wreckage (where chests come from), and open-water fishing yields almost no gold. Measure it yourself: /wff start, fish (the first catch starts the clock), /wff stop and /reload; your real gold/h shows up in My sessions.')}</p>
 
           {ranking.length > 0 && (
             <div>
@@ -233,6 +284,12 @@ export function Farmeo({ ctx, items, perfil, settings, onSettings, lang, planCtx
               </ul>
             </div>
           ))}
+          <p style={S.sub} data-testid="farm-prof-skill">{['herb', 'mine'].filter((k) => settings.prof?.[k]).map((k) => {
+            const nom = k === 'herb' ? cp(lang, 'Herboristería', 'Herbalism') : cp(lang, 'Minería', 'Mining')
+            return skillOficio[k] == null
+              ? cp(lang, `${nom}: sin tu skill (escríbelo en Profesiones); se asume que recolectas los nodos de tu nivel.`, `${nom}: no skill set (enter it in Professions); nodes of your level are assumed.`)
+              : cp(lang, `${nom} ${skillOficio[k]}: solo nodos que puedes recolectar.`, `${nom} ${skillOficio[k]}: only nodes you can gather.`)
+          }).join(' ')}</p>
           <p style={S.sub}>{t(lang, 'mercado.farm.porProfesionNota')}</p>
         </div>
       )}

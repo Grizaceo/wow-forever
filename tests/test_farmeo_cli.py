@@ -202,5 +202,48 @@ class TestFarmeoCli(unittest.TestCase):
         finally:
             shutil.rmtree(tmp)
 
+    def test_plan_con_meta_de_oro(self):
+        with open(FIX, encoding='utf-8') as fh:
+            d = json.load(fh)
+        d['plan']['meta'] = {'metaOro': 100, 'tengoOro': 40, 'faltaOro': 60, 'horas': 8, 'horasRango': [7.7, 8.4]}
+        tmp = tempfile.mkdtemp()
+        try:
+            f = os.path.join(tmp, 'farmeo-agente.json')
+            with open(f, 'w', encoding='utf-8') as fh:
+                json.dump(d, fh)
+            code, txt = correr('farmeo-plan', '--archivo', f)
+            self.assertEqual(code, 0)
+            self.assertIn('Meta 100.00o (tiene 40.00o): faltan 60.00o → ≈8.0 h con este plan (rango 7.7 h–8.4 h)', txt)
+            d['plan']['meta'] = {'metaOro': 100, 'tengoOro': 120, 'faltaOro': 0, 'horas': 0, 'horasRango': [0, 0]}
+            with open(f, 'w', encoding='utf-8') as fh:
+                json.dump(d, fh)
+            code, txt = correr('farmeo-plan', '--archivo', f)
+            self.assertIn('Meta 100.00o: ya la tiene (120.00o).', txt)
+        finally:
+            shutil.rmtree(tmp)
+
+    def test_sesion_de_pesca_en_tabla_y_detalle(self):
+        with open(FIX, encoding='utf-8') as fh:
+            d = json.load(fh)
+        pesca = dict(d['sesiones'][-1], id='s1795800000', inicio='2026-11-26T10:00:00.000Z', tipo='pesca',
+                     pescas=300, pescasH=300, muertes=0, muertesH=0, mobs=[], prediccion=None, saqueoS=2)
+        d['sesiones'].append(pesca)
+        d['totalSesiones'] = len(d['sesiones'])
+        tmp = tempfile.mkdtemp()
+        try:
+            f = os.path.join(tmp, 'farmeo-agente.json')
+            with open(f, 'w', encoding='utf-8') as fh:
+                json.dump(d, fh)
+            code, txt = correr('farmeo-sesiones', '--archivo', f)
+            self.assertEqual(code, 0)
+            self.assertIn('[pesca: 300 capturas/h]', txt)
+            code, txt = correr('farmeo-sesion', '1', '--archivo', f)
+            self.assertEqual(code, 0)
+            self.assertIn('Pesca: 300 capturas (300/h)', txt)
+            self.assertIn('El plugin no predice la pesca', txt)
+            self.assertNotIn('Mobs:', txt)
+        finally:
+            shutil.rmtree(tmp)
+
 if __name__ == '__main__':
     unittest.main()

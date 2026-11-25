@@ -3,7 +3,7 @@
 ## Notes: Farming session counter for the WoW Forever Hermes plugin: time from your first fight, kills, loot received (items and coins) and gold per hour. Nothing leaves your PC.
 ## Notes-esES: Contador de sesiones de farmeo para el plugin WoW Forever de Hermes: tiempo desde tu primera pelea, muertes, botín recibido (objetos y monedas) y oro por hora. Nada sale de tu PC.
 ## Author: DAVI + Cristóbal
-## Version: 0.2.0
+## Version: 0.3.0
 ## SavedVariables: WoWForeverFarmDB
 ## OptionalDeps: Auctionator
 

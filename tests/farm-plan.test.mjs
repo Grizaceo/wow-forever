@@ -233,3 +233,15 @@ test('evaluate: sin dataset schema 2 no inventa nada', () => {
   const ev = P.evaluate({ profile: profile(), market: new Map(), caps: new Map(), settings: {} })
   assert.deepEqual([ev.ranking.length, ev.mobs.length, ev.totalMobs, ev.items.size], [0, 0, 0, 0])
 })
+
+test('goal: horas hasta la meta con el oro/h central y el rango del plan', () => {
+  const P = fresh()
+  const best = { gph: 100000, low: 80000, high: 125000 }          // 10 o/h (8–12,5)
+  const g = P.goal(best, 1000000, 400000)                          // meta 100 o, tiene 40 o
+  assert.equal(g.falta, 600000)
+  assert.ok(near(g.horas, 6)); assert.ok(near(g.horasMin, 4.8)); assert.ok(near(g.horasMax, 7.5))
+  assert.equal(P.goal(best, 1000000, 2000000).horas, 0, 'meta ya alcanzada')
+  assert.equal(P.goal(best, 0, 0), null, 'sin meta')
+  assert.equal(P.goal(null, 1000000, 0), null, 'sin plan')
+  assert.equal(P.goal({ gph: 0, low: 0, high: 0 }, 1000000, 0).horas, null, 'un plan que no rinde no da horas')
+})

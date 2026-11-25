@@ -156,12 +156,13 @@ def build_public(src):
     db = read_sql(sql, TABLES)
     zones, maps = build_zones(src)
     loc = ZoneLocator(zones, db)
-    locks = {}
+    locks, lock_skill = {}, {}
     for r in read_csv(os.path.join(src, 'Lock.csv')):
         kind = None
         for k in range(8):
             if r['Type_%d' % k] == '2' and int(r['_Index_%d' % k]) in LOCK_KIND:
                 kind = LOCK_KIND[int(r['_Index_%d' % k])]
+                lock_skill[int(r['ID'])] = int(r['Skill_%d' % k] or 0)
                 break
         locks[int(r['ID'])] = kind
 
@@ -223,6 +224,7 @@ def build_public(src):
     sources = collections.defaultdict(list)   # item -> [type, id, chance, min, max]
     world = collections.defaultdict(list)     # item -> [(lvlmin,lvlmax,chance)]
     mobs, objects = {}, {}
+    obj_skill = {}  # goId -> skill de profesión mínimo (Lock.csv), solo hierbas/menas/pesca
     # schema 2: value of a kill beyond the capped item->source index
     mob_x, mob_loot, skin_loot = {}, {}, {}
     direct_rows = {}       # npcId -> [(item, chanceBp, count*10, vendorEV)] before the source cap
@@ -298,6 +300,8 @@ def build_public(src):
             zk, n = sorted(zc.items(), key=lambda kv: (-kv[1], kv[0]))[0]
             others = [[k, c] for k, c in sorted(zc.items()) if k != zk]
             objects[e] = [t['name'], kind, zk, n, median(resp)] + ([others] if others else [])
+            if kind in ('herb', 'ore', 'fish') and lock_skill.get(t['data0'], 0) > 0:
+                obj_skill[e] = lock_skill[t['data0']]
 
     items, used_m, used_o = {}, set(), set()
     for iid in sorted(set(sources) | set(world)):
@@ -404,6 +408,8 @@ def build_public(src):
                        'items[].sources entries + mobLoot; everything else is in mobX.restVendor',
             'skinLoot': 'npcId -> flat [itemId, chanceBasisPoints, avgCount*10, ...] full skinning loot',
             'itemStack': 'itemId -> stack size, only when > 1 (bag slots per farmed unit)',
+            'objSkill': 'goId -> minimum profession skill to gather (Lock.csv Skill), herb/ore/fish nodes only; '
+                        'absent = 0',
             'camps': '[[zoneKey, mapX*10, mapY*10, nnYards, [[npcId, spawns], ...]], ...] spatial camps of '
                      'normal-rank spawns (single linkage <= campRadiusYards)',
         },
@@ -415,6 +421,7 @@ def build_public(src):
         'camps': camps,
         'itemStack': item_stack,
         'objects': {str(k): objects[k] for k in sorted(used_o)},
+        'objSkill': {str(k): obj_skill[k] for k in sorted(used_o) if k in obj_skill},
         'items': items,
     }
 

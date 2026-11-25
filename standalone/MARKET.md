@@ -378,9 +378,10 @@ materiales del oficio en cada zona candidata, con las mismas reglas de
 `vendorGph` (top-3 entidades, elegibilidad completa) pero filtrado a fuentes
 del oficio: `skin` en cadáveres, nodos `herb`/`ore`. El valor unitario es el
 mejor canal real: AH neto si el material está en tu scan, si no `sellPrice`.
-Los materiales con `itemLevel > nivel+10` se excluyen — los nodos de
-hierbas/menas no tienen nivel propio y el iLvl es el proxy del tier que tu
-personaje puede recolectar. El `gph` mostrado descuenta riesgo de facción y
+Los materiales con `itemLevel > nivel+10` se excluyen cuando no se conoce tu skill
+— el iLvl es el proxy del tier que tu personaje puede recolectar. Con tu skill
+de Profesiones (Herboristería 182, Minería 186) manda el skill mínimo de cada
+nodo (`objSkill`, de `Lock.csv`): los nodos que piden más no cuentan. El `gph` mostrado descuenta riesgo de facción y
 factor de traslado como el ranking principal. Las profesiones del SimC
 importado (`Skinning`/`Herbalism`/`Mining`) pre-marcan los checks del toolbar
 de farmeo al aplicar el perfil. La card "Por tu profesión" lista el top-3 por

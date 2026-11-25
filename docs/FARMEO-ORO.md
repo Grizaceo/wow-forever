@@ -143,6 +143,23 @@ Desde las sesiones (`desktop/src/farm-sesiones.js`, puro):
   muertes) y conteos observados; monedas por mob con media observada.
 - El motor usa el estilo calibrado si el usuario lo activa ("usar mis métricas").
 
+## Meta, recolección y pesca (2.4.0)
+
+- **Meta de oro**: el jugador escribe su meta y su oro actual en Farmeo (oro entero,
+  `meta`/`tengo` en `farm-settings`). `FarmPlan.goal(best, meta, tengo)` da las horas
+  hasta la meta con el oro/h central del plan y el rango pesimista/optimista. El plugin
+  no fija precios de montura ni dual spec: no están verificados en Forever.
+- **Skill de recolección**: el dataset trae `objSkill` (skill mínimo de cada nodo de
+  hierbas, menas y pesca, de `Lock.csv`). «Por tu profesión» (motor heredado) descarta
+  los nodos sobre el skill que el jugador escribió en Profesiones (`skill-182`,
+  `skill-186`, o `niveles-oficio`); sin skill conocido queda el proxy de iLvl ≤ nivel+10.
+- **Pesca**: no se estima. CMaNGOS classic-db no trae spawns de bancos de peces ni de
+  restos de naufragio, y la pesca en agua abierta de zonas 130 (STV, Arathi, Desolace)
+  da casi solo pescado de pocos cobres. Un modelo con esos datos diría «pescar no vale
+  nada», contra lo que reportan los jugadores. En su lugar, WoWForeverFarm 0.3.0 cuenta
+  las capturas (`IsFishingLoot`; `fishing`, `fishItems`) y Desktop marca la sesión como
+  `tipo: 'pesca'` con capturas/h y su oro/h medido.
+
 ## Capa agéntica
 
 - Desktop escribe `data/farmeo-agente.json` (schema 1) cuando cambian las sesiones,

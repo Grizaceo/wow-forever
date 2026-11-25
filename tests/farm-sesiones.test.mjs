@@ -251,3 +251,46 @@ test('exportAgente: evaluación por mob en oro, precios por ítem y null si no h
   assert.equal(e.evaluacion.totalMobs, 2)
   assert.equal(exportAgente({}).evaluacion, null)
 })
+
+test('exportAgente: la meta de oro va dentro del plan, en oro y horas', () => {
+  const plan = { best: { hours: 2, gph: 100000, low: 80000, high: 125000, zones: [{ name: 'Desolace' }], travelMin: 20, legs: [], top: [] }, alternatives: [] }
+  const meta = { target: 1000000, have: 400000, falta: 600000, horas: 6, horasMin: 4.8, horasMax: 7.5 }
+  const e = exportAgente({ plan, meta })
+  assert.deepEqual(e.plan.meta, { metaOro: 100, tengoOro: 40, faltaOro: 60, horas: 6, horasRango: [4.8, 7.5] })
+  assert.equal(exportAgente({ plan }).plan.meta, null)
+})
+
+// Addon 0.3.0: pesca. Capturas por IsFishingLoot, sin muertes; el corcho no es recolección.
+const SV3 = `WoWForeverFarmDB = {
+["version"] = 1,
+["sessions"] = {
+{
+["v"] = 1, ["start"] = 1795800000, ["stop"] = 1795803600, ["level"] = 40, ["class"] = "HUNTER",
+["active"] = 3600, ["travel"] = 0, ["paused"] = 0, ["combat"] = 0, ["looting"] = 600, ["fights"] = 0, ["deaths"] = 0,
+["kills"] = {}, ["killsAnon"] = 0, ["corpses"] = {}, ["items"] = {}, ["skins"] = {}, ["skinItems"] = {},
+["gather"] = {}, ["gatherItems"] = {}, ["other"] = {}, ["got"] = {},
+["fishing"] = 300, ["fishItems"] = { [6308] = 280, [13875] = 2, },
+["money"] = { ["loot"] = 0, ["merchant"] = 0, ["other"] = 0, }, ["coinsBy"] = {}, ["zones"] = { [1434] = 3600, },
+["methods"] = { ["loot"] = true, ["pesca"] = true, },
+},
+},
+["ui"] = {},
+}
+`
+
+test('sesión de pesca: capturas por hora, lo pescado se valora y no hay predicción de mobs', () => {
+  const [s] = parseFarm(lua(SV3)).sessions
+  assert.equal(s.fishing, 300)
+  assert.deepEqual(s.fishItems, { 6308: 280, 13875: 2 })
+  assert.equal(s.methods.pesca, true)
+  const m = metricasSesion(s, null, DATASET)
+  assert.equal(m.tipo, 'pesca')
+  assert.equal(m.pescas, 300); assert.equal(m.pescasH, 300)
+  assert.equal(m.muertes, 0); assert.equal(m.prediccion, null)
+  assert.equal(m.saqueoS, 2, '600 s de saqueo entre 300 capturas')
+  assert.ok(m.items.some((x) => x.itemId === 6308 && x.unidades === 280), 'lo pescado entra al botín')
+  const ag = exportAgente({ sesiones: [s], metricas: [m] })
+  assert.deepEqual([ag.sesiones[0].tipo, ag.sesiones[0].pescas, ag.sesiones[0].pescasH], ['pesca', 300, 300])
+  const sinPesca = metricasSesion(parseFarm(lua(SV2)).sessions[0], null, DATASET)
+  assert.deepEqual([sinPesca.tipo, sinPesca.pescas], ['mobs', 0], 'las sesiones 0.2.0 siguen siendo de mobs')
+})

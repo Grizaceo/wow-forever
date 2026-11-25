@@ -166,6 +166,7 @@ function Logic.newSession(now, info, opts)
     kills = {}, killsAnon = 0, killBy = {}, signals = {}, xp = 0,
     deadGuids = {}, lootedGuids = {}, recent = {}, noGuid = {},
     corpses = {}, items = {}, skins = {}, skinItems = {}, gather = {}, gatherItems = {}, other = {}, got = {},
+    fishing = 0, fishItems = {},
     money = { loot = 0, merchant = 0, other = 0 }, coinsBy = {},
     zones = {}, path = '', pathN = 0, lastPath = nil, lastZoneAt = nil,
     ammo = {}, bags = {}, methods = {},
@@ -185,6 +186,8 @@ local function upgrade(s)
   s.xp = s.xp or 0
   s.deadGuids = s.deadGuids or {}
   s.lootedGuids = s.lootedGuids or {}
+  s.fishing = s.fishing or 0
+  s.fishItems = s.fishItems or {}
 end
 Logic.upgrade = upgrade
 
@@ -436,6 +439,21 @@ function Logic.loot(s, slots, singleSourceMoney, now)
   return nsrc
 end
 
+-- Pesca: una captura por ventana de botín de pesca (IsFishingLoot). El corcho es
+-- un objeto del mundo, así que sin esto la captura contaría como recolección.
+-- La primera captura arranca el reloj armado, igual que la primera muerte.
+function Logic.fishLoot(s, slots, now)
+  if not s or s.state ~= 'running' or type(slots) ~= 'table' then return false end
+  upgrade(s)
+  now = now or s.lastBeat or 0
+  Logic.engage(s, now)
+  s.fishing = s.fishing + 1
+  for _, sl in ipairs(slots) do
+    if sl.itemId then count(s.fishItems, sl.itemId, sl.qty or 1) end
+  end
+  return true
+end
+
 -- Lo que de verdad entró a las bolsas («Recibes botín: …»).
 function Logic.received(s, itemId, qty)
   if not s or s.state ~= 'running' or type(itemId) ~= 'number' then return false end
@@ -509,6 +527,7 @@ function Logic.units(s)
       end
     end
     for iid, q in pairs(s.other or {}) do add(iid, q) end
+    for iid, q in pairs(s.fishItems or {}) do add(iid, q) end
   end
   return per, from
 end
@@ -547,6 +566,7 @@ function Logic.summary(s, now, price)
     combat = combat, looting = looting, dead = dead,
     rest = math.max(0, active - combat - looting), kills = kills, fights = s.fights, deaths = s.deaths,
     killsPerHour = hours > 0 and kills / hours or 0,
+    fishing = s.fishing or 0, fishingPerHour = hours > 0 and (s.fishing or 0) / hours or 0,
     fightPerKill = kills > 0 and combat / kills or nil,
     xp = s.xp or 0, xpPerHour = hours > 0 and (s.xp or 0) / hours or 0,
     coins = coins, lootVendor = vendor, lootAH = ah, merchant = s.money.merchant or 0,
@@ -576,7 +596,7 @@ function Logic.finish(s, now)
   s.combatSince, s.lootSince, s.resumedAt, s.pausedAt, s.lastBeat, s.deadSince = nil, nil, nil, nil, nil, nil
   s.lastPath, s.lastZone, s.lastZoneAt = nil, nil, nil
   s.armed = nil
-  for _, k in ipairs({ 'kills', 'corpses', 'items', 'skins', 'skinItems', 'gather', 'gatherItems', 'other', 'got', 'coinsBy', 'zones' }) do
+  for _, k in ipairs({ 'kills', 'corpses', 'items', 'skins', 'skinItems', 'gather', 'gatherItems', 'other', 'got', 'fishItems', 'coinsBy', 'zones' }) do
     clean(s[k])
   end
   return s

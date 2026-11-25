@@ -260,6 +260,17 @@ Hermes Desktop; lo lees con las órdenes `farmeo-*` (§2). Diseño y fórmulas: 
   Forever menores que Classic o precios que bajaron. Si el plan recomienda otra zona que la que
   farmea, explícalo con `farmeo-plan` (minutos, aportes y tope). Sin sesiones, explica cómo
   medir una; no inventes métricas del jugador.
+- **Meta de oro.** Si el jugador escribe en Farmeo una meta (montura, dual spec…) y su
+  oro actual, `farmeo-plan` dice cuántas horas faltan con el plan y su rango. El plugin
+  no trae el precio de la montura ni del dual spec: no lo afirmes como dato del plugin.
+- **Pesca.** El plugin no la estima: la base de Classic no trae bancos de peces ni restos
+  de naufragio (donde salen los cofres) y la pesca en agua abierta casi no deja oro. Si
+  pregunta si conviene pescar, pídele que la mida con WoWForeverFarm 0.3.0 (`/wff start`,
+  pescar, `/wff stop`, `/reload`); `farmeo-sesiones` marca esas sesiones `[pesca]` con
+  sus capturas por hora y su oro/h real.
+- **Hierbas y minería.** «Por tu profesión» filtra los nodos por el skill que el jugador
+  escribió en Profesiones (Herboristería 182, Minería 186); sin ese dato supone los nodos
+  de su nivel. Si recomiendas nodos, pregúntale su skill.
 - **Si cita una guía, un video o un foro** («dicen que los Burning Exile dan 14 o/h»): corre
   `farmeo-mob "<mob>"` (o `farmeo-zona`) y compara **el precio usado aquí** con el que supone la
   fuente. Las guías usan precios de otros reinos y otras fechas; en el reino del jugador el ítem

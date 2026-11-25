@@ -47,7 +47,7 @@ function conteo2(o) {
 // Forever). «Directos» = ven también a los mobs que no sueltan nada.
 const METODOS = ['party', 'died', 'xp', 'slain', 'dies', 'target', 'loot', 'cleu']
 const DIRECTOS = ['party', 'died', 'xp', 'slain', 'dies', 'target', 'cleu']
-const LECTURAS = [...METODOS, 'position', 'auctionator', 'ammo', 'bags', 'lootchat', 'secretos']
+const LECTURAS = [...METODOS, 'position', 'auctionator', 'ammo', 'bags', 'lootchat', 'secretos', 'pesca']
 const texto = (s, max = 40) => (typeof s === 'string' && s.length <= max && !/[\x00-\x1f]/.test(s) ? s : null)
 
 export function normalizarSesion(s) {
@@ -71,6 +71,8 @@ export function normalizarSesion(s) {
     xp: num(s.xp, 0, 1e9) ? Math.round(s.xp) : 0,
     items: conteo2(s.items), skinItems: conteo2(s.skinItems), gatherItems: conteo2(s.gatherItems), other: conteo(s.other),
     got: conteo(s.got),
+    // Pesca (WoWForeverFarm ≥ 0.3.0): capturas por IsFishingLoot y lo pescado.
+    fishing: int(s.fishing, 0, 1e6) ? s.fishing : 0, fishItems: conteo(s.fishItems),
     money: {
       loot: num(s.money?.loot, -1e10, 1e10) ? Math.round(s.money.loot) : 0,
       merchant: num(s.money?.merchant, -1e10, 1e10) ? Math.round(s.money.merchant) : 0,
@@ -136,6 +138,7 @@ function unidades(s) {
   const add = (bag) => { for (const per of Object.values(bag || {})) for (const [iid, q] of Object.entries(per)) u.set(Number(iid), (u.get(Number(iid)) || 0) + q) }
   add(s.items); add(s.skinItems); add(s.gatherItems)
   for (const [iid, q] of Object.entries(s.other || {})) u.set(Number(iid), (u.get(Number(iid)) || 0) + q)
+  for (const [iid, q] of Object.entries(s.fishItems || {})) u.set(Number(iid), (u.get(Number(iid)) || 0) + q)
   return u
 }
 // Zona principal de la sesión (más segundos por mapa) como clave del dataset.
@@ -165,9 +168,12 @@ export function metricasSesion(s, ctx = null, dataset = null) {
     combatePct: s.active ? s.combat / s.active : 0, saqueoPct: s.active ? s.looting / s.active : 0,
     restoPct: s.active ? Math.max(0, s.active - s.combat - s.looting) / s.active : 0,
     muertes: kills, muertesH: h > 0 ? kills / h : 0, peleaS: kills ? s.combat / kills : null,
-    saqueoS: corpses + skins + gathers ? s.looting / (corpses + skins + gathers) : null,
+    saqueoS: corpses + skins + gathers + (s.fishing || 0) ? s.looting / (corpses + skins + gathers + (s.fishing || 0)) : null,
     segPorMuerte: kills ? s.active / kills : null,
     cadaveres: corpses, desuellos: skins, recolecciones: gathers, muertesJugador: s.deaths,
+    pescas: s.fishing || 0, pescasH: h > 0 ? (s.fishing || 0) / h : 0,
+    // «pesca» si las capturas superan a las muertes: el modelo de mobs no la predice.
+    tipo: (s.fishing || 0) > 0 && (s.fishing || 0) >= kills ? 'pesca' : 'mobs',
     monedas: coins, valorVendedor: vend, valorSubasta: ah,
     oroHVendedor: h > 0 ? (coins + vend) / h : 0, oroHSubasta: h > 0 ? (coins + ah) / h : 0,
     vendedorNeto: s.money.merchant, zona: zonaPrincipal(s, dataset),
@@ -322,14 +328,14 @@ function evaluacionAgente(ev) {
 
 // Contexto para el agente (data/farmeo-agente.json). Solo agregados: sin
 // nombres de personaje, reino ni ruta de posiciones.
-export function exportAgente({ sesiones = [], metricas = [], estilo = null, plan = null, perfil = null, evaluacion = null, ahora = new Date() } = {}) {
+export function exportAgente({ sesiones = [], metricas = [], estilo = null, plan = null, perfil = null, evaluacion = null, meta = null, ahora = new Date() } = {}) {
   const ses = metricas.slice(-50).map((m) => ({
     id: m.id, inicio: new Date(m.start * 1000).toISOString(), minutos: Math.round(m.activo / 60), pausaMin: Math.round(m.pausa / 60),
     zona: m.zona, combatePct: pct(m.combatePct), saqueoPct: pct(m.saqueoPct), restoPct: pct(m.restoPct),
     muertes: m.muertes, muertesH: r1(m.muertesH), peleaS: r1(m.peleaS), saqueoS: r1(m.saqueoS), segPorMuerte: r1(m.segPorMuerte),
     muertesJugador: m.muertesJugador, metodoMuertes: m.metodoMuertes,
     viajeMin: r1((m.viajeS || 0) / 60), muertoMin: r1((m.muertoS || 0) / 60), muertesSinMob: m.muertesSinMob || 0,
-    xpH: Math.round(m.xpH || 0), botinDe: m.botinDe,
+    xpH: Math.round(m.xpH || 0), botinDe: m.botinDe, tipo: m.tipo || 'mobs', pescas: m.pescas || 0, pescasH: r1(m.pescasH || 0),
     monedasOro: oro(m.monedas), valorVendedorOro: oro(m.valorVendedor), valorSubastaOro: oro(m.valorSubasta),
     oroHVendedor: oro(m.oroHVendedor), oroHSubasta: oro(m.oroHSubasta),
     prediccion: m.prediccion && {
@@ -357,6 +363,8 @@ export function exportAgente({ sesiones = [], metricas = [], estilo = null, plan
         mapa: l.farm.mapX != null ? [l.farm.mapX, l.farm.mapY] : null })),
       aportes: plan.best.top.map((t) => ({ nombre: t.name, oro: oro(t.gold), tope: t.capBasis })),
       alternativas: (plan.alternatives || []).map((a) => ({ zonas: a.zones.map((z) => z.name), oroH: oro(a.gph) })),
+      meta: meta ? { metaOro: oro(meta.target), tengoOro: oro(meta.have), faltaOro: oro(meta.falta),
+        horas: r1(meta.horas), horasRango: [r1(meta.horasMin), r1(meta.horasMax)] } : null,
     } : null,
     evaluacion: evaluacionAgente(evaluacion),
   }
