@@ -583,27 +583,28 @@ Fuentes candidatas a investigar:
   stats por spec serían el input ideal para "presupuesto de stats".
   `/simc` ya parsea nivel/arma/stats.
 
-### Pendiente — Valoración independiente basada en ventas efectivas TSM
+### Valoración independiente basada en ventas efectivas TSM
 
-**Idea acordada; no implementada.** Construir una señal de valoración personal
-independiente de las recomendaciones basadas en anuncios de Auctionator.
+**Primera entrega descriptiva implementada en el fuente; estimador pendiente.** El
+método `tsm-descriptiva-v1` describe exclusivamente ventas propias `Auction`, separa
+reino y variante literal, agrupa por día UTC y muestra mediana de resúmenes diarios,
+unidades, registros contables y días. Ventana de 28 días, piso de 5 días, antigüedad
+máxima de 7 días e IQR/mediana ≤ 0.5 son reglas operativas explícitas **no calibradas**;
+no son confianza estadística ni predicción. Los descriptivos siguen visibles sin evidencia
+suficiente. Método completo: [docs/TSM-VALORACION.md](../docs/TSM-VALORACION.md).
 
-- Usar exclusivamente ventas de subasta registradas por TSM (`source = Auction`),
-  separando reino y variantes del objeto; excluir comercio directo, COD y vendedores.
-- Evaluar precio realizado reciente, volumen vendido y frecuencia observada, con
-  confianza explícita según tamaño y antigüedad de la muestra. Definir y validar
-  ventanas, ponderaciones y umbrales antes de incorporarlos a recomendaciones.
-- Mostrar ambas señales separadas: **precio anunciado Auctionator** frente a
-  **valoración por ventas propias TSM**. Sin muestra suficiente, indicar
-  «sin evidencia suficiente», sin rellenar la valoración con precios anunciados.
-- No inferir demanda de todo el servidor ni probabilidad de venta a partir de las
-  ventas propias solamente. Expiraciones/cancelaciones pueden repetir unidades;
-  cualquier métrica de rotación requiere definir intentos y período de observación.
-- Distinguir ingresos de beneficio: no descontar dos veces la comisión ya registrada
-  por TSM; considerar fabricación y depósitos perdidos solo cuando existan datos.
-- Validar compatibilidad con el archivo TSM real y respetar la sustitución completa
-  del snapshot: no duplicar filas acumuladas ni prometer conservar historial que TSM
-  haya eliminado. Comprobar la señal con datos posteriores no usados para ajustarla.
+- Se retiró el cruce implícito TSM–Auctionator por nombre de reino/ID: no acredita
+  identidad económica ni equivalencia de variantes. Fuentes consultables separadas,
+  con bloqueo explícito; sin delta entre anuncios brutos e importes posiblemente netos.
+- Derivados efímeros reconstruidos desde el snapshot vigente y la fecha actual. Sin
+  historial paralelo ni deducción de ventas nuevas a partir de diferencias de snapshots.
+- No se infieren demanda, liquidez, probabilidad de venta ni beneficio; tampoco se
+  alimentan recomendaciones. Expiraciones y cancelaciones pueden repetir unidades.
+- Fixtures sintéticas no equivalen a validar el addon instalado o una cuenta real.
+  La validación con Cristóbal durante el juego y el despliegue permanecen pendientes.
+- El estimador necesita una referencia robusta sencilla, candidato y evaluación temporal
+  fijada antes de promoverlo; datos posteriores no usados para ajustar. Un diario
+  prospectivo requiere aprobación separada antes de persistirlo.
 
 ### Largo plazo
 

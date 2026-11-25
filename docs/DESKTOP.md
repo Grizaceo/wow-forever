@@ -111,8 +111,9 @@ deduplicación, acumulación, pausa al borrar, reanudación y descarga del plugi
 En Mercado → Ofertas, Auctionator (escaneo y precios) y Mis ventas TSM se presentan
 en columnas iguales, alineadas arriba cuando el contenedor lo permite. Cada columna
 tiene una base de 560 px; en paneles estrechos se apilan. Las tablas conservan scroll
-horizontal local, sin ensanchar toda la página. La distribución no cambia importaciones
-ni introduce una valoración algorítmica nueva.
+horizontal local, sin ensanchar toda la página. La distribución no cambia importaciones.
+La primera entrega descriptiva añade el resumen personal `tsm-descriptiva-v1`, sin predicción
+ni persistencia nueva: [método, límites y contrato](TSM-VALORACION.md).
 
 - `src/tsm.js` importa como **datos** `TradeSkillMasterDB` del addon TSM 4: campos
   `r@<reino>@internalData@csvSales/csvBuys/csvExpired/csvCancelled`. Se comprueba la cabecera
@@ -152,15 +153,24 @@ ni introduce una valoración algorítmica nueva.
   importación, sondeo, pausa y borrado. `dispose` impide iniciar escrituras nuevas; una ya
   enviada completa su commit sin publicar UI. El borrado es lógico (no borrado seguro del
   soporte): confirma snapshot vacío y pausa el sondeo; no borra precios Auctionator.
-- La tabla separa reino/variantes y muestra unidades vendidas/compradas, medias ponderadas,
-  ingresos registrados, compras y última venta. Expiraciones/cancelaciones son **unidades en
-  intentos de subasta**: pueden repetir el mismo objeto; no son ventas perdidas ni tasa de venta.
-  Ingresos no son beneficio neto: `Ledger/Mail.lua` calcula ventas de correo como
-  `floor((bid - ahcut) / quantity + 0.5)`. TSM ya descuenta ahí comisión y redondea por unidad.
-  No reconstruimos bruto, ni descontamos comisiones de nuevo; faltan fabricación y depósitos.
-- La referencia Auctionator solo se ofrece para el **mismo reino** y objetos base sin variantes.
-  Son precios anunciados, no operaciones ejecutadas. Inventario, profesiones y recomendaciones
-  personales de farmeo quedan fuera de esta fase. No se envía contabilidad a chat/red.
+- El resumen principal filtra ventas `Auction` y conserva reino/variante literal; muestra
+  precio típico diario, unidades positivas resumidas, registros contables, días distintos,
+  período de ventas registradas y motivos de evidencia insuficiente. La contabilidad de
+  todos los canales permanece en un desplegable, separada de la referencia personal.
+  Los objetos con registros TSM pero sin ventas de subasta (solo compras, expiradas,
+  canceladas o ventas por correo) siguen en la lista, después de las valoraciones, con su
+  contabilidad y el aviso «sin valoración». Los importes se muestran con `<Dinero>`.
+  Expiraciones/cancelaciones pueden repetir unidades: no son ventas perdidas ni tasa de venta.
+- La atribución preexistente a `Ledger/Mail.lua` de `floor((bid - ahcut) / quantity + 0.5)`
+  no verifica la versión instalada: el importe de correo puede ya descontar comisión y
+  redondear por unidad. Presentamos **importe registrado**; no reconstruimos bruto ni
+  descontamos comisión de nuevo. Tampoco inferimos beneficio, fabricación o depósitos.
+- No se cruza TSM–Auctionator por nombre de reino o ID base. TSM v1 no acredita identidad
+  económica ni equivalencia de variantes entre formatos. La UI lo dice en llano («TSM y
+  Auctionator se muestran por separado») y mantiene las fuentes consultables por separado,
+  sin delta económico.
+  Auctionator sigue mostrando anuncios, no operaciones ejecutadas. No se envía
+  contabilidad a chat/red. Método y límites: [TSM-VALORACION.md](TSM-VALORACION.md).
 
 Pruebas específicas (datos sintéticos, SDK simulado, Chromium/React reales, sin abrir juego):
 

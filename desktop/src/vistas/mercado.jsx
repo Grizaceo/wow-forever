@@ -572,6 +572,10 @@ export function VistaMercado({ ctx, almacen, sincronizador, ventas, puente, esta
   const sync = useMemo(() => sincronizador || createMarketSync(ctx, almacen), [sincronizador, ctx, almacen])
   const [auto, setAuto] = useState(sync.getState())
   useEffect(() => sync.subscribe(setAuto), [sync])
+  // Fuente TSM para el detalle: se comparte SIN cruzarla con el ítem Auctionator.
+  const [tsmState, setTsmState] = useState(() => ventas?.getState() || { snapshot: null })
+  useEffect(() => ventas?.subscribe(setTsmState), [ventas])
+  const tsmSnapshot = tsmState?.snapshot || null
   const cambiarAuto = async () => {
     try { await sync.setEnabled(!auto.enabled); if (!auto.enabled) await sync.poll() }
     catch (e) { setMensaje(String(e.message || e)) }
@@ -1467,7 +1471,7 @@ export function VistaMercado({ ctx, almacen, sincronizador, ventas, puente, esta
 
         {detalle && (
           <DetalleItem item={detalle} lang={lang} catalogo={CATALOGO} metrica={detalleMetrica} deal={detalleDeal}
-            onCerrar={() => setDetalleKey(null)} />
+            tsmSnapshot={tsmSnapshot} onCerrar={() => setDetalleKey(null)} />
         )}
 
         {detalle && snapshotDavi ? (

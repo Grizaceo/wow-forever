@@ -1,7 +1,7 @@
 ---
 name: wow-forever
 description: "Asiste a jugadores de World of Warcraft: Forever (juego oficial de Blizzard, cliente 1.60, basado en Classic) con los datos del plugin wow-forever de Hermes: entrenadores, hechizos y misiones de clase, zonas por nivel, profesiones (recetas, plan de subida, materiales), dungeons con jefes y botín, ítems, la guía curada del Cazador de la Horda, Legacy y el mercado local (Auctionator, contabilidad TSM y diario del puente WoWForeverBridge). Usar cuando el usuario juegue WoW Forever o pregunte por su personaje, dónde entrenar o subir de nivel, profesiones, drops, dungeons, precios o farmeo. Assists WoW Forever players (any race, class and faction) with the plugin's offline game data."
-version: 2.1.1
+version: 2.2.0
 author: Cristóbal Muñoz
 license: GPL-3.0-or-later
 metadata:
@@ -193,11 +193,22 @@ tres fuentes locales: **Auctionator** (precios anunciados), la **contabilidad TS
   vez por `stackSize`. Revisa `Transactions.lua`/`Auctions.lua` del código del addon al cambiar
   esquemas, no el archivo privado del jugador. Descarta nombres y `profileKeys` en el parser.
 - No llames beneficio neto a ingresos ni unidades expiradas/canceladas a ventas perdidas:
-  pueden ser intentos repetidos del mismo objeto. Las medias son ponderadas por unidades;
-  los importes de ventas por correo ya descuentan comisión (`floor((bid-ahcut)/quantity+0.5)`
-  en `Ledger/Mail.lua`). No reconstruir bruto ni descontar comisión dos veces: faltan depósitos
-  y fabricación para beneficio. La referencia Auctionator
-  requiere mismo reino y objeto base sin variantes.
+  pueden ser intentos repetidos del mismo objeto. Presenta «importe registrado»: la atribución
+  previa de una fórmula a `Ledger/Mail.lua` no verifica la versión instalada. No reconstruir
+  bruto, descontar comisión de nuevo ni inventar depósitos o fabricación.
+- Para valoración usa el núcleo `tsm-descriptiva-v1`: solo ventas Auction, reino y variante
+  literales, reloj explícito; mediana diaria ponderada por unidades y mediana entre días con
+  igual peso diario. Sin evidencia suficiente conserva los descriptivos disponibles. No
+  interpretar días o filas como ventas independientes, ni el resumen como predicción.
+- TSM v1 no acredita compatibilidad económica con Auctionator: mismo reino/ID base no basta.
+  Mantener fuentes separadas y consulta manual sin preselección. Vincular la selección al
+  snapshot; probar borrar + reimportar sin resurrección de selección y reloj del detalle sin
+  lecturas nuevas. Una prueba de no-cruce debe afirmar ausencia del bloque TSM, no solo de
+  un precio. Para no doble comisión, comprobar importe numérico exacto, no regex negativa.
+- Construir desde `desktop/` antes de reproducibilidad y Chromium. Probar también
+  `tests/tsm-valoracion.test.mjs` y `desktop/test/tsm-valoracion.mjs`; cuando Lua está prohibido,
+  usar `node scripts/run-gates.mjs --no-lua` y declarar su exclusión, no verificación del addon.
+  Método y límites en `docs/TSM-VALORACION.md`.
 - TSM usa su propia cola, slots e índice (`tsm-a/b.json`, `tsm-pointer`); nunca reutilizar los
   snapshots de Auctionator. Verificar archivo e índice por lectura, bloquear tras índice
   incierto hasta Reabrir TSM; si falta el índice, comprobar ambos slots antes de asumir vacío

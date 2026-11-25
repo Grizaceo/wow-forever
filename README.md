@@ -9,7 +9,9 @@ faction, with a skill so your agent answers from the same data.
 
 ## Status
 
-- Version 2.1.1. English is the default interface language, with Spanish optional. The
+- Version 2.2.0 adds a descriptive summary of personal TSM auction sales, with explicit
+  evidence limits and no implicit Auctionator comparison. Tested with synthetic fixtures,
+  not validated against a live player account. English is the default UI, Spanish optional. The
   market shows each item's thumbnail, tied to its item id. Version 2.0.0 added the local
   market, professions planner and the agent skill; 1.0.0 covered three classes only (Hunter,
   Warrior and Shaman).
@@ -48,6 +50,12 @@ characters in a doc that made Hermes's install scanner stop a direct Git install
 In Hermes Desktop, open **Capabilities → Plugins**, find **WoW Forever** and switch it on: the
 page arrives switched off even when the plugin is enabled. It then shows up in the sidebar. The
 `wow-forever:wow-forever` skill works on every Hermes surface.
+
+**Private repository:** your GitHub account needs access and authenticated Git (for example,
+`gh auth login`). Direct Git installs do not require catalog approval. For updates run
+`hermes plugins update wow-forever`; installs pinned with `--ref <40-character commit>`
+stay pinned and must be explicitly reinstalled at the desired commit. Catalog installs,
+when available, follow the catalog-reviewed commit instead of the latest branch head.
 
 **Upgrading from 1.0.0:** run `hermes plugins update wow-forever`. Hermes Desktop loads the new
 page after **Rescan** in **Capabilities → Plugins**, or when it restarts. The page keeps the
