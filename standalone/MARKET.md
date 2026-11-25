@@ -426,8 +426,10 @@ La capa privada RareScanner aporta 2243 (50.1%). El catálogo FDJ aporta 93
 (2.1%). El fallback por nombre aporta 0. Cualquier capa pública: 2951 (65.9%);
 todas las capas: 3014 (67.3%). IDs exclusivos de Forever (>25000): 622, de
 los cuales 81 tienen cobertura. La fracción del valor listado (precio ×
-cantidad ofertada) con cobertura es 76.5%. El dataset contiene 5424 ítems,
-2477 mobs, 183 objetos y 72 zonas; la capa privada 484 rares y 52 contenedores.
+cantidad ofertada) con cobertura es 76.5%. Esas cifras se midieron con el
+dataset schema 1 (5424 ítems, 2477 mobs, 183 objetos). El schema 2, sin spawns
+de evento (se conservan los diarios, como «Nights»), contiene 5401 ítems,
+3146 mobs, 173 objetos y 72 zonas. La capa privada: 484 rares y 52 contenedores.
 
 ## Seguridad, persistencia y recuperación
 

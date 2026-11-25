@@ -1635,6 +1635,176 @@ def cmd_farmeo_diagnostico(D, a, out):
     return 0
 
 
+# ---------------------------------------------------------------- farmeo (evaluación por mob y zona)
+# Mercado → Farmeo exporta también la evaluación completa del motor (evaluacion: ranking de
+# campamentos, cada mob elegible farmeado solo y los precios usados). Con eso el agente puede
+# contestar «¿y lo que dice tal guía?» con los precios del jugador, sin recalcular nada.
+MAX_SOBRE, MAX_BAJO = 2, 15  # = PARAMS.maxUp / maxDown de standalone/farm-plan.js
+RANGO_MOB = {"elite": "élite", "rareelite": "raro élite", "rare": "raro", "boss": "jefe"}
+
+
+def cargar_evaluacion(a):
+    d = cargar_farmeo(a.archivo)
+    ev = d.get("evaluacion")
+    if not isinstance(ev, dict) or not isinstance(ev.get("mobs"), list):
+        raise ErrorConsulta("el contexto de farmeo no trae la evaluación por mob: abre Mercado → Farmeo en "
+                            "Hermes Desktop con un escaneo de Auctionator para que el plugin la escriba")
+    return d, ev
+
+
+def cargar_drops():
+    """Dataset público de drops (standalone/drop-data.js) para explicar por qué un mob no se evalúa."""
+    ruta = RAIZ / "standalone" / "drop-data.js"
+    try:
+        txt = ruta.read_text(encoding="utf-8")
+    except OSError:
+        return None
+    i, j = txt.find("var DATA="), txt.rfind(";\nif(typeof module")
+    if i < 0 or j < i:
+        return None
+    try:
+        return json.loads(txt[i + len("var DATA="):j])
+    except ValueError:
+        return None
+
+
+def precio_txt(g):
+    return "?" if g is None else f"{g:.4f}o"
+
+
+def linea_campo(c, out, prefijo="  "):
+    out(f"{prefijo}≈{oro_txt(c.get('oroH'))}/h · {c.get('muertesH') or 0:.0f} muertes/h · {c.get('spawns')} spawns"
+        + (f" · riesgo {c['riesgo']}" if c.get("riesgo") else "")
+        + (f" · mapa {c['mapa'][0]:.1f}, {c['mapa'][1]:.1f}" if c.get("mapa") else ""))
+    out(f"{prefijo}Reparto: subasta {pct_txt(c.get('subastaPct'))} · vendedor {pct_txt(c.get('vendedorPct'))} · "
+        f"monedas {pct_txt(c.get('monedasPct'))}")
+
+
+def lineas_aportes(c, precios, out, n=4):
+    for x in (c.get("aportes") or [])[:n]:
+        pr = precios.get(str(x.get("itemId"))) or {}
+        tope = pr.get("tope") or "?"
+        out(f"    {x.get('nombre')} {pct_txt(x.get('cuotaPct'))} · {x.get('unidadesH') or 0:.1f} u/h, "
+            f"{x.get('subastaH') or 0:.1f} a subasta [{tope}"
+            + (f", tope {pr['topeUnidades']:.0f} u" if tope in ("kappa-ofertas", "ventas-propias") and pr.get("topeUnidades") is not None else "")
+            + "]")
+        if pr.get("medianaOro") is not None:
+            out(f"       precio usado (mediana {pr.get('dias')} d) {precio_txt(pr.get('medianaOro'))} · hoy {precio_txt(pr.get('hoyOro'))}"
+                f" · p25–p75 {precio_txt(pr.get('p25Oro'))}–{precio_txt(pr.get('p75Oro'))}"
+                + (f" · {pr['ofertas']:.0f} ofertas" if pr.get("ofertas") is not None else "")
+                + (" · mercado delgado (solo vendedor)" if pr.get("delgado") else "")
+                + f" · vendedor {precio_txt(pr.get('vendedorOro'))}"
+                + (" · el vendedor paga más que la subasta neta (−5 %)"
+                   if not pr.get("delgado") and pr.get("vendedorOro") is not None
+                   and pr["medianaOro"] * 0.95 <= pr["vendedorOro"] else ""))
+        elif pr:
+            out(f"       no está en tu escaneo: se valora a vendedor {precio_txt(pr.get('vendedorOro'))}")
+
+
+def por_que_no(m, zona, pj):
+    """Motivos (mismas reglas que mobOk/zoneOk de farm-plan.js) por los que un mob no se evalúa."""
+    motivos, nivel = [], pj.get("nivel")
+    lado = "a" if pj.get("faccion") == "alianza" else "h"
+    if lado not in (m[7] or "ah"):
+        motivos.append("tu facción no puede atacarlo")
+    if m[3] != "normal":
+        motivos.append(f"es {RANGO_MOB.get(m[3], m[3])}: el plan solo cuenta mobs normales")
+    if isinstance(nivel, int):
+        if m[2] > nivel + MAX_SOBRE:
+            motivos.append(f"nivel {m[1]}–{m[2]}: más de {MAX_SOBRE} niveles sobre el tuyo ({nivel})")
+        elif m[2] < nivel - MAX_BAJO:
+            motivos.append(f"nivel {m[1]}–{m[2]}: más de {MAX_BAJO} niveles bajo el tuyo ({nivel})")
+    if zona and (zona[2] in ("city", "instance") or str(m[4]).startswith("i")):
+        motivos.append("vive en una ciudad o instancia")
+    if (m[5] or 0) < 3:
+        motivos.append(f"solo {m[5] or 0} spawns en su zona principal")
+    return motivos
+
+
+def cmd_farmeo_mob(D, a, out):
+    d, ev = cargar_evaluacion(a)
+    pj, precios, q = d.get("personaje") or {}, ev.get("precios") or {}, normalizar(a.nombre)
+    if not q:
+        raise ErrorConsulta("falta el nombre del mob")
+    hits = [m for m in ev["mobs"] if q in normalizar(m.get("nombre"))]
+    if hits:
+        for m in hits[:a.max]:
+            nv = m.get("nivel") or [None, None]
+            out(f"[estimación] {m.get('nombre')} (nv {nv[0]}–{nv[1]}) · {m.get('zona')} · puesto {m.get('pos')} de "
+                f"{ev.get('totalMobs')} mobs elegibles a tu nivel, farmeado solo")
+            linea_campo(m, out)
+            out("  Aportes:")
+            lineas_aportes(m, precios, out)
+            camps = [(i + 1, c) for i, c in enumerate(ev.get("ranking") or []) if m.get("nombre") in (c.get("mobs") or [])]
+            for i, c in camps[:3]:
+                out(f"  En el ranking: #{i} {c.get('tipo')} {', '.join(c.get('mobs') or [])} · {c.get('zona')} ≈{oro_txt(c.get('oroH'))}/h")
+        if len(hits) > a.max:
+            out(f"(+{len(hits) - a.max} coincidencias más; usa --max)")
+    else:
+        drops = cargar_drops()
+        cand = [] if drops is None else [(k, v) for k, v in (drops.get("mobs") or {}).items() if q in normalizar(v[0])]
+        if drops is None:
+            out(f"SIN DATOS: «{a.nombre}» no está entre los {len(ev['mobs'])} mobs evaluados y no se pudo leer el dataset de drops.")
+        elif not cand:
+            out(f"SIN DATOS: «{a.nombre}» no está en el dataset de drops (Classic 1.12, sin spawns de evento): "
+                "no existe con ese nombre, no suelta nada farmeable o solo aparece durante un evento.")
+        for k, m in cand[:a.max]:
+            zona = (drops.get("zonas") or drops.get("zones") or {}).get(str(m[4]))
+            motivos = por_que_no(m, zona, pj)
+            out(f"{m[0]} (nv {m[1]}–{m[2]}) · {zona[0] if zona else m[4]}: "
+                + ("no se evalúa porque " + "; ".join(motivos) if motivos else
+                   f"es elegible, pero con tus precios queda fuera de los {len(ev['mobs'])} mejores de "
+                   f"{ev.get('totalMobs')} (o no rinde nada)"))
+    out("Oro/h = farmear ese sitio 1 h con tus precios (mediana de 14 días del escaneo) y el tope de venta; "
+        "drops de Classic 1.12 salvo lo observado en tus sesiones. Una guía externa usa otros precios y otros "
+        "supuestos: compara el precio usado aquí con el que cita la guía.")
+    return 0
+
+
+def cmd_farmeo_zona(D, a, out):
+    d, ev = cargar_evaluacion(a)
+    precios, q = ev.get("precios") or {}, normalizar(a.zona)
+    mobs = [m for m in ev["mobs"] if q and q in normalizar(m.get("zona"))]
+    camps = [(i + 1, c) for i, c in enumerate(ev.get("ranking") or []) if q and q in normalizar(c.get("zona"))]
+    if not mobs and not camps:
+        out(f"SIN DATOS: no hay mobs evaluados en «{a.zona}» a tu nivel (o la zona no se llama así en el dataset, "
+            "que usa los nombres en inglés: Arathi Highlands, Badlands, Desolace…).")
+        return 0
+    zonas = sorted({m.get("zona") for m in mobs} | {c.get("zona") for _, c in camps})
+    out(f"[estimación] {', '.join(zonas)}: {len(mobs)} mobs evaluados a tu nivel")
+    for i, c in camps[:3]:
+        out(f"  Ranking #{i}: {c.get('tipo')} {', '.join(c.get('mobs') or [])} ≈{oro_txt(c.get('oroH'))}/h")
+    out(f"  {'Puesto':>6}  {'Mob':<28}{'Nivel':>8}{'Oro/h':>9}  Aporta")
+    for m in mobs[:a.max]:
+        nv = m.get("nivel") or ["?", "?"]
+        ap = (m.get("aportes") or [{}])[0]
+        pr = precios.get(str(ap.get("itemId"))) or {}
+        out(f"  {m.get('pos'):>6}  {str(m.get('nombre'))[:27]:<28}{f'{nv[0]}–{nv[1]}':>8}{oro_txt(m.get('oroH')):>9}  "
+            f"{ap.get('nombre', '?')} {pct_txt(ap.get('cuotaPct'))}"
+            + (f" a {precio_txt(pr.get('medianaOro'))}" if pr.get("medianaOro") is not None else ""))
+    out("Detalle de un mob (aportes, precios y tope): farmeo-mob \"<nombre>\".")
+    return 0
+
+
+def cmd_farmeo_ranking(D, a, out):
+    d, ev = cargar_evaluacion(a)
+    precios = ev.get("precios") or {}
+    out(f"[estimación] Mejores campamentos a tu nivel (1 h cada uno, tus precios y tope de venta):")
+    for i, c in enumerate((ev.get("ranking") or [])[:a.max]):
+        out(f"{i + 1:>2}. {c.get('zona')} · {c.get('tipo')} {', '.join(c.get('mobs') or [])}")
+        linea_campo(c, out, prefijo="    ")
+        ap = c.get("aportes") or []
+        if ap:
+            out("    Aporta: " + ", ".join(
+                f"{x.get('nombre')} {pct_txt(x.get('cuotaPct'))}"
+                + (f" a {precio_txt((precios.get(str(x.get('itemId'))) or {}).get('medianaOro'))}"
+                   if (precios.get(str(x.get('itemId'))) or {}).get('medianaOro') is not None else "")
+                for x in ap[:3]))
+    out("«limpiar» = matar todo el campamento; «solo» = un tipo de mob. El plan de sesión (farmeo-plan) "
+        "reparte el tiempo y comparte el tope de venta entre campamentos.")
+    return 0
+
+
 def parser():
     p = argparse.ArgumentParser(prog="consultar.py", description=__doc__.split("\n\n")[0])
     p.add_argument("--datos", help="carpeta data/ (por defecto, la del plugin instalado)")
@@ -1700,13 +1870,20 @@ def parser():
             ("farmeo-sesion", cmd_farmeo_sesion, "detalle de una sesión de farmeo (id o 1 = la última)"),
             ("farmeo-estilo", cmd_farmeo_estilo, "tu estilo de farmeo calibrado (DPS efectivo, saqueo, pausas) y tendencias"),
             ("farmeo-plan", cmd_farmeo_plan, "plan de sesión para maximizar oro que muestra el plugin"),
-            ("farmeo-diagnostico", cmd_farmeo_diagnostico, "cuellos de botella de tus últimas sesiones de farmeo")):
+            ("farmeo-diagnostico", cmd_farmeo_diagnostico, "cuellos de botella de tus últimas sesiones de farmeo"),
+            ("farmeo-ranking", cmd_farmeo_ranking, "mejores campamentos a tu nivel con tus precios (1 h cada uno)"),
+            ("farmeo-mob", cmd_farmeo_mob, "oro/h de un mob con tus precios: qué ítems lo explican y a qué precio"),
+            ("farmeo-zona", cmd_farmeo_zona, "mobs evaluados de una zona, ordenados por oro/h")):
         s = orden(nombre_, fn, ayuda)
         s.add_argument("--archivo", help=f"{ARCHIVO_FARMEO} (por defecto, la carpeta de datos del plugin en Hermes Desktop)")
         if nombre_ == "farmeo-sesion":
             s.add_argument("id", nargs="?", help="id de sesión (s<inicio>) o posición desde la última (1)")
         if nombre_ == "farmeo-diagnostico":
             s.add_argument("--ultimas", type=int, default=3, help="cuántas sesiones recientes (3)")
+        if nombre_ == "farmeo-mob":
+            s.add_argument("nombre", help="nombre del mob (inglés, como en el juego), o parte")
+        if nombre_ == "farmeo-zona":
+            s.add_argument("zona", help="nombre de la zona (inglés, como en el dataset), o parte")
     return p
 
 

@@ -145,6 +145,11 @@ export function Farmeo({ ctx, items, perfil, settings, onSettings, lang, planCtx
     if (!items?.length || !planCtx) return []
     try { return FarmPlan.ranking(planCtx, 8) } catch { return [] }
   }, [items, planCtx])
+  // Evaluación completa para el agente (ranking + cada mob elegible + precios usados).
+  const evaluacion = useMemo(() => {
+    if (!items?.length || !planCtx) return null
+    try { return FarmPlan.evaluate(planCtx) } catch { return null }
+  }, [items, planCtx])
   const metricas = useMemo(() => {
     try { return (sesiones || []).map((s) => metricasSesion(s, items?.length ? planCtx : null, D.dropData)) } catch { return [] }
   }, [sesiones, planCtx, items])
@@ -162,14 +167,14 @@ export function Farmeo({ ctx, items, perfil, settings, onSettings, lang, planCtx
   const ultimo = useRef('')
   useEffect(() => {
     if (!ctx?.files?.writeText || (!metricas.length && !plan)) return
-    const payload = exportAgente({ sesiones, metricas, estilo, plan, perfil })
+    const payload = exportAgente({ sesiones, metricas, estilo, plan, perfil, evaluacion })
     const firma = JSON.stringify({ ...payload, generado: null })
     if (firma === ultimo.current) return
     const h = setTimeout(async () => {
       if (await exportarAgente(ctx, payload)) { ultimo.current = firma; setExportado(new Date().toLocaleTimeString(lang === 'en' ? 'en' : 'es')) }
     }, 1500)
     return () => clearTimeout(h)
-  }, [ctx, sesiones, metricas, estilo, plan, perfil, lang])
+  }, [ctx, sesiones, metricas, estilo, plan, perfil, evaluacion, lang])
 
   const snapshotDavi = useMemo(() => construirContextoFarmeo({ plan, estilo, metricas, resumenPerfil, lang,
     procedencia: ['WoWForeverFarm.lua (sesiones medidas)', 'CMaNGOS classic-db 1.12 (drops)', 'Auctionator / puente (precios)'] }), [plan, estilo, metricas, resumenPerfil, lang])

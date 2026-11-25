@@ -291,10 +291,38 @@ export function ventasPorDia(tsmSnapshot, { ahora = Date.now(), dias = 30 } = {}
 const r1 = (x) => (x == null || !Number.isFinite(x) ? null : Math.round(x * 10) / 10)
 const oro = (c) => (c == null || !Number.isFinite(c) ? null : Math.round(c / 100) / 100)  // cobre -> oro con 2 decimales
 const pct = (x) => (x == null || !Number.isFinite(x) ? null : Math.round(x * 1000) / 10)
+const oro4 = (c) => (c == null || !Number.isFinite(c) ? null : Math.round(c) / 10000)  // precios: cobre exacto, en oro
+const aportesDe = (top) => (top || []).map((t) => ({ itemId: t.itemId, nombre: t.name, cuotaPct: pct(t.share),
+  unidadesH: r1(t.units), subastaH: r1(t.ahUnits) }))
+
+// Evaluación del motor (FarmPlan.evaluate) en la forma del archivo del agente:
+// ranking de campamentos, cada mob elegible farmeado solo y los precios usados.
+function evaluacionAgente(ev) {
+  if (!ev || !Array.isArray(ev.mobs)) return null
+  const campo = (d) => ({
+    zona: d.zone, tipo: d.kind === 'clear' ? 'limpiar' : d.kind === 'target' ? 'solo' : d.kind, mobs: d.names,
+    oroH: oro(d.gph), muertesH: r1(d.rate), spawns: d.spawns, riesgo: d.riskLevel || null,
+    mapa: d.mapX != null ? [d.mapX, d.mapY] : null,
+    monedasPct: pct(d.coinsShare), subastaPct: pct(d.ahShare), vendedorPct: pct(d.vendorShare),
+    aportes: aportesDe(d.top),
+  })
+  const precios = {}
+  for (const [iid, p] of ev.items || []) {
+    precios[iid] = { nombre: p.name, medianaOro: oro4(p.price), p25Oro: oro4(p.p25), p75Oro: oro4(p.p75), hoyOro: oro4(p.last),
+      dias: p.days, ofertas: p.avail, delgado: p.thin, vendedorOro: oro4(p.vendor), topeUnidades: r1(p.capUnits), tope: p.capBasis }
+  }
+  return {
+    nota: 'Oro/h estimado farmeando cada sitio 1 h, con tus precios (mediana de 14 días) y el tope de venta; drops de Classic 1.12 salvo lo observado en tus sesiones.',
+    ranking: ev.ranking.map(campo),
+    mobs: ev.mobs.map((d) => ({ npcId: d.npcId, nombre: d.name, nivel: d.lvl, pos: d.pos, ...campo(d) })),
+    totalMobs: ev.totalMobs,
+    precios,
+  }
+}
 
 // Contexto para el agente (data/farmeo-agente.json). Solo agregados: sin
 // nombres de personaje, reino ni ruta de posiciones.
-export function exportAgente({ sesiones = [], metricas = [], estilo = null, plan = null, perfil = null, ahora = new Date() } = {}) {
+export function exportAgente({ sesiones = [], metricas = [], estilo = null, plan = null, perfil = null, evaluacion = null, ahora = new Date() } = {}) {
   const ses = metricas.slice(-50).map((m) => ({
     id: m.id, inicio: new Date(m.start * 1000).toISOString(), minutos: Math.round(m.activo / 60), pausaMin: Math.round(m.pausa / 60),
     zona: m.zona, combatePct: pct(m.combatePct), saqueoPct: pct(m.saqueoPct), restoPct: pct(m.restoPct),
@@ -330,7 +358,8 @@ export function exportAgente({ sesiones = [], metricas = [], estilo = null, plan
       aportes: plan.best.top.map((t) => ({ nombre: t.name, oro: oro(t.gold), tope: t.capBasis })),
       alternativas: (plan.alternatives || []).map((a) => ({ zonas: a.zones.map((z) => z.name), oroH: oro(a.gph) })),
     } : null,
+    evaluacion: evaluacionAgente(evaluacion),
   }
 }
 
-export const _test = { conteo, conteo2, unidades, zonaPrincipal, mediana, DAY_MS }
+export const _test = { conteo, conteo2, unidades, zonaPrincipal, mediana, DAY_MS, evaluacionAgente }

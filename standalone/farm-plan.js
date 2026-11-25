@@ -91,7 +91,9 @@ function marketModel(items, opt = {}) {
     const avail = avs.length ? q(avs, 0.5) : null;
     const prev = out.get(it.itemId);
     const rec = { price: q(lows, 0.5), p25: q(lows, 0.25), p75: q(lows, 0.75), days: lows.length, avail,
-      thin: avail != null && avail <= THIN_MAX_AVAIL };
+      thin: avail != null && avail <= THIN_MAX_AVAIL,
+      // Último mínimo publicado: solo para explicar (no entra al valor, que usa la mediana).
+      last: isInt(it.unitPriceCopper) && it.unitPriceCopper > 0 ? it.unitPriceCopper : null };
     if (!prev || rec.days > prev.days) out.set(it.itemId, rec);
   }
   return out;
@@ -330,7 +332,8 @@ function describe(f, ctx) {
   const h = hourly(f, ctx);
   const tot = h.coins + h.ahGold + h.vendorGold;
   const top = [...h.parts].sort((a, b) => b[1].gold - a[1].gold).slice(0, 4)
-    .map(([iid, p]) => ({ itemId: iid, name: itemName(iid), share: tot > 0 ? p.gold / tot : 0, perKill: f.units.get(iid) || 0 }));
+    .map(([iid, p]) => ({ itemId: iid, name: itemName(iid), share: tot > 0 ? p.gold / tot : 0, perKill: f.units.get(iid) || 0,
+      units: p.units, ahUnits: p.ahUnits }));
   return { id: f.id, kind: f.kind, zoneKey: f.zoneKey, zone: f.zone, names: f.names, members: f.members, spawns: f.spawns,
     mapX: f.mapX ?? null, mapY: f.mapY ?? null, nnYards: f.nnYards, rate: f.rate, fightSec: f.fightSec,
     gph: h.gph, coinsShare: tot > 0 ? h.coins / tot : 0, ahShare: tot > 0 ? h.ahGold / tot : 0, vendorShare: tot > 0 ? h.vendorGold / tot : 0,
@@ -394,7 +397,31 @@ function itemFarms(itemId, ctx, n = 3) {
   return out.slice(0, n).map(x => ({ ...describe(x.farm, c2), itemPerHour: x.itemPerHour, itemShare: x.itemShare }));
 }
 
-const api = { configure, marketModel, sellCaps, farms, hourly, plan, ranking, itemFarms, itemIndex, mixFarm, unitValue, softRate,
+// Evaluación para el agente: el ranking de campamentos y, por cada mob elegible
+// farmeado solo en su zona principal, su oro/h con tus precios y el tope de
+// venta, qué ítems lo explican y a qué precio. Sirve para contestar «¿y lo que
+// dice tal guía?» sin recalcular: el agente lee esto desde farmeo-agente.json.
+function priceInfo(iid, ctx) {
+  const m = ctx.market?.get(Number(iid)), cap = ctx.caps?.get(Number(iid));
+  return { name: itemName(iid), vendor: sellOf(iid), price: m ? m.price : null, p25: m ? m.p25 : null, p75: m ? m.p75 : null,
+    last: m ? m.last ?? null : null, days: m ? m.days : 0, avail: m ? m.avail : null, thin: !!m?.thin,
+    capUnits: cap ? cap.units : 0, capBasis: cap ? cap.basis : 'sin-ofertas' };
+}
+function evaluate(ctx, opt = {}) {
+  const nRank = Number.isInteger(opt.ranking) ? opt.ranking : 15, nMobs = Number.isInteger(opt.mobs) ? opt.mobs : 300;
+  const scored = farms(ctx).map(f => ({ f, g: hourly(f, ctx).gph })).filter(x => x.g > 0).sort((a, b) => b.g - a.g);
+  const ranking = scored.slice(0, nRank).map(x => describe(x.f, ctx));
+  const targets = scored.filter(x => x.f.kind === 'target');
+  const mobs = targets.slice(0, nMobs).map((x, i) => {
+    const d = describe(x.f, ctx), e = String(x.f.members[0].npcId), m = D.mobs[e];
+    return { ...d, npcId: Number(e), name: m[0], lvl: [m[1], m[2]], pos: i + 1 };
+  });
+  const items = new Map();
+  for (const d of [...ranking, ...mobs]) for (const t of d.top) if (!items.has(t.itemId)) items.set(t.itemId, priceInfo(t.itemId, ctx));
+  return { ranking, mobs, totalMobs: targets.length, items };
+}
+
+const api = { configure, marketModel, sellCaps, farms, hourly, plan, ranking, evaluate, priceInfo, itemFarms, itemIndex, mixFarm, unitValue, softRate,
   STYLE_DEFAULT, PARAMS, AH_CUT, THIN_MAX_AVAIL, N0_DROPS, N0_COINS, ammoCost,
   zoneName, itemName, sellOf,
   _reset() { FARMS_KEY = null; FARMS = null; IDX = null; IIDX_KEY = null; IIDX = null; } };

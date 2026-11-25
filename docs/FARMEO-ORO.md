@@ -58,7 +58,8 @@ tamaño del diario de mercado. Se instala junto al puente; ninguno exige al otro
 
 ### Campamento espacial
 Spawns normales atacables por la facción, de todos los tipos, sin spawns de eventos
-(`game_event_creature`), unidos por enlace simple a ≤ 60 yd. Cada campamento:
+(`game_event_creature`/`game_event_gameobject` con evento positivo; se conservan los
+eventos que se repiten cada día, como «Nights»), unidos por enlace simple a ≤ 60 yd. Cada campamento:
 zona, centro (coordenadas de mapa), spawns, composición por mob, distancia mediana al
 vecino y respawn. Estrategias: **limpiar** (mezcla ponderada por spawns) y **solo X**
 (un tipo; la caminata usa la distancia entre spawns de ese tipo).
@@ -146,8 +147,15 @@ Desde las sesiones (`desktop/src/farm-sesiones.js`, puro):
 
 - Desktop escribe `data/farmeo-agente.json` (schema 1) cuando cambian las sesiones,
   el estilo o el plan: sin nombre de personaje, solo agregados y conteos.
+- El archivo trae además `evaluacion` (`FarmPlan.evaluate`): el ranking de campamentos,
+  cada mob elegible farmeado solo (hasta 300, con su puesto entre todos) y, por ítem que
+  aparece, el precio usado (mediana de 14 días), el último mínimo, p25–p75, ofertas y tope
+  de venta. Sirve para contrastar lo que dice una guía externa con los precios del jugador.
 - `consultar.py farmeo-sesiones | farmeo-sesion ID | farmeo-estilo | farmeo-plan |
-  farmeo-calibracion` lo leen (solo lectura, como el resto del script).
+  farmeo-diagnostico | farmeo-ranking | farmeo-mob NOMBRE | farmeo-zona ZONA` lo leen
+  (solo lectura, como el resto del script). Si un mob no está evaluado, `farmeo-mob` dice
+  por qué con las mismas reglas del motor (nivel, rango, facción, spawns, ciudad o
+  instancia) leyendo `standalone/drop-data.js`.
 - `SKILL.md §Farmeo`: cómo arrancar una sesión, cómo leer las métricas y cómo
   aconsejar (cuello de botella: pelea, saqueo, caminata o pausas; predicho vs real;
   nunca inventar números).

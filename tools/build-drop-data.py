@@ -54,7 +54,7 @@ CSV_FILES = ['UiMapAssignment.csv', 'UiMap.csv', 'AreaTable.csv', 'Map.csv', 'Lo
 TABLES = {'creature', 'creature_template', 'creature_loot_template', 'reference_loot_template',
           'gameobject', 'gameobject_template', 'gameobject_loot_template', 'item_template',
           'skinning_loot_template', 'pickpocketing_loot_template', 'world_safe_locs',
-          'game_graveyard_zone', 'game_event_creature'}
+          'game_graveyard_zone', 'game_event', 'game_event_creature', 'game_event_gameobject'}
 
 RANKS = {0: 'normal', 1: 'elite', 2: 'rareelite', 3: 'boss', 4: 'rare'}
 LOCK_KIND = {1: 'chest', 2: 'herb', 3: 'ore', 19: 'fish'}
@@ -175,9 +175,13 @@ def build_public(src):
         return None
 
     # Spawns that only exist while a world event runs (AQ war effort, invasions,
-    # holidays): game_event_creature with a positive event. A negative event
-    # despawns a normal spawn during the event, so those stay.
-    event_guids = {r['guid'] for r in db['game_event_creature'] if r['event'] > 0}
+    # holidays): game_event_creature / game_event_gameobject with a positive
+    # event. A negative event despawns a normal spawn during the event, so those
+    # stay, and so do events that recur every day (occurence <= 1440 min, e.g.
+    # 'Nights': Leprithus and the Westfall ghouls spawn every night).
+    daily = {r['entry'] for r in db['game_event'] if 0 < r['occurence'] <= 1440}
+    event_guids = {t: {r['guid'] for r in db['game_event_' + t] if r['event'] > 0 and r['event'] not in daily}
+                   for t in ('creature', 'gameobject')}
 
     # spawns -> (zoneKey -> count), respawn, positions [(map, x, y, zoneKey, respawn)]
     def spawns_of(table, skip=frozenset()):
@@ -193,7 +197,7 @@ def build_public(src):
             a[1].append(r['spawntimesecsmin'])
             a[2].append((r['map'], r['position_x'], r['position_y'], zk, r['spawntimesecsmin']))
         return acc
-    cspawn, ospawn = spawns_of('creature', event_guids), spawns_of('gameobject')
+    cspawn, ospawn = spawns_of('creature', event_guids['creature']), spawns_of('gameobject', event_guids['gameobject'])
 
     ft = {int(r['ID']): r for r in read_csv(os.path.join(src, 'FactionTemplate.csv'))}
 
@@ -380,7 +384,8 @@ def build_public(src):
                       'Spawn counts/respawn are emulator values, not live population.',
             'params': {'worldRefUsers': WORLD_REF_USERS, 'maxSources': MAX_SOURCES, 'minChancePct': MIN_CHANCE,
                        'campRadiusYards': CAMP_RADIUS, 'campMinSpawns': CAMP_MIN_SPAWNS, 'nnCapYards': NN_CAP,
-                       'eventSpawns': 'excluded (game_event_creature, event > 0)'},
+                       'eventSpawns': 'excluded (game_event_creature/game_event_gameobject, event > 0, '
+                                      'except events recurring daily)'},
             'files': files,
         },
         'fields': {

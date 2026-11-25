@@ -226,3 +226,28 @@ test('sesión 0.2.0: muertes sin mob, botín recibido, viaje, XP y avisos', () =
   const ag = exportAgente({ sesiones: [s], metricas: [m] })
   assert.equal(ag.sesiones[0].viajeMin, 4); assert.equal(ag.sesiones[0].muertesSinMob, 10); assert.equal(ag.sesiones[0].botinDe, 'chat')
 })
+
+test('exportAgente: evaluación por mob en oro, precios por ítem y null si no hay', () => {
+  const ev = {
+    totalMobs: 2,
+    ranking: [{ kind: 'clear', zone: 'Desolace', names: ['Whirlwind Shredder', 'Scorpashi Venomlash'], gph: 108000, rate: 81.2,
+      spawns: 9, riskLevel: 'media', mapX: 30.1, mapY: 81.4, coinsShare: 0, ahShare: 0.79, vendorShare: 0.21,
+      top: [{ itemId: 7069, name: 'Elemental Air', share: 0.75, units: 40.04, ahUnits: 30 }] }],
+    mobs: [{ kind: 'target', npcId: 11578, name: 'Whirlwind Shredder', lvl: [32, 34], pos: 1, zone: 'Desolace',
+      names: ['Whirlwind Shredder'], gph: 140400, rate: 96.8, spawns: 13, riskLevel: 'media', mapX: null, mapY: null,
+      coinsShare: 0, ahShare: 0.841, vendorShare: 0.159, top: [{ itemId: 7069, name: 'Elemental Air', share: 0.948, units: 69.8, ahUnits: 30 }] }],
+    items: new Map([[7069, { name: 'Elemental Air', vendor: 400, price: 4500, p25: 4200, p75: 4800, last: 4499, days: 5,
+      avail: 599, thin: false, capUnits: 29.95, capBasis: 'kappa-ofertas' }]]),
+  }
+  const e = exportAgente({ evaluacion: ev })
+  const m = e.evaluacion.mobs[0]
+  assert.deepEqual([m.npcId, m.nombre, m.nivel, m.pos, m.zona, m.tipo, m.oroH], [11578, 'Whirlwind Shredder', [32, 34], 1, 'Desolace', 'solo', 14.04])
+  assert.deepEqual(m.aportes[0], { itemId: 7069, nombre: 'Elemental Air', cuotaPct: 94.8, unidadesH: 69.8, subastaH: 30 })
+  assert.equal(e.evaluacion.ranking[0].tipo, 'limpiar')
+  assert.deepEqual(e.evaluacion.ranking[0].mapa, [30.1, 81.4])
+  const p = e.evaluacion.precios['7069']
+  assert.deepEqual([p.medianaOro, p.hoyOro, p.p25Oro, p.vendedorOro, p.ofertas, p.topeUnidades, p.tope],
+    [0.45, 0.4499, 0.42, 0.04, 599, 30, 'kappa-ofertas'], 'precios con el cobre exacto')
+  assert.equal(e.evaluacion.totalMobs, 2)
+  assert.equal(exportAgente({}).evaluacion, null)
+})

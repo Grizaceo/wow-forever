@@ -262,5 +262,3256 @@
    }
   ],
   "alternativas": []
+ },
+ "evaluacion": {
+  "nota": "Oro/h estimado farmeando cada sitio 1 h, con tus precios (mediana de 14 días) y el tope de venta; drops de Classic 1.12 salvo lo observado en tus sesiones.",
+  "ranking": [
+   {
+    "zona": "Desolace",
+    "tipo": "solo",
+    "mobs": [
+     "Whirlwind Stormwalker"
+    ],
+    "oroH": 14.9,
+    "muertesH": 93.5,
+    "spawns": 13,
+    "riesgo": "media",
+    "mapa": null,
+    "monedasPct": 0,
+    "subastaPct": 84.7,
+    "vendedorPct": 15.3,
+    "aportes": [
+     {
+      "itemId": 7069,
+      "nombre": "Elemental Air",
+      "cuotaPct": 94.4,
+      "unidadesH": 66.5,
+      "subastaH": 30
+     },
+     {
+      "itemId": 3864,
+      "nombre": "Citrine",
+      "cuotaPct": 0.2,
+      "unidadesH": 0.4,
+      "subastaH": 0
+     },
+     {
+      "itemId": 1529,
+      "nombre": "Jade",
+      "cuotaPct": 0.1,
+      "unidadesH": 0.1,
+      "subastaH": 0
+     },
+     {
+      "itemId": 4636,
+      "nombre": "Strong Iron Lockbox",
+      "cuotaPct": 0.1,
+      "unidadesH": 0.8,
+      "subastaH": 0
+     }
+    ]
+   },
+   {
+    "zona": "Desolace",
+    "tipo": "solo",
+    "mobs": [
+     "Whirlwind Shredder"
+    ],
+    "oroH": 14.9,
+    "muertesH": 96.8,
+    "spawns": 13,
+    "riesgo": "media",
+    "mapa": null,
+    "monedasPct": 0,
+    "subastaPct": 84.7,
+    "vendedorPct": 15.3,
+    "aportes": [
+     {
+      "itemId": 7069,
+      "nombre": "Elemental Air",
+      "cuotaPct": 95.2,
+      "unidadesH": 69.8,
+      "subastaH": 30
+     },
+     {
+      "itemId": 1705,
+      "nombre": "Lesser Moonstone",
+      "cuotaPct": 0.3,
+      "unidadesH": 0.7,
+      "subastaH": 0
+     },
+     {
+      "itemId": 1529,
+      "nombre": "Jade",
+      "cuotaPct": 0.3,
+      "unidadesH": 0.6,
+      "subastaH": 0
+     },
+     {
+      "itemId": 3864,
+      "nombre": "Citrine",
+      "cuotaPct": 0.1,
+      "unidadesH": 0.1,
+      "subastaH": 0
+     }
+    ]
+   },
+   {
+    "zona": "Desolace",
+    "tipo": "solo",
+    "mobs": [
+     "Whirlwind Ripper"
+    ],
+    "oroH": 13.33,
+    "muertesH": 54.1,
+    "spawns": 11,
+    "riesgo": "media",
+    "mapa": null,
+    "monedasPct": 0,
+    "subastaPct": 95.2,
+    "vendedorPct": 4.8,
+    "aportes": [
+     {
+      "itemId": 7069,
+      "nombre": "Elemental Air",
+      "cuotaPct": 97.1,
+      "unidadesH": 36.3,
+      "subastaH": 30
+     },
+     {
+      "itemId": 1529,
+      "nombre": "Jade",
+      "cuotaPct": 0.1,
+      "unidadesH": 0.3,
+      "subastaH": 0
+     },
+     {
+      "itemId": 3864,
+      "nombre": "Citrine",
+      "cuotaPct": 0.1,
+      "unidadesH": 0.1,
+      "subastaH": 0
+     },
+     {
+      "itemId": 1705,
+      "nombre": "Lesser Moonstone",
+      "cuotaPct": 0,
+      "unidadesH": 0.1,
+      "subastaH": 0
+     }
+    ]
+   },
+   {
+    "zona": "Thousand Needles",
+    "tipo": "solo",
+    "mobs": [
+     "Swirling Vortex"
+    ],
+    "oroH": 13.09,
+    "muertesH": 44.4,
+    "spawns": 5,
+    "riesgo": "media",
+    "mapa": null,
+    "monedasPct": 0,
+    "subastaPct": 97.1,
+    "vendedorPct": 2.9,
+    "aportes": [
+     {
+      "itemId": 7069,
+      "nombre": "Elemental Air",
+      "cuotaPct": 97.2,
+      "unidadesH": 30.2,
+      "subastaH": 30
+     },
+     {
+      "itemId": 1529,
+      "nombre": "Jade",
+      "cuotaPct": 0.3,
+      "unidadesH": 0.6,
+      "subastaH": 0
+     },
+     {
+      "itemId": 3864,
+      "nombre": "Citrine",
+      "cuotaPct": 0.1,
+      "unidadesH": 0.2,
+      "subastaH": 0
+     },
+     {
+      "itemId": 1705,
+      "nombre": "Lesser Moonstone",
+      "cuotaPct": 0.1,
+      "unidadesH": 0.2,
+      "subastaH": 0
+     }
+    ]
+   },
+   {
+    "zona": "Arathi Highlands",
+    "tipo": "solo",
+    "mobs": [
+     "Thundering Exile"
+    ],
+    "oroH": 11.13,
+    "muertesH": 84.9,
+    "spawns": 12,
+    "riesgo": "media",
+    "mapa": null,
+    "monedasPct": 0,
+    "subastaPct": 92.7,
+    "vendedorPct": 7.3,
+    "aportes": [
+     {
+      "itemId": 7069,
+      "nombre": "Elemental Air",
+      "cuotaPct": 71.7,
+      "unidadesH": 19.1,
+      "subastaH": 19.1
+     },
+     {
+      "itemId": 4480,
+      "nombre": "Thundering Charm",
+      "cuotaPct": 21.1,
+      "unidadesH": 36.1,
+      "subastaH": 36.1
+     },
+     {
+      "itemId": 3864,
+      "nombre": "Citrine",
+      "cuotaPct": 0.1,
+      "unidadesH": 0.1,
+      "subastaH": 0
+     },
+     {
+      "itemId": 7909,
+      "nombre": "Aquamarine",
+      "cuotaPct": 0.1,
+      "unidadesH": 0.1,
+      "subastaH": 0
+     }
+    ]
+   }
+  ],
+  "mobs": [
+   {
+    "npcId": 11577,
+    "nombre": "Whirlwind Stormwalker",
+    "nivel": [
+     35,
+     37
+    ],
+    "pos": 1,
+    "zona": "Desolace",
+    "tipo": "solo",
+    "mobs": [
+     "Whirlwind Stormwalker"
+    ],
+    "oroH": 14.9,
+    "muertesH": 93.5,
+    "spawns": 13,
+    "riesgo": "media",
+    "mapa": null,
+    "monedasPct": 0,
+    "subastaPct": 84.7,
+    "vendedorPct": 15.3,
+    "aportes": [
+     {
+      "itemId": 7069,
+      "nombre": "Elemental Air",
+      "cuotaPct": 94.4,
+      "unidadesH": 66.5,
+      "subastaH": 30
+     },
+     {
+      "itemId": 3864,
+      "nombre": "Citrine",
+      "cuotaPct": 0.2,
+      "unidadesH": 0.4,
+      "subastaH": 0
+     },
+     {
+      "itemId": 1529,
+      "nombre": "Jade",
+      "cuotaPct": 0.1,
+      "unidadesH": 0.1,
+      "subastaH": 0
+     },
+     {
+      "itemId": 4636,
+      "nombre": "Strong Iron Lockbox",
+      "cuotaPct": 0.1,
+      "unidadesH": 0.8,
+      "subastaH": 0
+     }
+    ]
+   },
+   {
+    "npcId": 11578,
+    "nombre": "Whirlwind Shredder",
+    "nivel": [
+     32,
+     34
+    ],
+    "pos": 2,
+    "zona": "Desolace",
+    "tipo": "solo",
+    "mobs": [
+     "Whirlwind Shredder"
+    ],
+    "oroH": 14.9,
+    "muertesH": 96.8,
+    "spawns": 13,
+    "riesgo": "media",
+    "mapa": null,
+    "monedasPct": 0,
+    "subastaPct": 84.7,
+    "vendedorPct": 15.3,
+    "aportes": [
+     {
+      "itemId": 7069,
+      "nombre": "Elemental Air",
+      "cuotaPct": 95.2,
+      "unidadesH": 69.8,
+      "subastaH": 30
+     },
+     {
+      "itemId": 1705,
+      "nombre": "Lesser Moonstone",
+      "cuotaPct": 0.3,
+      "unidadesH": 0.7,
+      "subastaH": 0
+     },
+     {
+      "itemId": 1529,
+      "nombre": "Jade",
+      "cuotaPct": 0.3,
+      "unidadesH": 0.6,
+      "subastaH": 0
+     },
+     {
+      "itemId": 3864,
+      "nombre": "Citrine",
+      "cuotaPct": 0.1,
+      "unidadesH": 0.1,
+      "subastaH": 0
+     }
+    ]
+   },
+   {
+    "npcId": 11576,
+    "nombre": "Whirlwind Ripper",
+    "nivel": [
+     32,
+     34
+    ],
+    "pos": 3,
+    "zona": "Desolace",
+    "tipo": "solo",
+    "mobs": [
+     "Whirlwind Ripper"
+    ],
+    "oroH": 13.33,
+    "muertesH": 54.1,
+    "spawns": 11,
+    "riesgo": "media",
+    "mapa": null,
+    "monedasPct": 0,
+    "subastaPct": 95.2,
+    "vendedorPct": 4.8,
+    "aportes": [
+     {
+      "itemId": 7069,
+      "nombre": "Elemental Air",
+      "cuotaPct": 97.1,
+      "unidadesH": 36.3,
+      "subastaH": 30
+     },
+     {
+      "itemId": 1529,
+      "nombre": "Jade",
+      "cuotaPct": 0.1,
+      "unidadesH": 0.3,
+      "subastaH": 0
+     },
+     {
+      "itemId": 3864,
+      "nombre": "Citrine",
+      "cuotaPct": 0.1,
+      "unidadesH": 0.1,
+      "subastaH": 0
+     },
+     {
+      "itemId": 1705,
+      "nombre": "Lesser Moonstone",
+      "cuotaPct": 0,
+      "unidadesH": 0.1,
+      "subastaH": 0
+     }
+    ]
+   },
+   {
+    "npcId": 9377,
+    "nombre": "Swirling Vortex",
+    "nivel": [
+     33,
+     34
+    ],
+    "pos": 4,
+    "zona": "Thousand Needles",
+    "tipo": "solo",
+    "mobs": [
+     "Swirling Vortex"
+    ],
+    "oroH": 13.09,
+    "muertesH": 44.4,
+    "spawns": 5,
+    "riesgo": "media",
+    "mapa": null,
+    "monedasPct": 0,
+    "subastaPct": 97.1,
+    "vendedorPct": 2.9,
+    "aportes": [
+     {
+      "itemId": 7069,
+      "nombre": "Elemental Air",
+      "cuotaPct": 97.2,
+      "unidadesH": 30.2,
+      "subastaH": 30
+     },
+     {
+      "itemId": 1529,
+      "nombre": "Jade",
+      "cuotaPct": 0.3,
+      "unidadesH": 0.6,
+      "subastaH": 0
+     },
+     {
+      "itemId": 3864,
+      "nombre": "Citrine",
+      "cuotaPct": 0.1,
+      "unidadesH": 0.2,
+      "subastaH": 0
+     },
+     {
+      "itemId": 1705,
+      "nombre": "Lesser Moonstone",
+      "cuotaPct": 0.1,
+      "unidadesH": 0.2,
+      "subastaH": 0
+     }
+    ]
+   },
+   {
+    "npcId": 2762,
+    "nombre": "Thundering Exile",
+    "nivel": [
+     38,
+     39
+    ],
+    "pos": 5,
+    "zona": "Arathi Highlands",
+    "tipo": "solo",
+    "mobs": [
+     "Thundering Exile"
+    ],
+    "oroH": 11.13,
+    "muertesH": 84.9,
+    "spawns": 12,
+    "riesgo": "media",
+    "mapa": null,
+    "monedasPct": 0,
+    "subastaPct": 92.7,
+    "vendedorPct": 7.3,
+    "aportes": [
+     {
+      "itemId": 7069,
+      "nombre": "Elemental Air",
+      "cuotaPct": 71.7,
+      "unidadesH": 19.1,
+      "subastaH": 19.1
+     },
+     {
+      "itemId": 4480,
+      "nombre": "Thundering Charm",
+      "cuotaPct": 21.1,
+      "unidadesH": 36.1,
+      "subastaH": 36.1
+     },
+     {
+      "itemId": 3864,
+      "nombre": "Citrine",
+      "cuotaPct": 0.1,
+      "unidadesH": 0.1,
+      "subastaH": 0
+     },
+     {
+      "itemId": 7909,
+      "nombre": "Aquamarine",
+      "cuotaPct": 0.1,
+      "unidadesH": 0.1,
+      "subastaH": 0
+     }
+    ]
+   },
+   {
+    "npcId": 2359,
+    "nombre": "Elemental Slave",
+    "nivel": [
+     33,
+     34
+    ],
+    "pos": 6,
+    "zona": "Silverpine Forest",
+    "tipo": "solo",
+    "mobs": [
+     "Elemental Slave"
+    ],
+    "oroH": 9.32,
+    "muertesH": 123.7,
+    "spawns": 22,
+    "riesgo": "baja",
+    "mapa": null,
+    "monedasPct": 0,
+    "subastaPct": 20.7,
+    "vendedorPct": 79.3,
+    "aportes": [
+     {
+      "itemId": 4784,
+      "nombre": "Lifeless Stone",
+      "cuotaPct": 26.4,
+      "unidadesH": 71.1,
+      "subastaH": 0
+     },
+     {
+      "itemId": 7067,
+      "nombre": "Elemental Earth",
+      "cuotaPct": 20.7,
+      "unidadesH": 9.6,
+      "subastaH": 9.6
+     },
+     {
+      "itemId": 4553,
+      "nombre": "Jagged Piece of Stone",
+      "cuotaPct": 12.6,
+      "unidadesH": 29.7,
+      "subastaH": 0
+     },
+     {
+      "itemId": 8150,
+      "nombre": "Deeprock Salt",
+      "cuotaPct": 7.2,
+      "unidadesH": 27.8,
+      "subastaH": 0
+     }
+    ]
+   },
+   {
+    "npcId": 769,
+    "nombre": "Deathstrike Tarantula",
+    "nivel": [
+     40,
+     41
+    ],
+    "pos": 7,
+    "zona": "Swamp of Sorrows",
+    "tipo": "solo",
+    "mobs": [
+     "Deathstrike Tarantula"
+    ],
+    "oroH": 8.77,
+    "muertesH": 105.2,
+    "spawns": 34,
+    "riesgo": "media",
+    "mapa": null,
+    "monedasPct": 0,
+    "subastaPct": 0,
+    "vendedorPct": 100,
+    "aportes": [
+     {
+      "itemId": 4585,
+      "nombre": "Dripping Spider Mandible",
+      "cuotaPct": 27.8,
+      "unidadesH": 43.8,
+      "subastaH": 0
+     },
+     {
+      "itemId": 4337,
+      "nombre": "Thick Spider's Silk",
+      "cuotaPct": 14.7,
+      "unidadesH": 18,
+      "subastaH": 0
+     },
+     {
+      "itemId": 10285,
+      "nombre": "Shadow Silk",
+      "cuotaPct": 9.4,
+      "unidadesH": 8.6,
+      "subastaH": 0
+     },
+     {
+      "itemId": 1074,
+      "nombre": "Hard Spider Leg Tip",
+      "cuotaPct": 6.8,
+      "unidadesH": 12.7,
+      "subastaH": 0
+     }
+    ]
+   },
+   {
+    "npcId": 92,
+    "nombre": "Rock Elemental",
+    "nivel": [
+     39,
+     40
+    ],
+    "pos": 8,
+    "zona": "Badlands",
+    "tipo": "solo",
+    "mobs": [
+     "Rock Elemental"
+    ],
+    "oroH": 8.15,
+    "muertesH": 108.9,
+    "spawns": 30,
+    "riesgo": "media",
+    "mapa": null,
+    "monedasPct": 0,
+    "subastaPct": 25,
+    "vendedorPct": 75,
+    "aportes": [
+     {
+      "itemId": 7067,
+      "nombre": "Elemental Earth",
+      "cuotaPct": 25,
+      "unidadesH": 10.2,
+      "subastaH": 10.2
+     },
+     {
+      "itemId": 4784,
+      "nombre": "Lifeless Stone",
+      "cuotaPct": 22.1,
+      "unidadesH": 52.6,
+      "subastaH": 0
+     },
+     {
+      "itemId": 4553,
+      "nombre": "Jagged Piece of Stone",
+      "cuotaPct": 17.7,
+      "unidadesH": 36.9,
+      "subastaH": 0
+     },
+     {
+      "itemId": 4552,
+      "nombre": "Smooth Stone Chip",
+      "cuotaPct": 9.4,
+      "unidadesH": 15.2,
+      "subastaH": 0
+     }
+    ]
+   },
+   {
+    "npcId": 2760,
+    "nombre": "Burning Exile",
+    "nivel": [
+     38,
+     39
+    ],
+    "pos": 9,
+    "zona": "Arathi Highlands",
+    "tipo": "solo",
+    "mobs": [
+     "Burning Exile"
+    ],
+    "oroH": 8.08,
+    "muertesH": 87.3,
+    "spawns": 14,
+    "riesgo": "media",
+    "mapa": null,
+    "monedasPct": 0,
+    "subastaPct": 63,
+    "vendedorPct": 37,
+    "aportes": [
+     {
+      "itemId": 7068,
+      "nombre": "Elemental Fire",
+      "cuotaPct": 48.1,
+      "unidadesH": 11.8,
+      "subastaH": 11.8
+     },
+     {
+      "itemId": 4787,
+      "nombre": "Burning Pitch",
+      "cuotaPct": 24.8,
+      "unidadesH": 36,
+      "subastaH": 0
+     },
+     {
+      "itemId": 4479,
+      "nombre": "Burning Charm",
+      "cuotaPct": 14.8,
+      "unidadesH": 34.9,
+      "subastaH": 34.9
+     },
+     {
+      "itemId": 3857,
+      "nombre": "Coal",
+      "cuotaPct": 2,
+      "unidadesH": 13.4,
+      "subastaH": 0
+     }
+    ]
+   },
+   {
+    "npcId": 5268,
+    "nombre": "Ironfur Bear",
+    "nivel": [
+     41,
+     42
+    ],
+    "pos": 10,
+    "zona": "Feralas",
+    "tipo": "solo",
+    "mobs": [
+     "Ironfur Bear"
+    ],
+    "oroH": 7.49,
+    "muertesH": 89.9,
+    "spawns": 67,
+    "riesgo": "media",
+    "mapa": null,
+    "monedasPct": 0,
+    "subastaPct": 0,
+    "vendedorPct": 100,
+    "aportes": [
+     {
+      "itemId": 11408,
+      "nombre": "Bear Jaw",
+      "cuotaPct": 37,
+      "unidadesH": 32.4,
+      "subastaH": 0
+     },
+     {
+      "itemId": 11409,
+      "nombre": "Bear Flank",
+      "cuotaPct": 20.8,
+      "unidadesH": 32.5,
+      "subastaH": 0
+     },
+     {
+      "itemId": 11410,
+      "nombre": "Savage Bear Claw",
+      "cuotaPct": 4.8,
+      "unidadesH": 6.5,
+      "subastaH": 0
+     },
+     {
+      "itemId": 8146,
+      "nombre": "Wicked Claw",
+      "cuotaPct": 1.6,
+      "unidadesH": 2.5,
+      "subastaH": 0
+     }
+    ]
+   },
+   {
+    "npcId": 767,
+    "nombre": "Swamp Jaguar",
+    "nivel": [
+     36,
+     37
+    ],
+    "pos": 11,
+    "zona": "Swamp of Sorrows",
+    "tipo": "solo",
+    "mobs": [
+     "Swamp Jaguar"
+    ],
+    "oroH": 7.08,
+    "muertesH": 112.3,
+    "spawns": 45,
+    "riesgo": "media",
+    "mapa": null,
+    "monedasPct": 0,
+    "subastaPct": 0,
+    "vendedorPct": 100,
+    "aportes": [
+     {
+      "itemId": 1688,
+      "nombre": "Long Soft Tail",
+      "cuotaPct": 66.1,
+      "unidadesH": 61,
+      "subastaH": 0
+     },
+     {
+      "itemId": 1686,
+      "nombre": "Bristly Whisker",
+      "cuotaPct": 16.7,
+      "unidadesH": 17,
+      "subastaH": 0
+     },
+     {
+      "itemId": 8146,
+      "nombre": "Wicked Claw",
+      "cuotaPct": 2.1,
+      "unidadesH": 3.1,
+      "subastaH": 0
+     },
+     {
+      "itemId": 5637,
+      "nombre": "Large Fang",
+      "cuotaPct": 1.3,
+      "unidadesH": 12.9,
+      "subastaH": 0
+     }
+    ]
+   },
+   {
+    "npcId": 683,
+    "nombre": "Young Panther",
+    "nivel": [
+     30,
+     31
+    ],
+    "pos": 12,
+    "zona": "Stranglethorn Vale",
+    "tipo": "solo",
+    "mobs": [
+     "Young Panther"
+    ],
+    "oroH": 6.99,
+    "muertesH": 135,
+    "spawns": 24,
+    "riesgo": "media",
+    "mapa": null,
+    "monedasPct": 0,
+    "subastaPct": 0,
+    "vendedorPct": 100,
+    "aportes": [
+     {
+      "itemId": 1686,
+      "nombre": "Bristly Whisker",
+      "cuotaPct": 80,
+      "unidadesH": 79.7,
+      "subastaH": 0
+     },
+     {
+      "itemId": 1687,
+      "nombre": "Retractable Claw",
+      "cuotaPct": 7.7,
+      "unidadesH": 23.1,
+      "subastaH": 0
+     },
+     {
+      "itemId": 5637,
+      "nombre": "Large Fang",
+      "cuotaPct": 0.8,
+      "unidadesH": 7.3,
+      "subastaH": 0
+     },
+     {
+      "itemId": 1705,
+      "nombre": "Lesser Moonstone",
+      "cuotaPct": 0.2,
+      "unidadesH": 0.2,
+      "subastaH": 0
+     }
+    ]
+   },
+   {
+    "npcId": 4248,
+    "nombre": "Pesterhide Hyena",
+    "nivel": [
+     26,
+     27
+    ],
+    "pos": 13,
+    "zona": "Thousand Needles",
+    "tipo": "solo",
+    "mobs": [
+     "Pesterhide Hyena"
+    ],
+    "oroH": 6.87,
+    "muertesH": 160.1,
+    "spawns": 46,
+    "riesgo": "media",
+    "mapa": null,
+    "monedasPct": 0,
+    "subastaPct": 0,
+    "vendedorPct": 100,
+    "aportes": [
+     {
+      "itemId": 3402,
+      "nombre": "Soft Patch of Fur",
+      "cuotaPct": 87.8,
+      "unidadesH": 104.2,
+      "subastaH": 0
+     },
+     {
+      "itemId": 3301,
+      "nombre": "Sharp Canine",
+      "cuotaPct": 2.1,
+      "unidadesH": 14.8,
+      "subastaH": 0
+     },
+     {
+      "itemId": 5635,
+      "nombre": "Sharp Claw",
+      "cuotaPct": 0.9,
+      "unidadesH": 13.7,
+      "subastaH": 0
+     },
+     {
+      "itemId": 5637,
+      "nombre": "Large Fang",
+      "cuotaPct": 0.3,
+      "unidadesH": 3.3,
+      "subastaH": 0
+     }
+    ]
+   },
+   {
+    "npcId": 4133,
+    "nombre": "Silithid Hive Drone",
+    "nivel": [
+     33,
+     34
+    ],
+    "pos": 14,
+    "zona": "Tanaris",
+    "tipo": "solo",
+    "mobs": [
+     "Silithid Hive Drone"
+    ],
+    "oroH": 6.82,
+    "muertesH": 144,
+    "spawns": 22,
+    "riesgo": "media",
+    "mapa": null,
+    "monedasPct": 0,
+    "subastaPct": 0,
+    "vendedorPct": 100,
+    "aportes": [
+     {
+      "itemId": 1529,
+      "nombre": "Jade",
+      "cuotaPct": 0.2,
+      "unidadesH": 0.2,
+      "subastaH": 0
+     },
+     {
+      "itemId": 1705,
+      "nombre": "Lesser Moonstone",
+      "cuotaPct": 0.2,
+      "unidadesH": 0.2,
+      "subastaH": 0
+     },
+     {
+      "itemId": 3864,
+      "nombre": "Citrine",
+      "cuotaPct": 0.1,
+      "unidadesH": 0.1,
+      "subastaH": 0
+     },
+     {
+      "itemId": 4634,
+      "nombre": "Iron Lockbox",
+      "cuotaPct": 0,
+      "unidadesH": 0.3,
+      "subastaH": 0
+     }
+    ]
+   },
+   {
+    "npcId": 4688,
+    "nombre": "Bonepaw Hyena",
+    "nivel": [
+     33,
+     35
+    ],
+    "pos": 15,
+    "zona": "Desolace",
+    "tipo": "solo",
+    "mobs": [
+     "Bonepaw Hyena"
+    ],
+    "oroH": 6.81,
+    "muertesH": 162.3,
+    "spawns": 15,
+    "riesgo": "media",
+    "mapa": null,
+    "monedasPct": 0,
+    "subastaPct": 0,
+    "vendedorPct": 100,
+    "aportes": [
+     {
+      "itemId": 3402,
+      "nombre": "Soft Patch of Fur",
+      "cuotaPct": 60.3,
+      "unidadesH": 69.8,
+      "subastaH": 0
+     },
+     {
+      "itemId": 4582,
+      "nombre": "Soft Bushy Tail",
+      "cuotaPct": 33.7,
+      "unidadesH": 31.5,
+      "subastaH": 0
+     },
+     {
+      "itemId": 12203,
+      "nombre": "Red Wolf Meat",
+      "cuotaPct": 3,
+      "unidadesH": 24,
+      "subastaH": 0
+     },
+     {
+      "itemId": 12037,
+      "nombre": "Mystery Meat",
+      "cuotaPct": 3,
+      "unidadesH": 23.6,
+      "subastaH": 0
+     }
+    ]
+   },
+   {
+    "npcId": 2735,
+    "nombre": "Lesser Rock Elemental",
+    "nivel": [
+     37,
+     39
+    ],
+    "pos": 16,
+    "zona": "Badlands",
+    "tipo": "solo",
+    "mobs": [
+     "Lesser Rock Elemental"
+    ],
+    "oroH": 6.77,
+    "muertesH": 104.1,
+    "spawns": 18,
+    "riesgo": "media",
+    "mapa": null,
+    "monedasPct": 0,
+    "subastaPct": 25.8,
+    "vendedorPct": 74.2,
+    "aportes": [
+     {
+      "itemId": 7067,
+      "nombre": "Elemental Earth",
+      "cuotaPct": 25.8,
+      "unidadesH": 8.8,
+      "subastaH": 8.8
+     },
+     {
+      "itemId": 4784,
+      "nombre": "Lifeless Stone",
+      "cuotaPct": 25.8,
+      "unidadesH": 51.1,
+      "subastaH": 0
+     },
+     {
+      "itemId": 4553,
+      "nombre": "Jagged Piece of Stone",
+      "cuotaPct": 14.2,
+      "unidadesH": 24.6,
+      "subastaH": 0
+     },
+     {
+      "itemId": 8150,
+      "nombre": "Deeprock Salt",
+      "cuotaPct": 6.9,
+      "unidadesH": 19.7,
+      "subastaH": 0
+     }
+    ]
+   },
+   {
+    "npcId": 2761,
+    "nombre": "Cresting Exile",
+    "nivel": [
+     38,
+     39
+    ],
+    "pos": 17,
+    "zona": "Arathi Highlands",
+    "tipo": "solo",
+    "mobs": [
+     "Cresting Exile"
+    ],
+    "oroH": 6.64,
+    "muertesH": 94.5,
+    "spawns": 14,
+    "riesgo": "media",
+    "mapa": null,
+    "monedasPct": 0,
+    "subastaPct": 48.1,
+    "vendedorPct": 51.9,
+    "aportes": [
+     {
+      "itemId": 4481,
+      "nombre": "Cresting Charm",
+      "cuotaPct": 52,
+      "unidadesH": 40.3,
+      "subastaH": 25
+     },
+     {
+      "itemId": 4791,
+      "nombre": "Enchanted Water",
+      "cuotaPct": 27,
+      "unidadesH": 140.2,
+      "subastaH": 0
+     },
+     {
+      "itemId": 7070,
+      "nombre": "Elemental Water",
+      "cuotaPct": 7.9,
+      "unidadesH": 13.6,
+      "subastaH": 0
+     },
+     {
+      "itemId": 3864,
+      "nombre": "Citrine",
+      "cuotaPct": 0.1,
+      "unidadesH": 0.1,
+      "subastaH": 0
+     }
+    ]
+   },
+   {
+    "npcId": 2592,
+    "nombre": "Rumbling Exile",
+    "nivel": [
+     38,
+     39
+    ],
+    "pos": 18,
+    "zona": "Arathi Highlands",
+    "tipo": "solo",
+    "mobs": [
+     "Rumbling Exile"
+    ],
+    "oroH": 6.6,
+    "muertesH": 91.2,
+    "spawns": 16,
+    "riesgo": "media",
+    "mapa": null,
+    "monedasPct": 0,
+    "subastaPct": 26,
+    "vendedorPct": 74,
+    "aportes": [
+     {
+      "itemId": 7067,
+      "nombre": "Elemental Earth",
+      "cuotaPct": 26,
+      "unidadesH": 8.6,
+      "subastaH": 8.6
+     },
+     {
+      "itemId": 4784,
+      "nombre": "Lifeless Stone",
+      "cuotaPct": 23.6,
+      "unidadesH": 45.3,
+      "subastaH": 0
+     },
+     {
+      "itemId": 4553,
+      "nombre": "Jagged Piece of Stone",
+      "cuotaPct": 16.9,
+      "unidadesH": 28.4,
+      "subastaH": 0
+     },
+     {
+      "itemId": 4552,
+      "nombre": "Smooth Stone Chip",
+      "cuotaPct": 9.3,
+      "unidadesH": 12.2,
+      "subastaH": 0
+     }
+    ]
+   },
+   {
+    "npcId": 2732,
+    "nombre": "Ridge Huntress",
+    "nivel": [
+     38,
+     39
+    ],
+    "pos": 19,
+    "zona": "Badlands",
+    "tipo": "solo",
+    "mobs": [
+     "Ridge Huntress"
+    ],
+    "oroH": 6.49,
+    "muertesH": 111.2,
+    "spawns": 42,
+    "riesgo": "media",
+    "mapa": null,
+    "monedasPct": 0,
+    "subastaPct": 0,
+    "vendedorPct": 100,
+    "aportes": [
+     {
+      "itemId": 1688,
+      "nombre": "Long Soft Tail",
+      "cuotaPct": 46.7,
+      "unidadesH": 39.8,
+      "subastaH": 0
+     },
+     {
+      "itemId": 1686,
+      "nombre": "Bristly Whisker",
+      "cuotaPct": 12.3,
+      "unidadesH": 11.6,
+      "subastaH": 0
+     },
+     {
+      "itemId": 12202,
+      "nombre": "Tiger Meat",
+      "cuotaPct": 7.1,
+      "unidadesH": 55.8,
+      "subastaH": 0
+     },
+     {
+      "itemId": 8146,
+      "nombre": "Wicked Claw",
+      "cuotaPct": 2.1,
+      "unidadesH": 2.9,
+      "subastaH": 0
+     }
+    ]
+   },
+   {
+    "npcId": 858,
+    "nombre": "Sorrow Spinner",
+    "nivel": [
+     36,
+     37
+    ],
+    "pos": 20,
+    "zona": "Swamp of Sorrows",
+    "tipo": "solo",
+    "mobs": [
+     "Sorrow Spinner"
+    ],
+    "oroH": 6.42,
+    "muertesH": 109.4,
+    "spawns": 27,
+    "riesgo": "media",
+    "mapa": null,
+    "monedasPct": 0,
+    "subastaPct": 0,
+    "vendedorPct": 100,
+    "aportes": [
+     {
+      "itemId": 4585,
+      "nombre": "Dripping Spider Mandible",
+      "cuotaPct": 41.8,
+      "unidadesH": 48.5,
+      "subastaH": 0
+     },
+     {
+      "itemId": 4337,
+      "nombre": "Thick Spider's Silk",
+      "cuotaPct": 17.5,
+      "unidadesH": 15.8,
+      "subastaH": 0
+     },
+     {
+      "itemId": 10285,
+      "nombre": "Shadow Silk",
+      "cuotaPct": 10,
+      "unidadesH": 6.8,
+      "subastaH": 0
+     },
+     {
+      "itemId": 1074,
+      "nombre": "Hard Spider Leg Tip",
+      "cuotaPct": 9.6,
+      "unidadesH": 13.3,
+      "subastaH": 0
+     }
+    ]
+   },
+   {
+    "npcId": 1550,
+    "nombre": "Thrashtail Basilisk",
+    "nivel": [
+     41,
+     42
+    ],
+    "pos": 21,
+    "zona": "Stranglethorn Vale",
+    "tipo": "solo",
+    "mobs": [
+     "Thrashtail Basilisk"
+    ],
+    "oroH": 6.06,
+    "muertesH": 83.3,
+    "spawns": 13,
+    "riesgo": "media",
+    "mapa": null,
+    "monedasPct": 0,
+    "subastaPct": 0,
+    "vendedorPct": 100,
+    "aportes": [
+     {
+      "itemId": 4093,
+      "nombre": "Large Basilisk Tail",
+      "cuotaPct": 32.9,
+      "unidadesH": 29.5,
+      "subastaH": 0
+     },
+     {
+      "itemId": 11386,
+      "nombre": "Squishy Basilisk Eye",
+      "cuotaPct": 29.3,
+      "unidadesH": 27.8,
+      "subastaH": 0
+     },
+     {
+      "itemId": 4092,
+      "nombre": "Prismatic Basilisk Scale",
+      "cuotaPct": 11,
+      "unidadesH": 5.4,
+      "subastaH": 0
+     },
+     {
+      "itemId": 11387,
+      "nombre": "Basilisk Heart",
+      "cuotaPct": 9.8,
+      "unidadesH": 6.2,
+      "subastaH": 0
+     }
+    ]
+   },
+   {
+    "npcId": 4729,
+    "nombre": "Hulking Gritjaw Basilisk",
+    "nivel": [
+     35,
+     36
+    ],
+    "pos": 22,
+    "zona": "Desolace",
+    "tipo": "solo",
+    "mobs": [
+     "Hulking Gritjaw Basilisk"
+    ],
+    "oroH": 5.99,
+    "muertesH": 113.5,
+    "spawns": 52,
+    "riesgo": "media",
+    "mapa": null,
+    "monedasPct": 0,
+    "subastaPct": 0,
+    "vendedorPct": 100,
+    "aportes": [
+     {
+      "itemId": 4093,
+      "nombre": "Large Basilisk Tail",
+      "cuotaPct": 24.3,
+      "unidadesH": 21.6,
+      "subastaH": 0
+     },
+     {
+      "itemId": 11386,
+      "nombre": "Squishy Basilisk Eye",
+      "cuotaPct": 21.6,
+      "unidadesH": 20.3,
+      "subastaH": 0
+     },
+     {
+      "itemId": 1701,
+      "nombre": "Curved Basilisk Claw",
+      "cuotaPct": 20.1,
+      "unidadesH": 34,
+      "subastaH": 0
+     },
+     {
+      "itemId": 1702,
+      "nombre": "Intact Basilisk Spine",
+      "cuotaPct": 17.9,
+      "unidadesH": 35.6,
+      "subastaH": 0
+     }
+    ]
+   },
+   {
+    "npcId": 4249,
+    "nombre": "Pesterhide Snarler",
+    "nivel": [
+     28,
+     29
+    ],
+    "pos": 23,
+    "zona": "Thousand Needles",
+    "tipo": "solo",
+    "mobs": [
+     "Pesterhide Snarler"
+    ],
+    "oroH": 5.93,
+    "muertesH": 137.7,
+    "spawns": 30,
+    "riesgo": "media",
+    "mapa": null,
+    "monedasPct": 0,
+    "subastaPct": 0,
+    "vendedorPct": 100,
+    "aportes": [
+     {
+      "itemId": 3402,
+      "nombre": "Soft Patch of Fur",
+      "cuotaPct": 86.5,
+      "unidadesH": 89.1,
+      "subastaH": 0
+     },
+     {
+      "itemId": 3301,
+      "nombre": "Sharp Canine",
+      "cuotaPct": 2.1,
+      "unidadesH": 12.9,
+      "subastaH": 0
+     },
+     {
+      "itemId": 5635,
+      "nombre": "Sharp Claw",
+      "cuotaPct": 1,
+      "unidadesH": 13.6,
+      "subastaH": 0
+     },
+     {
+      "itemId": 5637,
+      "nombre": "Large Fang",
+      "cuotaPct": 0.3,
+      "unidadesH": 2.7,
+      "subastaH": 0
+     }
+    ]
+   },
+   {
+    "npcId": 5422,
+    "nombre": "Scorpid Hunter",
+    "nivel": [
+     40,
+     41
+    ],
+    "pos": 24,
+    "zona": "Tanaris",
+    "tipo": "solo",
+    "mobs": [
+     "Scorpid Hunter"
+    ],
+    "oroH": 5.91,
+    "muertesH": 89.8,
+    "spawns": 43,
+    "riesgo": "media",
+    "mapa": null,
+    "monedasPct": 0,
+    "subastaPct": 0,
+    "vendedorPct": 100,
+    "aportes": [
+     {
+      "itemId": 19936,
+      "nombre": "Dried Scorpid Carapace",
+      "cuotaPct": 30.7,
+      "unidadesH": 23.2,
+      "subastaH": 0
+     },
+     {
+      "itemId": 19935,
+      "nombre": "Empty Venom Sac",
+      "cuotaPct": 22.8,
+      "unidadesH": 17.2,
+      "subastaH": 0
+     },
+     {
+      "itemId": 19937,
+      "nombre": "Small Scorpid Claw",
+      "cuotaPct": 21.2,
+      "unidadesH": 17,
+      "subastaH": 0
+     },
+     {
+      "itemId": 12037,
+      "nombre": "Mystery Meat",
+      "cuotaPct": 5.2,
+      "unidadesH": 37.7,
+      "subastaH": 0
+     }
+    ]
+   },
+   {
+    "npcId": 4696,
+    "nombre": "Scorpashi Snapper",
+    "nivel": [
+     30,
+     31
+    ],
+    "pos": 25,
+    "zona": "Desolace",
+    "tipo": "solo",
+    "mobs": [
+     "Scorpashi Snapper"
+    ],
+    "oroH": 5.85,
+    "muertesH": 138.4,
+    "spawns": 53,
+    "riesgo": "media",
+    "mapa": null,
+    "monedasPct": 0,
+    "subastaPct": 0,
+    "vendedorPct": 100,
+    "aportes": [
+     {
+      "itemId": 19938,
+      "nombre": "Heavy Scorpid Leg",
+      "cuotaPct": 37.6,
+      "unidadesH": 39.9,
+      "subastaH": 0
+     },
+     {
+      "itemId": 19937,
+      "nombre": "Small Scorpid Claw",
+      "cuotaPct": 34,
+      "unidadesH": 26.8,
+      "subastaH": 0
+     },
+     {
+      "itemId": 12037,
+      "nombre": "Mystery Meat",
+      "cuotaPct": 7,
+      "unidadesH": 49.3,
+      "subastaH": 0
+     },
+     {
+      "itemId": 1288,
+      "nombre": "Large Venom Sac",
+      "cuotaPct": 4.9,
+      "unidadesH": 16.5,
+      "subastaH": 0
+     }
+    ]
+   },
+   {
+    "npcId": 5616,
+    "nombre": "Wastewander Thief",
+    "nivel": [
+     40,
+     41
+    ],
+    "pos": 26,
+    "zona": "Tanaris",
+    "tipo": "solo",
+    "mobs": [
+     "Wastewander Thief"
+    ],
+    "oroH": 5.85,
+    "muertesH": 103.1,
+    "spawns": 25,
+    "riesgo": "media",
+    "mapa": null,
+    "monedasPct": 11.8,
+    "subastaPct": 0,
+    "vendedorPct": 88.2,
+    "aportes": [
+     {
+      "itemId": 4338,
+      "nombre": "Mageweave Cloth",
+      "cuotaPct": 13,
+      "unidadesH": 32.6,
+      "subastaH": 0
+     },
+     {
+      "itemId": 8398,
+      "nombre": "Pattern: Tough Scorpid Gloves",
+      "cuotaPct": 9.6,
+      "unidadesH": 5.3,
+      "subastaH": 0
+     },
+     {
+      "itemId": 8483,
+      "nombre": "Wastewander Water Pouch",
+      "cuotaPct": 8.4,
+      "unidadesH": 30.7,
+      "subastaH": 0
+     },
+     {
+      "itemId": 4306,
+      "nombre": "Silk Cloth",
+      "cuotaPct": 3.1,
+      "unidadesH": 13,
+      "subastaH": 0
+     }
+    ]
+   },
+   {
+    "npcId": 690,
+    "nombre": "Cold Eye Basilisk",
+    "nivel": [
+     39,
+     40
+    ],
+    "pos": 27,
+    "zona": "Stranglethorn Vale",
+    "tipo": "solo",
+    "mobs": [
+     "Cold Eye Basilisk"
+    ],
+    "oroH": 5.68,
+    "muertesH": 97,
+    "spawns": 19,
+    "riesgo": "media",
+    "mapa": null,
+    "monedasPct": 0,
+    "subastaPct": 0,
+    "vendedorPct": 100,
+    "aportes": [
+     {
+      "itemId": 4093,
+      "nombre": "Large Basilisk Tail",
+      "cuotaPct": 22.3,
+      "unidadesH": 18.9,
+      "subastaH": 0
+     },
+     {
+      "itemId": 11386,
+      "nombre": "Squishy Basilisk Eye",
+      "cuotaPct": 21,
+      "unidadesH": 18.7,
+      "subastaH": 0
+     },
+     {
+      "itemId": 1701,
+      "nombre": "Curved Basilisk Claw",
+      "cuotaPct": 17.2,
+      "unidadesH": 27.6,
+      "subastaH": 0
+     },
+     {
+      "itemId": 1702,
+      "nombre": "Intact Basilisk Spine",
+      "cuotaPct": 14.6,
+      "unidadesH": 27.5,
+      "subastaH": 0
+     }
+    ]
+   },
+   {
+    "npcId": 681,
+    "nombre": "Young Stranglethorn Tiger",
+    "nivel": [
+     30,
+     31
+    ],
+    "pos": 28,
+    "zona": "Stranglethorn Vale",
+    "tipo": "solo",
+    "mobs": [
+     "Young Stranglethorn Tiger"
+    ],
+    "oroH": 5.68,
+    "muertesH": 129.2,
+    "spawns": 23,
+    "riesgo": "media",
+    "mapa": null,
+    "monedasPct": 0,
+    "subastaPct": 0,
+    "vendedorPct": 100,
+    "aportes": [
+     {
+      "itemId": 1686,
+      "nombre": "Bristly Whisker",
+      "cuotaPct": 53.2,
+      "unidadesH": 43.4,
+      "subastaH": 0
+     },
+     {
+      "itemId": 12202,
+      "nombre": "Tiger Meat",
+      "cuotaPct": 9.4,
+      "unidadesH": 64.4,
+      "subastaH": 0
+     },
+     {
+      "itemId": 1687,
+      "nombre": "Retractable Claw",
+      "cuotaPct": 4.9,
+      "unidadesH": 12.1,
+      "subastaH": 0
+     },
+     {
+      "itemId": 5637,
+      "nombre": "Large Fang",
+      "cuotaPct": 0.5,
+      "unidadesH": 4.3,
+      "subastaH": 0
+     }
+    ]
+   },
+   {
+    "npcId": 4379,
+    "nombre": "Darkmist Silkspinner",
+    "nivel": [
+     38,
+     39
+    ],
+    "pos": 29,
+    "zona": "The Barrens",
+    "tipo": "solo",
+    "mobs": [
+     "Darkmist Silkspinner"
+    ],
+    "oroH": 5.51,
+    "muertesH": 101.1,
+    "spawns": 19,
+    "riesgo": "baja",
+    "mapa": null,
+    "monedasPct": 0,
+    "subastaPct": 0,
+    "vendedorPct": 100,
+    "aportes": [
+     {
+      "itemId": 4585,
+      "nombre": "Dripping Spider Mandible",
+      "cuotaPct": 41.6,
+      "unidadesH": 42.3,
+      "subastaH": 0
+     },
+     {
+      "itemId": 10285,
+      "nombre": "Shadow Silk",
+      "cuotaPct": 12.2,
+      "unidadesH": 7.2,
+      "subastaH": 0
+     },
+     {
+      "itemId": 4337,
+      "nombre": "Thick Spider's Silk",
+      "cuotaPct": 9.6,
+      "unidadesH": 7.6,
+      "subastaH": 0
+     },
+     {
+      "itemId": 12205,
+      "nombre": "White Spider Meat",
+      "cuotaPct": 7.5,
+      "unidadesH": 39.6,
+      "subastaH": 0
+     }
+    ]
+   },
+   {
+    "npcId": 4728,
+    "nombre": "Gritjaw Basilisk",
+    "nivel": [
+     31,
+     32
+    ],
+    "pos": 30,
+    "zona": "Desolace",
+    "tipo": "solo",
+    "mobs": [
+     "Gritjaw Basilisk"
+    ],
+    "oroH": 5.5,
+    "muertesH": 127.3,
+    "spawns": 58,
+    "riesgo": "media",
+    "mapa": null,
+    "monedasPct": 0,
+    "subastaPct": 0,
+    "vendedorPct": 100,
+    "aportes": [
+     {
+      "itemId": 1701,
+      "nombre": "Curved Basilisk Claw",
+      "cuotaPct": 28.8,
+      "unidadesH": 44.5,
+      "subastaH": 0
+     },
+     {
+      "itemId": 1702,
+      "nombre": "Intact Basilisk Spine",
+      "cuotaPct": 25.1,
+      "unidadesH": 45.7,
+      "subastaH": 0
+     },
+     {
+      "itemId": 4093,
+      "nombre": "Large Basilisk Tail",
+      "cuotaPct": 16.9,
+      "unidadesH": 13.8,
+      "subastaH": 0
+     },
+     {
+      "itemId": 11386,
+      "nombre": "Squishy Basilisk Eye",
+      "cuotaPct": 15.4,
+      "unidadesH": 13.2,
+      "subastaH": 0
+     }
+    ]
+   },
+   {
+    "npcId": 4397,
+    "nombre": "Mudrock Spikeshell",
+    "nivel": [
+     37,
+     38
+    ],
+    "pos": 31,
+    "zona": "The Barrens",
+    "tipo": "solo",
+    "mobs": [
+     "Mudrock Spikeshell"
+    ],
+    "oroH": 5.49,
+    "muertesH": 108.1,
+    "spawns": 33,
+    "riesgo": "baja",
+    "mapa": null,
+    "monedasPct": 0,
+    "subastaPct": 0,
+    "vendedorPct": 100,
+    "aportes": [
+     {
+      "itemId": 4556,
+      "nombre": "Speckled Shell Fragment",
+      "cuotaPct": 57.6,
+      "unidadesH": 37.7,
+      "subastaH": 0
+     },
+     {
+      "itemId": 4555,
+      "nombre": "Thick Scaly Tail",
+      "cuotaPct": 18,
+      "unidadesH": 68.7,
+      "subastaH": 0
+     },
+     {
+      "itemId": 3712,
+      "nombre": "Turtle Meat",
+      "cuotaPct": 5.8,
+      "unidadesH": 39.3,
+      "subastaH": 0
+     },
+     {
+      "itemId": 6362,
+      "nombre": "Raw Rockscale Cod",
+      "cuotaPct": 0.1,
+      "unidadesH": 18.8,
+      "subastaH": 0
+     }
+    ]
+   },
+   {
+    "npcId": 2729,
+    "nombre": "Elder Crag Coyote",
+    "nivel": [
+     39,
+     40
+    ],
+    "pos": 32,
+    "zona": "Badlands",
+    "tipo": "solo",
+    "mobs": [
+     "Elder Crag Coyote"
+    ],
+    "oroH": 5.48,
+    "muertesH": 112.4,
+    "spawns": 46,
+    "riesgo": "media",
+    "mapa": null,
+    "monedasPct": 0,
+    "subastaPct": 0,
+    "vendedorPct": 100,
+    "aportes": [
+     {
+      "itemId": 4582,
+      "nombre": "Soft Bushy Tail",
+      "cuotaPct": 34.5,
+      "unidadesH": 27.3,
+      "subastaH": 0
+     },
+     {
+      "itemId": 12203,
+      "nombre": "Red Wolf Meat",
+      "cuotaPct": 6.6,
+      "unidadesH": 44.3,
+      "subastaH": 0
+     },
+     {
+      "itemId": 8146,
+      "nombre": "Wicked Claw",
+      "cuotaPct": 2,
+      "unidadesH": 2.3,
+      "subastaH": 0
+     },
+     {
+      "itemId": 5637,
+      "nombre": "Large Fang",
+      "cuotaPct": 0.7,
+      "unidadesH": 5.8,
+      "subastaH": 0
+     }
+    ]
+   },
+   {
+    "npcId": 674,
+    "nombre": "Venture Co. Strip Miner",
+    "nivel": [
+     40,
+     41
+    ],
+    "pos": 33,
+    "zona": "Stranglethorn Vale",
+    "tipo": "solo",
+    "mobs": [
+     "Venture Co. Strip Miner"
+    ],
+    "oroH": 5.45,
+    "muertesH": 103.8,
+    "spawns": 25,
+    "riesgo": "media",
+    "mapa": null,
+    "monedasPct": 12.6,
+    "subastaPct": 0,
+    "vendedorPct": 87.4,
+    "aportes": [
+     {
+      "itemId": 4306,
+      "nombre": "Silk Cloth",
+      "cuotaPct": 13.1,
+      "unidadesH": 51.1,
+      "subastaH": 0
+     },
+     {
+      "itemId": 11203,
+      "nombre": "Formula: Enchant Gloves - Advanced Mining",
+      "cuotaPct": 6.6,
+      "unidadesH": 3.5,
+      "subastaH": 0
+     },
+     {
+      "itemId": 1630,
+      "nombre": "Broken Electro-lantern",
+      "cuotaPct": 3,
+      "unidadesH": 26.9,
+      "subastaH": 0
+     },
+     {
+      "itemId": 4338,
+      "nombre": "Mageweave Cloth",
+      "cuotaPct": 1.8,
+      "unidadesH": 4.2,
+      "subastaH": 0
+     }
+    ]
+   },
+   {
+    "npcId": 2563,
+    "nombre": "Plains Creeper",
+    "nivel": [
+     32,
+     33
+    ],
+    "pos": 34,
+    "zona": "Arathi Highlands",
+    "tipo": "solo",
+    "mobs": [
+     "Plains Creeper"
+    ],
+    "oroH": 5.44,
+    "muertesH": 136.9,
+    "spawns": 108,
+    "riesgo": "media",
+    "mapa": null,
+    "monedasPct": 0,
+    "subastaPct": 0,
+    "vendedorPct": 100,
+    "aportes": [
+     {
+      "itemId": 1074,
+      "nombre": "Hard Spider Leg Tip",
+      "cuotaPct": 28.1,
+      "unidadesH": 33.1,
+      "subastaH": 0
+     },
+     {
+      "itemId": 4337,
+      "nombre": "Thick Spider's Silk",
+      "cuotaPct": 16,
+      "unidadesH": 12.3,
+      "subastaH": 0
+     },
+     {
+      "itemId": 3182,
+      "nombre": "Spider's Silk",
+      "cuotaPct": 14.7,
+      "unidadesH": 21.9,
+      "subastaH": 0
+     },
+     {
+      "itemId": 1081,
+      "nombre": "Crisp Spider Meat",
+      "cuotaPct": 5.1,
+      "unidadesH": 58.9,
+      "subastaH": 0
+     }
+    ]
+   },
+   {
+    "npcId": 4151,
+    "nombre": "Saltstone Crystalhide",
+    "nivel": [
+     32,
+     33
+    ],
+    "pos": 35,
+    "zona": "Thousand Needles",
+    "tipo": "solo",
+    "mobs": [
+     "Saltstone Crystalhide"
+    ],
+    "oroH": 5.38,
+    "muertesH": 122.4,
+    "spawns": 22,
+    "riesgo": "media",
+    "mapa": null,
+    "monedasPct": 0,
+    "subastaPct": 0,
+    "vendedorPct": 100,
+    "aportes": [
+     {
+      "itemId": 1701,
+      "nombre": "Curved Basilisk Claw",
+      "cuotaPct": 28.7,
+      "unidadesH": 43,
+      "subastaH": 0
+     },
+     {
+      "itemId": 1702,
+      "nombre": "Intact Basilisk Spine",
+      "cuotaPct": 24.6,
+      "unidadesH": 43.3,
+      "subastaH": 0
+     },
+     {
+      "itemId": 4093,
+      "nombre": "Large Basilisk Tail",
+      "cuotaPct": 16.6,
+      "unidadesH": 13.1,
+      "subastaH": 0
+     },
+     {
+      "itemId": 11386,
+      "nombre": "Squishy Basilisk Eye",
+      "cuotaPct": 15.4,
+      "unidadesH": 12.8,
+      "subastaH": 0
+     }
+    ]
+   },
+   {
+    "npcId": 4150,
+    "nombre": "Saltstone Gazer",
+    "nivel": [
+     34,
+     35
+    ],
+    "pos": 36,
+    "zona": "Tanaris",
+    "tipo": "solo",
+    "mobs": [
+     "Saltstone Gazer"
+    ],
+    "oroH": 5.35,
+    "muertesH": 113.1,
+    "spawns": 18,
+    "riesgo": "media",
+    "mapa": null,
+    "monedasPct": 0,
+    "subastaPct": 0,
+    "vendedorPct": 100,
+    "aportes": [
+     {
+      "itemId": 1701,
+      "nombre": "Curved Basilisk Claw",
+      "cuotaPct": 25.5,
+      "unidadesH": 38.4,
+      "subastaH": 0
+     },
+     {
+      "itemId": 1702,
+      "nombre": "Intact Basilisk Spine",
+      "cuotaPct": 21.5,
+      "unidadesH": 38.1,
+      "subastaH": 0
+     },
+     {
+      "itemId": 4093,
+      "nombre": "Large Basilisk Tail",
+      "cuotaPct": 19.6,
+      "unidadesH": 15.6,
+      "subastaH": 0
+     },
+     {
+      "itemId": 11386,
+      "nombre": "Squishy Basilisk Eye",
+      "cuotaPct": 17.8,
+      "unidadesH": 15,
+      "subastaH": 0
+     }
+    ]
+   },
+   {
+    "npcId": 686,
+    "nombre": "Lashtail Raptor",
+    "nivel": [
+     35,
+     36
+    ],
+    "pos": 37,
+    "zona": "Stranglethorn Vale",
+    "tipo": "solo",
+    "mobs": [
+     "Lashtail Raptor"
+    ],
+    "oroH": 5.29,
+    "muertesH": 118.5,
+    "spawns": 29,
+    "riesgo": "media",
+    "mapa": null,
+    "monedasPct": 0,
+    "subastaPct": 0,
+    "vendedorPct": 100,
+    "aportes": [
+     {
+      "itemId": 1696,
+      "nombre": "Curved Raptor Talon",
+      "cuotaPct": 23,
+      "unidadesH": 21.5,
+      "subastaH": 0
+     },
+     {
+      "itemId": 4461,
+      "nombre": "Raptor Hide",
+      "cuotaPct": 15.4,
+      "unidadesH": 41.9,
+      "subastaH": 0
+     },
+     {
+      "itemId": 4586,
+      "nombre": "Smooth Raptor Skin",
+      "cuotaPct": 10.2,
+      "unidadesH": 8.1,
+      "subastaH": 0
+     },
+     {
+      "itemId": 3685,
+      "nombre": "Raptor Egg",
+      "cuotaPct": 6.6,
+      "unidadesH": 52.8,
+      "subastaH": 0
+     }
+    ]
+   },
+   {
+    "npcId": 5286,
+    "nombre": "Longtooth Runner",
+    "nivel": [
+     40,
+     41
+    ],
+    "pos": 38,
+    "zona": "Feralas",
+    "tipo": "solo",
+    "mobs": [
+     "Longtooth Runner"
+    ],
+    "oroH": 5.24,
+    "muertesH": 100.9,
+    "spawns": 98,
+    "riesgo": "media",
+    "mapa": null,
+    "monedasPct": 0,
+    "subastaPct": 0,
+    "vendedorPct": 100,
+    "aportes": [
+     {
+      "itemId": 4583,
+      "nombre": "Thick Furry Mane",
+      "cuotaPct": 40.8,
+      "unidadesH": 28.3,
+      "subastaH": 0
+     },
+     {
+      "itemId": 4584,
+      "nombre": "Large Trophy Paw",
+      "cuotaPct": 19.9,
+      "unidadesH": 12,
+      "subastaH": 0
+     },
+     {
+      "itemId": 12208,
+      "nombre": "Tender Wolf Meat",
+      "cuotaPct": 9.1,
+      "unidadesH": 34.1,
+      "subastaH": 0
+     },
+     {
+      "itemId": 12203,
+      "nombre": "Red Wolf Meat",
+      "cuotaPct": 7.1,
+      "unidadesH": 46.3,
+      "subastaH": 0
+     }
+    ]
+   },
+   {
+    "npcId": 2727,
+    "nombre": "Crag Coyote",
+    "nivel": [
+     35,
+     36
+    ],
+    "pos": 39,
+    "zona": "Badlands",
+    "tipo": "solo",
+    "mobs": [
+     "Crag Coyote"
+    ],
+    "oroH": 5.23,
+    "muertesH": 115.7,
+    "spawns": 28,
+    "riesgo": "media",
+    "mapa": null,
+    "monedasPct": 0,
+    "subastaPct": 0,
+    "vendedorPct": 100,
+    "aportes": [
+     {
+      "itemId": 4582,
+      "nombre": "Soft Bushy Tail",
+      "cuotaPct": 33.9,
+      "unidadesH": 25.4,
+      "subastaH": 0
+     },
+     {
+      "itemId": 12203,
+      "nombre": "Red Wolf Meat",
+      "cuotaPct": 8.4,
+      "unidadesH": 53.9,
+      "subastaH": 0
+     },
+     {
+      "itemId": 8146,
+      "nombre": "Wicked Claw",
+      "cuotaPct": 1.4,
+      "unidadesH": 1.5,
+      "subastaH": 0
+     },
+     {
+      "itemId": 5637,
+      "nombre": "Large Fang",
+      "cuotaPct": 0.9,
+      "unidadesH": 6.4,
+      "subastaH": 0
+     }
+    ]
+   },
+   {
+    "npcId": 671,
+    "nombre": "Bloodscalp Headhunter",
+    "nivel": [
+     36,
+     37
+    ],
+    "pos": 40,
+    "zona": "Stranglethorn Vale",
+    "tipo": "solo",
+    "mobs": [
+     "Bloodscalp Headhunter"
+    ],
+    "oroH": 5.18,
+    "muertesH": 116.8,
+    "spawns": 20,
+    "riesgo": "media",
+    "mapa": null,
+    "monedasPct": 12.7,
+    "subastaPct": 0,
+    "vendedorPct": 87.3,
+    "aportes": [
+     {
+      "itemId": 1522,
+      "nombre": "Headhunting Spear",
+      "cuotaPct": 21.9,
+      "unidadesH": 1.2,
+      "subastaH": 0
+     },
+     {
+      "itemId": 4306,
+      "nombre": "Silk Cloth",
+      "cuotaPct": 15.5,
+      "unidadesH": 57.3,
+      "subastaH": 0
+     },
+     {
+      "itemId": 9294,
+      "nombre": "Recipe: Wildvine Potion",
+      "cuotaPct": 2.3,
+      "unidadesH": 0.6,
+      "subastaH": 0
+     },
+     {
+      "itemId": 4338,
+      "nombre": "Mageweave Cloth",
+      "cuotaPct": 2.2,
+      "unidadesH": 4.9,
+      "subastaH": 0
+     }
+    ]
+   }
+  ],
+  "totalMobs": 442,
+  "precios": {
+   "1074": {
+    "nombre": "Hard Spider Leg Tip",
+    "medianaOro": null,
+    "p25Oro": null,
+    "p75Oro": null,
+    "hoyOro": null,
+    "dias": 0,
+    "ofertas": null,
+    "delgado": false,
+    "vendedorOro": 0.0491,
+    "topeUnidades": 0,
+    "tope": "sin-ofertas"
+   },
+   "1081": {
+    "nombre": "Crisp Spider Meat",
+    "medianaOro": null,
+    "p25Oro": null,
+    "p75Oro": null,
+    "hoyOro": null,
+    "dias": 0,
+    "ofertas": null,
+    "delgado": false,
+    "vendedorOro": 0.005,
+    "topeUnidades": 0,
+    "tope": "sin-ofertas"
+   },
+   "1288": {
+    "nombre": "Large Venom Sac",
+    "medianaOro": null,
+    "p25Oro": null,
+    "p75Oro": null,
+    "hoyOro": null,
+    "dias": 0,
+    "ofertas": null,
+    "delgado": false,
+    "vendedorOro": 0.0185,
+    "topeUnidades": 0,
+    "tope": "sin-ofertas"
+   },
+   "1522": {
+    "nombre": "Headhunting Spear",
+    "medianaOro": null,
+    "p25Oro": null,
+    "p75Oro": null,
+    "hoyOro": null,
+    "dias": 0,
+    "ofertas": null,
+    "delgado": false,
+    "vendedorOro": 1.0224,
+    "topeUnidades": 0,
+    "tope": "sin-ofertas"
+   },
+   "1529": {
+    "nombre": "Jade",
+    "medianaOro": null,
+    "p25Oro": null,
+    "p75Oro": null,
+    "hoyOro": null,
+    "dias": 0,
+    "ofertas": null,
+    "delgado": false,
+    "vendedorOro": 0.07,
+    "topeUnidades": 0,
+    "tope": "sin-ofertas"
+   },
+   "1630": {
+    "nombre": "Broken Electro-lantern",
+    "medianaOro": null,
+    "p25Oro": null,
+    "p75Oro": null,
+    "hoyOro": null,
+    "dias": 0,
+    "ofertas": null,
+    "delgado": false,
+    "vendedorOro": 0.0066,
+    "topeUnidades": 0,
+    "tope": "sin-ofertas"
+   },
+   "1686": {
+    "nombre": "Bristly Whisker",
+    "medianaOro": null,
+    "p25Oro": null,
+    "p75Oro": null,
+    "hoyOro": null,
+    "dias": 0,
+    "ofertas": null,
+    "delgado": false,
+    "vendedorOro": 0.0733,
+    "topeUnidades": 0,
+    "tope": "sin-ofertas"
+   },
+   "1687": {
+    "nombre": "Retractable Claw",
+    "medianaOro": null,
+    "p25Oro": null,
+    "p75Oro": null,
+    "hoyOro": null,
+    "dias": 0,
+    "ofertas": null,
+    "delgado": false,
+    "vendedorOro": 0.0243,
+    "topeUnidades": 0,
+    "tope": "sin-ofertas"
+   },
+   "1688": {
+    "nombre": "Long Soft Tail",
+    "medianaOro": null,
+    "p25Oro": null,
+    "p75Oro": null,
+    "hoyOro": null,
+    "dias": 0,
+    "ofertas": null,
+    "delgado": false,
+    "vendedorOro": 0.0806,
+    "topeUnidades": 0,
+    "tope": "sin-ofertas"
+   },
+   "1696": {
+    "nombre": "Curved Raptor Talon",
+    "medianaOro": null,
+    "p25Oro": null,
+    "p75Oro": null,
+    "hoyOro": null,
+    "dias": 0,
+    "ofertas": null,
+    "delgado": false,
+    "vendedorOro": 0.0606,
+    "topeUnidades": 0,
+    "tope": "sin-ofertas"
+   },
+   "1701": {
+    "nombre": "Curved Basilisk Claw",
+    "medianaOro": null,
+    "p25Oro": null,
+    "p75Oro": null,
+    "hoyOro": null,
+    "dias": 0,
+    "ofertas": null,
+    "delgado": false,
+    "vendedorOro": 0.0376,
+    "topeUnidades": 0,
+    "tope": "sin-ofertas"
+   },
+   "1702": {
+    "nombre": "Intact Basilisk Spine",
+    "medianaOro": null,
+    "p25Oro": null,
+    "p75Oro": null,
+    "hoyOro": null,
+    "dias": 0,
+    "ofertas": null,
+    "delgado": false,
+    "vendedorOro": 0.032,
+    "topeUnidades": 0,
+    "tope": "sin-ofertas"
+   },
+   "1705": {
+    "nombre": "Lesser Moonstone",
+    "medianaOro": null,
+    "p25Oro": null,
+    "p75Oro": null,
+    "hoyOro": null,
+    "dias": 0,
+    "ofertas": null,
+    "delgado": false,
+    "vendedorOro": 0.06,
+    "topeUnidades": 0,
+    "tope": "sin-ofertas"
+   },
+   "3182": {
+    "nombre": "Spider's Silk",
+    "medianaOro": null,
+    "p25Oro": null,
+    "p75Oro": null,
+    "hoyOro": null,
+    "dias": 0,
+    "ofertas": null,
+    "delgado": false,
+    "vendedorOro": 0.0387,
+    "topeUnidades": 0,
+    "tope": "sin-ofertas"
+   },
+   "3301": {
+    "nombre": "Sharp Canine",
+    "medianaOro": null,
+    "p25Oro": null,
+    "p75Oro": null,
+    "hoyOro": null,
+    "dias": 0,
+    "ofertas": null,
+    "delgado": false,
+    "vendedorOro": 0.0102,
+    "topeUnidades": 0,
+    "tope": "sin-ofertas"
+   },
+   "3402": {
+    "nombre": "Soft Patch of Fur",
+    "medianaOro": null,
+    "p25Oro": null,
+    "p75Oro": null,
+    "hoyOro": null,
+    "dias": 0,
+    "ofertas": null,
+    "delgado": false,
+    "vendedorOro": 0.0602,
+    "topeUnidades": 0,
+    "tope": "sin-ofertas"
+   },
+   "3685": {
+    "nombre": "Raptor Egg",
+    "medianaOro": null,
+    "p25Oro": null,
+    "p75Oro": null,
+    "hoyOro": null,
+    "dias": 0,
+    "ofertas": null,
+    "delgado": false,
+    "vendedorOro": 0.0071,
+    "topeUnidades": 0,
+    "tope": "sin-ofertas"
+   },
+   "3712": {
+    "nombre": "Turtle Meat",
+    "medianaOro": null,
+    "p25Oro": null,
+    "p75Oro": null,
+    "hoyOro": null,
+    "dias": 0,
+    "ofertas": null,
+    "delgado": false,
+    "vendedorOro": 0.0087,
+    "topeUnidades": 0,
+    "tope": "sin-ofertas"
+   },
+   "3857": {
+    "nombre": "Coal",
+    "medianaOro": null,
+    "p25Oro": null,
+    "p75Oro": null,
+    "hoyOro": null,
+    "dias": 0,
+    "ofertas": null,
+    "delgado": false,
+    "vendedorOro": 0.0125,
+    "topeUnidades": 0,
+    "tope": "sin-ofertas"
+   },
+   "3864": {
+    "nombre": "Citrine",
+    "medianaOro": null,
+    "p25Oro": null,
+    "p75Oro": null,
+    "hoyOro": null,
+    "dias": 0,
+    "ofertas": null,
+    "delgado": false,
+    "vendedorOro": 0.08,
+    "topeUnidades": 0,
+    "tope": "sin-ofertas"
+   },
+   "4092": {
+    "nombre": "Prismatic Basilisk Scale",
+    "medianaOro": null,
+    "p25Oro": null,
+    "p75Oro": null,
+    "hoyOro": null,
+    "dias": 0,
+    "ofertas": null,
+    "delgado": false,
+    "vendedorOro": 0.1296,
+    "topeUnidades": 0,
+    "tope": "sin-ofertas"
+   },
+   "4093": {
+    "nombre": "Large Basilisk Tail",
+    "medianaOro": null,
+    "p25Oro": null,
+    "p75Oro": null,
+    "hoyOro": null,
+    "dias": 0,
+    "ofertas": null,
+    "delgado": false,
+    "vendedorOro": 0.0713,
+    "topeUnidades": 0,
+    "tope": "sin-ofertas"
+   },
+   "4306": {
+    "nombre": "Silk Cloth",
+    "medianaOro": null,
+    "p25Oro": null,
+    "p75Oro": null,
+    "hoyOro": null,
+    "dias": 0,
+    "ofertas": null,
+    "delgado": false,
+    "vendedorOro": 0.015,
+    "topeUnidades": 0,
+    "tope": "sin-ofertas"
+   },
+   "4337": {
+    "nombre": "Thick Spider's Silk",
+    "medianaOro": null,
+    "p25Oro": null,
+    "p75Oro": null,
+    "hoyOro": null,
+    "dias": 0,
+    "ofertas": null,
+    "delgado": false,
+    "vendedorOro": 0.075,
+    "topeUnidades": 0,
+    "tope": "sin-ofertas"
+   },
+   "4338": {
+    "nombre": "Mageweave Cloth",
+    "medianaOro": null,
+    "p25Oro": null,
+    "p75Oro": null,
+    "hoyOro": null,
+    "dias": 0,
+    "ofertas": null,
+    "delgado": false,
+    "vendedorOro": 0.025,
+    "topeUnidades": 0,
+    "tope": "sin-ofertas"
+   },
+   "4461": {
+    "nombre": "Raptor Hide",
+    "medianaOro": null,
+    "p25Oro": null,
+    "p75Oro": null,
+    "hoyOro": null,
+    "dias": 0,
+    "ofertas": null,
+    "delgado": false,
+    "vendedorOro": 0.0208,
+    "topeUnidades": 0,
+    "tope": "sin-ofertas"
+   },
+   "4479": {
+    "nombre": "Burning Charm",
+    "medianaOro": 0.0375,
+    "p25Oro": 0.0375,
+    "p75Oro": 0.0375,
+    "hoyOro": 0.0375,
+    "dias": 3,
+    "ofertas": 1200,
+    "delgado": false,
+    "vendedorOro": 0.0178,
+    "topeUnidades": 60,
+    "tope": "kappa-ofertas"
+   },
+   "4480": {
+    "nombre": "Thundering Charm",
+    "medianaOro": 0.07,
+    "p25Oro": 0.07,
+    "p75Oro": 0.07,
+    "hoyOro": 0.07,
+    "dias": 3,
+    "ofertas": 1250,
+    "delgado": false,
+    "vendedorOro": 0.0185,
+    "topeUnidades": 62.5,
+    "tope": "kappa-ofertas"
+   },
+   "4481": {
+    "nombre": "Cresting Charm",
+    "medianaOro": 0.14,
+    "p25Oro": 0.14,
+    "p75Oro": 0.14,
+    "hoyOro": 0.14,
+    "dias": 3,
+    "ofertas": 500,
+    "delgado": false,
+    "vendedorOro": 0.0176,
+    "topeUnidades": 25,
+    "tope": "kappa-ofertas"
+   },
+   "4552": {
+    "nombre": "Smooth Stone Chip",
+    "medianaOro": null,
+    "p25Oro": null,
+    "p75Oro": null,
+    "hoyOro": null,
+    "dias": 0,
+    "ofertas": null,
+    "delgado": false,
+    "vendedorOro": 0.053,
+    "topeUnidades": 0,
+    "tope": "sin-ofertas"
+   },
+   "4553": {
+    "nombre": "Jagged Piece of Stone",
+    "medianaOro": null,
+    "p25Oro": null,
+    "p75Oro": null,
+    "hoyOro": null,
+    "dias": 0,
+    "ofertas": null,
+    "delgado": false,
+    "vendedorOro": 0.0411,
+    "topeUnidades": 0,
+    "tope": "sin-ofertas"
+   },
+   "4555": {
+    "nombre": "Thick Scaly Tail",
+    "medianaOro": null,
+    "p25Oro": null,
+    "p75Oro": null,
+    "hoyOro": null,
+    "dias": 0,
+    "ofertas": null,
+    "delgado": false,
+    "vendedorOro": 0.0155,
+    "topeUnidades": 0,
+    "tope": "sin-ofertas"
+   },
+   "4556": {
+    "nombre": "Speckled Shell Fragment",
+    "medianaOro": null,
+    "p25Oro": null,
+    "p75Oro": null,
+    "hoyOro": null,
+    "dias": 0,
+    "ofertas": null,
+    "delgado": false,
+    "vendedorOro": 0.0903,
+    "topeUnidades": 0,
+    "tope": "sin-ofertas"
+   },
+   "4582": {
+    "nombre": "Soft Bushy Tail",
+    "medianaOro": null,
+    "p25Oro": null,
+    "p75Oro": null,
+    "hoyOro": null,
+    "dias": 0,
+    "ofertas": null,
+    "delgado": false,
+    "vendedorOro": 0.0745,
+    "topeUnidades": 0,
+    "tope": "sin-ofertas"
+   },
+   "4583": {
+    "nombre": "Thick Furry Mane",
+    "medianaOro": null,
+    "p25Oro": null,
+    "p75Oro": null,
+    "hoyOro": null,
+    "dias": 0,
+    "ofertas": null,
+    "delgado": false,
+    "vendedorOro": 0.0812,
+    "topeUnidades": 0,
+    "tope": "sin-ofertas"
+   },
+   "4584": {
+    "nombre": "Large Trophy Paw",
+    "medianaOro": null,
+    "p25Oro": null,
+    "p75Oro": null,
+    "hoyOro": null,
+    "dias": 0,
+    "ofertas": null,
+    "delgado": false,
+    "vendedorOro": 0.0937,
+    "topeUnidades": 0,
+    "tope": "sin-ofertas"
+   },
+   "4585": {
+    "nombre": "Dripping Spider Mandible",
+    "medianaOro": null,
+    "p25Oro": null,
+    "p75Oro": null,
+    "hoyOro": null,
+    "dias": 0,
+    "ofertas": null,
+    "delgado": false,
+    "vendedorOro": 0.0583,
+    "topeUnidades": 0,
+    "tope": "sin-ofertas"
+   },
+   "4586": {
+    "nombre": "Smooth Raptor Skin",
+    "medianaOro": null,
+    "p25Oro": null,
+    "p75Oro": null,
+    "hoyOro": null,
+    "dias": 0,
+    "ofertas": null,
+    "delgado": false,
+    "vendedorOro": 0.0713,
+    "topeUnidades": 0,
+    "tope": "sin-ofertas"
+   },
+   "4634": {
+    "nombre": "Iron Lockbox",
+    "medianaOro": null,
+    "p25Oro": null,
+    "p75Oro": null,
+    "hoyOro": null,
+    "dias": 0,
+    "ofertas": null,
+    "delgado": false,
+    "vendedorOro": 0.0087,
+    "topeUnidades": 0,
+    "tope": "sin-ofertas"
+   },
+   "4636": {
+    "nombre": "Strong Iron Lockbox",
+    "medianaOro": null,
+    "p25Oro": null,
+    "p75Oro": null,
+    "hoyOro": null,
+    "dias": 0,
+    "ofertas": null,
+    "delgado": false,
+    "vendedorOro": 0.011,
+    "topeUnidades": 0,
+    "tope": "sin-ofertas"
+   },
+   "4784": {
+    "nombre": "Lifeless Stone",
+    "medianaOro": null,
+    "p25Oro": null,
+    "p75Oro": null,
+    "hoyOro": null,
+    "dias": 0,
+    "ofertas": null,
+    "delgado": false,
+    "vendedorOro": 0.036,
+    "topeUnidades": 0,
+    "tope": "sin-ofertas"
+   },
+   "4787": {
+    "nombre": "Burning Pitch",
+    "medianaOro": null,
+    "p25Oro": null,
+    "p75Oro": null,
+    "hoyOro": null,
+    "dias": 0,
+    "ofertas": null,
+    "delgado": false,
+    "vendedorOro": 0.0577,
+    "topeUnidades": 0,
+    "tope": "sin-ofertas"
+   },
+   "4791": {
+    "nombre": "Enchanted Water",
+    "medianaOro": null,
+    "p25Oro": null,
+    "p75Oro": null,
+    "hoyOro": null,
+    "dias": 0,
+    "ofertas": null,
+    "delgado": false,
+    "vendedorOro": 0.0133,
+    "topeUnidades": 0,
+    "tope": "sin-ofertas"
+   },
+   "5635": {
+    "nombre": "Sharp Claw",
+    "medianaOro": null,
+    "p25Oro": null,
+    "p75Oro": null,
+    "hoyOro": null,
+    "dias": 0,
+    "ofertas": null,
+    "delgado": false,
+    "vendedorOro": 0.0045,
+    "topeUnidades": 0,
+    "tope": "sin-ofertas"
+   },
+   "5637": {
+    "nombre": "Large Fang",
+    "medianaOro": null,
+    "p25Oro": null,
+    "p75Oro": null,
+    "hoyOro": null,
+    "dias": 0,
+    "ofertas": null,
+    "delgado": false,
+    "vendedorOro": 0.0075,
+    "topeUnidades": 0,
+    "tope": "sin-ofertas"
+   },
+   "6362": {
+    "nombre": "Raw Rockscale Cod",
+    "medianaOro": null,
+    "p25Oro": null,
+    "p75Oro": null,
+    "hoyOro": null,
+    "dias": 0,
+    "ofertas": null,
+    "delgado": false,
+    "vendedorOro": 0.0004,
+    "topeUnidades": 0,
+    "tope": "sin-ofertas"
+   },
+   "7067": {
+    "nombre": "Elemental Earth",
+    "medianaOro": 0.22,
+    "p25Oro": 0.22,
+    "p75Oro": 0.22,
+    "hoyOro": 0.22,
+    "dias": 3,
+    "ofertas": 1300,
+    "delgado": false,
+    "vendedorOro": 0.04,
+    "topeUnidades": 65,
+    "tope": "kappa-ofertas"
+   },
+   "7068": {
+    "nombre": "Elemental Fire",
+    "medianaOro": 0.36,
+    "p25Oro": 0.36,
+    "p75Oro": 0.36,
+    "hoyOro": 0.36,
+    "dias": 3,
+    "ofertas": 900,
+    "delgado": false,
+    "vendedorOro": 0.04,
+    "topeUnidades": 45,
+    "tope": "kappa-ofertas"
+   },
+   "7069": {
+    "nombre": "Elemental Air",
+    "medianaOro": 0.45,
+    "p25Oro": 0.45,
+    "p75Oro": 0.45,
+    "hoyOro": 0.45,
+    "dias": 3,
+    "ofertas": 600,
+    "delgado": false,
+    "vendedorOro": 0.04,
+    "topeUnidades": 30,
+    "tope": "kappa-ofertas"
+   },
+   "7070": {
+    "nombre": "Elemental Water",
+    "medianaOro": null,
+    "p25Oro": null,
+    "p75Oro": null,
+    "hoyOro": null,
+    "dias": 0,
+    "ofertas": null,
+    "delgado": false,
+    "vendedorOro": 0.04,
+    "topeUnidades": 0,
+    "tope": "sin-ofertas"
+   },
+   "7909": {
+    "nombre": "Aquamarine",
+    "medianaOro": null,
+    "p25Oro": null,
+    "p75Oro": null,
+    "hoyOro": null,
+    "dias": 0,
+    "ofertas": null,
+    "delgado": false,
+    "vendedorOro": 0.1,
+    "topeUnidades": 0,
+    "tope": "sin-ofertas"
+   },
+   "8146": {
+    "nombre": "Wicked Claw",
+    "medianaOro": null,
+    "p25Oro": null,
+    "p75Oro": null,
+    "hoyOro": null,
+    "dias": 0,
+    "ofertas": null,
+    "delgado": false,
+    "vendedorOro": 0.05,
+    "topeUnidades": 0,
+    "tope": "sin-ofertas"
+   },
+   "8150": {
+    "nombre": "Deeprock Salt",
+    "medianaOro": null,
+    "p25Oro": null,
+    "p75Oro": null,
+    "hoyOro": null,
+    "dias": 0,
+    "ofertas": null,
+    "delgado": false,
+    "vendedorOro": 0.025,
+    "topeUnidades": 0,
+    "tope": "sin-ofertas"
+   },
+   "8398": {
+    "nombre": "Pattern: Tough Scorpid Gloves",
+    "medianaOro": null,
+    "p25Oro": null,
+    "p75Oro": null,
+    "hoyOro": null,
+    "dias": 0,
+    "ofertas": null,
+    "delgado": false,
+    "vendedorOro": 0.1125,
+    "topeUnidades": 0,
+    "tope": "sin-ofertas"
+   },
+   "8483": {
+    "nombre": "Wastewander Water Pouch",
+    "medianaOro": null,
+    "p25Oro": null,
+    "p75Oro": null,
+    "hoyOro": null,
+    "dias": 0,
+    "ofertas": null,
+    "delgado": false,
+    "vendedorOro": 0.0171,
+    "topeUnidades": 0,
+    "tope": "sin-ofertas"
+   },
+   "9294": {
+    "nombre": "Recipe: Wildvine Potion",
+    "medianaOro": null,
+    "p25Oro": null,
+    "p75Oro": null,
+    "hoyOro": null,
+    "dias": 0,
+    "ofertas": null,
+    "delgado": false,
+    "vendedorOro": 0.2,
+    "topeUnidades": 0,
+    "tope": "sin-ofertas"
+   },
+   "10285": {
+    "nombre": "Shadow Silk",
+    "medianaOro": null,
+    "p25Oro": null,
+    "p75Oro": null,
+    "hoyOro": null,
+    "dias": 0,
+    "ofertas": null,
+    "delgado": false,
+    "vendedorOro": 0.1,
+    "topeUnidades": 0,
+    "tope": "sin-ofertas"
+   },
+   "11203": {
+    "nombre": "Formula: Enchant Gloves - Advanced Mining",
+    "medianaOro": null,
+    "p25Oro": null,
+    "p75Oro": null,
+    "hoyOro": null,
+    "dias": 0,
+    "ofertas": null,
+    "delgado": false,
+    "vendedorOro": 0.11,
+    "topeUnidades": 0,
+    "tope": "sin-ofertas"
+   },
+   "11386": {
+    "nombre": "Squishy Basilisk Eye",
+    "medianaOro": null,
+    "p25Oro": null,
+    "p75Oro": null,
+    "hoyOro": null,
+    "dias": 0,
+    "ofertas": null,
+    "delgado": false,
+    "vendedorOro": 0.0676,
+    "topeUnidades": 0,
+    "tope": "sin-ofertas"
+   },
+   "11387": {
+    "nombre": "Basilisk Heart",
+    "medianaOro": null,
+    "p25Oro": null,
+    "p75Oro": null,
+    "hoyOro": null,
+    "dias": 0,
+    "ofertas": null,
+    "delgado": false,
+    "vendedorOro": 0.1013,
+    "topeUnidades": 0,
+    "tope": "sin-ofertas"
+   },
+   "11408": {
+    "nombre": "Bear Jaw",
+    "medianaOro": null,
+    "p25Oro": null,
+    "p75Oro": null,
+    "hoyOro": null,
+    "dias": 0,
+    "ofertas": null,
+    "delgado": false,
+    "vendedorOro": 0.0898,
+    "topeUnidades": 0,
+    "tope": "sin-ofertas"
+   },
+   "11409": {
+    "nombre": "Bear Flank",
+    "medianaOro": null,
+    "p25Oro": null,
+    "p75Oro": null,
+    "hoyOro": null,
+    "dias": 0,
+    "ofertas": null,
+    "delgado": false,
+    "vendedorOro": 0.0503,
+    "topeUnidades": 0,
+    "tope": "sin-ofertas"
+   },
+   "11410": {
+    "nombre": "Savage Bear Claw",
+    "medianaOro": null,
+    "p25Oro": null,
+    "p75Oro": null,
+    "hoyOro": null,
+    "dias": 0,
+    "ofertas": null,
+    "delgado": false,
+    "vendedorOro": 0.0578,
+    "topeUnidades": 0,
+    "tope": "sin-ofertas"
+   },
+   "12037": {
+    "nombre": "Mystery Meat",
+    "medianaOro": null,
+    "p25Oro": null,
+    "p75Oro": null,
+    "hoyOro": null,
+    "dias": 0,
+    "ofertas": null,
+    "delgado": false,
+    "vendedorOro": 0.0087,
+    "topeUnidades": 0,
+    "tope": "sin-ofertas"
+   },
+   "12202": {
+    "nombre": "Tiger Meat",
+    "medianaOro": null,
+    "p25Oro": null,
+    "p75Oro": null,
+    "hoyOro": null,
+    "dias": 0,
+    "ofertas": null,
+    "delgado": false,
+    "vendedorOro": 0.0087,
+    "topeUnidades": 0,
+    "tope": "sin-ofertas"
+   },
+   "12203": {
+    "nombre": "Red Wolf Meat",
+    "medianaOro": null,
+    "p25Oro": null,
+    "p75Oro": null,
+    "hoyOro": null,
+    "dias": 0,
+    "ofertas": null,
+    "delgado": false,
+    "vendedorOro": 0.0087,
+    "topeUnidades": 0,
+    "tope": "sin-ofertas"
+   },
+   "12205": {
+    "nombre": "White Spider Meat",
+    "medianaOro": null,
+    "p25Oro": null,
+    "p75Oro": null,
+    "hoyOro": null,
+    "dias": 0,
+    "ofertas": null,
+    "delgado": false,
+    "vendedorOro": 0.0112,
+    "topeUnidades": 0,
+    "tope": "sin-ofertas"
+   },
+   "12208": {
+    "nombre": "Tender Wolf Meat",
+    "medianaOro": null,
+    "p25Oro": null,
+    "p75Oro": null,
+    "hoyOro": null,
+    "dias": 0,
+    "ofertas": null,
+    "delgado": false,
+    "vendedorOro": 0.015,
+    "topeUnidades": 0,
+    "tope": "sin-ofertas"
+   },
+   "19935": {
+    "nombre": "Empty Venom Sac",
+    "medianaOro": null,
+    "p25Oro": null,
+    "p75Oro": null,
+    "hoyOro": null,
+    "dias": 0,
+    "ofertas": null,
+    "delgado": false,
+    "vendedorOro": 0.083,
+    "topeUnidades": 0,
+    "tope": "sin-ofertas"
+   },
+   "19936": {
+    "nombre": "Dried Scorpid Carapace",
+    "medianaOro": null,
+    "p25Oro": null,
+    "p75Oro": null,
+    "hoyOro": null,
+    "dias": 0,
+    "ofertas": null,
+    "delgado": false,
+    "vendedorOro": 0.083,
+    "topeUnidades": 0,
+    "tope": "sin-ofertas"
+   },
+   "19937": {
+    "nombre": "Small Scorpid Claw",
+    "medianaOro": null,
+    "p25Oro": null,
+    "p75Oro": null,
+    "hoyOro": null,
+    "dias": 0,
+    "ofertas": null,
+    "delgado": false,
+    "vendedorOro": 0.078,
+    "topeUnidades": 0,
+    "tope": "sin-ofertas"
+   },
+   "19938": {
+    "nombre": "Heavy Scorpid Leg",
+    "medianaOro": null,
+    "p25Oro": null,
+    "p75Oro": null,
+    "hoyOro": null,
+    "dias": 0,
+    "ofertas": null,
+    "delgado": false,
+    "vendedorOro": 0.058,
+    "topeUnidades": 0,
+    "tope": "sin-ofertas"
+   }
+  }
  }
 }

@@ -64,7 +64,9 @@ muestra, 15 por defecto.)
 | ¿De dónde salen los datos? | `fuentes` |
 | ¿Cómo me fue farmeando? (sesiones medidas) | `farmeo-sesiones` · detalle: `farmeo-sesion 1` |
 | ¿Dónde está mi cuello de botella farmeando? | `farmeo-diagnostico` · estilo: `farmeo-estilo` |
-| ¿Qué farmeo para ganar más oro? | `farmeo-plan` |
+| ¿Qué farmeo para ganar más oro? | `farmeo-plan` · campamentos: `farmeo-ranking` |
+| ¿Conviene farmear tal mob? (p. ej. lo que dice una guía) | `farmeo-mob "Burning Exile"` |
+| ¿Qué rinde en tal zona a mi nivel? | `farmeo-zona "Arathi"` |
 
 Razas, clases, facciones y profesiones se aceptan en español o inglés, con o sin tildes, o por
 ID. Si el script dice que un nombre es ambiguo (por ejemplo, «cielonato» sin facción), pasa
@@ -258,6 +260,14 @@ Hermes Desktop; lo lees con las órdenes `farmeo-*` (§2). Diseño y fórmulas: 
   Forever menores que Classic o precios que bajaron. Si el plan recomienda otra zona que la que
   farmea, explícalo con `farmeo-plan` (minutos, aportes y tope). Sin sesiones, explica cómo
   medir una; no inventes métricas del jugador.
+- **Si cita una guía, un video o un foro** («dicen que los Burning Exile dan 14 o/h»): corre
+  `farmeo-mob "<mob>"` (o `farmeo-zona`) y compara **el precio usado aquí** con el que supone la
+  fuente. Las guías usan precios de otros reinos y otras fechas; en el reino del jugador el ítem
+  que sostiene ese número puede valer mucho menos (o más). Di qué ítem explica el valor, su precio
+  en el escaneo del jugador, su tope de venta y en qué puesto queda frente a lo demás. Si el mob
+  no está evaluado, la orden dice por qué (nivel, élite o raro, pocos spawns, facción, o que no
+  está en el dataset porque solo aparece durante un evento). La cifra de la guía es «fuera de la
+  guía»: nunca la presentes como del plugin. `farmeo-ranking` lista los mejores campamentos.
 - Tú no juegas por el jugador ni envías entradas al juego: solo lees lo exportado y explicas.
 
 ## Reglas
