@@ -219,6 +219,13 @@ generados offline. Nada se consulta en red ni en el juego.
   AreaTable, Map, Lock, FactionTemplate). Texto completo de la licencia y la
   atribución en `LICENSE-DATA.md`. Los nombres de World of Warcraft son
   marcas/derechos de Blizzard Entertainment: uso no comercial, sin afiliación.
+  **Spawns de evento excluidos** (2.2.1): los que solo existen mientras corre un
+  evento del mundo (`game_event_creature`/`game_event_gameobject` con evento
+  positivo: guerra de AQ, invasiones elementales, festividades) no entran. Se
+  conservan los eventos que se repiten cada día (`occurence` ≤ 1440 min, p. ej.
+  «Nights»: Leprithus y los Ghoul de Westfall salen todas las noches). Antes,
+  la élite de la invasión de AQ en Thousand Needles (Lesser Anubisath
+  Warbringer) salía primera en el ranking a nivel 40.
 - **Privada — `drop-data-private.js` → `window.HunterDropDataPrivate`**
   (All Rights Reserved, solo local, gitignored): rares y contenedores
   observados por el addon **RareScanner** instalado, con probabilidades de
@@ -426,8 +433,10 @@ La capa privada RareScanner aporta 2243 (50.1%). El catálogo FDJ aporta 93
 (2.1%). El fallback por nombre aporta 0. Cualquier capa pública: 2951 (65.9%);
 todas las capas: 3014 (67.3%). IDs exclusivos de Forever (>25000): 622, de
 los cuales 81 tienen cobertura. La fracción del valor listado (precio ×
-cantidad ofertada) con cobertura es 76.5%. El dataset contiene 5424 ítems,
-2477 mobs, 183 objetos y 72 zonas; la capa privada 484 rares y 52 contenedores.
+cantidad ofertada) con cobertura es 76.5%. Esas cifras se midieron con el
+dataset anterior a 2.2.1 (5424 ítems, 2477 mobs, 183 objetos); sin los spawns
+de evento contiene 5398 ítems, 2460 mobs, 173 objetos y 72 zonas. La capa
+privada: 484 rares y 52 contenedores.
 
 ## Seguridad, persistencia y recuperación
 

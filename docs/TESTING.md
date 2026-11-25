@@ -27,7 +27,7 @@ byte-idéntico si no hay cambios en `desktop/src/`).
 
 | Harness | Comando | Esperado | Qué cubre |
 |---|---|---|---|
-| `tests/` (node) | `node scripts/test-node.mjs` | **413** pass, 0 fail | lógica de `desktop/src/` + motor: mercado v2/atómico/sync/migración, puente (`bridge*.test.mjs`), TSM, ROI, ruta/maxeo, guía, perfil, recetas propias, niveles de oficio, personaje SimC (`simc.test.mjs`), escala Pawn (`pawn.test.mjs`), catálogo de stats de ítems y equipo por slot (`item-stats.test.mjs`), puntuador Subasta × Pawn (`subasta-pawn.test.mjs`), unificación de etiquetas de reino y presupuesto del histórico (`market-reino-unificado.test.mjs`), techos del parser Lua (`parser-limites.test.mjs`), preguntar-davi, referencias-skill, claves heredadas |
+| `tests/` (node) | `node scripts/test-node.mjs` | **417** pass, 0 fail | lógica de `desktop/src/` + motor: mercado v2/atómico/sync/migración, puente (`bridge*.test.mjs`), TSM, ROI, ruta/maxeo, guía, perfil, recetas propias, niveles de oficio, personaje SimC (`simc.test.mjs`), escala Pawn (`pawn.test.mjs`), catálogo de stats de ítems y equipo por slot (`item-stats.test.mjs`), puntuador Subasta × Pawn (`subasta-pawn.test.mjs`), unificación de etiquetas de reino y presupuesto del histórico (`market-reino-unificado.test.mjs`), techos del parser Lua (`parser-limites.test.mjs`), preguntar-davi, referencias-skill, claves heredadas |
 | `tests/` (python) | `python3 -m unittest discover -s tests` | **122** OK | datos (`test_datos`, catálogo reproducible), desktop (`test_desktop`), maxeo, ROI, skill (`consultar.py`), perfil (`test_perfil.py`, incluye instalación sintética del agente-half y CLI real con `data/`), reproducibilidad de `data/`+drops+bundle |
 | `addon/tests/` (lua) | `lua5.1 addon/tests/test_bridge.lua` | **180** checks, 0 fallos | diario del puente WoWForeverBridge (captura, poda, retención, epoch) + captura SimC de `Personaje.lua` (eventos, `/wfbp`, `personagemErro`, conservación del export bueno) + captura Pawn de `Pawn.lua` (escala por ClassID/SpecID, pesos, `equipo.ilvl`, `pawnErro`, `/wfbpawn`, wrapper `/wfbp pawn`, captura final en `PLAYER_LEAVING_WORLD`, silencio cuando Pawn ya desinicializó sus proveedores, reintento acotado del equipo) + cosecha del catálogo de stats (`idsDaFonte`, lote por frames, cursor/vuelta, poda) |
 | `desktop/test/` (navegador) | 17 suites, ver abajo | **597** checks, red 0, errores 0 | bundle real en Chromium headless con dobles del SDK |
@@ -37,7 +37,7 @@ byte-idéntico si no hay cambios en `desktop/src/`).
 Los defaults viven en `scripts/run-gates.mjs`. Si una rama incorpora tests nuevos
 antes de actualizarlos, se pueden sobreescribir temporalmente con
 `WOW_GATES_EXPECT_NODE`, `WOW_GATES_EXPECT_PY`, `WOW_GATES_EXPECT_LUA` y
-`WOW_GATES_EXPECT_CJS` (p. ej. `WOW_GATES_EXPECT_NODE=413 node scripts/run-gates.mjs`).
+`WOW_GATES_EXPECT_CJS` (p. ej. `WOW_GATES_EXPECT_NODE=417 node scripts/run-gates.mjs`).
 CI no los define: usa los defaults versionados.
 
 ### Suites navegador (597; 598 con `HERMES_SDK_TABS=1`)

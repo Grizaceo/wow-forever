@@ -54,7 +54,7 @@ CSV_FILES = ['UiMapAssignment.csv', 'UiMap.csv', 'AreaTable.csv', 'Map.csv', 'Lo
 TABLES = {'creature', 'creature_template', 'creature_loot_template', 'reference_loot_template',
           'gameobject', 'gameobject_template', 'gameobject_loot_template', 'item_template',
           'skinning_loot_template', 'pickpocketing_loot_template', 'world_safe_locs',
-          'game_graveyard_zone'}
+          'game_graveyard_zone', 'game_event', 'game_event_creature', 'game_event_gameobject'}
 
 RANKS = {0: 'normal', 1: 'elite', 2: 'rareelite', 3: 'boss', 4: 'rare'}
 LOCK_KIND = {1: 'chest', 2: 'herb', 3: 'ore', 19: 'fish'}
@@ -90,9 +90,23 @@ def build_public(src):
         return None
 
     # spawns -> (zoneKey -> count), respawn
+    # Spawns that only exist while a world event runs (AQ war effort, invasions,
+    # holidays): game_event_creature / game_event_gameobject with a positive
+    # event. A negative event despawns a normal spawn during the event, so those
+    # stay, and so do events that recur every day (occurence <= 1440 min, e.g.
+    # 'Nights': Leprithus and the Westfall ghouls spawn every night). Without
+    # this, AQ-invasion elites (e.g. Lesser Anubisath Warbringer in Thousand
+    # Needles) ranked as everyday farm camps.
+    daily = {r['entry'] for r in db['game_event'] if 0 < r['occurence'] <= 1440}
+    event_guids = {t: {r['guid'] for r in db['game_event_' + t] if r['event'] > 0 and r['event'] not in daily}
+                   for t in ('creature', 'gameobject')}
+
     def spawns_of(table):
         acc = collections.defaultdict(lambda: [collections.Counter(), []])
+        skip = event_guids[table]
         for r in db[table]:
+            if r['guid'] in skip:
+                continue
             zk = zone_key(r['map'], r['position_x'], r['position_y'])
             if zk is None:
                 continue
@@ -236,7 +250,9 @@ def build_public(src):
                       'farmableBy from FactionTemplate group masks (faction members excluded). Object spawn '
                       'counts are all known spawn points; pooled chests are not simultaneous. '
                       'Spawn counts/respawn are emulator values, not live population.',
-            'params': {'worldRefUsers': WORLD_REF_USERS, 'maxSources': MAX_SOURCES, 'minChancePct': MIN_CHANCE},
+            'params': {'worldRefUsers': WORLD_REF_USERS, 'maxSources': MAX_SOURCES, 'minChancePct': MIN_CHANCE,
+                       'eventSpawns': 'excluded (game_event_creature/game_event_gameobject, event > 0, '
+                                      'except events recurring daily)'},
             'files': files,
         },
         'fields': {
