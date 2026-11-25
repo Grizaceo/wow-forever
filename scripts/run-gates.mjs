@@ -41,7 +41,7 @@ function expected(name, fallback) {
   return Number.isInteger(n) && n >= 0 ? n : fallback;
 }
 const EXPECT_NODE = expected('NODE', 413);
-const EXPECT_PY = expected('PY', 122);
+const EXPECT_PY = expected('PY', 129);
 const EXPECT_LUA = expected('LUA', 180);
 // Tests unitarios del motor en standalone/tests/*.cjs (node:test). Los «real
 // fixture» son stat-only por defecto; WOW_FOREVER_REAL_FIXTURE=1 los hace leer
