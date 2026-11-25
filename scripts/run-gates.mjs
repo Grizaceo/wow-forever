@@ -40,13 +40,13 @@ function expected(name, fallback) {
   const n = Number(raw);
   return Number.isInteger(n) && n >= 0 ? n : fallback;
 }
-const EXPECT_NODE = expected('NODE', 413);
+const EXPECT_NODE = expected('NODE', 425);
 const EXPECT_PY = expected('PY', 129);
 const EXPECT_LUA = expected('LUA', 180);
 // Tests unitarios del motor en standalone/tests/*.cjs (node:test). Los «real
 // fixture» son stat-only por defecto; WOW_FOREVER_REAL_FIXTURE=1 los hace leer
 // contenido de SavedVariables (solo para diagnóstico manual, nunca en gates).
-const EXPECT_CJS = expected('CJS', 129);
+const EXPECT_CJS = expected('CJS', 133);
 const BROWSER = [
   ['navegador', process.env.HERMES_SDK_TABS === '1' ? 68 : 67], ['vista-clase', 23],
   ['mercado-auto', 14], ['mercado-procedencia', 24],
@@ -144,7 +144,8 @@ console.log(`raíz: ${ROOT}\n`);
   const r = sh('node', ['--test',
     'standalone/tests/market.cjs', 'standalone/tests/market-history.cjs',
     'standalone/tests/market-deals.cjs', 'standalone/tests/market-chart.cjs',
-    'standalone/tests/market-farm.cjs', 'standalone/tests/market-farm-routing.cjs']);
+    'standalone/tests/market-farm.cjs', 'standalone/tests/market-farm-routing.cjs',
+    'standalone/tests/farm-plan-real.cjs']);
   const pass = num(/(?:ℹ|#)\s+pass (\d+)/, r.out);
   const fail = num(/(?:ℹ|#)\s+fail (\d+)/, r.out);
   const ok = r.code === 0 && fail === 0 && pass === EXPECT_CJS;

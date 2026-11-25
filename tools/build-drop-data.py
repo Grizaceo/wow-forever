@@ -357,6 +357,7 @@ def build_public(src):
     keep = lambda rows: [r for r in rows if str(r[0]) in items]
     skin_out = {str(e): [x for r in keep(skin_loot[e]) for x in r] for e in out_m if e in skin_loot and keep(skin_loot[e])}
     camps = build_camps(cspawn, {e: mobs[e] for e in out_m}, loc)
+    item_stack = {iid: items_t[int(iid)]['stackable'] for iid in items if items_t[int(iid)]['stackable'] > 1}
 
     files = [{'path': CMANGOS_FILE, 'sha256': sha256(sql)}] + \
             [{'path': c, 'sha256': sha256(os.path.join(src, c))} for c in CSV_FILES]
@@ -397,6 +398,7 @@ def build_public(src):
                        'items[].sources index does not list for that mob. Full direct loot of a mob = its '
                        'items[].sources entries + mobLoot; everything else is in mobX.restVendor',
             'skinLoot': 'npcId -> flat [itemId, chanceBasisPoints, avgCount*10, ...] full skinning loot',
+            'itemStack': 'itemId -> stack size, only when > 1 (bag slots per farmed unit)',
             'camps': '[[zoneKey, mapX*10, mapY*10, nnYards, [[npcId, spawns], ...]], ...] spatial camps of '
                      'normal-rank spawns (single linkage <= campRadiusYards)',
         },
@@ -406,6 +408,7 @@ def build_public(src):
         'mobLoot': loot_out,
         'skinLoot': skin_out,
         'camps': camps,
+        'itemStack': item_stack,
         'objects': {str(k): objects[k] for k in sorted(used_o)},
         'items': items,
     }
