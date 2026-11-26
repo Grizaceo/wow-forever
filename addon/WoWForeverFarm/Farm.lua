@@ -26,7 +26,7 @@ local session            -- sesión abierta (db.current)
 local lootSources = {}   -- GUIDs del botín abierto (para atribuir el dinero)
 local lootMoneyBase = nil
 local lootHandled = false
-local lootLeft = {}      -- slot -> GUID de criatura aún sin recoger (LOOT_SLOT_CLEARED)
+local lootLeft = {}      -- slot -> GUIDs de criatura aún sin recoger (LOOT_SLOT_CLEARED)
 local merchantOpen = false
 local lastMoney = nil
 local fightUntil = 0     -- fin de la última pelea + 3 s (para «X muere.»)
@@ -238,25 +238,50 @@ for _, ev in ipairs(EVENTS) do
   registered[ev] = pcall(frame.RegisterEvent, frame, ev) and true or false
 end
 
+-- ¿La fuente del botín es una unidad viva que tienes delante? Entonces es un robo
+-- (Rogue), no un cadáver.
+local function aliveSource(guid)
+  for _, u in ipairs({ 'target', 'mouseover', 'focus' }) do
+    if plain(safe(UnitGUID, u)) == guid and plain(safe(UnitExists, u)) and not plain(safe(UnitIsDead, u)) then
+      return true
+    end
+  end
+  return false
+end
+
 local function readLoot()
   if lootHandled or not running() then return end
   lootHandled = true
   local n = plain(safe(GetNumLootItems)) or 0
-  local slots, sources, distinct = {}, {}, 0
+  local slots, sources, distinct, alive = {}, {}, 0, false
   lootLeft = {}
   for i = 1, n do
     local slotType = plain(safe(GetLootSlotType, i))
     local _, _, qty = safe(GetLootSlotInfo, i)
     qty = plain(qty)
-    local link = plain(safe(GetLootSlotLink, i))
-    local guid = plain((safe(GetLootSourceInfo, i)))   -- guid1, qty1, guid2, qty2...
-    if guid and not sources[guid] then sources[guid] = true; distinct = distinct + 1 end
-    if guid and L.parseGUID(guid) == 'creature' then lootLeft[i] = guid end
-    if slotType ~= 2 then  -- 2 = dinero (LOOT_SLOT_MONEY)
-      slots[#slots + 1] = { guid = guid, itemId = L.itemId(link), qty = type(qty) == 'number' and qty or 1 }
-    elseif guid then
-      slots[#slots + 1] = { guid = guid }
+    qty = type(qty) == 'number' and qty or 1
+    local itemId = slotType ~= 2 and L.itemId(plain(safe(GetLootSlotLink, i))) or nil   -- 2 = dinero
+    -- Botín de área: un slot puede juntar varios cadáveres (guid1, qty1, guid2, qty2…).
+    local src, from = pack(safe(GetLootSourceInfo, i)), {}
+    for k = 1, src.n, 2 do
+      local g, q = plain(src[k]), plain(src[k + 1])
+      if type(g) == 'string' then from[#from + 1] = { g = g, q = type(q) == 'number' and q or nil } end
     end
+    local left = {}
+    for _, f in ipairs(from) do
+      if not sources[f.g] then sources[f.g] = true; distinct = distinct + 1 end
+      if L.parseGUID(f.g) == 'creature' then
+        left[#left + 1] = f.g
+        if aliveSource(f.g) then alive = true end
+      end
+      if slotType ~= 2 then
+        slots[#slots + 1] = { guid = f.g, itemId = itemId, qty = (#from > 1 and f.q) or qty }
+      else
+        slots[#slots + 1] = { guid = f.g }
+      end
+    end
+    if #from == 0 and slotType ~= 2 then slots[#slots + 1] = { itemId = itemId, qty = qty } end
+    if #left > 0 then lootLeft[i] = left end
   end
   L.mark(session, 'loot', n > 0)
   -- IsFishingLoot existe en Classic; si Forever no la expone, la pesca queda
@@ -265,6 +290,11 @@ local function readLoot()
   if fishing then
     L.mark(session, 'pesca', true)
     L.fishLoot(session, slots, now())
+  elseif alive then
+    -- Robo: el mob sigue vivo. Ni cadáver ni muestra de monedas.
+    L.mark(session, 'robo', true)
+    L.pickpocket(session, slots, now())
+    lootLeft, sources, distinct = {}, {}, 0
   else
     L.loot(session, slots, nil, now())
   end
@@ -341,7 +371,7 @@ frame:SetScript('OnEvent', function(_, event, ...)
     -- Sin LOOT_SLOT_CLEARED no se sabe qué quedó: se asume todo recogido.
     if registered.LOOT_SLOT_CLEARED and lootHandled then
       local left = {}
-      for _, g in pairs(lootLeft) do left[g] = true end
+      for _, gs in pairs(lootLeft) do for _, g in ipairs(gs) do left[g] = true end end
       if next(left) then L.lootLeft(session, left) end
     end
     lootHandled, lootMoneyBase, lootSources, lootLeft = false, nil, {}, {}

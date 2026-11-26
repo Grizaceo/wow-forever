@@ -47,7 +47,7 @@ function conteo2(o) {
 // Forever). «Directos» = ven también a los mobs que no sueltan nada.
 const METODOS = ['party', 'died', 'xp', 'slain', 'dies', 'target', 'loot', 'cleu']
 const DIRECTOS = ['party', 'died', 'xp', 'slain', 'dies', 'target', 'cleu']
-const LECTURAS = [...METODOS, 'position', 'auctionator', 'ammo', 'bags', 'lootchat', 'secretos', 'pesca']
+const LECTURAS = [...METODOS, 'position', 'auctionator', 'ammo', 'bags', 'lootchat', 'secretos', 'pesca', 'robo']
 const texto = (s, max = 40) => (typeof s === 'string' && s.length <= max && !/[\x00-\x1f]/.test(s) ? s : null)
 
 export function normalizarSesion(s) {

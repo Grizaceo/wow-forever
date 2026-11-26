@@ -41,7 +41,11 @@ const CONC_SHARE = 0.8;  // aviso «depende de un solo ítem» (describe)
 const PARAMS = Object.freeze({ kappa: 0.05, windowDays: 14, maxUp: 2, maxDown: 15, minCampShare: 0.8 });
 
 let D = null, IDX = null;
-function configure(o) { if (o && o.HunterDropData) { D = o.HunterDropData; IDX = null; } return api; }
+function configure(o) {
+  // Otro dataset: fuera también los campamentos y el índice por ítem del anterior.
+  if (o && o.HunterDropData) { D = o.HunterDropData; IDX = null; FARMS_KEY = null; FARMS = null; IIDX_KEY = null; IIDX = null; }
+  return api;
+}
 const today = () => Math.floor((Date.now() - EPOCH) / DAY_MS);
 const isInt = Number.isSafeInteger;
 

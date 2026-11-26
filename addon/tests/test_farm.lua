@@ -371,7 +371,11 @@ _G.GetNumLootItems = function() return #lootWin end
 _G.GetLootSlotType = function(i) return lootWin[i].money and 2 or 1 end
 _G.GetLootSlotInfo = function(i) return 'tex', 'name', lootWin[i].qty or 1 end
 _G.GetLootSlotLink = function(i) return lootWin[i].itemId and ('|Hitem:' .. lootWin[i].itemId .. ':|h') or nil end
-_G.GetLootSourceInfo = function(i) return lootWin[i].guid, 1 end
+_G.GetLootSourceInfo = function(i)
+  local w = lootWin[i]
+  if w.sources then return unpack(w.sources) end   -- botín de área: guid1, qty1, guid2, qty2…
+  return w.guid, 1
+end
 -- Sin C_Map, sin munición, sin C_Container: el pegamento debe degradarse sin romper.
 dofile('addon/WoWForeverFarm/Farm.lua')
 local ev = frames[1].scripts.OnEvent
@@ -418,8 +422,21 @@ eq(cur.items[4127][2318], 1, 'lo que quedaba se cuenta una vez')
 lootWin = { { guid = 'Creature-0-1-1-1-4127-K2', itemId = 4304, qty = 1 } }
 ev(nil, 'LOOT_READY'); ev(nil, 'LOOT_SLOT_CLEARED', 1); ev(nil, 'LOOT_CLOSED')
 eq(cur.skins[4127], 1, 'vacío el cadáver, la ventana siguiente es desuello')
+-- botín de área: un slot junta dos cadáveres (tela y monedas)
+local A1, B1 = 'Creature-0-1-1-1-4127-A1', 'Creature-0-1-1-1-4127-B1'
+lootWin = { { sources = { A1, 1, B1, 2 }, itemId = 2589, qty = 3 }, { sources = { A1, 0, B1, 0 }, money = true } }
+ev(nil, 'LOOT_READY'); money = 10225; ev(nil, 'PLAYER_MONEY')
+ev(nil, 'LOOT_SLOT_CLEARED', 1); ev(nil, 'LOOT_SLOT_CLEARED', 2); ev(nil, 'LOOT_CLOSED')
+eq(cur.corpses[4127], 4, 'botín de área: los dos cadáveres del slot compartido')
+eq(cur.items[4127][2589], 3, 'la tela se reparte por cadáver (1 + 2)')
+eq(cur.coinsBy[4127], 125, 'monedas de dos cadáveres no se atribuyen')
+eq(cur.coinCorpses[4127], 2, 'ni son muestra de monedas')
+lootWin = { { guid = B1, itemId = 4304, qty = 1 } }
+ev(nil, 'LOOT_READY'); ev(nil, 'LOOT_SLOT_CLEARED', 1); ev(nil, 'LOOT_CLOSED')
+eq(cur.skins[4127], 2, 'el segundo cadáver del slot compartido ya estaba saqueado: esto es desuello')
+eq(cur.corpses[4127], 4, 'y no otro cadáver')
 SlashCmdList['WOWFOREVERFARM']('status')
-ok(string.find(chatLog[#chatLog], ', 1 desuellos', 1, true) ~= nil, 'status: 1 desuello (sin contar la clave interna) ' .. chatLog[#chatLog])
+ok(string.find(chatLog[#chatLog], ', 2 desuellos', 1, true) ~= nil, 'status: 2 desuellos (sin contar la clave interna) ' .. chatLog[#chatLog])
 nowValue = 5033
 eq(cur.combat, 20, 'la pelea previa al saqueo cuenta')
 eq(cur.travel, 10, 'viaje antes de la pelea')
@@ -463,11 +480,26 @@ upd(nil, 1.2)
 ok(string.find(win.title.text, 'en curso') ~= nil, 'ventana: en curso')
 ok(string.find(win.rows[1].name.text, '1× ', 1, true) ~= nil, 'ventana: fila de botín ' .. tostring(win.rows[1].name.text))
 ok(string.find(win.lootTitle.text, 'Botín') ~= nil, 'ventana: título del botín')
-ev(nil, 'MERCHANT_SHOW'); money = 12125; ev(nil, 'PLAYER_MONEY'); ev(nil, 'MERCHANT_CLOSED')
+ev(nil, 'MERCHANT_SHOW'); money = 12225; ev(nil, 'PLAYER_MONEY'); ev(nil, 'MERCHANT_CLOSED')
 eq(cur.money.merchant, 2000, 'venta al vendedor')
 nowValue = 5070; ev(nil, 'PLAYER_DEAD')
 nowValue = 5100; ev(nil, 'PLAYER_UNGHOST')
 eq(cur.deadTime, 30, 'tiempo muerto hasta revivir')
+-- robo (Rogue): ventana de botín de un mob vivo; matarlo y saquearlo después es su cadáver
+target = { guid = 'Creature-0-1-1-1-3100-PP', name = 'Defias Pillager', threat = 1 }
+lootWin = { { guid = 'Creature-0-1-1-1-3100-PP', itemId = 5374, qty = 1 } }
+ev(nil, 'LOOT_READY'); ev(nil, 'LOOT_SLOT_CLEARED', 1); ev(nil, 'LOOT_CLOSED')
+eq(cur.pickpockets, 1, 'un robo')
+eq(cur.corpses[3100], nil, 'robar no es saquear un cadáver')
+eq(cur.kills[3100], nil, 'ni una muerte')
+eq(cur.other[5374], 1, 'lo robado va sin origen')
+ok(cur.methods.robo == true, 'anota que vio un robo')
+target.dead = true
+lootWin = { { guid = 'Creature-0-1-1-1-3100-PP', itemId = 2589, qty = 1 } }
+ev(nil, 'LOOT_READY'); ev(nil, 'LOOT_SLOT_CLEARED', 1); ev(nil, 'LOOT_CLOSED')
+eq(cur.corpses[3100], 1, 'después de matarlo, su botín es el cadáver')
+eq(cur.skins[3100], nil, 'no un desuello')
+target = nil
 SlashCmdList['WOWFOREVERFARM']('pause'); eq(cur.state, 'paused', '/wff pause')
 nowValue = 5150; SlashCmdList['WOWFOREVERFARM']('resume'); eq(cur.state, 'running', '/wff resume')
 target = { guid = SECRET, name = SECRET }

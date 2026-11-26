@@ -32,6 +32,8 @@ entradas al juego: lo juegas tú.
   contigo en la sesión: los que mataron guardias u otros, o los de antes de Iniciar, no.
 - **Desuello:** es la ventana que se abre en un cadáver ya vaciado. Si cierras un
   saqueo dejando algo (bolsas llenas) y lo reabres, no cuenta como desuello.
+- **Robo (Rogue):** la ventana de botín de un mob vivo es un robo: lo robado cuenta
+  como botín, pero no como cadáver ni muerte.
 
 ## Checklist (10 minutos)
 

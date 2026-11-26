@@ -24,6 +24,7 @@
 --   money  = { loot=c, merchant=c, other=c }, coinsBy = { [npcId] = c }
 --   coinCorpses = { [npcId] = n }       cadáveres saqueados solos en su ventana: los
 --            únicos cuyas monedas se pueden atribuir (coinsBy sale de ellos)
+--   pickpockets = n                     robos (Rogue): lo robado va a `other`
 --   zones  = { [uiMapId] = segundos }, path = "mapa:x,y;..." (cada 30 s, acotado)
 --   ammo   = { start=n, stop=n }, bags = { start=libres, stop=libres }
 --   methods= { [método o lectura] = bool }
@@ -169,7 +170,7 @@ function Logic.newSession(now, info, opts)
     deadGuids = {}, lootedGuids = {}, recent = {}, noGuid = {},
     corpses = {}, items = {}, skins = {}, skinItems = {}, gather = {}, gatherItems = {}, other = {}, got = {},
     fishing = 0, fishItems = {},
-    money = { loot = 0, merchant = 0, other = 0 }, coinsBy = {}, coinCorpses = {},
+    money = { loot = 0, merchant = 0, other = 0 }, coinsBy = {}, coinCorpses = {}, pickpockets = 0,
     zones = {}, path = '', pathN = 0, lastPath = nil, lastZoneAt = nil,
     ammo = {}, bags = {}, methods = {},
   }
@@ -191,6 +192,7 @@ local function upgrade(s)
   s.fishing = s.fishing or 0
   s.fishItems = s.fishItems or {}
   s.coinCorpses = s.coinCorpses or {}
+  s.pickpockets = s.pickpockets or 0
 end
 Logic.upgrade = upgrade
 
@@ -457,6 +459,18 @@ function Logic.loot(s, slots, singleSourceMoney, now)
     count(s.coinsBy, singleSourceMoney.npcId, singleSourceMoney.copper)
   end
   return nsrc
+end
+
+-- Robo (Rogue): ventana de botín de un mob que sigue vivo. Lo robado cuenta como
+-- botín sin origen: no es cadáver, ni muerte, ni desuello, ni muestra de monedas.
+function Logic.pickpocket(s, slots, now)
+  if not s or s.state ~= 'running' or type(slots) ~= 'table' then return false end
+  upgrade(s)
+  s.pickpockets = s.pickpockets + 1
+  for _, sl in ipairs(slots) do
+    if sl.itemId then count(s.other, sl.itemId, sl.qty or 1) end
+  end
+  return true
 end
 
 -- La ventana se cerró con slots sin recoger de estos GUIDs: el cadáver (o el

@@ -120,7 +120,7 @@ Eventos (solo API pública; todo protegido con `pcall` y detección de funciones
 | Mide | Fuente |
 |---|---|
 | Combate | `PLAYER_REGEN_DISABLED/ENABLED` |
-| Saqueo, botín y origen | `LOOT_READY`/`LOOT_OPENED`/`LOOT_CLOSED`, `GetLootSlotInfo/Link/Type`, `GetLootSourceInfo` (GUID → npcId/objeto); `LOOT_SLOT_CLEARED` para saber si un cadáver quedó con botín |
+| Saqueo, botín y origen | `LOOT_READY`/`LOOT_OPENED`/`LOOT_CLOSED`, `GetLootSlotInfo/Link/Type`, `GetLootSourceInfo` (todos los GUID de cada slot, con su cantidad: el botín de área junta cadáveres → npcId/objeto); `LOOT_SLOT_CLEARED` para saber si un cadáver quedó con botín; la ventana de un mob vivo (objetivo, mouseover o foco) es un robo de Rogue y va sin origen |
 | Desuello / recolección | segundo saqueo del mismo GUID de criatura, una vez vaciado el cadáver (reabrir uno que quedó con botín no cuenta, y nada después del desuello) / GUID de objeto |
 | Muertes | `PARTY_KILL` (GUID o, si es secreto, muerte sin mob), `UNIT_DIED` de un mob que peleaba contigo (amenaza), `CHAT_MSG_COMBAT_XP_GAIN` y `CHAT_MSG_COMBAT_HOSTILE_DEATH` («Has matado X», nombre), cadáver visto (objetivo, mouseover, placas; no ajeno; solo cuenta si ese mob peleó contigo en la sesión, si no solo nombra una muerte ya contada) y saqueado; `killBy` = método que la vio primero, `signals` = todos los avisos |
 | Botín recibido | `CHAT_MSG_LOOT` con `LOOT_ITEM_SELF(_MULTIPLE)` en el idioma del cliente (`got`); si no llega, lo de las ventanas de botín |

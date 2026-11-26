@@ -17664,6 +17664,10 @@ var require_farm_plan = __commonJS({
       if (o && o.HunterDropData) {
         D2 = o.HunterDropData;
         IDX = null;
+        FARMS_KEY = null;
+        FARMS = null;
+        IIDX_KEY = null;
+        IIDX = null;
       }
       return api;
     }
@@ -76981,7 +76985,7 @@ function oroEntero(v) {
 function contextoFarmeo({ perfil, settings, items, ventas = null, estilo = null, observados: observados2 = null, marketKey = "" }) {
   const market = FarmPlan.marketModel(items || []);
   const kappa = TOPES[settings?.tope] ?? TOPES.k5;
-  const caps = FarmPlan.sellCaps(market, ventas, { kappa });
+  const caps = FarmPlan.sellCaps(market, settings?.tope === "libre" ? null : ventas, { kappa });
   const base = estilo && settings?.miEstilo !== false && estilo.source === "sesiones" ? estilo : { ...FarmPlan.STYLE_DEFAULT };
   const style = { ...base, ...settings?.montura ? { speed: 14 } : {} };
   const observed = settings?.miEstilo !== false && observados2?.sesiones ? observados2 : null;
@@ -83170,7 +83174,7 @@ function conteo2(o) {
 }
 var METODOS = ["party", "died", "xp", "slain", "dies", "target", "loot", "cleu"];
 var DIRECTOS = ["party", "died", "xp", "slain", "dies", "target", "cleu"];
-var LECTURAS = [...METODOS, "position", "auctionator", "ammo", "bags", "lootchat", "secretos", "pesca"];
+var LECTURAS = [...METODOS, "position", "auctionator", "ammo", "bags", "lootchat", "secretos", "pesca", "robo"];
 var texto2 = (s, max = 40) => typeof s === "string" && s.length <= max && !/[\x00-\x1f]/.test(s) ? s : null;
 function normalizarSesion(s) {
   if (!s || typeof s !== "object" || s.v !== 1 || !int2(s.start, 1)) return null;

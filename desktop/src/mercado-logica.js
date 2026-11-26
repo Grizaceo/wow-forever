@@ -499,7 +499,8 @@ function oroEntero(v) {
 export function contextoFarmeo({ perfil, settings, items, ventas = null, estilo = null, observados = null, marketKey = '' }) {
   const market = FarmPlan.marketModel(items || [])
   const kappa = TOPES[settings?.tope] ?? TOPES.k5
-  const caps = FarmPlan.sellCaps(market, ventas, { kappa })
+  // «Sin tope (optimista)» quita también el tope por tus ventas TSM.
+  const caps = FarmPlan.sellCaps(market, settings?.tope === 'libre' ? null : ventas, { kappa })
   const base = estilo && settings?.miEstilo !== false && estilo.source === 'sesiones' ? estilo : { ...FarmPlan.STYLE_DEFAULT }
   const style = { ...base, ...(settings?.montura ? { speed: 14 } : {}) }
   const observed = settings?.miEstilo !== false && observados?.sesiones ? observados : null

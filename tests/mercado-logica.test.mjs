@@ -240,4 +240,8 @@ test('contextoFarmeo: un tope nuevo por ventas propias cambia la clave de caché
   const otra = contextoFarmeo({ ...base, ventas: new Map([[4304, { units: 60, events: 8, perDay: 6 }]]) })
   assert.notEqual(con.cacheKey, otra.cacheKey)
   assert.equal(contextoFarmeo({ ...base, ventas: new Map([[4304, { units: 30, events: 4, perDay: 3 }]]) }).cacheKey, con.cacheKey, 'mismas ventas, misma clave')
+  // «Sin tope (optimista)»: tampoco topa lo que ya vendiste por TSM.
+  const libre = contextoFarmeo({ ...base, settings: ajustesFarm(null, { tope: 'libre' }), ventas: new Map([[4304, { units: 30, events: 4, perDay: 3 }]]) })
+  assert.equal(libre.caps.get(4304).basis, 'kappa-ofertas')
+  assert.ok(libre.caps.get(4304).units > 1e6)
 })
