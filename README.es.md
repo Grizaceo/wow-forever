@@ -9,6 +9,10 @@ facción, con una skill para que tu agente responda con los mismos datos.
 
 ## Estado
 
+- Versión 2.2.1: los datos de botín ya no incluyen los spawns de eventos del mundo (guerra
+  de Ahn'Qiraj, invasiones, festividades, Feria de la Luna Negra y Fishing Extravaganza). El
+  ranking de farmeo ya no cuenta como permanentes a los mobs que solo aparecen durante un
+  evento.
 - Versión 2.2.0: resumen descriptivo de ventas propias TSM, con límites de evidencia y sin
   comparación implícita con Auctionator. Probado con fixtures sintéticas, no validado con
   una cuenta real. Interfaz en inglés por defecto, con español opcional.
