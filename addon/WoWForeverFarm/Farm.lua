@@ -594,7 +594,7 @@ SlashCmdList['WOWFOREVERFARM'] = function(msg)
   elseif cmd == 'status' then
     local sm = session and L.summary(session, t, price)
     local skins = 0
-    for _, n in pairs(session and session.skins or {}) do skins = skins + n end
+    for k, n in pairs(session and session.skins or {}) do if k ~= '__n' then skins = skins + n end end
     chat(string.format('%d sesiones guardadas; %s.', #db.sessions,
       sm and ('abierta: ' .. L.clock(sm.active) .. ', ' .. sm.kills .. ' muertes, ' .. skins .. ' desuellos') or 'ninguna abierta')
       .. ' Avisos de muerte: ' .. signalsText(session) .. '.')

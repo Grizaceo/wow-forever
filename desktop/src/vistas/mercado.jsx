@@ -676,7 +676,9 @@ export function VistaMercado({ ctx, almacen, sincronizador, ventas, puente, farm
   const leerFarm = useCallback(() => farmSync.read(), [farmSync])
   const estiloFarm = useMemo(() => perfilJugador(sesionesFarm, D.dropData, { nivel }), [sesionesFarm, nivel])
   const observadosFarm = useMemo(() => observados(sesionesFarm), [sesionesFarm])
-  const ventasFarm = useMemo(() => ventasPorDia(tsmSnapshot), [tsmSnapshot])
+  // Tope por ventas propias: solo las del reino que miras (nunca se suman reinos).
+  const reinoVentas = realm?.name ?? realmName
+  const ventasFarm = useMemo(() => ventasPorDia(tsmSnapshot, { reino: reinoVentas }), [tsmSnapshot, reinoVentas])
   // Contexto del motor v2: lo comparten la columna, el detalle y el plan.
   const planCtx = useMemo(() => contextoFarmeo({
     perfil, settings, items, ventas: ventasFarm, estilo: estiloFarm, observados: observadosFarm,

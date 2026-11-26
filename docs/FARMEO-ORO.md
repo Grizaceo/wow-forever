@@ -78,9 +78,12 @@ por defecto declarados; la calibración por sesiones los reemplaza.
 ```
 V        = monedas + Σ_i p_i · n̄_i · valor_i     (directo + compartido + desuello)
 valor_i  = max(vendedor_i, 0,95 · precio_i)       precio_i = mediana de mínimos diarios (ventana)
-tope C_i = ventas propias TSM/día si hay historial; si no κ · ofertas (κ = 5 %); ≤ 5 ofertas → vendedor
+tope C_i = ventas propias TSM/día del reino que miras si hay historial; si no κ · ofertas (κ = 5 %); ≤ 5 ofertas → vendedor
 ```
 Las unidades sobre el tope se valoran a precio de vendedor (ingreso cóncavo).
+Las ventas de distintos reinos nunca se suman: se usa el reino TSM con el nombre del
+mercado (sin el sufijo de facción); si ninguno coincide, el único reino con ventas; si
+hay varios y ninguno coincide, el tope sale de las ofertas.
 
 ### Planificador de sesión
 `oro(plan) = Σ_c muertes_c·(monedas_c − munición_c) + Σ_i [min(U_i,C_i)·subasta_i + resto·vendedor_i]`,

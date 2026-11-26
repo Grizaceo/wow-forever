@@ -351,6 +351,11 @@ function Logic.killSignal(s, now, sig)
   prune(s, now)
   if guid and s.deadGuids[guid] then return false end
   if guid and (s.deadN or 0) >= Logic.MAX_DEAD then return false end
+  -- Un cadáver que solo miraste (objetivo, mouseover) y que no peleó contigo en
+  -- la sesión: muerto antes de /wff start, o por guardias o PNJ. No cuenta, no
+  -- arranca el reloj y no se pega a otra muerte (reciente o sin GUID): esas las
+  -- nombra el cadáver que de verdad saquees o que peleó contigo.
+  if how == 'target' and sig.fought == false then return false end
 
   -- ¿Otro aviso de una muerte recién contada? Se le suma lo que este sabe.
   local e = sameDeath(s, now, how, guid, npc, name)
@@ -385,10 +390,6 @@ function Logic.killSignal(s, now, sig)
       count(s.kills, npc, 1)
       return false
     end
-    -- Un cadáver que solo miraste (objetivo, mouseover) y que no peleó contigo
-    -- en la sesión: muerto antes de /wff start, o por guardias o PNJ. Sirve para
-    -- nombrar una muerte ya contada, no para contar una nueva ni arrancar el reloj.
-    if how == 'target' and sig.fought == false then return false end
   end
   return newKill(s, now, how, guid, npc, name)
 end

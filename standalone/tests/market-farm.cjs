@@ -440,4 +440,8 @@ test('recolección: con tu skill, los nodos que piden más no cuentan; sin skill
   assert.ok(bajo.gph < alto.gph, 'sin el nodo caro rinde menos');
   assert.equal(sin.gph, alto.gph);
   assert.equal(zona({ skill: { herb: 'x' } }).gph, sin.gph, 'un skill inválido se ignora');
+  // ≤5 ofertas: la recolección tampoco valora la Flor a subasta (queda a vendedor).
+  const delgado = [sc[0], { itemId: 511, unitPriceCopper: 5000, observedDay: 0, history: [{ day: 0, low: 5000, high: 5000, available: 2 }] }];
+  const zd = F.profRecommendations(delgado, prof, { prof: { herb: true }, campMode: 'single' })[0]?.zones[0];
+  assert.ok(zd.gph < sin.gph, 'el mercado delgado no se valora a subasta en la recolección');
 });

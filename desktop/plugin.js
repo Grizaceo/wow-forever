@@ -16834,7 +16834,7 @@ ah", chance: s[2] / 100, avgCount: (s[3] + s[4]) / 2, objKind: o[1], origin: "cm
             if (sell <= 0) continue;
             if (!(isObj && mySkill != null) && (dd?.[6] || 0) > level + 10) continue;
             const it = sess.scan.get(iid), rp = it ? refPrice(it) : null;
-            const ah = rp && rp.price > 0 ? Math.floor(rp.price * (1 - AH_CUT)) : 0;
+            const ah = rp ? rp.ahNet : 0;
             const unit = Math.max(ah, sell);
             if (unit <= 0) continue;
             for (const s of normSources(iid)) {
@@ -18077,9 +18077,13 @@ var require_farm_plan = __commonJS({
         a.sort((x, y) => y.gph - x.gph);
         a.length = Math.min(a.length, 3);
       }
+      const memo = /* @__PURE__ */ new Map();
       const res = { get(iid) {
-        const a = out.get(Number(iid));
-        return a ? a.map((x) => ({ ...describe(x.f, c2), itemShare: x.itemShare, itemPerHour: x.itemPerHour })) : [];
+        const k = Number(iid);
+        if (memo.has(k)) return memo.get(k);
+        const a = out.get(k), r = a ? a.map((x) => ({ ...describe(x.f, c2), itemShare: x.itemShare, itemPerHour: x.itemPerHour })) : [];
+        memo.set(k, r);
+        return r;
       }, size: out.size };
       if (key) {
         IIDX_KEY = key;
@@ -83235,9 +83239,9 @@ function parseFarm(bytes) {
   for (const s of lista(db.sessions)) {
     const n = normalizarSesion(s);
     if (n && n.stop) sessions.push(n);
-    if (sessions.length > MAX_SESIONES) break;
   }
   sessions.sort((a, b) => a.start - b.start);
+  if (sessions.length > MAX_SESIONES) sessions.splice(0, sessions.length - MAX_SESIONES);
   const current = normalizarSesion(db.current);
   return { sessions, current: current && current.open ? current : null };
 }
@@ -83424,10 +83428,14 @@ function observados(sesiones) {
   const key = usadas ? `obs:${(sesiones || []).filter(aptaObs).map((s) => s.id).join(",")}` : null;
   return { mobs, sesiones: usadas, key };
 }
-function ventasPorDia(tsmSnapshot, { ahora = Date.now(), dias = 30 } = {}) {
+var reinoBase = (n) => String(n ?? "").toLowerCase().replace(/\s*-?\s*(horde|alliance|horda|alianza)\s*$/, "").replace(/\s+/g, " ").trim();
+function ventasPorDia(tsmSnapshot, { ahora = Date.now(), dias = 30, reino = null } = {}) {
   const out = /* @__PURE__ */ new Map(), desde = ahora / 1e3 - dias * 86400;
+  const conVentas = (tsmSnapshot?.realms || []).filter((realm) => (realm?.records || []).some((r) => r.kind === "sale" && r.source === "Auction" && r.time >= desde));
+  const base = reino == null ? null : reinoBase(reino);
+  const elegido = base && conVentas.find((realm) => reinoBase(realm.name) === base) || (conVentas.length === 1 ? conVentas[0] : null);
   let primera = Infinity;
-  for (const realm of tsmSnapshot?.realms || []) {
+  for (const realm of elegido ? [elegido] : []) {
     for (const r of realm.records || []) {
       if (r.kind !== "sale" || r.source !== "Auction" || r.time < desde) continue;
       primera = Math.min(primera, r.time);
@@ -85492,7 +85500,8 @@ function VistaMercado({ ctx, almacen, sincronizador, ventas, puente, farmeo, est
   const leerFarm = useCallback(() => farmSync.read(), [farmSync]);
   const estiloFarm = useMemo19(() => perfilJugador(sesionesFarm, D.dropData, { nivel }), [sesionesFarm, nivel]);
   const observadosFarm = useMemo19(() => observados(sesionesFarm), [sesionesFarm]);
-  const ventasFarm = useMemo19(() => ventasPorDia(tsmSnapshot), [tsmSnapshot]);
+  const reinoVentas = realm?.name ?? realmName;
+  const ventasFarm = useMemo19(() => ventasPorDia(tsmSnapshot, { reino: reinoVentas }), [tsmSnapshot, reinoVentas]);
   const planCtx = useMemo19(() => contextoFarmeo({
     perfil,
     settings,

@@ -176,6 +176,27 @@ test('ventasPorDia: ventas de subasta en la ventana, por día', () => {
   assert.equal(v.has(7069), false, 'fuera de la ventana')
 })
 
+test('parseFarm: con más de MAX_SESIONES guarda las más recientes', () => {
+  const una = (i) => `{ ["v"] = 1, ["start"] = ${1795000000 + i * 3600}, ["stop"] = ${1795000000 + i * 3600 + 600}, ["active"] = 600, },`
+  const sv = `WoWForeverFarmDB = { ["version"] = 1, ["sessions"] = { ${Array.from({ length: 502 }, (_, i) => una(i)).join('\n')} }, }`
+  const { sessions } = parseFarm(lua(sv))
+  assert.equal(sessions.length, 500)
+  assert.equal(sessions[0].start, 1795000000 + 2 * 3600, 'fuera las dos más antiguas')
+  assert.equal(sessions.at(-1).start, 1795000000 + 501 * 3600)
+})
+
+test('ventasPorDia: nunca suma reinos; usa el del mercado que miras', () => {
+  const now = 1795600000 * 1000, t = 1795600000 - 86400
+  const venta = (q) => ({ kind: 'sale', source: 'Auction', itemId: 4306, quantity: q, time: t })
+  const dos = { realms: [{ name: 'PvP - Horde', records: [venta(40)] }, { name: 'Otro - Horde', records: [venta(2)] }, { name: 'Vacío', records: [] }] }
+  assert.equal(ventasPorDia(dos, { ahora: now, reino: 'PvP Horde' }).get(4306).units, 40, 'mismo reino sin el sufijo de facción')
+  assert.equal(ventasPorDia(dos, { ahora: now, reino: 'otro' }).get(4306).units, 2)
+  assert.equal(ventasPorDia(dos, { ahora: now, reino: 'Tercero' }).size, 0, 'varios con ventas y ninguno coincide: sin tope propio')
+  assert.equal(ventasPorDia(dos, { ahora: now }).size, 0, 'sin reino tampoco se suman')
+  const uno = { realms: [{ name: 'PvP - Horde', records: [venta(40)] }, { name: 'Vacío', records: [] }] }
+  assert.equal(ventasPorDia(uno, { ahora: now, reino: 'Tercero' }).get(4306).units, 40, 'un solo reino con ventas: ese')
+})
+
 test('exportAgente: agregados en oro, sin nombres ni ruta', () => {
   const s = parseFarm(lua(SV)).sessions[0]
   const m = metricasSesion(s, null, DATASET)

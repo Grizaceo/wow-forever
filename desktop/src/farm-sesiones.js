@@ -107,9 +107,10 @@ export function parseFarm(bytes) {
   for (const s of lista(db.sessions)) {
     const n = normalizarSesion(s)
     if (n && n.stop) sessions.push(n)
-    if (sessions.length > MAX_SESIONES) break
   }
+  // Las MAX_SESIONES más recientes (el archivo ya está acotado a 4 MiB).
   sessions.sort((a, b) => a.start - b.start)
+  if (sessions.length > MAX_SESIONES) sessions.splice(0, sessions.length - MAX_SESIONES)
   const current = normalizarSesion(db.current)
   return { sessions, current: current && current.open ? current : null }
 }
@@ -281,10 +282,20 @@ export function observados(sesiones) {
 
 /* --------------------------------------------------- ventas propias (TSM) */
 // Unidades vendidas por día en subasta por ítem (ventana `dias`), para el tope.
-export function ventasPorDia(tsmSnapshot, { ahora = Date.now(), dias = 30 } = {}) {
+// Nunca suma reinos: el tope de un mercado sale de las ventas de ese reino.
+// `reino` = nombre del reino del mercado que miras. Se usa el reino TSM con el
+// mismo nombre (sin mayúsculas ni sufijo de facción); si ninguno coincide y solo
+// un reino tiene ventas, ese; si varios tienen ventas y ninguno coincide, ninguno
+// (el motor usa entonces el tope por ofertas).
+const reinoBase = (n) => String(n ?? '').toLowerCase().replace(/\s*-?\s*(horde|alliance|horda|alianza)\s*$/, '').replace(/\s+/g, ' ').trim()
+export function ventasPorDia(tsmSnapshot, { ahora = Date.now(), dias = 30, reino = null } = {}) {
   const out = new Map(), desde = ahora / 1000 - dias * 86400
+  const conVentas = (tsmSnapshot?.realms || []).filter((realm) =>
+    (realm?.records || []).some((r) => r.kind === 'sale' && r.source === 'Auction' && r.time >= desde))
+  const base = reino == null ? null : reinoBase(reino)
+  const elegido = (base && conVentas.find((realm) => reinoBase(realm.name) === base)) || (conVentas.length === 1 ? conVentas[0] : null)
   let primera = Infinity
-  for (const realm of tsmSnapshot?.realms || []) {
+  for (const realm of elegido ? [elegido] : []) {
     for (const r of realm.records || []) {
       if (r.kind !== 'sale' || r.source !== 'Auction' || r.time < desde) continue
       primera = Math.min(primera, r.time)

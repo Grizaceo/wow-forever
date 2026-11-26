@@ -387,7 +387,14 @@ function itemIndex(ctx) {
     }
   }
   for (const a of out.values()) { a.sort((x, y) => y.gph - x.gph); a.length = Math.min(a.length, 3); }
-  const res = { get(iid) { const a = out.get(Number(iid)); return a ? a.map(x => ({ ...describe(x.f, c2), itemShare: x.itemShare, itemPerHour: x.itemPerHour })) : [] }, size: out.size };
+  // describe() recalcula el oro/h del campamento: se hace una vez por ítem. La
+  // tabla de Mercado llama get() varias veces por fila al ordenar y filtrar.
+  const memo = new Map();
+  const res = { get(iid) {
+    const k = Number(iid); if (memo.has(k)) return memo.get(k);
+    const a = out.get(k), r = a ? a.map(x => ({ ...describe(x.f, c2), itemShare: x.itemShare, itemPerHour: x.itemPerHour })) : [];
+    memo.set(k, r); return r;
+  }, size: out.size };
   if (key) { IIDX_KEY = key; IIDX = res; }
   return res;
 }

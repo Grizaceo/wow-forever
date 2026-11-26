@@ -464,7 +464,8 @@ function profGph(zk,kind,level,profile,settings,sess){
       // es el proxy del tier que tu personaje puede recolectar a su nivel.
       if(!(isObj&&mySkill!=null)&&(dd?.[6]||0)>level+10)continue;
       const it=sess.scan.get(iid),rp=it?refPrice(it):null;
-      const ah=rp&&rp.price>0?Math.floor(rp.price*(1-AH_CUT)):0;
+      // Misma regla que la ruta por ítem: con ≤5 ofertas no hay canal de subasta.
+      const ah=rp?rp.ahNet:0;
       const unit=Math.max(ah,sell);if(unit<=0)continue;
       for(const s of normSources(iid)){
         const okProf=isObj?s.kind==='object'&&s.objKind===wantObj:s.kind==='skin';

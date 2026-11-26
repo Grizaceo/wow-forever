@@ -207,6 +207,18 @@ test('itemFarms: campamentos donde cae el ítem, con su parte del oro', () => {
   assert.ok(mezcla.itemShare < solo.itemShare)
 })
 
+test('itemIndex: cada ítem se describe una sola vez (la tabla llama get por fila al ordenar)', () => {
+  const P = fresh()
+  P.configure({ HunterDropData: dataset() })
+  const market = P.marketModel([hist(900, [3500], 500), hist(901, [2000], 500)])
+  const ctx = { profile: profile(), market, caps: P.sellCaps(market, null, { kappa: 1 }), settings: { pvp: false }, cacheKey: 'memo' }
+  const idx = P.itemIndex(ctx)
+  const a = idx.get(900), b = idx.get('900')
+  assert.ok(a.length > 0)
+  assert.equal(a, b, 'la segunda consulta devuelve el mismo resultado sin recalcular')
+  assert.deepEqual(idx.get(12345), [])
+})
+
 test('sin dataset schema 2 el motor no inventa campamentos', () => {
   const P = fresh()
   P.configure({ HunterDropData: { ...dataset(), schemaVersion: 1 } })
