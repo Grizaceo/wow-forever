@@ -54,7 +54,14 @@ CSV_FILES = ['UiMapAssignment.csv', 'UiMap.csv', 'AreaTable.csv', 'Map.csv', 'Lo
 TABLES = {'creature', 'creature_template', 'creature_loot_template', 'reference_loot_template',
           'gameobject', 'gameobject_template', 'gameobject_loot_template', 'item_template',
           'skinning_loot_template', 'pickpocketing_loot_template', 'world_safe_locs',
-          'game_graveyard_zone', 'game_event', 'game_event_creature', 'game_event_gameobject'}
+          'game_graveyard_zone', 'game_event', 'game_event_creature', 'game_event_gameobject',
+          'spawn_group', 'spawn_group_spawn'}
+# World states that only hold while a world event runs. Spawn groups gated by them
+# are event spawns too, even without a game_event_* row: 2099 = AQ War Effort
+# (10 Hour War, e.g. the Cenarion Hold siege elites), 6035 = Stranglethorn Fishing
+# Extravaganza (School of Tastyfish pools). Other gated groups (quest steps, raid
+# encounter states, day/night RP) are normal world and stay.
+EVENT_WORLDSTATES = {2099, 6035}
 
 RANKS = {0: 'normal', 1: 'elite', 2: 'rareelite', 3: 'boss', 4: 'rare'}
 LOCK_KIND = {1: 'chest', 2: 'herb', 3: 'ore', 19: 'fish'}
@@ -178,11 +185,18 @@ def build_public(src):
     # Spawns that only exist while a world event runs (AQ war effort, invasions,
     # holidays): game_event_creature / game_event_gameobject with a positive
     # event. A negative event despawns a normal spawn during the event, so those
-    # stay, and so do events that recur every day (occurence <= 1440 min, e.g.
-    # 'Nights': Leprithus and the Westfall ghouls spawn every night).
-    daily = {r['entry'] for r in db['game_event'] if 0 < r['occurence'] <= 1440}
+    # stay, and so do events that recur every day on their own (occurence <= 1440
+    # min and not linked to a parent event, e.g. 'Nights': Leprithus and the
+    # Westfall ghouls spawn every night; Hallow's End sub-events also recur daily
+    # but only inside the holiday). Spawn groups gated by an event world state
+    # (EVENT_WORLDSTATES) are excluded as well.
+    daily = {r['entry'] for r in db['game_event'] if 0 < r['occurence'] <= 1440 and not r['linkedTo']}
     event_guids = {t: {r['guid'] for r in db['game_event_' + t] if r['event'] > 0 and r['event'] not in daily}
                    for t in ('creature', 'gameobject')}
+    gated = {r['Id']: r['Type'] for r in db['spawn_group'] if r['WorldState'] in EVENT_WORLDSTATES}
+    for r in db['spawn_group_spawn']:
+        if r['Id'] in gated:
+            event_guids['creature' if gated[r['Id']] == 0 else 'gameobject'].add(r['Guid'])
 
     # spawns -> (zoneKey -> count), respawn, positions [(map, x, y, zoneKey, respawn)]
     def spawns_of(table, skip=frozenset()):
@@ -389,7 +403,8 @@ def build_public(src):
             'params': {'worldRefUsers': WORLD_REF_USERS, 'maxSources': MAX_SOURCES, 'minChancePct': MIN_CHANCE,
                        'campRadiusYards': CAMP_RADIUS, 'campMinSpawns': CAMP_MIN_SPAWNS, 'nnCapYards': NN_CAP,
                        'eventSpawns': 'excluded (game_event_creature/game_event_gameobject, event > 0, '
-                                      'except events recurring daily)'},
+                                      'except events recurring daily not linked to another event; spawn '
+                                      'groups gated by world state 2099 AQ war or 6035 Fishing Extravaganza)'},
             'files': files,
         },
         'fields': {
