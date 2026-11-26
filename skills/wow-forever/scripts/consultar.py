@@ -1513,8 +1513,8 @@ def elegir_sesion(d, clave):
         raise ErrorConsulta("no hay sesiones medidas")
     if clave is None or clave == "":
         return ses[-1]
-    if str(clave).isdigit() and int(clave) <= len(ses):
-        return ses[-int(clave)]  # 1 = la última
+    if str(clave).isdigit() and 1 <= int(clave) <= len(ses):
+        return ses[-int(clave)]  # 1 = la última (0 no es una posición)
     for s in ses:
         if s.get("id") == clave:
             return s

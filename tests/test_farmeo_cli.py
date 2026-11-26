@@ -48,6 +48,10 @@ class TestFarmeoCli(unittest.TestCase):
         code3, txt3 = correr('farmeo-sesion', 's999', '--archivo', FIX)
         self.assertEqual(code3, 2)
         self.assertIn('no existe la sesión', txt3)
+        # 0 no es una posición (1 = la última): antes devolvía la más antigua.
+        code4, txt4 = correr('farmeo-sesion', '0', '--archivo', FIX)
+        self.assertEqual(code4, 2)
+        self.assertIn('no existe la sesión 0', txt4)
 
     def test_estilo_calibrado_y_tendencias(self):
         code, txt = correr('farmeo-estilo', '--archivo', FIX)

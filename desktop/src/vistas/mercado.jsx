@@ -78,7 +78,6 @@ agregarTextos({
   'mercado.orden.nombre': 'Nombre',
   'mercado.orden.precio': 'Precio',
   'mercado.orden.ofertas': 'Mejores ofertas',
-  'mercado.orden.roi': 'Margen frente al oro/h objetivo',
   'mercado.orden.gph': 'Oro/hora estimado',
   'mercado.col.item': 'Ítem / clave',
   'mercado.col.min': 'Último mínimo por unidad',
@@ -90,7 +89,6 @@ agregarTextos({
   'mercado.ordenTxt.precio': 'precio descendente',
   'mercado.ordenTxt.nombre': 'nombre',
   'mercado.ordenTxt.ofertas': 'mejores ofertas vs mediana histórica (approx)',
-  'mercado.ordenTxt.roi': 'orden por margen frente al oro/h objetivo (estimado)',
   'mercado.ordenTxt.gph': 'orden por oro/hora estimado (approx)',
   'mercado.vacio.scan': 'Todavía no importaste precios. Elige tu Auctionator.lua para empezar.',
   'mercado.restaurado': 'Precios importados restaurados. Son ofertas anunciadas, no ventas.',
@@ -276,7 +274,6 @@ agregarTextos({
   'mercado.orden.nombre': 'Name',
   'mercado.orden.precio': 'Price',
   'mercado.orden.ofertas': 'Best deals',
-  'mercado.orden.roi': 'Margin vs target gold/h',
   'mercado.orden.gph': 'Estimated gold/hour',
   'mercado.col.item': 'Item / key',
   'mercado.col.min': 'Last unit minimum',
@@ -288,7 +285,6 @@ agregarTextos({
   'mercado.ordenTxt.precio': 'price descending',
   'mercado.ordenTxt.nombre': 'name',
   'mercado.ordenTxt.ofertas': 'best deals vs historical median (approx)',
-  'mercado.ordenTxt.roi': 'sorted by margin vs target gold/h (estimate)',
   'mercado.ordenTxt.gph': 'sorted by estimated gold/hour (approx)',
   'mercado.vacio.scan': 'No prices imported yet. Pick your Auctionator.lua to start.',
   'mercado.restaurado': 'Imported prices restored. They are listed offers, not sales.',
@@ -438,7 +434,9 @@ Farm.configure({ HunterDropData: D.dropData, HunterMarketCatalog: CATALOGO, Hunt
 FarmPlan.configure({ HunterDropData: D.dropData })
 
 const fmt = Farm.fmt || {}
-const ORDENES = ['nombre', 'precio', 'ofertas', 'roi', 'gph']
+// Sin «margen frente al oro/h objetivo»: el índice del motor v2 no tiene margen y,
+// con un objetivo fijo, ese orden sería el mismo que el de oro/hora.
+const ORDENES = ['nombre', 'precio', 'ofertas', 'gph']
 
 /* ------------------------------------------------ procedencia / comparación */
 // Textos nuevos, deliberadamente fuera del catálogo i18n grande: son avisos de

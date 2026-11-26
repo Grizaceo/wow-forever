@@ -508,7 +508,10 @@ export function contextoFarmeo({ perfil, settings, items, ventas = null, estilo 
     cls: CLASE_MOTOR[perfil?.clase] || 'otro', prof: { skin: !!settings?.prof?.skin }, group: !!settings?.group,
   }
   const ajustes = { pvp: settings?.pvp !== false, zoneComp: settings?.zoneComp || {} }
-  const cacheKey = JSON.stringify([marketKey, (items || []).length, profile, ajustes, kappa, style, observed?.key || null])
+  // Los topes por ventas propias (TSM) cambian sin cambiar el escaneo: van en la
+  // clave para que el índice por ítem (columna Farmeo) no quede con el tope viejo.
+  const ventasKey = [...caps].filter(([, c]) => c.basis === 'ventas-propias').map(([i, c]) => `${i}:${Math.round(c.units * 1000)}`).join(',')
+  const cacheKey = JSON.stringify([marketKey, (items || []).length, profile, ajustes, kappa, style, observed?.key || null, ventasKey])
   return { profile, market, caps, style, observed, settings: ajustes, kappa, cacheKey }
 }
 

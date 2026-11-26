@@ -165,10 +165,12 @@ function killUnits(e, ctx) {
   }
   return out;
 }
+// Monedas: solo cuentan los cadáveres saqueados solos en su ventana
+// (obs.coinCorpses), los únicos cuyas monedas el addon puede atribuir.
 function killCoins(e, ctx) {
   const prior = D.mobX[e][1], obs = ctx.observed?.mobs?.get(String(e));
-  if (!obs || !(obs.corpses > 0) || !Number.isFinite(obs.coins)) return prior;
-  return (N0_COINS * prior + obs.coins) / (N0_COINS + obs.corpses);
+  if (!obs || !(obs.coinCorpses > 0) || !Number.isFinite(obs.coins)) return prior;
+  return (N0_COINS * prior + obs.coins) / (N0_COINS + obs.coinCorpses);
 }
 
 function softRate(cycle, cap) { return cap > 0 && cycle > 0 ? Math.pow(Math.pow(cycle, -2) + Math.pow(cap, -2), -0.5) : 0; }
@@ -260,7 +262,7 @@ function hourly(f, ctx) {
 const BLOCK = 10;
 function greedy(list, ctx, T) {
   const st = style(ctx);
-  const alloc = new Map(), zones = new Map(); let used = 0, g0 = 0;
+  const alloc = new Map(), zones = new Map(); let used = 0, g0 = 0, trips0 = 0;
   for (;;) {
     let best = null;
     for (let i = 0; i < list.length; i++) {
@@ -271,15 +273,19 @@ function greedy(list, ctx, T) {
       const extra = zones.has(zk) ? 0 : zones.size ? trip / 2 : trip;
       if (used + BLOCK + extra > T) continue;
       const a = new Map(alloc); a.set(i, (a.get(i) || 0) + BLOCK);
-      const g = planValue(a, list, ctx).gold, gain = (g - g0) / (BLOCK + extra);
-      if (!best || gain > best.gain) best = { gain, i, g, extra, zk };
+      // Bolsas llenas: los viajes al vendedor también salen del tiempo de la
+      // sesión (igual que en hourly), así que el bloque debe caber con ellos.
+      const pv = planValue(a, list, ctx), trips = Math.floor(pv.slots / st.bagFree);
+      if (used + BLOCK + extra + trips * st.bagTripMin > T) continue;
+      const gain = (pv.gold - g0) / (BLOCK + extra + (trips - trips0) * st.bagTripMin);
+      if (!best || gain > best.gain) best = { gain, i, g: pv.gold, extra, zk, trips };
     }
     if (!best || best.gain <= 0) break;
     alloc.set(best.i, (alloc.get(best.i) || 0) + BLOCK);
-    used += BLOCK + best.extra; g0 = best.g;
+    used += BLOCK + best.extra; g0 = best.g; trips0 = best.trips;
     if (!zones.has(best.zk)) zones.set(best.zk, best.extra);
   }
-  // Bolsas llenas: viajes al vendedor descontados del tiempo de farmeo.
+  // Farmeo + traslados + viajes al vendedor caben en T.
   const v = planValue(alloc, list, ctx), trips = Math.floor(v.slots / st.bagFree);
   return { alloc, zones, gold: v.gold, value: v, bagTrips: trips, travelMin: [...zones.values()].reduce((s, x) => s + x, 0) };
 }

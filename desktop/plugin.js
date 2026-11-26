@@ -17793,8 +17793,8 @@ var require_farm_plan = __commonJS({
     }
     function killCoins(e, ctx) {
       const prior = D2.mobX[e][1], obs = ctx.observed?.mobs?.get(String(e));
-      if (!obs || !(obs.corpses > 0) || !Number.isFinite(obs.coins)) return prior;
-      return (N0_COINS * prior + obs.coins) / (N0_COINS + obs.corpses);
+      if (!obs || !(obs.coinCorpses > 0) || !Number.isFinite(obs.coins)) return prior;
+      return (N0_COINS * prior + obs.coins) / (N0_COINS + obs.coinCorpses);
     }
     function softRate(cycle, cap) {
       return cap > 0 && cycle > 0 ? Math.pow(Math.pow(cycle, -2) + Math.pow(cap, -2), -0.5) : 0;
@@ -17916,7 +17916,7 @@ var require_farm_plan = __commonJS({
     function greedy(list, ctx, T) {
       const st = style(ctx);
       const alloc = /* @__PURE__ */ new Map(), zones = /* @__PURE__ */ new Map();
-      let used = 0, g0 = 0;
+      let used = 0, g0 = 0, trips0 = 0;
       for (; ; ) {
         let best = null;
         for (let i = 0; i < list.length; i++) {
@@ -17927,13 +17927,16 @@ var require_farm_plan = __commonJS({
           if (used + BLOCK + extra > T) continue;
           const a = new Map(alloc);
           a.set(i, (a.get(i) || 0) + BLOCK);
-          const g = planValue(a, list, ctx).gold, gain = (g - g0) / (BLOCK + extra);
-          if (!best || gain > best.gain) best = { gain, i, g, extra, zk };
+          const pv = planValue(a, list, ctx), trips2 = Math.floor(pv.slots / st.bagFree);
+          if (used + BLOCK + extra + trips2 * st.bagTripMin > T) continue;
+          const gain = (pv.gold - g0) / (BLOCK + extra + (trips2 - trips0) * st.bagTripMin);
+          if (!best || gain > best.gain) best = { gain, i, g: pv.gold, extra, zk, trips: trips2 };
         }
         if (!best || best.gain <= 0) break;
         alloc.set(best.i, (alloc.get(best.i) || 0) + BLOCK);
         used += BLOCK + best.extra;
         g0 = best.g;
+        trips0 = best.trips;
         if (!zones.has(best.zk)) zones.set(best.zk, best.extra);
       }
       const v = planValue(alloc, list, ctx), trips = Math.floor(v.slots / st.bagFree);
@@ -76986,7 +76989,8 @@ function contextoFarmeo({ perfil, settings, items, ventas = null, estilo = null,
     group: !!settings?.group
   };
   const ajustes = { pvp: settings?.pvp !== false, zoneComp: settings?.zoneComp || {} };
-  const cacheKey = JSON.stringify([marketKey, (items || []).length, profile, ajustes, kappa, style, observed?.key || null]);
+  const ventasKey = [...caps].filter(([, c]) => c.basis === "ventas-propias").map(([i, c]) => `${i}:${Math.round(c.units * 1e3)}`).join(",");
+  const cacheKey = JSON.stringify([marketKey, (items || []).length, profile, ajustes, kappa, style, observed?.key || null, ventasKey]);
   return { profile, market, caps, style, observed, settings: ajustes, kappa, cacheKey };
 }
 function ajustesFarm(perfil, guardado) {
@@ -83195,6 +83199,9 @@ function normalizarSesion(s) {
     gatherItems: conteo2(s.gatherItems),
     other: conteo(s.other),
     got: conteo(s.got),
+    // Cadáveres saqueados solos en su ventana (WoWForeverFarm ≥ 0.3.0): las
+    // monedas de coinsBy salen solo de ellos. null = sesión anterior, sin muestra.
+    coinCorpses: s.coinCorpses && typeof s.coinCorpses === "object" ? conteo(s.coinCorpses) : null,
     // Pesca (WoWForeverFarm ≥ 0.3.0): capturas por IsFishingLoot y lo pescado.
     fishing: int2(s.fishing, 0, 1e6) ? s.fishing : 0,
     fishItems: conteo(s.fishItems),
@@ -83398,12 +83405,15 @@ function observados(sesiones) {
     for (const [e, k] of Object.entries(s.kills || {})) {
       let o = mobs.get(e);
       if (!o) {
-        o = { kills: 0, corpses: 0, coins: 0, items: /* @__PURE__ */ new Map(), skinOnly: /* @__PURE__ */ new Set() };
+        o = { kills: 0, corpses: 0, coins: 0, coinCorpses: 0, items: /* @__PURE__ */ new Map(), skinOnly: /* @__PURE__ */ new Set() };
         mobs.set(e, o);
       }
       o.kills += k;
       o.corpses += s.corpses?.[e] || 0;
-      o.coins += s.coinsBy?.[e] || 0;
+      if (s.coinCorpses) {
+        o.coins += s.coinsBy?.[e] || 0;
+        o.coinCorpses += s.coinCorpses[e] || 0;
+      }
       for (const [iid, q] of Object.entries(s.items?.[e] || {})) o.items.set(Number(iid), (o.items.get(Number(iid)) || 0) + q);
       for (const [iid, q] of Object.entries(s.skinItems?.[e] || {})) {
         o.items.set(Number(iid), (o.items.get(Number(iid)) || 0) + q);
@@ -84889,7 +84899,6 @@ tes en el catálogo local; las variantes se conservan sin mezclarlas.",
   "mercado.orden.nombre": "Nombre",
   "mercado.orden.precio": "Precio",
   "mercado.orden.ofertas": "Mejores ofertas",
-  "mercado.orden.roi": "Margen frente al oro/h objetivo",
   "mercado.orden.gph": "Oro/hora estimado",
   "mercado.col.item": "Ítem / clave",
   "mercado.col.min": "Último mínimo por unidad",
@@ -84901,7 +84910,6 @@ tes en el catálogo local; las variantes se conservan sin mezclarlas.",
   "mercado.ordenTxt.precio": "precio descendente",
   "mercado.ordenTxt.nombre": "nombre",
   "mercado.ordenTxt.ofertas": "mejores ofertas vs mediana histórica (approx)",
-  "mercado.ordenTxt.roi": "orden por margen frente al oro/h objetivo (estimado)",
   "mercado.ordenTxt.gph": "orden por oro/hora estimado (approx)",
   "mercado.vacio.scan": "Todavía no importaste precios. Elige tu Auctionator.lua para empezar.",
   "mercado.restaurado": "Precios importados restaurados. Son ofertas anunciadas, no ventas.",
@@ -85091,7 +85099,6 @@ han 3 days; each item keeps its own date even if imported today. The DB does not
   "mercado.orden.nombre": "Name",
   "mercado.orden.precio": "Price",
   "mercado.orden.ofertas": "Best deals",
-  "mercado.orden.roi": "Margin vs target gold/h",
   "mercado.orden.gph": "Estimated gold/hour",
   "mercado.col.item": "Item / key",
   "mercado.col.min": "Last unit minimum",
@@ -85103,7 +85110,6 @@ han 3 days; each item keeps its own date even if imported today. The DB does not
   "mercado.ordenTxt.precio": "price descending",
   "mercado.ordenTxt.nombre": "name",
   "mercado.ordenTxt.ofertas": "best deals vs historical median (approx)",
-  "mercado.ordenTxt.roi": "sorted by margin vs target gold/h (estimate)",
   "mercado.ordenTxt.gph": "sorted by estimated gold/hour (approx)",
   "mercado.vacio.scan": "No prices imported yet. Pick your Auctionator.lua to start.",
   "mercado.restaurado": "Imported prices restored. They are listed offers, not sales.",
@@ -85252,7 +85258,7 @@ Farm.configure({
 });
 FarmPlan.configure({ HunterDropData: D.dropData });
 var fmt = Farm.fmt || {};
-var ORDENES = ["nombre", "precio", "ofertas", "roi", "gph"];
+var ORDENES = ["nombre", "precio", "ofertas", "gph"];
 var cp4 = (lang, es, en) => lang === "en" ? en : es;
 var DATA_CLI = "~/.config/Hermes/plugin-files/data/wow-hunter-guide";
 var MOTIVOS2 = {

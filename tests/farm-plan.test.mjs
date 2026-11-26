@@ -163,10 +163,23 @@ test('plan: respeta las horas incluyendo el viaje y entrega rango y aportes', ()
   const ctx = { profile: profile(), market, caps: P.sellCaps(market, null, { kappa: 0.05 }), settings: { pvp: false } }
   const r = P.plan(ctx, { hours: 2 })
   const mins = r.best.legs.reduce((s, l) => s + l.minutes, 0)
-  assert.ok(mins + r.best.travelMin <= 120)
+  assert.ok(mins + r.best.travelMin + r.best.bagTripMin <= 120)
   assert.ok(r.best.low <= r.best.gph && r.best.gph <= r.best.high)
   assert.ok(r.best.top.length > 0)
   assert.ok(r.best.legs.every(l => l.farm.zoneKey && l.farm.names.length))
+})
+
+test('plan: los viajes al vendedor por bolsas llenas salen del tiempo de la sesión', () => {
+  const P = fresh()
+  P.configure({ HunterDropData: dataset() })
+  const market = P.marketModel([hist(900, [3500], 500), hist(901, [2000], 500), hist(903, [500], 500)])
+  const ctx = { profile: profile(), market, caps: P.sellCaps(market, null, { kappa: 0.05 }), settings: { pvp: false },
+    style: { ...P.STYLE_DEFAULT, bagFree: 3 } }
+  const r = P.plan(ctx, { hours: 2 })
+  assert.ok(r.best.bagTrips > 0, 'con 3 casillas libres las bolsas se llenan')
+  const mins = r.best.legs.reduce((s, l) => s + l.minutes, 0)
+  assert.ok(mins + r.best.travelMin + r.best.bagTripMin <= 120, `farmeo ${mins} + traslado ${r.best.travelMin} + vendedor ${r.best.bagTripMin} min caben en 2 h`)
+  assert.ok(near(r.best.gph, r.best.gold / 2), 'oro/h = oro del plan / horas de sesión')
 })
 
 test('munición: solo el cazador la paga', () => {

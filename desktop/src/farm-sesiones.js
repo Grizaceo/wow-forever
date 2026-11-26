@@ -71,6 +71,9 @@ export function normalizarSesion(s) {
     xp: num(s.xp, 0, 1e9) ? Math.round(s.xp) : 0,
     items: conteo2(s.items), skinItems: conteo2(s.skinItems), gatherItems: conteo2(s.gatherItems), other: conteo(s.other),
     got: conteo(s.got),
+    // Cadáveres saqueados solos en su ventana (WoWForeverFarm ≥ 0.3.0): las
+    // monedas de coinsBy salen solo de ellos. null = sesión anterior, sin muestra.
+    coinCorpses: s.coinCorpses && typeof s.coinCorpses === 'object' ? conteo(s.coinCorpses) : null,
     // Pesca (WoWForeverFarm ≥ 0.3.0): capturas por IsFishingLoot y lo pescado.
     fishing: int(s.fishing, 0, 1e6) ? s.fishing : 0, fishItems: conteo(s.fishItems),
     money: {
@@ -260,10 +263,12 @@ export function observados(sesiones) {
     usadas++
     for (const [e, k] of Object.entries(s.kills || {})) {
       let o = mobs.get(e)
-      if (!o) { o = { kills: 0, corpses: 0, coins: 0, items: new Map(), skinOnly: new Set() }; mobs.set(e, o) }
+      if (!o) { o = { kills: 0, corpses: 0, coins: 0, coinCorpses: 0, items: new Map(), skinOnly: new Set() }; mobs.set(e, o) }
       o.kills += k
       o.corpses += s.corpses?.[e] || 0
-      o.coins += s.coinsBy?.[e] || 0
+      // Monedas por cadáver: solo de los saqueados solos (coinsBy sale de ellos);
+      // dividir por todos los cadáveres subestima con saqueo de área.
+      if (s.coinCorpses) { o.coins += s.coinsBy?.[e] || 0; o.coinCorpses += s.coinCorpses[e] || 0 }
       for (const [iid, q] of Object.entries(s.items?.[e] || {})) o.items.set(Number(iid), (o.items.get(Number(iid)) || 0) + q)
       for (const [iid, q] of Object.entries(s.skinItems?.[e] || {})) {
         o.items.set(Number(iid), (o.items.get(Number(iid)) || 0) + q); o.skinOnly.add(Number(iid))

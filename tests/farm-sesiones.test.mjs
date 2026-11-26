@@ -42,7 +42,7 @@ const SV = `WoWForeverFarmDB = {
 ["skinItems"] = { [4127] = { [4234] = 50, }, },
 ["gather"] = {}, ["gatherItems"] = {}, ["other"] = { [999] = 1, },
 ["money"] = { ["loot"] = 5000, ["merchant"] = 20000, ["other"] = -300, },
-["coinsBy"] = { [4127] = 1000, },
+["coinsBy"] = { [4127] = 1000, }, ["coinCorpses"] = { [4127] = 20, },
 ["zones"] = { [1443] = 3500, },
 ["path"] = "1443:50.0,25.0;1443:51.0,25.5",
 ["ammo"] = { ["start"] = 1000, ["stop"] = 200, }, ["bags"] = { ["start"] = 40, ["stop"] = 12, },
@@ -150,6 +150,15 @@ test('observados: solo sesiones con muertes directas; el motor ajusta hacia lo v
   const hiena = FarmPlan.farms({ ...base, observed: o }).find((f) => f.id === 't4127')
   assert.equal(hiena.units.has(4234), false, 'sin Desollar el cuero observado no cuenta')
   assert.ok(hiena.coins > 0, 'las monedas observadas suben las del dataset (0)')
+  // (20·0 + 1000) / (20 + 20): solo los 20 cadáveres saqueados solos, no los 55
+  assert.equal(o.mobs.get('4127').coinCorpses, 20)
+  assert.ok(Math.abs(hiena.coins - 1000 / 40) < 1e-9)
+  // Sesión de 0.2.0 sin coinCorpses: no hay muestra de monedas, queda el prior.
+  const vieja = observados([{ ...s, coinCorpses: null }])
+  assert.equal(vieja.mobs.get('4127').coinCorpses, 0)
+  assert.equal(vieja.mobs.get('4127').coins, 0)
+  FarmPlan._reset(); FarmPlan.configure({ HunterDropData: DATASET })
+  assert.equal(FarmPlan.farms({ ...base, observed: vieja }).find((f) => f.id === 't4127').coins, 0)
 })
 
 test('ventasPorDia: ventas de subasta en la ventana, por día', () => {

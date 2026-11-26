@@ -86,6 +86,8 @@ Las unidades sobre el tope se valoran a precio de vendedor (ingreso cóncavo).
 `oro(plan) = Σ_c muertes_c·(monedas_c − munición_c) + Σ_i [min(U_i,C_i)·subasta_i + resto·vendedor_i]`,
 con `U_i` sumado sobre todos los campamentos del plan (tope **compartido**). Bloques de
 10 min por ganancia marginal por minuto; entrar a una zona cuesta su viaje de ida;
+cada vez que se llenan las bolsas, un viaje al vendedor (6 min) que también sale de
+las horas de la sesión (igual que en el oro/h de un campamento solo);
 se prueban conjuntos de 1 y 2 zonas. Salida: tramos `{campamento, minutos, oro}`,
 total con rango (pesimista/central/optimista) y alternativas dentro del rango.
 
@@ -115,12 +117,12 @@ Eventos (solo API pública; todo protegido con `pcall` y detección de funciones
 | Mide | Fuente |
 |---|---|
 | Combate | `PLAYER_REGEN_DISABLED/ENABLED` |
-| Saqueo, botín y origen | `LOOT_READY`/`LOOT_OPENED`/`LOOT_CLOSED`, `GetLootSlotInfo/Link/Type`, `GetLootSourceInfo` (GUID → npcId/objeto) |
-| Desuello / recolección | segundo saqueo del mismo GUID de criatura / GUID de objeto |
-| Muertes | `PARTY_KILL` (GUID o, si es secreto, muerte sin mob), `UNIT_DIED` de un mob que peleaba contigo (amenaza), `CHAT_MSG_COMBAT_XP_GAIN` y `CHAT_MSG_COMBAT_HOSTILE_DEATH` («Has matado X», nombre), cadáver visto (objetivo, mouseover, placas; no ajeno) y saqueado; `killBy` = método que la vio primero, `signals` = todos los avisos |
+| Saqueo, botín y origen | `LOOT_READY`/`LOOT_OPENED`/`LOOT_CLOSED`, `GetLootSlotInfo/Link/Type`, `GetLootSourceInfo` (GUID → npcId/objeto); `LOOT_SLOT_CLEARED` para saber si un cadáver quedó con botín |
+| Desuello / recolección | segundo saqueo del mismo GUID de criatura, una vez vaciado el cadáver (reabrir uno que quedó con botín no cuenta, y nada después del desuello) / GUID de objeto |
+| Muertes | `PARTY_KILL` (GUID o, si es secreto, muerte sin mob), `UNIT_DIED` de un mob que peleaba contigo (amenaza), `CHAT_MSG_COMBAT_XP_GAIN` y `CHAT_MSG_COMBAT_HOSTILE_DEATH` («Has matado X», nombre), cadáver visto (objetivo, mouseover, placas; no ajeno; solo cuenta si ese mob peleó contigo en la sesión, si no solo nombra una muerte ya contada) y saqueado; `killBy` = método que la vio primero, `signals` = todos los avisos |
 | Botín recibido | `CHAT_MSG_LOOT` con `LOOT_ITEM_SELF(_MULTIPLE)` en el idioma del cliente (`got`); si no llega, lo de las ventanas de botín |
 | Tu muerte | `PLAYER_DEAD` → `PLAYER_ALIVE`/`PLAYER_UNGHOST` (`deadTime`) |
-| Monedas | `PLAYER_MONEY` (delta) dentro y fuera del saqueo, y ventas a vendedor (`MERCHANT_SHOW/CLOSED`) |
+| Monedas | `PLAYER_MONEY` (delta) dentro y fuera del saqueo, y ventas a vendedor (`MERCHANT_SHOW/CLOSED`); por mob (`coinsBy`) solo en ventanas de un único cadáver, que se cuentan en `coinCorpses` |
 | Lugar | `C_Map.GetBestMapForUnit` + `C_Map.GetPlayerMapPosition` cada 10 s (si existe) |
 | Munición y bolsas | cuenta del slot de munición; casillas libres al inicio y al final |
 
@@ -140,7 +142,8 @@ Desde las sesiones (`desktop/src/farm-sesiones.js`, puro):
   mobs muertos; `t_botín`, `t_desuello`; `pausas` = resto no explicado por caminata;
   medianas con al menos 30 muertes, si no, valores por defecto.
 - **Botín:** probabilidad por (mob, ítem) con prior Beta desde CMaNGOS (peso n₀ = 50
-  muertes) y conteos observados; monedas por mob con media observada.
+  muertes) y conteos observados; monedas por mob con media observada sobre los
+  cadáveres saqueados solos (`coinCorpses`, peso n₀ = 20), no sobre todos.
 - El motor usa el estilo calibrado si el usuario lo activa ("usar mis métricas").
 
 ## Meta, recolección y pesca (2.4.0)
