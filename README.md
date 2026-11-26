@@ -9,6 +9,9 @@ faction, with a skill so your agent answers from the same data.
 
 ## Status
 
+- Version 2.2.1 removes world-event spawns from the drop data: Ahn'Qiraj war, invasions,
+  holidays, Darkmoon Faire and the Fishing Extravaganza. The farm ranking no longer counts
+  mobs that only appear during an event as permanent ones.
 - Version 2.2.0 adds a descriptive summary of personal TSM auction sales, with explicit
   evidence limits and no implicit Auctionator comparison. Tested with synthetic fixtures,
   not validated against a live player account. English is the default UI, Spanish optional. The
