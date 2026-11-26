@@ -26,6 +26,7 @@ local session            -- sesión abierta (db.current)
 local lootSources = {}   -- GUIDs del botín abierto (para atribuir el dinero)
 local lootMoneyBase = nil
 local lootHandled = false
+local lootLeft = {}      -- slot -> GUID de criatura aún sin recoger (LOOT_SLOT_CLEARED)
 local merchantOpen = false
 local lastMoney = nil
 local fightUntil = 0     -- fin de la última pelea + 3 s (para «X muere.»)
@@ -179,7 +180,8 @@ local function observe(unit)
       corpseN = corpseN + 1
       if corpseN > 2000 then corpseSeen, corpseN = {}, 1 end
       corpseSeen[guid] = true
-      signal('target', guid, name)
+      -- Solo cuenta como muerte nueva si ese mob peleó contigo en la sesión.
+      signal('target', guid, name, { fought = engaged[guid] ~= nil })
     end
     return
   end
@@ -226,7 +228,7 @@ end
 local frame = CreateFrame('Frame')
 local EVENTS = {
   'PLAYER_ENTERING_WORLD', 'PLAYER_REGEN_DISABLED', 'PLAYER_REGEN_ENABLED',
-  'LOOT_READY', 'LOOT_OPENED', 'LOOT_CLOSED', 'PLAYER_MONEY', 'MERCHANT_SHOW', 'MERCHANT_CLOSED',
+  'LOOT_READY', 'LOOT_OPENED', 'LOOT_SLOT_CLEARED', 'LOOT_CLOSED', 'PLAYER_MONEY', 'MERCHANT_SHOW', 'MERCHANT_CLOSED',
   'PLAYER_DEAD', 'PLAYER_ALIVE', 'PLAYER_UNGHOST',
   'PARTY_KILL', 'UNIT_DIED', 'CHAT_MSG_COMBAT_XP_GAIN', 'CHAT_MSG_COMBAT_HOSTILE_DEATH', 'CHAT_MSG_LOOT',
   'PLAYER_TARGET_CHANGED', 'UPDATE_MOUSEOVER_UNIT', 'NAME_PLATE_UNIT_ADDED',
@@ -241,6 +243,7 @@ local function readLoot()
   lootHandled = true
   local n = plain(safe(GetNumLootItems)) or 0
   local slots, sources, distinct = {}, {}, 0
+  lootLeft = {}
   for i = 1, n do
     local slotType = plain(safe(GetLootSlotType, i))
     local _, _, qty = safe(GetLootSlotInfo, i)
@@ -248,6 +251,7 @@ local function readLoot()
     local link = plain(safe(GetLootSlotLink, i))
     local guid = plain((safe(GetLootSourceInfo, i)))   -- guid1, qty1, guid2, qty2...
     if guid and not sources[guid] then sources[guid] = true; distinct = distinct + 1 end
+    if guid and L.parseGUID(guid) == 'creature' then lootLeft[i] = guid end
     if slotType ~= 2 then  -- 2 = dinero (LOOT_SLOT_MONEY)
       slots[#slots + 1] = { guid = guid, itemId = L.itemId(link), qty = type(qty) == 'number' and qty or 1 }
     elseif guid then
@@ -329,9 +333,18 @@ frame:SetScript('OnEvent', function(_, event, ...)
     L.combatEnd(session, t)
   elseif event == 'LOOT_READY' or event == 'LOOT_OPENED' then
     L.lootOpen(session, t); readLoot()
+  elseif event == 'LOOT_SLOT_CLEARED' then
+    local slot = plain((...))
+    if type(slot) == 'number' then lootLeft[slot] = nil end
   elseif event == 'LOOT_CLOSED' then
     L.lootClose(session, t)
-    lootHandled, lootMoneyBase, lootSources = false, nil, {}
+    -- Sin LOOT_SLOT_CLEARED no se sabe qué quedó: se asume todo recogido.
+    if registered.LOOT_SLOT_CLEARED and lootHandled then
+      local left = {}
+      for _, g in pairs(lootLeft) do left[g] = true end
+      if next(left) then L.lootLeft(session, left) end
+    end
+    lootHandled, lootMoneyBase, lootSources, lootLeft = false, nil, {}, {}
   elseif event == 'PLAYER_MONEY' then moneyChanged()
   elseif event == 'MERCHANT_SHOW' then merchantOpen = true
   elseif event == 'MERCHANT_CLOSED' then merchantOpen = false
@@ -580,8 +593,10 @@ SlashCmdList['WOWFOREVERFARM'] = function(msg)
     if ui then ui:Hide() end; db.ui.shown = false
   elseif cmd == 'status' then
     local sm = session and L.summary(session, t, price)
+    local skins = 0
+    for _, n in pairs(session and session.skins or {}) do skins = skins + n end
     chat(string.format('%d sesiones guardadas; %s.', #db.sessions,
-      sm and ('abierta: ' .. L.clock(sm.active) .. ', ' .. sm.kills .. ' muertes') or 'ninguna abierta')
+      sm and ('abierta: ' .. L.clock(sm.active) .. ', ' .. sm.kills .. ' muertes, ' .. skins .. ' desuellos') or 'ninguna abierta')
       .. ' Avisos de muerte: ' .. signalsText(session) .. '.')
   elseif cmd == 'test' then
     diagnose()

@@ -22,6 +22,8 @@
 --   other  = { [itemId] = qty }         botín sin origen conocido
 --   got    = { [itemId] = qty }         lo que de verdad entró a tus bolsas («Recibes botín»)
 --   money  = { loot=c, merchant=c, other=c }, coinsBy = { [npcId] = c }
+--   coinCorpses = { [npcId] = n }       cadáveres saqueados solos en su ventana: los
+--            únicos cuyas monedas se pueden atribuir (coinsBy sale de ellos)
 --   zones  = { [uiMapId] = segundos }, path = "mapa:x,y;..." (cada 30 s, acotado)
 --   ammo   = { start=n, stop=n }, bags = { start=libres, stop=libres }
 --   methods= { [método o lectura] = bool }
@@ -167,7 +169,7 @@ function Logic.newSession(now, info, opts)
     deadGuids = {}, lootedGuids = {}, recent = {}, noGuid = {},
     corpses = {}, items = {}, skins = {}, skinItems = {}, gather = {}, gatherItems = {}, other = {}, got = {},
     fishing = 0, fishItems = {},
-    money = { loot = 0, merchant = 0, other = 0 }, coinsBy = {},
+    money = { loot = 0, merchant = 0, other = 0 }, coinsBy = {}, coinCorpses = {},
     zones = {}, path = '', pathN = 0, lastPath = nil, lastZoneAt = nil,
     ammo = {}, bags = {}, methods = {},
   }
@@ -188,6 +190,7 @@ local function upgrade(s)
   s.lootedGuids = s.lootedGuids or {}
   s.fishing = s.fishing or 0
   s.fishItems = s.fishItems or {}
+  s.coinCorpses = s.coinCorpses or {}
 end
 Logic.upgrade = upgrade
 
@@ -382,6 +385,10 @@ function Logic.killSignal(s, now, sig)
       count(s.kills, npc, 1)
       return false
     end
+    -- Un cadáver que solo miraste (objetivo, mouseover) y que no peleó contigo
+    -- en la sesión: muerto antes de /wff start, o por guardias o PNJ. Sirve para
+    -- nombrar una muerte ya contada, no para contar una nueva ni arrancar el reloj.
+    if how == 'target' and sig.fought == false then return false end
   end
   return newKill(s, now, how, guid, npc, name)
 end
@@ -396,12 +403,15 @@ end
 -- Una ventana de botín: slots = { { guid=, itemId=, qty= } , ... } ya
 -- resueltos por Farm.lua (cada slot con su GUID de origen). Clasifica:
 -- 1er saqueo de un GUID de criatura = cadáver; 2º = desuello; GUID de objeto =
--- recolección. Devuelve el número de orígenes contados.
+-- recolección. Reabrir un cadáver que quedó con botín (Logic.lootLeft: bolsas
+-- llenas, un BoP sin confirmar) no es desuello y lo que muestra ya se contó; nada
+-- después del desuello se cuenta. Devuelve el número de orígenes contados.
+-- lootedGuids[g]: 1 = cadáver saqueado, 2 = desollado; negativo = quedó con botín.
 function Logic.loot(s, slots, singleSourceMoney, now)
   if not s or s.state ~= 'running' or type(slots) ~= 'table' then return 0 end
   upgrade(s)
   now = now or s.lastBeat or 0
-  local seenHere, nsrc = {}, 0
+  local seenHere, nsrc, reopen, corpseNpc = {}, 0, {}, nil
   for _, sl in ipairs(slots) do
     local kind, id = Logic.parseGUID(sl.guid)
     local g = sl.guid
@@ -413,14 +423,20 @@ function Logic.loot(s, slots, singleSourceMoney, now)
         if before == nil then
           s.lootedGuids[g] = 1
           count(s.corpses, id, 1)
+          corpseNpc = id
           Logic.killSignal(s, now, { guid = g, how = 'loot' })
         elseif before == 1 then
           s.lootedGuids[g] = 2
           count(s.skins, id, 1)
+        else
+          if before < 0 then s.lootedGuids[g] = -before end
+          reopen[g] = true
         end
       end
-      local bucket = (s.lootedGuids[g] == 2) and sub(s.skinItems, id) or sub(s.items, id)
-      if sl.itemId then count(bucket, sl.itemId, sl.qty or 1) end
+      if not reopen[g] then
+        local bucket = (s.lootedGuids[g] == 2) and sub(s.skinItems, id) or sub(s.items, id)
+        if sl.itemId then count(bucket, sl.itemId, sl.qty or 1) end
+      end
     elseif kind == 'object' and id then
       if not seenHere[g] then
         seenHere[g] = true
@@ -433,10 +449,26 @@ function Logic.loot(s, slots, singleSourceMoney, now)
       count(s.other, sl.itemId, sl.qty or 1)
     end
   end
+  -- Un solo cadáver nuevo en la ventana: sus monedas (si trae) se le atribuyen
+  -- (coinsBy); se cuenta aunque no traiga, para no sobrestimar la media.
+  if nsrc == 1 and corpseNpc then count(s.coinCorpses, corpseNpc, 1) end
   if singleSourceMoney and singleSourceMoney.npcId and (singleSourceMoney.copper or 0) > 0 then
     count(s.coinsBy, singleSourceMoney.npcId, singleSourceMoney.copper)
   end
   return nsrc
+end
+
+-- La ventana se cerró con slots sin recoger de estos GUIDs: el cadáver (o el
+-- desuello) quedó con botín y la próxima ventana suya será una reapertura.
+function Logic.lootLeft(s, guids)
+  if not s or s.state ~= 'running' or type(guids) ~= 'table' then return 0 end
+  upgrade(s)
+  local n = 0
+  for g in pairs(guids) do
+    local v = s.lootedGuids[g]
+    if v == 1 or v == 2 then s.lootedGuids[g] = -v; n = n + 1 end
+  end
+  return n
 end
 
 -- Pesca: una captura por ventana de botín de pesca (IsFishingLoot). El corcho es
@@ -596,7 +628,7 @@ function Logic.finish(s, now)
   s.combatSince, s.lootSince, s.resumedAt, s.pausedAt, s.lastBeat, s.deadSince = nil, nil, nil, nil, nil, nil
   s.lastPath, s.lastZone, s.lastZoneAt = nil, nil, nil
   s.armed = nil
-  for _, k in ipairs({ 'kills', 'corpses', 'items', 'skins', 'skinItems', 'gather', 'gatherItems', 'other', 'got', 'fishItems', 'coinsBy', 'zones' }) do
+  for _, k in ipairs({ 'kills', 'corpses', 'items', 'skins', 'skinItems', 'gather', 'gatherItems', 'other', 'got', 'fishItems', 'coinsBy', 'coinCorpses', 'zones' }) do
     clean(s[k])
   end
   return s

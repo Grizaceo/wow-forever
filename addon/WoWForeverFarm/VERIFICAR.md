@@ -28,6 +28,10 @@ entradas al juego: lo juegas tú.
   la primera arranca el reloj. El corcho no cuenta como recolección.
 - **Muertes:** cada aviso de una misma muerte se junta en una sola. Si el juego oculta
   de qué mob era, la muerte cuenta igual (sin mob) y el saqueo le pone nombre después.
+  Un cadáver que solo miras (objetivo, mouseover) cuenta únicamente si ese mob peleó
+  contigo en la sesión: los que mataron guardias u otros, o los de antes de Iniciar, no.
+- **Desuello:** es la ventana que se abre en un cadáver ya vaciado. Si cierras un
+  saqueo dejando algo (bolsas llenas) y lo reabres, no cuenta como desuello.
 
 ## Checklist (10 minutos)
 
@@ -39,7 +43,7 @@ entradas al juego: lo juegas tú.
 | 4 | Saquéalo | Aparece en «Botín» con su icono, cantidad y valor; «Monedas» sube | ¿lista vacía? |
 | 5 | Pon un mob de objetivo y escribe `/wff test` | Dice si el GUID y el nombre del objetivo son visibles o «SECRETO» | Copia las 4 líneas |
 | 6 | Mata 5 mobs más y escribe `/wff status` | «Avisos de muerte: party N, xp N…» | Copia la línea: dice qué avisos llegan |
-| 7 | Desuella un cadáver (si tienes Desollar) | El cuero sale en «Botín»; las muertes no se duplican | ¿cuenta dos muertes? |
+| 7 | Desuella un cadáver (si tienes Desollar). Luego, en otro, cierra el saqueo dejando un ítem y reábrelo | El cuero sale en «Botín»; las muertes no se duplican; reabrir no suma un desuello (`/wff status`) | ¿cuenta dos muertes o un desuello de más? |
 | 8 | Mata un mob que no suelte nada | Muertes sube igual | Si no sube: anota el `/wff status` |
 | 9 | **Pausar**, espera 1 min, **Seguir** | El reloj no cuenta el minuto | — |
 | 10 | Vende algo a un vendedor | No cambia «Monedas» (se guarda aparte) | — |
