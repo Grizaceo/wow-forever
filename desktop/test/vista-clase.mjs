@@ -18,7 +18,8 @@ const aqui = path.dirname(fileURLToPath(import.meta.url))
 const raiz = path.resolve(aqui, '..', '..')
 const tmp = mkdtempSync(path.join(tmpdir(), 'wow-p0-clase-'))
 // El bundle de prueba pesa ~10 MB: se borra al salir, también si un check falla.
-process.on('exit', () => rmSync(tmp, { recursive: true, force: true }))
+// Si no se puede borrar (p. ej. un archivo bloqueado), no cambia el resultado del test.
+process.on('exit', () => { try { rmSync(tmp, { recursive: true, force: true }) } catch {} })
 
 // El bundle se construye aparte: desktop/plugin.js es un artefacto que regenera el
 // integrador; aquí se usa el bundle recién hecho desde desktop/src. Con
