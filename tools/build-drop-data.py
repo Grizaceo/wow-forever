@@ -272,8 +272,18 @@ def build_public(src):
                 quest = it['bonding'] == 4 or it['class'] == 12
                 if typ != 'p' and not quest:
                     ev = ch / 100.0 * (mn + mx) / 2.0 * it['SellPrice']
-                    if w or (it['bonding'] == 1 and typ == 'm'):
+                    # El botín ligado (BoP) de un mob normal solo entra en el restVendor:
+                    # al filtrarse sus sources no puede contarse también como unidad.
+                    # En rare/rareelite/boss la source SÍ se conserva para afinidad de
+                    # equipo: su valor debe contarse una sola vez, desde esa unidad.
+                    bop_rara = it['bonding'] == 1 and typ == 'm' and rank in ('rare', 'rareelite', 'boss')
+                    if w or (it['bonding'] == 1 and typ == 'm' and not bop_rara):
                         rest_ev += ev
+                    elif bop_rara:
+                        # La source se conserva porque es botín ligado de un
+                        # mob raro/jefe; su valor se cuenta desde la unidad,
+                        # no otra vez dentro de restVendorCopperPerKill.
+                        pass
                     elif ch >= MIN_CHANCE:
                         (direct if typ == 'm' else skin)[item] = [item, int(round(ch * 100)), int(round((mn + mx) * 5)), ev]
                     else:

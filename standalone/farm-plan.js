@@ -127,6 +127,9 @@ function sellCaps(market, sales, opt = {}) {
 // Valor por unidad: subasta neta si supera al vendedor; si no, vendedor.
 function unitValue(iid, ctx, priceKey = 'price') {
   const sell = sellOf(iid), m = ctx.market?.get(iid);
+  // Los objetos ligados (bonding 1) no se pueden subastar: aunque el dataset
+  // tenga un precio de mercado, su único destino es el vendedor.
+  if (D?.items?.[String(iid)]?.[7] === 1) return { ah: 0, vendor: sell };
   const ah = m && !m.thin ? Math.floor(m[priceKey] * (1 - AH_CUT)) : 0;
   return { ah: ah > sell ? ah : 0, vendor: sell };
 }
@@ -312,9 +315,25 @@ function plan(ctx, opt = {}) {
     const low = planValue(r.alloc, list, ctx, { rateK: 1 - u, priceKey: 'p25' }).gold;
     const high = planValue(r.alloc, list, ctx, { rateK: 1 + u, priceKey: 'p75' }).gold;
     const tripMin = r.bagTrips * st.bagTripMin;
+    // El oro de cada tramo se reparte del valor ya calculado con el tope
+    // COMPARTIDO: recalcular cada tramo por separado duplicaba el tope y la
+    // suma de legs[].gold no cuadraba con best.gold (unidades AH por encima
+    // del límite contadas dos veces).
+    const goldDeTramo = (f, mins, st, parts) => {
+      const kk = f.rate * f.riskMult * mins / 60;
+      let gold = kk * (f.coins + f.rest);
+      if (ctx.profile?.cls === 'hunter' || ctx.profile?.cls === 3) {
+        gold -= kk * f.fightSec / st.shotSec * ammoCost(ctx.profile?.level || 1);
+      }
+      for (const [iid, u] of f.units) {
+        const p = parts.get(iid);
+        if (p && p.units > 0) gold += p.gold * (kk * u) / p.units;
+      }
+      return gold;
+    };
     const legs = [...r.alloc].sort((a, b) => b[1] - a[1]).map(([i, mins]) => {
-      const f = list[i], v = planValue(new Map([[i, mins]]), list, ctx);
-      return { farm: describe(f, ctx), minutes: mins, gold: v.gold };
+      const v = planValue(new Map([[i, mins]]), list, ctx);
+      return { farm: describe(list[i], ctx), minutes: mins, gold: goldDeTramo(list[i], mins, st, r.value.parts), low: v.low, high: v.high, top: v.top };
     });
     const top = [...r.value.parts].sort((a, b) => b[1].gold - a[1].gold).slice(0, 6)
       .map(([iid, p]) => ({ itemId: iid, name: itemName(iid), units: p.units, gold: p.gold, ahUnits: p.ahUnits, capBasis: ctx.caps?.get(iid)?.basis || 'sin-ofertas' }));

@@ -283,3 +283,34 @@ test('describe: avisa cuando un solo ítem sostiene ≥ 80 % del oro', () => {
   const mixto = ev.ranking.find(d => d.kind === 'clear')
   assert.ok(mixto.top[0].share < P.CONC_SHARE ? mixto.concentrated === null : mixto.concentrated !== null, 'coherente con su reparto')
 })
+
+
+test('plan: legs[].gold suma el total del plan aunque dos campamentos compartan el tope', () => {
+  const P = fresh()
+  const items = { ...dataset().items,
+    '900': ['Aire Elemental', 1, 7, 0, 0, 0, 30, 0, -1, 400, [['m', 10, 100, 1, 1], ['m', 20, 100, 1, 1]]] }
+  const camps = [['1', 500, 500, 30, [[10, 10]]], ['1', 700, 700, 30, [[20, 10]]]]
+  P.configure({ HunterDropData: dataset({ items, camps }) })
+  const market = P.marketModel([hist(900, [10000], 100)])
+  const ctx = { profile: profile(), market, caps: new Map([[900, { units: 5, basis: 'kappa-ofertas' }]]), settings: { pvp: false } }
+  const r = P.plan(ctx, { hours: 2 })
+  assert.ok(r?.best && r.best.legs.length >= 2)
+  const suma = r.best.legs.reduce((s, l) => s + l.gold, 0)
+  assert.ok(near(suma, r.best.gold), `suma de tramos ${suma} debe cuadrar con el plan ${r.best.gold}`)
+})
+
+test('objetos ligados: nunca se valoran en subasta aunque tengan precio de mercado', () => {
+  const P = fresh()
+  const items = { ...dataset().items,
+    '905': ['Collar ligado', 3, 4, 0, 2, 60, 60, 1, -1, 1000, [['m', 10, 10, 1, 1]]] }
+  P.configure({ HunterDropData: dataset({ items }) })
+  const market = P.marketModel([hist(905, [50000], 500)])
+  const ctx = { profile: profile(), market, settings: { pvp: false } }
+  const fa = P.itemFarms(905, ctx)
+  assert.ok(fa.length >= 1)
+  const v = P.hourly(P.mixFarm([[10, 1]], null, ctx), ctx)
+  assert.ok(v.parts.get(905).gold > 0, 'el botín ligado se valora al vendedor')
+  assert.equal(v.parts.get(905).ahUnits, 0, 'sin unidades en subasta')
+  assert.equal(v.ahGold, 0, 'sin oro de subasta')
+  assert.ok(v.vendorGold > 0, 'el botín ligado se valora al vendedor')
+})
