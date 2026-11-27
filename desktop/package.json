@@ -1,7 +1,7 @@
 {
   "name": "wow-forever-desktop",
   "private": true,
-  "version": "2.2.1",
+  "version": "2.4.0",
   "description": "Build de la mitad Desktop de wow-forever: un solo ESM legible en desktop/plugin.js.",
   "type": "module",
   "scripts": {

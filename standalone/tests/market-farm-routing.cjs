@@ -13,11 +13,13 @@ Farm.configure({ HunterDropData: Drops, HunterDropDataPrivate: null, HunterMarke
 const PROFILE = { level: 38, fac: 'horde', cls: 'hunter', hubZones: [] }
 const SETTINGS = { gph: 5, session: 2, comp: 'low', pvp: true, prof: {}, n: 5 }
 const PRICE = { 2091: 17100, 7069: 3999 }
+// Observación de hoy: la liquidez (aplicada también a la ruta por ítem) no recorta por antigüedad.
+const TODAY = Math.floor((Date.now() - Date.UTC(2020, 0, 1)) / 86400000)
 const metric = (id, settings = SETTINGS) => Farm.itemMetrics({
   itemId: id,
   unitPriceCopper: PRICE[id],
-  observedDay: 0,
-  history: [{ day: 0, low: PRICE[id], high: PRICE[id], available: 20 }],
+  observedDay: TODAY,
+  history: [{ day: TODAY, low: PRICE[id], high: PRICE[id], available: 20 }],
 }, PROFILE, settings)
 const close = (actual, expected, epsilon = 1e-7) => {
   assert.ok(Number.isFinite(actual), `valor no finito: ${actual}`)

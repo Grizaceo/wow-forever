@@ -3,7 +3,8 @@
 
 La skill del agente lo corre con la terminal para responder con los mismos datos que muestra
 la página de Hermes Desktop. Solo usa la biblioteca estándar, solo lee los archivos de data/
-del paquete instalado, no escribe nada, no usa red y no lanza procesos.
+del paquete instalado (y, para farmeo-*, el resumen farmeo-agente.json que la página escribe en
+su carpeta de datos), no escribe nada, no usa red y no lanza procesos.
 
 Cada línea dice de dónde sale el dato, como la página:
   [Classic 1.12]     generado de CMaNGOS (WoW 1.12): aproximado, Forever puede diferir
@@ -1427,6 +1428,413 @@ def cmd_roi(D, a, out):
     return 0
 
 
+# ---------------------------------------------------------------- farmeo (sesiones y plan)
+# La página Mercado → Farmeo escribe farmeo-agente.json en la carpeta de datos del plugin
+# de Hermes Desktop: sesiones medidas con el addon WoWForeverFarm, estilo calibrado y el
+# plan de sesión. Aquí solo se lee. Los valores vienen en oro (1 oro = 10000 cobre).
+ARCHIVO_FARMEO = "farmeo-agente.json"
+
+
+def rutas_farmeo():
+    rel = Path("Hermes") / "plugin-files" / "data" / "wow-hunter-guide" / ARCHIVO_FARMEO
+    out = []
+    if os.environ.get("WOW_FOREVER_FARMEO"):
+        out.append(Path(os.environ["WOW_FOREVER_FARMEO"]).expanduser())
+    out.append(Path.home() / ".config" / rel)
+    if os.environ.get("APPDATA"):
+        out.append(Path(os.environ["APPDATA"]) / rel)
+    out.append(Path.home() / "Library" / "Application Support" / rel)
+    return out
+
+
+def cargar_farmeo(archivo=None):
+    candidatos = [Path(archivo).expanduser()] if archivo else rutas_farmeo()
+    for c in candidatos:
+        if c.is_file():
+            try:
+                d = json.loads(c.read_text(encoding="utf-8"))
+            except (OSError, ValueError) as e:
+                raise ErrorConsulta(f"no se pudo leer {c}: {e}")
+            if not isinstance(d, dict) or d.get("schema") != 1 or not isinstance(d.get("sesiones"), list):
+                raise ErrorConsulta(f"{c} no es un contexto de farmeo schema 1")
+            d["_archivo"] = str(c)
+            return d
+    raise ErrorConsulta("no hay contexto de farmeo. Abre Hermes Desktop → WoW Forever → Mercado → Farmeo "
+                        "(con un escaneo de Auctionator) para que el plugin escriba " + ARCHIVO_FARMEO +
+                        "; las sesiones se miden con el addon WoWForeverFarm (/wff start, /wff stop, /reload). "
+                        "Buscado en: " + ", ".join(str(c) for c in candidatos))
+
+
+def oro_txt(g):
+    return "?" if g is None else f"{g:.2f}o"
+
+
+def pct_txt(x, signo=False):
+    if x is None:
+        return "?"
+    return (f"{x:+.0f}%" if signo else f"{x:.0f}%")
+
+
+def cabecera_farmeo(d, out):
+    pj = d.get("personaje") or {}
+    out(f"[tus sesiones] {d.get('totalSesiones', len(d['sesiones']))} sesiones medidas · contexto generado {d.get('generado', '?')}"
+        + (f" · nivel {pj.get('nivel')}" if pj.get("nivel") else ""))
+
+
+def cmd_farmeo_sesiones(D, a, out):
+    d = cargar_farmeo(a.archivo)
+    cabecera_farmeo(d, out)
+    ses = d["sesiones"][-a.max:]
+    if not ses:
+        out("SIN DATOS: todavía no hay sesiones. En el juego: /wff start antes de farmear, /wff stop al terminar y /reload.")
+        return 0
+    out(f"{'Fecha':<11}{'Min':>5} {'Zona':<20}{'Muertes/h':>10}{'Pelea':>7}  {'Comb·Saq·Resto':<16}{'Oro/h':>9}{'Predicho':>10}{'Ritmo':>7}{'Botín':>7}")
+    for s in ses:
+        p = s.get("prediccion") or {}
+        out(f"{(s.get('inicio') or '?')[:10]:<11}{s.get('minutos', 0):>5} {str(s.get('zona') or '?')[:19]:<20}"
+            f"{(s.get('muertesH') or 0):>10.0f}{(str(round(s['peleaS'])) + ' s') if s.get('peleaS') is not None else '?':>7}  "
+            f"{pct_txt(s.get('combatePct'))}·{pct_txt(s.get('saqueoPct'))}·{pct_txt(s.get('restoPct')):<8}"
+            f"{oro_txt(s.get('oroHSubasta')):>9}{oro_txt(p.get('oroH')) if p else '—':>10}"
+            f"{pct_txt(p.get('errorRitmoPct'), True) if p else '—':>7}{pct_txt(p.get('errorBotinPct'), True) if p else '—':>7}"
+            + ("  *muertes solo por saqueo" if s.get("metodoMuertes") == "solo-saqueo" else "")
+            + (f"  [pesca: {s.get('pescasH') or 0:.0f} capturas/h]" if s.get("tipo") == "pesca" else ""))
+    horas = sum((s.get("minutos") or 0) for s in d["sesiones"]) / 60
+    oro_total = sum((s.get("oroHSubasta") or 0) * (s.get("minutos") or 0) / 60 for s in d["sesiones"])
+    out(f"Total: {horas:.1f} h medidas · ≈{oro_total:.1f} oro (botín a precio de subasta actual + monedas).")
+    out("Zona = UiMapID del juego. «Predicho» = modelo base del plugin (drops de Classic, estilo por defecto) para los "
+        "mismos mobs; «Ritmo» y «Botín» = cuánto se aparta tu sesión de ese modelo. Oro/h valora el botín al precio de "
+        "subasta actual sin tope de venta; no es lo vendido.")
+    return 0
+
+
+def elegir_sesion(d, clave):
+    ses = d["sesiones"]
+    if not ses:
+        raise ErrorConsulta("no hay sesiones medidas")
+    if clave is None or clave == "":
+        return ses[-1]
+    if str(clave).isdigit() and 1 <= int(clave) <= len(ses):
+        return ses[-int(clave)]  # 1 = la última (0 no es una posición)
+    for s in ses:
+        if s.get("id") == clave:
+            return s
+    raise ErrorConsulta(f"no existe la sesión {clave} (usa farmeo-sesiones para ver ids; 1 = la última)")
+
+
+def cmd_farmeo_sesion(D, a, out):
+    d = cargar_farmeo(a.archivo)
+    s = elegir_sesion(d, a.id)
+    p = s.get("prediccion") or {}
+    out(f"[tus sesiones] Sesión {s.get('id')} · {s.get('inicio')} · {s.get('minutos')} min activos (+{s.get('pausaMin', 0)} en pausa)")
+    out(f"Tiempo: combate {pct_txt(s.get('combatePct'))} · saqueo {pct_txt(s.get('saqueoPct'))} · resto (caminar, comer, buscar) {pct_txt(s.get('restoPct'))}")
+    if s.get("tipo") == "pesca":
+        out(f"Pesca: {s.get('pescas')} capturas ({(s.get('pescasH') or 0):.0f}/h) · saqueo {s.get('saqueoS')} s por captura"
+            + (f" · además {s.get('muertes')} muertes" if s.get("muertes") else "")
+            + ". El plugin no predice la pesca: este oro/h es lo medido.")
+    else:
+        out(f"Ritmo: {s.get('muertes')} muertes ({(s.get('muertesH') or 0):.0f}/h) · pelea {s.get('peleaS')} s por muerte · "
+            f"saqueo {s.get('saqueoS')} s · {s.get('segPorMuerte')} s por muerte en total · muertes propias {s.get('muertesJugador', 0)}")
+    out(f"Oro: monedas {oro_txt(s.get('monedasOro'))} · botín a vendedor {oro_txt(s.get('valorVendedorOro'))} · a subasta {oro_txt(s.get('valorSubastaOro'))} "
+        f"→ {oro_txt(s.get('oroHSubasta'))}/h (vendedor {oro_txt(s.get('oroHVendedor'))}/h)")
+    if p:
+        out(f"[estimación] Predicho para los mismos mobs: {oro_txt(p.get('oroH'))}/h · {p.get('muertesH')} muertes/h · "
+            f"diferencia oro {pct_txt(p.get('errorOroPct'), True)}, ritmo {pct_txt(p.get('errorRitmoPct'), True)}, botín por muerte {pct_txt(p.get('errorBotinPct'), True)}")
+    if s.get("mobs"):
+        out("Mobs: " + ", ".join(f"{m.get('nombre')} ×{m.get('muertes')}" for m in s.get("mobs", [])))
+    out("Botín principal: " + ", ".join(f"{i.get('nombre')} ×{i.get('unidades')} ({oro_txt(i.get('valorOro'))})" for i in s.get("items", [])))
+    out(f"Muertes contadas por: {s.get('metodoMuertes')}" + (" (los mobs sin botín no cuentan)" if s.get("metodoMuertes") == "solo-saqueo" else ""))
+    extra = []
+    if s.get("viajeMin"):
+        extra.append(f"viaje hasta la primera pelea {s.get('viajeMin')} min (fuera del reloj)")
+    if s.get("muertoMin"):
+        extra.append(f"{s.get('muertoMin')} min muerto o volviendo al cadáver")
+    if s.get("muertesSinMob"):
+        extra.append(f"{s.get('muertesSinMob')} muertes sin mob conocido (el juego ocultó el GUID)")
+    if s.get("xpH"):
+        extra.append(f"{s.get('xpH')} XP/h")
+    if s.get("botinDe") == "chat":
+        extra.append("botín = lo que entró a tus bolsas")
+    if extra:
+        out("Además: " + " · ".join(extra))
+    return 0
+
+
+def cmd_farmeo_estilo(D, a, out):
+    d = cargar_farmeo(a.archivo)
+    cabecera_farmeo(d, out)
+    e = d.get("estilo")
+    if not e:
+        out("SIN DATOS: el plugin no exportó estilo.")
+        return 0
+    if e.get("fuente") == "sesiones":
+        out(f"[tus sesiones] Estilo calibrado con {e.get('muertes')} muertes en {e.get('sesiones')} sesiones:")
+    else:
+        out(f"[estimación] Supuestos por defecto: faltan muertes medidas ({e.get('muertes', 0)} de 30) para calibrar.")
+    out(f"  DPS efectivo: {e.get('dpsK')} × nivel (vida del mob ÷ segundos de pelea por muerte)")
+    out(f"  Saqueo: {e.get('saqueoS')} s por cadáver · pausas: {pct_txt(e.get('pausasPct'))} del tiempo · velocidad supuesta {e.get('velocidad')} yd/s")
+    out(f"  Incertidumbre del plan: ±{pct_txt(e.get('incertidumbrePct'))}")
+    ses = [s for s in d["sesiones"] if s.get("muertesH")]
+    if len(ses) >= 4:
+        mitad = len(ses) // 2
+        def media(xs, k):
+            v = [x.get(k) for x in xs if x.get(k) is not None]
+            return sum(v) / len(v) if v else None
+        for k, nom in (("muertesH", "muertes/h"), ("peleaS", "s de pelea"), ("oroHSubasta", "oro/h")):
+            a1, a2 = media(ses[:mitad], k), media(ses[mitad:], k)
+            if a1 and a2:
+                out(f"  Tendencia {nom}: {a1:.1f} → {a2:.1f} ({(a2 / a1 - 1) * 100:+.0f}%) entre la primera y la segunda mitad de tus sesiones")
+    return 0
+
+
+def cmd_farmeo_plan(D, a, out):
+    d = cargar_farmeo(a.archivo)
+    pl = d.get("plan")
+    if not pl:
+        out("SIN DATOS: el plugin no tiene plan (falta un escaneo de Auctionator o no hay campamentos elegibles).")
+        return 0
+    lo, hi = (pl.get("rango") or [None, None])[:2]
+    out(f"[estimación] Plan de {pl.get('horas')} h: ≈{oro_txt(pl.get('oroH'))}/h (rango {oro_txt(lo)}–{oro_txt(hi)}) en "
+        + " + ".join(pl.get("zonas", [])) + f" · viaje {pl.get('viajeMin')} min")
+    for t in pl.get("tramos", []):
+        mapa = f" (mapa {t['mapa'][0]:.1f}, {t['mapa'][1]:.1f})" if t.get("mapa") else ""
+        out(f"  {t.get('minutos')} min · {t.get('tipo')} {', '.join(t.get('mobs', []))} · {t.get('zona')}{mapa} → {oro_txt(t.get('oro'))}")
+    if pl.get("aportes"):
+        out("  Aportan: " + ", ".join(f"{x.get('nombre')} {oro_txt(x.get('oro'))} [{x.get('tope')}]" for x in pl["aportes"]))
+    if pl.get("alternativas"):
+        out("  Alternativas dentro del rango: " + "; ".join(" + ".join(x.get("zonas", [])) + f" ≈{oro_txt(x.get('oroH'))}/h" for x in pl["alternativas"]))
+    mt = pl.get("meta")
+    if mt:
+        if not mt.get("faltaOro"):
+            out(f"  Meta {oro_txt(mt.get('metaOro'))}: ya la tiene ({oro_txt(mt.get('tengoOro'))}).")
+        else:
+            lo, hi = (mt.get("horasRango") or [None, None])[:2]
+            fh = lambda h: "?" if h is None else f"{h:.1f} h"
+            out(f"  Meta {oro_txt(mt.get('metaOro'))} (tiene {oro_txt(mt.get('tengoOro'))}): faltan {oro_txt(mt.get('faltaOro'))} "
+                f"→ ≈{fh(mt.get('horas'))} con este plan (rango {fh(lo)}–{fh(hi)}), sin contar lo que gaste.")
+    out("Tope de venta: «ventas-propias» = tus ventas TSM; «kappa-ofertas» = fracción declarada de lo publicado; "
+        "«mercado-delgado» = solo vendedor; «sin-ofertas» = no está en tu escaneo, se valora a vendedor. "
+        "Drops de Classic 1.12 salvo lo observado en tus sesiones.")
+    return 0
+
+
+def cmd_farmeo_diagnostico(D, a, out):
+    """Cuellos de botella de las últimas sesiones, con reglas fijas y los números exportados."""
+    d = cargar_farmeo(a.archivo)
+    ses = d["sesiones"][-(a.ultimas or 3):]
+    if not ses:
+        out("SIN DATOS: no hay sesiones medidas para diagnosticar.")
+        return 0
+    e = d.get("estilo") or {}
+    out(f"[tus sesiones] Diagnóstico de {len(ses)} sesión(es):")
+    for s in ses:
+        p = s.get("prediccion") or {}
+        hall = []
+        if (s.get("restoPct") or 0) >= 50:
+            hall.append(f"el {pct_txt(s.get('restoPct'))} del tiempo no es pelea ni saqueo: caminar entre spawns, comer/beber o buscar mobs; "
+                        "un campamento más denso o menos pausas sube el ritmo")
+        if (s.get("saqueoS") or 0) > 3:
+            hall.append(f"saqueas {s.get('saqueoS')} s por cadáver: el autosaqueo (Mayús+clic o la opción de interfaz) lo baja a ~1–2 s")
+        if e.get("fuente") == "sesiones" and (e.get("dpsK") or 0) < 1.5:
+            hall.append(f"tu DPS efectivo ({e.get('dpsK')}×nivel) es bajo para el nivel: equipo, mascota o mobs de nivel más alto alargan la pelea")
+        if p.get("errorRitmoPct") is not None and p["errorRitmoPct"] <= -30:
+            hall.append(f"mataste {pct_txt(p['errorRitmoPct'], True)} menos de lo esperado: posible competencia por los spawns o campamento disperso")
+        if p.get("errorBotinPct") is not None and p["errorBotinPct"] <= -30:
+            hall.append(f"cada muerte rindió {pct_txt(p['errorBotinPct'], True)} menos de lo esperado: drops de Forever menores que Classic o precios que bajaron")
+        if (s.get("muertesJugador") or 0) >= 2:
+            hall.append(f"moriste {s.get('muertesJugador')} veces: cada muerte cuesta caminata y reparación"
+                        + (f" ({s.get('muertoMin')} min muerto)" if s.get("muertoMin") else ""))
+        if s.get("metodoMuertes") == "solo-saqueo":
+            hall.append("las muertes se contaron solo por saqueo (el juego no expuso el objetivo muerto): el ritmo real es algo mayor")
+        out(f"- {s.get('id')} ({(s.get('inicio') or '?')[:10]}, {s.get('minutos')} min, {oro_txt(s.get('oroHSubasta'))}/h):")
+        for h in hall or ["sin cuellos de botella claros con estas reglas"]:
+            out(f"    · {h}")
+    return 0
+
+
+# ---------------------------------------------------------------- farmeo (evaluación por mob y zona)
+# Mercado → Farmeo exporta también la evaluación completa del motor (evaluacion: ranking de
+# campamentos, cada mob elegible farmeado solo y los precios usados). Con eso el agente puede
+# contestar «¿y lo que dice tal guía?» con los precios del jugador, sin recalcular nada.
+MAX_SOBRE, MAX_BAJO = 2, 15  # = PARAMS.maxUp / maxDown de standalone/farm-plan.js
+RANGO_MOB = {"elite": "élite", "rareelite": "raro élite", "rare": "raro", "boss": "jefe"}
+
+
+def cargar_evaluacion(a):
+    d = cargar_farmeo(a.archivo)
+    ev = d.get("evaluacion")
+    if not isinstance(ev, dict) or not isinstance(ev.get("mobs"), list):
+        raise ErrorConsulta("el contexto de farmeo no trae la evaluación por mob: abre Mercado → Farmeo en "
+                            "Hermes Desktop con un escaneo de Auctionator para que el plugin la escriba")
+    return d, ev
+
+
+def cargar_drops():
+    """Dataset público de drops (standalone/drop-data.js) para explicar por qué un mob no se evalúa."""
+    ruta = RAIZ / "standalone" / "drop-data.js"
+    try:
+        txt = ruta.read_text(encoding="utf-8")
+    except OSError:
+        return None
+    i, j = txt.find("var DATA="), txt.rfind(";\nif(typeof module")
+    if i < 0 or j < i:
+        return None
+    try:
+        return json.loads(txt[i + len("var DATA="):j])
+    except ValueError:
+        return None
+
+
+def precio_txt(g):
+    return "?" if g is None else f"{g:.4f}o"
+
+
+def linea_campo(c, out, prefijo="  "):
+    out(f"{prefijo}≈{oro_txt(c.get('oroH'))}/h · {c.get('muertesH') or 0:.0f} muertes/h · {c.get('spawns')} spawns"
+        + (f" · riesgo {c['riesgo']}" if c.get("riesgo") else "")
+        + (f" · mapa {c['mapa'][0]:.1f}, {c['mapa'][1]:.1f}" if c.get("mapa") else ""))
+    out(f"{prefijo}Reparto: subasta {pct_txt(c.get('subastaPct'))} · vendedor {pct_txt(c.get('vendedorPct'))} · "
+        f"monedas {pct_txt(c.get('monedasPct'))}")
+
+
+def avisos_campo(c, out, prefijo="  "):
+    co = c.get("concentrado")
+    if co:
+        out(f"{prefijo}Ojo: el {pct_txt(co.get('cuotaPct'))} del oro sale de {co.get('nombre')}. Si su precio o su drop "
+            "real en Forever difieren de Classic, el oro/h cambia casi en la misma proporción.")
+    if "vistoMuertes" in c:
+        if c.get("vistoMuertes"):
+            out(f"{prefijo}[tus sesiones] Visto en Forever: {c['vistoMuertes']} muertes en tus sesiones medidas.")
+        else:
+            out(f"{prefijo}Sin verificar en Forever: ninguna de tus sesiones lo mató (spawns y drops de Classic 1.12).")
+
+
+def lineas_aportes(c, precios, out, n=4):
+    for x in (c.get("aportes") or [])[:n]:
+        pr = precios.get(str(x.get("itemId"))) or {}
+        tope = pr.get("tope") or "?"
+        out(f"    {x.get('nombre')} {pct_txt(x.get('cuotaPct'))} · {x.get('unidadesH') or 0:.1f} u/h, "
+            f"{x.get('subastaH') or 0:.1f} a subasta [{tope}"
+            + (f", tope {pr['topeUnidades']:.0f} u" if tope in ("kappa-ofertas", "ventas-propias") and pr.get("topeUnidades") is not None else "")
+            + "]")
+        if pr.get("medianaOro") is not None:
+            out(f"       precio usado (mediana {pr.get('dias')} d) {precio_txt(pr.get('medianaOro'))} · hoy {precio_txt(pr.get('hoyOro'))}"
+                f" · p25–p75 {precio_txt(pr.get('p25Oro'))}–{precio_txt(pr.get('p75Oro'))}"
+                + (f" · {pr['ofertas']:.0f} ofertas" if pr.get("ofertas") is not None else "")
+                + (" · mercado delgado (solo vendedor)" if pr.get("delgado") else "")
+                + f" · vendedor {precio_txt(pr.get('vendedorOro'))}"
+                + (" · el vendedor paga más que la subasta neta (−5 %)"
+                   if not pr.get("delgado") and pr.get("vendedorOro") is not None
+                   and pr["medianaOro"] * 0.95 <= pr["vendedorOro"] else ""))
+        elif pr:
+            out(f"       no está en tu escaneo: se valora a vendedor {precio_txt(pr.get('vendedorOro'))}")
+
+
+def por_que_no(m, zona, pj):
+    """Motivos (mismas reglas que mobOk/zoneOk de farm-plan.js) por los que un mob no se evalúa."""
+    motivos, nivel = [], pj.get("nivel")
+    lado = "a" if pj.get("faccion") == "alianza" else "h"
+    if lado not in (m[7] or "ah"):
+        motivos.append("tu facción no puede atacarlo")
+    if m[3] != "normal":
+        motivos.append(f"es {RANGO_MOB.get(m[3], m[3])}: el plan solo cuenta mobs normales")
+    if isinstance(nivel, int):
+        if m[2] > nivel + MAX_SOBRE:
+            motivos.append(f"nivel {m[1]}–{m[2]}: más de {MAX_SOBRE} niveles sobre el tuyo ({nivel})")
+        elif m[2] < nivel - MAX_BAJO:
+            motivos.append(f"nivel {m[1]}–{m[2]}: más de {MAX_BAJO} niveles bajo el tuyo ({nivel})")
+    if zona and (zona[2] in ("city", "instance") or str(m[4]).startswith("i")):
+        motivos.append("vive en una ciudad o instancia")
+    if (m[5] or 0) < 3:
+        motivos.append(f"solo {m[5] or 0} spawns en su zona principal")
+    return motivos
+
+
+def cmd_farmeo_mob(D, a, out):
+    d, ev = cargar_evaluacion(a)
+    pj, precios, q = d.get("personaje") or {}, ev.get("precios") or {}, normalizar(a.nombre)
+    if not q:
+        raise ErrorConsulta("falta el nombre del mob")
+    hits = [m for m in ev["mobs"] if q in normalizar(m.get("nombre"))]
+    if hits:
+        for m in hits[:a.max]:
+            nv = m.get("nivel") or [None, None]
+            out(f"[estimación] {m.get('nombre')} (nv {nv[0]}–{nv[1]}) · {m.get('zona')} · puesto {m.get('pos')} de "
+                f"{ev.get('totalMobs')} mobs elegibles a tu nivel, farmeado solo")
+            linea_campo(m, out)
+            out("  Aportes:")
+            lineas_aportes(m, precios, out)
+            avisos_campo(m, out)
+            camps = [(i + 1, c) for i, c in enumerate(ev.get("ranking") or []) if m.get("nombre") in (c.get("mobs") or [])]
+            for i, c in camps[:3]:
+                out(f"  En el ranking: #{i} {c.get('tipo')} {', '.join(c.get('mobs') or [])} · {c.get('zona')} ≈{oro_txt(c.get('oroH'))}/h")
+        if len(hits) > a.max:
+            out(f"(+{len(hits) - a.max} coincidencias más; usa --max)")
+    else:
+        drops = cargar_drops()
+        cand = [] if drops is None else [(k, v) for k, v in (drops.get("mobs") or {}).items() if q in normalizar(v[0])]
+        if drops is None:
+            out(f"SIN DATOS: «{a.nombre}» no está entre los {len(ev['mobs'])} mobs evaluados y no se pudo leer el dataset de drops.")
+        elif not cand:
+            out(f"SIN DATOS: «{a.nombre}» no está en el dataset de drops (Classic 1.12, sin spawns de evento): "
+                "no existe con ese nombre, no suelta nada farmeable o solo aparece durante un evento.")
+        for k, m in cand[:a.max]:
+            zona = (drops.get("zonas") or drops.get("zones") or {}).get(str(m[4]))
+            motivos = por_que_no(m, zona, pj)
+            out(f"{m[0]} (nv {m[1]}–{m[2]}) · {zona[0] if zona else m[4]}: "
+                + ("no se evalúa porque " + "; ".join(motivos) if motivos else
+                   f"es elegible, pero con tus precios queda fuera de los {len(ev['mobs'])} mejores de "
+                   f"{ev.get('totalMobs')} (o no rinde nada)"))
+    out("Oro/h = farmear ese sitio 1 h con tus precios (mediana de 14 días del escaneo) y el tope de venta; "
+        "drops de Classic 1.12 salvo lo observado en tus sesiones. Una guía externa usa otros precios y otros "
+        "supuestos: compara el precio usado aquí con el que cita la guía.")
+    return 0
+
+
+def cmd_farmeo_zona(D, a, out):
+    d, ev = cargar_evaluacion(a)
+    precios, q = ev.get("precios") or {}, normalizar(a.zona)
+    mobs = [m for m in ev["mobs"] if q and q in normalizar(m.get("zona"))]
+    camps = [(i + 1, c) for i, c in enumerate(ev.get("ranking") or []) if q and q in normalizar(c.get("zona"))]
+    if not mobs and not camps:
+        out(f"SIN DATOS: no hay mobs evaluados en «{a.zona}» a tu nivel (o la zona no se llama así en el dataset, "
+            "que usa los nombres en inglés: Arathi Highlands, Badlands, Desolace…).")
+        return 0
+    zonas = sorted({m.get("zona") for m in mobs} | {c.get("zona") for _, c in camps})
+    out(f"[estimación] {', '.join(zonas)}: {len(mobs)} mobs evaluados a tu nivel")
+    for i, c in camps[:3]:
+        out(f"  Ranking #{i}: {c.get('tipo')} {', '.join(c.get('mobs') or [])} ≈{oro_txt(c.get('oroH'))}/h")
+    out(f"  {'Puesto':>6}  {'Mob':<28}{'Nivel':>8}{'Oro/h':>9}  Aporta")
+    for m in mobs[:a.max]:
+        nv = m.get("nivel") or ["?", "?"]
+        ap = (m.get("aportes") or [{}])[0]
+        pr = precios.get(str(ap.get("itemId"))) or {}
+        out(f"  {m.get('pos'):>6}  {str(m.get('nombre'))[:27]:<28}{f'{nv[0]}–{nv[1]}':>8}{oro_txt(m.get('oroH')):>9}  "
+            f"{ap.get('nombre', '?')} {pct_txt(ap.get('cuotaPct'))}"
+            + (f" a {precio_txt(pr.get('medianaOro'))}" if pr.get("medianaOro") is not None else ""))
+    out("Detalle de un mob (aportes, precios y tope): farmeo-mob \"<nombre>\".")
+    return 0
+
+
+def cmd_farmeo_ranking(D, a, out):
+    d, ev = cargar_evaluacion(a)
+    precios = ev.get("precios") or {}
+    out(f"[estimación] Mejores campamentos a tu nivel (1 h cada uno, tus precios y tope de venta):")
+    for i, c in enumerate((ev.get("ranking") or [])[:a.max]):
+        out(f"{i + 1:>2}. {c.get('zona')} · {c.get('tipo')} {', '.join(c.get('mobs') or [])}")
+        linea_campo(c, out, prefijo="    ")
+        avisos_campo(c, out, prefijo="    ")
+        ap = c.get("aportes") or []
+        if ap:
+            out("    Aporta: " + ", ".join(
+                f"{x.get('nombre')} {pct_txt(x.get('cuotaPct'))}"
+                + (f" a {precio_txt((precios.get(str(x.get('itemId'))) or {}).get('medianaOro'))}"
+                   if (precios.get(str(x.get('itemId'))) or {}).get('medianaOro') is not None else "")
+                for x in ap[:3]))
+    out("«limpiar» = matar todo el campamento; «solo» = un tipo de mob. El plan de sesión (farmeo-plan) "
+        "reparte el tiempo y comparte el tope de venta entre campamentos.")
+    return 0
+
+
 def parser():
     p = argparse.ArgumentParser(prog="consultar.py", description=__doc__.split("\n\n")[0])
     p.add_argument("--datos", help="carpeta data/ (por defecto, la del plugin instalado)")
@@ -1487,6 +1895,25 @@ def parser():
                    help="mediana de mínimos y tendencia por mitades en vez de media/extremos (H11)")
     s.add_argument("--saturacion", type=float, default=None, metavar="F",
                    help="supuesto explícito 0<F<=1 de tasa de venta; sin él NO se asume (H12)")
+    for nombre_, fn, ayuda in (
+            ("farmeo-sesiones", cmd_farmeo_sesiones, "sesiones de farmeo medidas con WoWForeverFarm (predicho vs real)"),
+            ("farmeo-sesion", cmd_farmeo_sesion, "detalle de una sesión de farmeo (id o 1 = la última)"),
+            ("farmeo-estilo", cmd_farmeo_estilo, "tu estilo de farmeo calibrado (DPS efectivo, saqueo, pausas) y tendencias"),
+            ("farmeo-plan", cmd_farmeo_plan, "plan de sesión para maximizar oro que muestra el plugin"),
+            ("farmeo-diagnostico", cmd_farmeo_diagnostico, "cuellos de botella de tus últimas sesiones de farmeo"),
+            ("farmeo-ranking", cmd_farmeo_ranking, "mejores campamentos a tu nivel con tus precios (1 h cada uno)"),
+            ("farmeo-mob", cmd_farmeo_mob, "oro/h de un mob con tus precios: qué ítems lo explican y a qué precio"),
+            ("farmeo-zona", cmd_farmeo_zona, "mobs evaluados de una zona, ordenados por oro/h")):
+        s = orden(nombre_, fn, ayuda)
+        s.add_argument("--archivo", help=f"{ARCHIVO_FARMEO} (por defecto, la carpeta de datos del plugin en Hermes Desktop)")
+        if nombre_ == "farmeo-sesion":
+            s.add_argument("id", nargs="?", help="id de sesión (s<inicio>) o posición desde la última (1)")
+        if nombre_ == "farmeo-diagnostico":
+            s.add_argument("--ultimas", type=int, default=3, help="cuántas sesiones recientes (3)")
+        if nombre_ == "farmeo-mob":
+            s.add_argument("nombre", help="nombre del mob (inglés, como en el juego), o parte")
+        if nombre_ == "farmeo-zona":
+            s.add_argument("zona", help="nombre de la zona (inglés, como en el dataset), o parte")
     return p
 
 

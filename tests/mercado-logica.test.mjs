@@ -6,7 +6,7 @@ import {
   fuenteEnRango, filtrarMercado, ordenarMercado, frescura, snapshotVisible,
   planImportacion, snapshotValido, infoHistorial, perfilMotor, hubZonesDe,
   ajustesBase, ajustesFarm, normalizarAjustes, geometriaGrafico, fmtCobre,
-  HunterMarket, HunterHistory, PAGE_SIZE,
+  contextoFarmeo, HunterMarket, HunterHistory, PAGE_SIZE,
 } from '../desktop/src/mercado-logica.js'
 
 const req = createRequire(import.meta.url)
@@ -158,6 +158,10 @@ test('perfilMotor y ajustes: mapeo clase/facción y recolección', () => {
   assert.equal(n.prof.skin, true)
   assert.equal(n.n, 5)
   assert.equal(n.session, 2)
+  assert.deepEqual([ab.meta, ab.tengo], [0, 0], 'sin meta de oro por defecto')
+  assert.deepEqual([normalizarAjustes({ meta: '150', tengo: 42.9 }).meta, normalizarAjustes({ meta: '150', tengo: 42.9 }).tengo], [150, 42])
+  assert.deepEqual([normalizarAjustes({ meta: -5, tengo: 'x' }).meta, normalizarAjustes({ meta: -5, tengo: 'x' }).tengo], [0, 0])
+  assert.equal(normalizarAjustes({ meta: 5e9 }).meta, 1000000, 'tope de un millón de oro')
   const af = ajustesFarm(cazador, { gph: 12, prof: { herb: true } })
   assert.equal(af.gph, 12)
   assert.deepEqual(af.prof, { skin: true, herb: true, mine: false })
@@ -223,4 +227,21 @@ test('rotación sin pesos guardados aplica los pesos visibles desde el primer re
   assert.deepEqual(normalizarAjustes({ campMode: 'rotation' }).campWeights, [0.5, 0.3, 0.2])
   assert.deepEqual(normalizarAjustes({ campMode: 'rotation', campWeights: [0.8, 0.6, 0] }).campWeights, [0.5, 0.3, 0.2])
   assert.deepEqual(normalizarAjustes({ campMode: 'rotation', campWeights: [1, 0, 0] }).campWeights, [1, 0, 0])
+})
+
+test('contextoFarmeo: un tope nuevo por ventas propias cambia la clave de caché', () => {
+  const hoy = Math.floor((Date.now() - Date.UTC(2020, 0, 1)) / 86400000)
+  const items = [{ itemId: 4304, sourceKey: '4304', unitPriceCopper: 500, observedDay: hoy, history: [{ day: hoy, low: 500, high: 600, available: 80 }] }]
+  const base = { perfil: { nivel: 40, clase: 'cazador', faccion: 'horda' }, settings: ajustesFarm(null, {}), items, marketKey: 'k' }
+  const sin = contextoFarmeo({ ...base, ventas: new Map() })
+  const con = contextoFarmeo({ ...base, ventas: new Map([[4304, { units: 30, events: 4, perDay: 3 }]]) })
+  assert.equal(con.caps.get(4304).basis, 'ventas-propias')
+  assert.notEqual(sin.cacheKey, con.cacheKey, 'el índice por ítem no debe reutilizar el tope viejo')
+  const otra = contextoFarmeo({ ...base, ventas: new Map([[4304, { units: 60, events: 8, perDay: 6 }]]) })
+  assert.notEqual(con.cacheKey, otra.cacheKey)
+  assert.equal(contextoFarmeo({ ...base, ventas: new Map([[4304, { units: 30, events: 4, perDay: 3 }]]) }).cacheKey, con.cacheKey, 'mismas ventas, misma clave')
+  // «Sin tope (optimista)»: tampoco topa lo que ya vendiste por TSM.
+  const libre = contextoFarmeo({ ...base, settings: ajustesFarm(null, { tope: 'libre' }), ventas: new Map([[4304, { units: 30, events: 4, perDay: 3 }]]) })
+  assert.equal(libre.caps.get(4304).basis, 'kappa-ofertas')
+  assert.ok(libre.caps.get(4304).units > 1e6)
 })

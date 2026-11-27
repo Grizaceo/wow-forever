@@ -395,6 +395,62 @@ export function construirContextoComparacionCapitalNeutral({ resultado, lang = '
   }
 }
 
+/* --------------------------------------------------------------- farmeo */
+
+// Contexto del plan de sesión y de las sesiones medidas con WoWForeverFarm.
+// Lista blanca: plan (tramos y rango), estilo calibrado y las últimas sesiones
+// como agregados. Nunca nombres de personaje ni la ruta de posiciones.
+const ETIQUETAS_FARMEO = {
+  es: { titulo: 'Farmeo', plan: 'Plan de sesión', estilo: 'Tu estilo', sesion: 'Sesión', sinPlan: 'Sin plan (falta escaneo de mercado o dataset)',
+    sinSesiones: 'Sin sesiones medidas todavía (addon WoWForeverFarm, /wff start)', datos: 'Datos de farmeo',
+    limite1: 'Estimaciones con drops de Classic 1.12 (CMaNGOS) salvo lo observado en tus sesiones.',
+    limite2: 'El tope de venta es un supuesto declarado (κ × ofertas) salvo que tengas ventas propias en TSM.',
+    limite3: 'Solo agregados: sin nombre de personaje, reino ni posiciones.' },
+  en: { titulo: 'Farming', plan: 'Session plan', estilo: 'Your style', sesion: 'Session', sinPlan: 'No plan (missing market scan or dataset)',
+    sinSesiones: 'No measured sessions yet (WoWForeverFarm addon, /wff start)', datos: 'Farming data',
+    limite1: 'Estimates use Classic 1.12 drops (CMaNGOS) except what your sessions observed.',
+    limite2: 'The sell cap is a declared assumption (κ × listings) unless you have own TSM sales.',
+    limite3: 'Aggregates only: no character name, realm or positions.' },
+}
+const oroTxt = (c) => (Number.isFinite(c) ? (Math.round(c / 100) / 100).toFixed(2) + 'g' : '?')
+export function construirContextoFarmeo({ plan = null, estilo = null, metricas = [], resumenPerfil = null, lang = 'es', procedencia = [] }) {
+  const e = et(lang), t = lang === 'en' ? ETIQUETAS_FARMEO.en : ETIQUETAS_FARMEO.es
+  const seleccion = []
+  const b = plan?.best
+  if (b) {
+    seleccion.push(t.plan + ': ' + oroTxt(b.gph) + '/h (' + oroTxt(b.low) + '–' + oroTxt(b.high) + ') · ' + b.hours + ' h · '
+      + b.zones.map((z) => texto(z.name)).join(' + ') + ' · viaje ' + Math.round(b.travelMin) + ' min')
+    for (const l of (b.legs || []).slice(0, 4)) {
+      seleccion.push('  ' + l.minutes + ' min · ' + (l.farm.kind === 'clear' ? 'limpiar' : 'solo') + ' ' + l.farm.names.slice(0, 3).map((n) => texto(n)).join(', ')
+        + (l.farm.mapX != null ? ' (' + l.farm.mapX.toFixed(1) + ', ' + l.farm.mapY.toFixed(1) + ')' : '') + ' → ' + oroTxt(l.gold))
+    }
+  } else seleccion.push(t.sinPlan)
+  if (estilo) {
+    seleccion.push(t.estilo + ': ' + (estilo.source === 'sesiones' ? estilo.muertes + ' muertes medidas' : 'supuestos por defecto')
+      + ' · DPS ' + (Math.round(estilo.dpsK * 10) / 10) + '×nivel · saqueo ' + (Math.round(estilo.lootSec * 10) / 10) + ' s · pausas '
+      + Math.round(estilo.downtime * 100) + '%')
+  }
+  const ult = (Array.isArray(metricas) ? metricas : []).slice(-5)
+  if (!ult.length) seleccion.push(t.sinSesiones)
+  for (const m of ult) {
+    const p = m.prediccion
+    seleccion.push(t.sesion + ' ' + fechaDe(Math.floor((m.start * 1000 - Date.UTC(2020, 0, 1)) / 86400000)) + ': ' + Math.round(m.activo / 60) + ' min · '
+      + Math.round(m.muertesH) + ' muertes/h · pelea ' + (m.peleaS == null ? '?' : Math.round(m.peleaS)) + ' s · combate ' + Math.round(m.combatePct * 100)
+      + '% · saqueo ' + Math.round(m.saqueoPct * 100) + '% · ' + oroTxt(m.oroHSubasta) + '/h'
+      + (p ? ' (predicho ' + oroTxt(p.oroH) + '/h, ritmo ' + (p.errorRitmo == null ? '?' : Math.round(p.errorRitmo * 100) + '%') + ', botín '
+        + (p.errorBotin == null ? '?' : Math.round(p.errorBotin * 100) + '%') + ')' : '')
+      + ' · ' + m.mobs.slice(0, 3).map((x) => texto(x.nombre) + ' ×' + x.muertes).join(', '))
+  }
+  return {
+    seccion: 'farmeo',
+    titulo: t.titulo,
+    seleccion,
+    partes: { perfil: partePerfil(resumenPerfil, e), precios: null },
+    limites: [t.limite1, t.limite2, t.limite3],
+    procedencia: [...procedencia],
+  }
+}
+
 /* ----------------------------------------------------------- previsualizar */
 
 export function previsualizarDavi({ pregunta, snapshot, activas, lang = 'es' }) {

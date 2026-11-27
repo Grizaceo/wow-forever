@@ -9,6 +9,10 @@ faction, with a skill so your agent answers from the same data.
 
 ## Status
 
+- Version 2.4.0 adds farming for gold: a session plan scored by the gold you actually keep per
+  hour (the full value of each kill, a sell cap per item, real camps), and the companion
+  WoWForeverFarm addon to measure your sessions in-game, not yet verified on the Forever
+  client.
 - Version 2.2.1 removes world-event spawns from the drop data: Ahn'Qiraj war, invasions,
   holidays, Darkmoon Faire and the Fishing Extravaganza. The farm ranking no longer counts
   mobs that only appear during an event as permanent ones.
@@ -80,8 +84,12 @@ grant carry over. The route changes from `/wow-hunter-guide` to `/wow-forever`.
 - **Dungeons**: bosses in order with their loot, a filter for what your class can use, and the
   9 new Forever dungeons with their bosses.
 - **Market**: imports your `Auctionator.lua`, TSM accounting and the WoWForeverBridge daily
-  diary; builds up price history, flags deals, shows each item's thumbnail from its item id
-  and suggests where to farm.
+  diary; builds up price history, flags deals and shows each item's thumbnail from its item id.
+- **Farming for gold**: a session plan that maximizes the gold you actually end up with per hour
+  (real camps, kills/h from mob health and spawn spacing, the full value of each kill, a sell cap
+  from your own TSM sales or the posted supply), the best camps, and the sessions you measure
+  in-game with the companion **WoWForeverFarm** addon (time, combat, looting, kills and loot per
+  mob), compared against the prediction and used to calibrate the plan to how you play.
 - **Curated guide** for the Horde Hunter, and **Legacy**. A test checks them against the generated
   data (items, loot, quests, spells, races); the other classes use the generated data only.
 - **Agent skill**: answers questions such as "I'm a level 24 Undead Paladin, where do I
@@ -122,6 +130,13 @@ asking prices, and are kept separate from the Auctionator market. See **Market �
 (`WoWForeverBridge.lua`) that survives Auctionator's own ~21-day prune. Retention is
 configurable in-game with `/wfb days N`. The bridge is a transport, not a verified exporter:
 prices it carries are labelled **UNKNOWN** provenance by design.
+
+**WoWForeverFarm sessions** — a second companion addon (`addon/WoWForeverFarm`, SavedVariables
+`WoWForeverFarmDB`, its own small `WoWForeverFarm.lua`) counts a farming session in-game:
+`/wff start`, `/wff stop`, then `/reload`. Market → Farming reads it from the same granted
+folder and writes an aggregate summary, `farmeo-agente.json`, into the plugin data folder for
+the skill's `consultar.py farmeo-*` commands. It is **not yet verified on the Forever client**:
+see `addon/WoWForeverFarm/VERIFICAR.md`. Design: `docs/FARMEO-ORO.md`.
 
 **Automatic polling** — all three sources are polled every 30 s while Hermes is open and the
 plugin enabled, even when Market is not mounted. Grant the SavedVariables folder once; the
@@ -166,8 +181,8 @@ button is disabled so it cannot insert twice, and nothing new is written to stor
 
 ## What it reads, stores and runs
 
-- **Reads** only `Auctionator.lua`, `TradeSkillMaster.lua` and `WoWForeverBridge.lua` inside
-  the folder you grant with the Hermes picker (bounded subfolder search), and its own `data/`.
+- **Reads** only `Auctionator.lua`, `TradeSkillMaster.lua`, `WoWForeverBridge.lua` and
+  `WoWForeverFarm.lua` inside the folder you grant with the Hermes picker (bounded subfolder search), and its own `data/`.
   Every file is parsed as data: Lua is never run.
 - **Stores** your profile, guide progress and normalized prices in the plugin's own storage on
   your machine. Prices and history use the v2 store (`market-v2-*`, `price-history-v2-*`); the

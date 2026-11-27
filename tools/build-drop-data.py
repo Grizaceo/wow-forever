@@ -67,6 +67,91 @@ RANKS = {0: 'normal', 1: 'elite', 2: 'rareelite', 3: 'boss', 4: 'rare'}
 LOCK_KIND = {1: 'chest', 2: 'herb', 3: 'ore', 19: 'fish'}
 MAX_SOURCES = 15          # per item, best sources by chance x min(spawns, 30)
 MIN_CHANCE = 0.05         # percent; below this a source is not a farm target
+CAMP_RADIUS = 60.0        # yards; spawns closer than this belong to the same camp (single linkage)
+CAMP_MIN_SPAWNS = 4       # smaller groups are not a camp
+NN_CAP = 400              # yards; nearest-neighbour distances are capped (isolated spawns)
+
+
+# ------------------------------------------------------------------ geometry
+def nn_median(points):
+    """Median nearest-neighbour distance (yards) among same-map points, capped."""
+    if len(points) < 2:
+        return NN_CAP
+    cell = collections.defaultdict(list)
+    for i, (x, y) in enumerate(points):
+        cell[(int(x // NN_CAP), int(y // NN_CAP))].append(i)
+    d = []
+    for i, (x, y) in enumerate(points):
+        cx, cy, best = int(x // NN_CAP), int(y // NN_CAP), NN_CAP
+        for dx in (-1, 0, 1):
+            for dy in (-1, 0, 1):
+                for j in cell.get((cx + dx, cy + dy), ()):
+                    if j != i:
+                        best = min(best, math.hypot(x - points[j][0], y - points[j][1]))
+        d.append(best)
+    d.sort()
+    return int(round(d[len(d) // 2]))
+
+
+def build_camps(cspawn, mobs, loc):
+    """Spatial camps: single-linkage groups (<= CAMP_RADIUS) of normal-rank farmable
+    spawns of every type, per continent. -> [[zoneKey, mapX*10, mapY*10, nnYards,
+    [[npcId, spawns], ...]], ...] sorted by zone and position. Deterministic."""
+    pts = collections.defaultdict(list)
+    for e in sorted(mobs):
+        if mobs[e][3] != 'normal':
+            continue
+        for m, x, y, zk, _ in cspawn[e][2]:
+            if m in (0, 1):
+                pts[m].append((x, y, e))
+    out = []
+    R = CAMP_RADIUS
+    for m in sorted(pts):
+        P = pts[m]
+        parent = list(range(len(P)))
+
+        def find(a):
+            while parent[a] != a:
+                parent[a] = parent[parent[a]]
+                a = parent[a]
+            return a
+        cell = collections.defaultdict(list)
+        for i, (x, y, _) in enumerate(P):
+            cell[(int(x // R), int(y // R))].append(i)
+        nn = [NN_CAP] * len(P)
+        for (cx, cy), ids in cell.items():
+            for dx in (-1, 0, 1):
+                for dy in (-1, 0, 1):
+                    for j in cell.get((cx + dx, cy + dy), ()):
+                        for i in ids:
+                            if i == j:
+                                continue
+                            d = math.hypot(P[i][0] - P[j][0], P[i][1] - P[j][1])
+                            if d < nn[i]:
+                                nn[i] = d
+                            if d <= R:
+                                a, b = find(i), find(j)
+                                if a != b:
+                                    parent[max(a, b)] = min(a, b)
+        groups = collections.defaultdict(list)
+        for i in range(len(P)):
+            groups[find(i)].append(i)
+        for ids in groups.values():
+            if len(ids) < CAMP_MIN_SPAWNS:
+                continue
+            cx = sum(P[i][0] for i in ids) / len(ids)
+            cy = sum(P[i][1] for i in ids) / len(ids)
+            z = loc.locate(m, cx, cy)
+            if not z:
+                continue
+            mx = (z['y1'] - cy) / (z['y1'] - z['y0']) * 100.0
+            my = (z['x1'] - cx) / (z['x1'] - z['x0']) * 100.0
+            mix = collections.Counter(P[i][2] for i in ids)
+            d = sorted(nn[i] for i in ids)
+            out.append([str(z['ui']), int(round(mx * 10)), int(round(my * 10)), int(round(d[len(d) // 2])),
+                        sorted(([e, c] for e, c in mix.items()), key=lambda ec: (-ec[1], ec[0]))])
+    out.sort(key=lambda c: (c[0], c[1], c[2], c[4][0][0]))
+    return out
 
 
 # ------------------------------------------------------------------ builder
@@ -78,12 +163,13 @@ def build_public(src):
     db = read_sql(sql, TABLES)
     zones, maps = build_zones(src)
     loc = ZoneLocator(zones, db)
-    locks = {}
+    locks, lock_skill = {}, {}
     for r in read_csv(os.path.join(src, 'Lock.csv')):
         kind = None
         for k in range(8):
             if r['Type_%d' % k] == '2' and int(r['_Index_%d' % k]) in LOCK_KIND:
                 kind = LOCK_KIND[int(r['_Index_%d' % k])]
+                lock_skill[int(r['ID'])] = int(r['Skill_%d' % k] or 0)
                 break
         locks[int(r['ID'])] = kind
 
@@ -96,7 +182,6 @@ def build_public(src):
             return 'i%d' % m
         return None
 
-    # spawns -> (zoneKey -> count), respawn
     # Spawns that only exist while a world event runs (AQ war effort, invasions,
     # holidays): game_event_creature / game_event_gameobject with a positive
     # event. A negative event despawns a normal spawn during the event, so those
@@ -104,9 +189,7 @@ def build_public(src):
     # min and not linked to a parent event, e.g. 'Nights': Leprithus and the
     # Westfall ghouls spawn every night; Hallow's End sub-events also recur daily
     # but only inside the holiday). Spawn groups gated by an event world state
-    # (EVENT_WORLDSTATES) are excluded as well. Without this, AQ-invasion elites
-    # (e.g. Lesser Anubisath Warbringer in Thousand Needles) ranked as everyday
-    # farm camps.
+    # (EVENT_WORLDSTATES) are excluded as well.
     daily = {r['entry'] for r in db['game_event'] if 0 < r['occurence'] <= 1440 and not r['linkedTo']}
     event_guids = {t: {r['guid'] for r in db['game_event_' + t] if r['event'] > 0 and r['event'] not in daily}
                    for t in ('creature', 'gameobject')}
@@ -115,9 +198,9 @@ def build_public(src):
         if r['Id'] in gated:
             event_guids['creature' if gated[r['Id']] == 0 else 'gameobject'].add(r['Guid'])
 
-    def spawns_of(table):
-        acc = collections.defaultdict(lambda: [collections.Counter(), []])
-        skip = event_guids[table]
+    # spawns -> (zoneKey -> count), respawn, positions [(map, x, y, zoneKey, respawn)]
+    def spawns_of(table, skip=frozenset()):
+        acc = collections.defaultdict(lambda: [collections.Counter(), [], []])
         for r in db[table]:
             if r['guid'] in skip:
                 continue
@@ -127,8 +210,9 @@ def build_public(src):
             a = acc[r['id']]
             a[0][zk] += 1
             a[1].append(r['spawntimesecsmin'])
+            a[2].append((r['map'], r['position_x'], r['position_y'], zk, r['spawntimesecsmin']))
         return acc
-    cspawn, ospawn = spawns_of('creature'), spawns_of('gameobject')
+    cspawn, ospawn = spawns_of('creature', event_guids['creature']), spawns_of('gameobject', event_guids['gameobject'])
 
     ft = {int(r['ID']): r for r in read_csv(os.path.join(src, 'FactionTemplate.csv'))}
 
@@ -154,6 +238,10 @@ def build_public(src):
     sources = collections.defaultdict(list)   # item -> [type, id, chance, min, max]
     world = collections.defaultdict(list)     # item -> [(lvlmin,lvlmax,chance)]
     mobs, objects = {}, {}
+    obj_skill = {}  # goId -> skill de profesión mínimo (Lock.csv), solo hierbas/menas/pesca
+    # schema 2: value of a kill beyond the capped item->source index
+    mob_x, mob_loot, skin_loot = {}, {}, {}
+    direct_rows = {}       # npcId -> [(item, chanceBp, count*10, vendorEV)] before the source cap
 
     def median(v):
         v = sorted(v)
@@ -166,10 +254,12 @@ def build_public(src):
         side = sides(t['Faction'])
         if not side:
             continue
-        zc, resp = cspawn[e]
+        zc, resp, pos = cspawn[e]
         rank = RANKS.get(t['Rank'], 'normal')
         zk, n = sorted(zc.items(), key=lambda kv: (-kv[1], kv[0]))[0]
         rec = None
+        rest_ev = 0.0          # copper per kill: shared (world) loot + BoP vendor value
+        direct, skin = {}, {}
         for typ, table, lid in (('m', 'creature_loot_template', t['LootId']),
                                 ('s', 'skinning_loot_template', t['SkinningLootId']),
                                 ('p', 'pickpocketing_loot_template', t['PickpocketLootId'])):
@@ -178,6 +268,26 @@ def build_public(src):
             for item, (ch, mn, mx, w) in loot.expand(table, lid).items():
                 if item not in items_t:
                     continue
+                it = items_t[item]
+                quest = it['bonding'] == 4 or it['class'] == 12
+                if typ != 'p' and not quest:
+                    ev = ch / 100.0 * (mn + mx) / 2.0 * it['SellPrice']
+                    # El botín ligado (BoP) de un mob normal solo entra en el restVendor:
+                    # al filtrarse sus sources no puede contarse también como unidad.
+                    # En rare/rareelite/boss la source SÍ se conserva para afinidad de
+                    # equipo: su valor debe contarse una sola vez, desde esa unidad.
+                    bop_rara = it['bonding'] == 1 and typ == 'm' and rank in ('rare', 'rareelite', 'boss')
+                    if w or (it['bonding'] == 1 and typ == 'm' and not bop_rara):
+                        rest_ev += ev
+                    elif bop_rara:
+                        # La source se conserva porque es botín ligado de un
+                        # mob raro/jefe; su valor se cuenta desde la unidad,
+                        # no otra vez dentro de restVendorCopperPerKill.
+                        pass
+                    elif ch >= MIN_CHANCE:
+                        (direct if typ == 'm' else skin)[item] = [item, int(round(ch * 100)), int(round((mn + mx) * 5)), ev]
+                    else:
+                        rest_ev += ev
                 if w:
                     world[item].append((t['MinLevel'], t['MaxLevel'], ch))
                     continue
@@ -185,17 +295,25 @@ def build_public(src):
                     continue
                 sources[item].append([typ, e, round(ch, 2), mn, mx])
                 rec = True
-        if rec:
+        coins = (t['MinLootGold'] + t['MaxLootGold']) / 2.0
+        if rec or ((coins > 0 or rest_ev > 0) and t['CreatureType'] != 8):
             # [name, lvlMin, lvlMax, rank, zoneKey(main), spawns(main), respawnSec, otherZones]
             others = [[k, c] for k, c in sorted(zc.items()) if k != zk]
             mobs[e] = [t['Name'], t['MinLevel'], t['MaxLevel'], rank, zk, n, median(resp), side] + ([others] if others else [])
+            main = [(x, y) for m_, x, y, z_, _ in pos if z_ == zk]
+            mob_x[e] = [int(round((t['MinLevelHealth'] + t['MaxLevelHealth']) / 2.0)), int(round(coins)),
+                        t['CreatureType'], round(rest_ev, 1), nn_median(main), 1 if skin else 0]
+            if direct:
+                direct_rows[e] = sorted(direct.values())
+            if skin:
+                skin_loot[e] = [r[:3] for r in sorted(skin.values())]
 
     for t in sorted(db['gameobject_template'], key=lambda r: r['entry']):
         e = t['entry']
         if t['type'] != 3 or e not in ospawn or not t['data1']:
             continue
         kind = locks.get(t['data0']) or 'chest'
-        zc, resp = ospawn[e]
+        zc, resp, _pos = ospawn[e]
         got = False
         for item, (ch, mn, mx, w) in loot.expand('gameobject_loot_template', t['data1']).items():
             if item not in items_t or w or ch < MIN_CHANCE:
@@ -206,6 +324,8 @@ def build_public(src):
             zk, n = sorted(zc.items(), key=lambda kv: (-kv[1], kv[0]))[0]
             others = [[k, c] for k, c in sorted(zc.items()) if k != zk]
             objects[e] = [t['name'], kind, zk, n, median(resp)] + ([others] if others else [])
+            if kind in ('herb', 'ore', 'fish') and lock_skill.get(t['data0'], 0) > 0:
+                obj_skill[e] = lock_skill[t['data0']]
 
     items, used_m, used_o = {}, set(), set()
     for iid in sorted(set(sources) | set(world)):
@@ -245,10 +365,36 @@ def build_public(src):
         lo, hi = (L[len(L) // 10], L[(len(L) * 9) // 10]) if L else (None, None)
         zone_out['i%d' % m] = [mp['MapName_lang'], 'raid' if mp['InstanceType'] == '2' else 'dungeon', 'instance', lo, hi]
 
+    # schema 2: every farmable mob with value (coins, shared loot, direct loot),
+    # its full direct/skinning loot list (no per-item source cap) and the camps.
+    out_m = sorted(used_m | set(mob_x))
+    # Direct loot the capped item->source index lost: commodities (cloth, mats,
+    # reagents, recipes) are listed per mob so the market can price them; the
+    # rest (grey junk, gear) only adds its vendor value to mobX.restVendor.
+    kept = {(s[1], int(iid)) for iid, rec in items.items() for s in rec[10] if s[0] == 'm'}
+    for e, rows in direct_rows.items():
+        for item, bp, c10, ev in rows:
+            if (e, item) in kept:
+                continue
+            it = items_t[item]
+            commodity = it['class'] in (5, 7, 9) or (it['class'] in (0, 15) and it['Quality'] >= 1)
+            if commodity and str(item) in items:
+                mob_loot.setdefault(e, []).append(item)
+                mob_loot[e] += [bp, c10]
+            else:
+                mob_x[e][3] += ev
+    for e in mob_x:
+        mob_x[e][3] = round(mob_x[e][3], 1)
+    loot_out = {str(e): mob_loot[e] for e in out_m if e in mob_loot}
+    keep = lambda rows: [r for r in rows if str(r[0]) in items]
+    skin_out = {str(e): [x for r in keep(skin_loot[e]) for x in r] for e in out_m if e in skin_loot and keep(skin_loot[e])}
+    camps = build_camps(cspawn, {e: mobs[e] for e in out_m}, loc)
+    item_stack = {iid: items_t[int(iid)]['stackable'] for iid in items if items_t[int(iid)]['stackable'] > 1}
+
     files = [{'path': CMANGOS_FILE, 'sha256': sha256(sql)}] + \
             [{'path': c, 'sha256': sha256(os.path.join(src, c))} for c in CSV_FILES]
     return {
-        'schemaVersion': 1,
+        'schemaVersion': 2,
         'source': {
             'name': 'CMaNGOS classic-db (WoW 1.12) + WoW Classic Era client tables',
             'license': 'GPL-3.0-or-later',
@@ -265,6 +411,7 @@ def build_public(src):
                       'counts are all known spawn points; pooled chests are not simultaneous. '
                       'Spawn counts/respawn are emulator values, not live population.',
             'params': {'worldRefUsers': WORLD_REF_USERS, 'maxSources': MAX_SOURCES, 'minChancePct': MIN_CHANCE,
+                       'campRadiusYards': CAMP_RADIUS, 'campMinSpawns': CAMP_MIN_SPAWNS, 'nnCapYards': NN_CAP,
                        'eventSpawns': 'excluded (game_event_creature/game_event_gameobject, event > 0, '
                                       'except events recurring daily not linked to another event; spawn '
                                       'groups gated by world state 2099 AQ war or 6035 Fishing Extravaganza)'},
@@ -277,10 +424,29 @@ def build_public(src):
             'items': 'itemId -> [name, quality, class, subclass, invType, reqLevel, itemLevel, bonding, '
                      'allowableClass, sellPriceCopper, sources[[m|o|s|p, id, chancePct, minCount, maxCount]], '
                      'world?[mobLvlMin, mobLvlMax, mobCount, medianChancePct]]',
+            'mobX': 'npcId -> [healthAvg, coinsAvgCopper, creatureType, restVendorCopperPerKill '
+                    '(shared world loot + BoP + direct loot below minChancePct or outside items/mobLoot), '
+                    'nnSameTypeYards (main zone), skinnable 0|1]',
+            'mobLoot': 'npcId -> flat [itemId, chanceBasisPoints (1/100 %), avgCount*10, ...]: direct-loot '
+                       'commodities (trade goods, reagents, recipes, non-grey consumables/misc) that the capped '
+                       'items[].sources index does not list for that mob. Full direct loot of a mob = its '
+                       'items[].sources entries + mobLoot; everything else is in mobX.restVendor',
+            'skinLoot': 'npcId -> flat [itemId, chanceBasisPoints, avgCount*10, ...] full skinning loot',
+            'itemStack': 'itemId -> stack size, only when > 1 (bag slots per farmed unit)',
+            'objSkill': 'goId -> minimum profession skill to gather (Lock.csv Skill), herb/ore/fish nodes only; '
+                        'absent = 0',
+            'camps': '[[zoneKey, mapX*10, mapY*10, nnYards, [[npcId, spawns], ...]], ...] spatial camps of '
+                     'normal-rank spawns (single linkage <= campRadiusYards)',
         },
         'zones': zone_out,
-        'mobs': {str(k): mobs[k] for k in sorted(used_m)},
+        'mobs': {str(k): mobs[k] for k in out_m},
+        'mobX': {str(k): mob_x[k] for k in out_m if k in mob_x},
+        'mobLoot': loot_out,
+        'skinLoot': skin_out,
+        'camps': camps,
+        'itemStack': item_stack,
         'objects': {str(k): objects[k] for k in sorted(used_o)},
+        'objSkill': {str(k): obj_skill[k] for k in sorted(used_o) if k in obj_skill},
         'items': items,
     }
 

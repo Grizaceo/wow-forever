@@ -12,6 +12,8 @@ const KILL_SEC={normal:20,elite:45,rareelite:60,rare:30,boss:90};
 const GATHER_SEC=10,TRAVEL_SEC={mob:15,object:45};
 const RARE_K=0.2,RARE_ZONE_MAX=1,CHEST_OPEN_RATE=0.05,CHEST_ZONE_MAX=4;
 const OUTLIER_VENDOR_MULT=50,OUTLIER_MAX_AVAIL=2;
+// Mercado delgado: con ≤5 ofertas conocidas la subasta no se cuenta (se vende al vendedor).
+const THIN_MAX_AVAIL=5,PRICE_WINDOW_DAYS=14;
 const COMP={low:1,med:0.75,high:0.45},COMP_ORDER=['low','med','high'];
 const COMP_LABEL={low:'baja',med:'media',high:'alta'};
 const CLASS_BIT={warrior:1,hunter:4,shaman:64};
@@ -35,14 +37,16 @@ const pctF=c=>c>=0.095?`${Math.round(c*100)}%`:`${(c*100).toFixed(1).replace(/\.
    con retorno de capital. La vía de zona es la única que aplica L. */
 const MODEL={
   risk:{heuristic:true,basis:'facción + PvP; sin datos de población'},
-  competition:{heuristic:true,basis:'selección manual + hub/horario pico; sin datos de población'},
+  competition:{heuristic:true,basis:'selección manual + hub de tu ruta de nivel; sin datos de población (la hora del reloj no cuenta)'},
   travel:{heuristic:true,basis:'flight paths Classic 1.12 aproximados + duración de sesión'},
   liquidity:{heuristic:true,basis:'proxy de profundidad de oferta anunciada; no mide volumen vendido'},
   outlier:{heuristic:true,basis:`freno conservador: ≤${OUTLIER_MAX_AVAIL} ofertas y >${OUTLIER_VENDOR_MULT}× vendedor; legitimidad no verificable offline`},
-  usefulBonus:{heuristic:true,basis:'conteo de ítems útiles, aplicado sólo a AH; sin valoración marginal'},
+  usefulBonus:{heuristic:true,basis:'conteo de ítems útiles; solo información, no entra al puntaje (objetivo: oro)'},
+  price:{heuristic:false,basis:`mediana de mínimos diarios de los últimos ${PRICE_WINDOW_DAYS} días; sin historial, último mínimo`},
+  thin:{heuristic:true,basis:`≤${THIN_MAX_AVAIL} ofertas: sin canal de subasta, solo vendedor`},
   rare:{heuristic:true,basis:'RARE_K=0,2/h sólo si falta respawn; con dato se usa la cota física'},
   roi:{heuristic:false,basis:'retorno/coste unitario con coste imputado por tiempo; NO ROI sobre capital'},
-  itemMetrics:{liquidityApplied:false,basis:'métricas por ítem no integran L'},
+  itemMetrics:{liquidityApplied:true,basis:'L se aplica igual que en la vía de zona; SIN DATOS = sin ajuste'},
   zoneEntry:{liquidityApplied:true,basis:'L se aplica en la vía de zona; SIN DATOS = sin ajuste'}
 };
 // H2: un jugador ocupa UN campamento a la vez. La rotación ponderada sólo se
@@ -332,9 +336,11 @@ function normalizeSettings(s){
   s=s||{};const zc={};
   if(s.zoneComp&&typeof s.zoneComp==='object')for(const k of Object.keys(s.zoneComp))if(COMP_ORDER.includes(s.zoneComp[k]))zc[k]=s.zoneComp[k];
   const p=s.prof||{},n=Number(s.n);
+  // Skill de recolección del jugador (Profesiones → skill-182/186); null = no lo sabemos.
+  const sk=s.skill||{},skv=v=>Number.isInteger(v)&&v>=0&&v<=300?v:null;
   return{comp:COMP_ORDER.includes(s.comp)?s.comp:'auto',zoneComp:zc,
     gph:Number.isFinite(+s.gph)&&+s.gph>0?Math.min(1000,+s.gph):5,
-    prof:{skin:!!p.skin,herb:!!p.herb,mine:!!p.mine},group:!!s.group,pvp:s.pvp!==false,
+    prof:{skin:!!p.skin,herb:!!p.herb,mine:!!p.mine},skill:{herb:skv(sk.herb),mine:skv(sk.mine)},group:!!s.group,pvp:s.pvp!==false,
     n:Number.isInteger(n)&&n>=3&&n<=8?n:5,
     session:[1,2,4].includes(+s.session)?+s.session:2,
     // H2: por defecto un sitio a la vez; rotación sólo con pesos explícitos.
@@ -362,18 +368,38 @@ function eligible(src,profile,settings){
   return{ok:true,reason:''};
 }
 function rate(src,level){return rateInfo(src,level).rate;}
+// Precio robusto: mediana de los mínimos diarios de la ventana que termina en
+// observedDay. Sin mínimos fechados se usa el último mínimo (unitPriceCopper).
+function windowPrice(it){
+  const hist=Array.isArray(it?.history)?it.history:[],end=Number.isSafeInteger(it?.observedDay)?it.observedDay:null;
+  const lows=[];
+  for(const h of hist){
+    if(!h||!Number.isSafeInteger(h.low)||h.low<=0||!Number.isSafeInteger(h.day))continue;
+    if(end!=null&&(h.day>end||h.day<=end-PRICE_WINDOW_DAYS))continue;
+    lows.push(h.low);
+  }
+  if(!lows.length)return{price:it?.unitPriceCopper||0,days:0,basis:'último mínimo'};
+  lows.sort((a,b)=>a-b);
+  const m=lows.length>>1,med=lows.length%2?lows[m]:Math.round((lows[m-1]+lows[m])/2);
+  return{price:med,days:lows.length,basis:'mediana de la ventana'};
+}
 function refPrice(it){
   const h=Array.isArray(it?.history)?it.history.find(x=>x.day===it.observedDay):null;
   const avail=h?.available??null;
-  const sell=it?.sellPriceCopper||IX.items[String(it?.itemId)]?.[9]||0,price=it?.unitPriceCopper||0;
-  const c=clampOutlier(price,sell,avail);
-  return{price:c.price,sell,doubtful:c.doubtful,clamped:c.clamped,rule:c.rule,vendorFloor:c.price<=0&&sell>0};
+  const sell=it?.sellPriceCopper||IX?.items?.[String(it?.itemId)]?.[9]||0,wp=windowPrice(it);
+  const c=clampOutlier(wp.price,sell,avail);
+  const thin=Number.isFinite(avail)&&avail>=0&&avail<=THIN_MAX_AVAIL;
+  const ahNet=thin?0:Math.floor(c.price*(1-AH_CUT));
+  // El canal es el mejor de los dos: vendedor si la subasta neta no lo supera.
+  const vendorFloor=sell>0&&ahNet<=sell;
+  return{price:c.price,sell,doubtful:c.doubtful,clamped:c.clamped,rule:c.rule,vendorFloor,thin,ahNet,
+    priceDays:wp.days,priceBasis:wp.basis};
 }
 function metrics(src,it,settings,level){
   const ri=rateInfo(src,level),K=ri.rate,u=src.chance*(src.avgCount||1);
   const rp=refPrice(it);
   const vendorFloor=rp.vendorFloor;
-  const net=vendorFloor?rp.sell:Math.floor(rp.price*(1-AH_CUT));
+  const net=vendorFloor?rp.sell:rp.ahNet;
   const gph=K*u*net,denom=K*u;
   const farmCost=denom>0?(settings.gph||5)*10000/denom:Infinity;
   const margin=net-farmCost;
@@ -382,7 +408,7 @@ function metrics(src,it,settings,level){
   return{K,u,net,gph,denom,farmCostPerUnit:farmCost,margin,roi,
     marginPct:mi.netOverCost,returnOverCost:mi.returnOverCost,roiLabel:mi.label,roiNote:mi.note,
     rateApprox:ri.approx,rateBasis:ri.basis,respawnKnown:ri.respawnKnown,spawnCap:ri.spawnCap,
-    doubtful:rp.doubtful,clamped:rp.clamped,clampRule:rp.rule,vendorFloor,
+    doubtful:rp.doubtful,clamped:rp.clamped,clampRule:rp.rule,vendorFloor,thin:rp.thin,priceDays:rp.priceDays,
     liquidityApplied:MODEL.itemMetrics.liquidityApplied,model:MODEL.roi};
 }
 
@@ -421,19 +447,25 @@ function vendorCamps(zk,level,profile,settings,sess){
    es el mejor canal real: AH neto si está en tu scan, si no el sellPrice. */
 const PROF_KINDS={skin:'Piel',herb:'Hierbas',mine:'Minería'};
 function profGph(zk,kind,level,profile,settings,sess){
-  const key='pf|'+[zk,kind,level,profile.fac||'',settings.group?1:0,settings.campMode||'single',(settings.campWeights||[]).join(',')].join('|');
+  const rawSkill=kind==='herb'||kind==='mine'?settings.skill?.[kind]:null;
+  const mySkill=Number.isInteger(rawSkill)&&rawSkill>=0&&rawSkill<=300?rawSkill:null;
+  const key='pf|'+[zk,kind,level,profile.fac||'',settings.group?1:0,settings.campMode||'single',(settings.campWeights||[]).join(','),mySkill??''].join('|');
   const hit=sess.profCache.get(key);if(hit!=null)return hit;
   const wantObj=kind==='herb'?'herb':kind==='mine'?'ore':null;
   const vals=[],itemVal=new Map();
   const addEnt=(id,isObj)=>{
+    // Con tu skill conocido, el nodo que pide más skill no se recolecta (Lock.csv);
+    // sin él queda el proxy de iLvl ≤ nivel+10 de abajo.
+    if(isObj&&mySkill!=null&&(ENV.HunterDropData?.objSkill?.[id]||0)>mySkill)return;
     const per=new Map();let anySrc=null;
     for(const iid of (isObj?IX.objItems[id]:IX.mobItems[id])||[]){
       const dd=IX.items[iid],sell=dd?.[9]||0;if(sell<=0)continue;
       // Los nodos de hierbas/menas no tienen nivel propio: el iLvl del material
       // es el proxy del tier que tu personaje puede recolectar a su nivel.
-      if((dd?.[6]||0)>level+10)continue;
+      if(!(isObj&&mySkill!=null)&&(dd?.[6]||0)>level+10)continue;
       const it=sess.scan.get(iid),rp=it?refPrice(it):null;
-      const ah=rp&&rp.price>0?Math.floor(rp.price*(1-AH_CUT)):0;
+      // Misma regla que la ruta por ítem: con ≤5 ofertas no hay canal de subasta.
+      const ah=rp?rp.ahNet:0;
       const unit=Math.max(ah,sell);if(unit<=0)continue;
       for(const s of normSources(iid)){
         const okProf=isObj?s.kind==='object'&&s.objKind===wantObj:s.kind==='skin';
@@ -565,7 +597,7 @@ function sources(itemId,profile,settings){
 }
 function itemMetrics(scanItem,profile,settings){
   const out={best:null,gph:0,roi:null,margin:null,farmable:false,sources:[],
-    roiLabel:'retorno/coste',roiNote:MODEL.roi.basis,liquidityApplied:false,model:MODEL.roi};
+    roiLabel:'retorno/coste',roiNote:MODEL.roi.basis,liquidityApplied:true,model:MODEL.roi};
   index();
   const id=scanItem&&scanItem.itemId;
   if(!Number.isSafeInteger(id)||id<=0||!IX.hasData)return out;
@@ -573,8 +605,12 @@ function itemMetrics(scanItem,profile,settings){
   profile=profile||{};
   const level=profile.level||12,st=normalizeSettings(settings);
   const targetCopper=st.gph*10000;
+  // Misma liquidez que la vía de zona: la oferta anunciada acota lo vendible.
+  const liq=liquidityInfo(scanItem,today()),L=liq.factor==null?1:liq.factor;
+  out.liquidity=liq;
   const all=normSources(String(id)).map(src=>{
-    const e=eligible(src,profile,st),camp=metrics(src,scanItem,st,level);
+    const e=eligible(src,profile,st),camp0=metrics(src,scanItem,st,level);
+    const camp=camp0.vendorFloor||L===1?camp0:{...camp0,gph:camp0.gph*L};
     const z=IX.zones[src.zoneKey];
     const travel=travelFor(z?.[0],profile.fac,profile.hubZones,st.session);
     const risk=riskFor(z?.[2],profile,st);
@@ -654,9 +690,10 @@ function compFor(zk,zname,settings,profile){
   const ov=settings.zoneComp[zk];
   if(ov)return{comp:ov,why:'manual para esta zona',heuristic:true,basis:MODEL.competition.basis};
   if(settings.comp!=='auto')return{comp:settings.comp,why:'manual global',heuristic:true,basis:MODEL.competition.basis};
-  const hour=new Date().getHours(),hub=zoneInHub(zname,profile.hubZones),peak=hour>=18&&hour<=23;
-  const comp=COMP_ORDER[Math.min(2,1+(hub?1:0)+(peak?1:0))];
-  const why='auto'+(hub&&peak?' (hub de tu guía + horario pico)':hub?' (hub de tu guía)':peak?' (horario pico)':'');
+  // La hora del reloj no mide jugadores: solo el hub de tu ruta de nivel sube la competencia.
+  const hub=zoneInHub(zname,profile.hubZones);
+  const comp=COMP_ORDER[hub?2:1];
+  const why='auto'+(hub?' (hub de tu guía)':'');
   return{comp,why,heuristic:true,basis:MODEL.competition.basis};
 }
 function riskFor(zfac,profile,settings){return riskInfo(zfac,profile?.fac,settings);}
@@ -777,7 +814,7 @@ function zoneEntry(zk,level,cls,profile,settings,sess){
     useful.push({iid:+iid,name:cat?.name||dd[0]||`Ítem #${iid}`,srcName:best.name,preferred:g.preferred,isRare:isRareKind(best),v:itemZone.get(iid)?.v||0,hist:sess.scan.get(iid)?.history||[],price:sess.scan.get(iid)?.unitPriceCopper});
   }
   useful.sort((a,b)=>b.v-a.v||Number(b.isRare)-Number(a.isRare)||a.name.localeCompare(b.name));
-  const ub=usefulBonusFor(useful.length),usefulBonus=ub.factor;
+  const ub=usefulBonusFor(useful.length),usefulBonus=0; // informativo: no se aplica al puntaje
   // Un solo orden de campamentos, por valor combinado sin bonus. Ambos canales
   // usan el mismo sitio o los mismos pesos; el bonus no cambia el itinerario.
   for(const c of camps)c.value=c.ah+c.vendor;
@@ -791,8 +828,9 @@ function zoneEntry(zk,level,cls,profile,settings,sess){
   const total=ahTotal+vendorValue;
   const risk=riskFor(zfac,profile,settings),comp=compFor(zk,zname,settings,profile);
   const travel=travelFor(zname,profile.fac,profile.hubZones,settings.session);
-  const score=(ahTotal*(1+usefulBonus)+vendorValue)*risk.mult*COMP[comp.comp]*travel.factor;
-  const scoreNoBonus=total*risk.mult*COMP[comp.comp]*travel.factor; // sensibilidad H8
+  // Objetivo único: oro. Los ítems útiles para tu clase se informan, no puntúan.
+  const score=total*risk.mult*COMP[comp.comp]*travel.factor;
+  const scoreNoBonus=score;
   if(!(score>0)||!isFinite(score))return null;
   const topItems=[...itemZone.entries()].filter(([,a])=>a.v>0).sort((a,b)=>b[1].v-a[1].v).slice(0,3).map(([iid,a])=>{
     const inf=sess.info.get(iid),scanIt=sess.scan.get(iid);
@@ -805,7 +843,7 @@ function zoneEntry(zk,level,cls,profile,settings,sess){
   reasons.push(`Campamentos: ${settings.campMode==='rotation'&&validCampWeights(settings.campWeights)?'rotación con pesos de tiempo declarados':'un sitio a la vez = max(camp)'} — sin simultaneidad asumida`);
   if(rares.size)reasons.push(`${rares.size} rareza${rares.size>1?'s':''} en zona (${rareScan} con ítems de tu scan)${rareApprox?' — tasa 0,2/h aproximada sin respawn':''}`);
   if(chestSpots)reasons.push(`${chestSpots} puntos de cofre conocidos (no simultáneos)`);
-  if(useful.length)reasons.push(`${useful.length} ítem${useful.length>1?'s':''} útil${useful.length>1?'es':''} para ${clsName} · bonus +${pctF(usefulBonus)} heurístico (conteo, sólo AH)`);
+  if(useful.length)reasons.push(`${useful.length} ítem${useful.length>1?'s':''} útil${useful.length>1?'es':''} para ${clsName} (información; no suma al oro estimado)`);
   if(liqUnknown)reasons.push(`Liquidez SIN DATOS en ${liqUnknown} drops: sin ajuste; available es oferta, no venta`);
   reasons.push(risk.note||(isInst?'Riesgo bajo: instancia':'Riesgo bajo: territorio propio'));
   reasons.push(`Riesgo y competencia: heurísticos, sin datos de población (${risk.level}, ${COMP_LABEL[comp.comp]}) — ${comp.why}`);

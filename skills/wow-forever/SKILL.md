@@ -1,7 +1,7 @@
 ---
 name: wow-forever
 description: "Asiste a jugadores de World of Warcraft: Forever (juego oficial de Blizzard, cliente 1.60, basado en Classic) con los datos del plugin wow-forever de Hermes: entrenadores, hechizos y misiones de clase, zonas por nivel, profesiones (recetas, plan de subida, materiales), dungeons con jefes y botín, ítems, la guía curada del Cazador de la Horda, Legacy y el mercado local (Auctionator, contabilidad TSM y diario del puente WoWForeverBridge). Usar cuando el usuario juegue WoW Forever o pregunte por su personaje, dónde entrenar o subir de nivel, profesiones, drops, dungeons, precios o farmeo. Assists WoW Forever players (any race, class and faction) with the plugin's offline game data."
-version: 2.2.1
+version: 2.4.0
 author: Cristóbal Muñoz
 license: GPL-3.0-or-later
 metadata:
@@ -42,7 +42,8 @@ script de solo lectura de esta skill con la terminal:
 python3 ${HERMES_SKILL_DIR}/scripts/consultar.py <orden> [opciones]
 ```
 
-(Si `python3` no existe, usa `python`. El script solo lee `data/` del plugin, sin red y sin
+(Si `python3` no existe, usa `python`. El script solo lee `data/` del plugin y, para las órdenes
+`farmeo-*`, el resumen `farmeo-agente.json` que escribe la página; sin red y sin
 escribir nada. `--en` pone los nombres en inglés primero, y `--max N` cambia cuántas filas
 muestra, 15 por defecto.)
 
@@ -61,6 +62,11 @@ muestra, 15 por defecto.)
 | Buscar una misión y sus recompensas | `mision "call of water" --faccion horda` (o un id) |
 | ¿Qué datos faltan? | `huecos --tema entrenadores` |
 | ¿De dónde salen los datos? | `fuentes` |
+| ¿Cómo me fue farmeando? (sesiones medidas) | `farmeo-sesiones` · detalle: `farmeo-sesion 1` |
+| ¿Dónde está mi cuello de botella farmeando? | `farmeo-diagnostico` · estilo: `farmeo-estilo` |
+| ¿Qué farmeo para ganar más oro? | `farmeo-plan` · campamentos: `farmeo-ranking` |
+| ¿Conviene farmear tal mob? (p. ej. lo que dice una guía) | `farmeo-mob "Burning Exile"` |
+| ¿Qué rinde en tal zona a mi nivel? | `farmeo-zona "Arathi"` |
 
 Razas, clases, facciones y profesiones se aceptan en español o inglés, con o sin tildes, o por
 ID. Si el script dice que un nombre es ambiguo (por ejemplo, «cielonato» sin facción), pasa
@@ -164,7 +170,7 @@ tres fuentes locales: **Auctionator** (precios anunciados), la **contabilidad TS
   son el intervalo de sondeo, no una promesa de nueva revisión sin datos nuevos.
 - Si el usuario te pega números de la página: `m` es el último mínimo unitario observado, en
   cobre (1 oro = 10000), no una venta. Oro por hora, ROI y ofertas son **estimaciones** con
-  drops de Classic 1.12 y sin datos de población.
+  drops de Classic 1.12 y sin datos de población. El farmeo tiene su propia sección (§7).
 
 ## 6. Mis ventas · contabilidad TSM
 
@@ -220,6 +226,65 @@ tres fuentes locales: **Auctionator** (precios anunciados), la **contabilidad TS
   promesas bloqueadas, fallo tras commit del índice, readback corrupto, importación repetida,
   cantidades mutables, restauración y Chromium claro/oscuro. No confundir esto con validación
   de una cuenta real. Diseño y límites en `docs/DESKTOP.md`.
+
+## 7. Farmeo: plan, sesiones y cómo aconsejar
+
+El objetivo del farmeo en el plugin es uno: **el oro que el jugador termina ganando por hora de
+sesión**. Mercado → Farmeo muestra un plan de sesión (campamentos reales, minutos y rango), los
+mejores campamentos y las sesiones que el jugador midió con el addon **WoWForeverFarm**. La
+página escribe un resumen para ti, `farmeo-agente.json`, en la carpeta de datos del plugin de
+Hermes Desktop; lo lees con las órdenes `farmeo-*` (§2). Diseño y fórmulas: `docs/FARMEO-ORO.md`.
+
+- **Medir una sesión** (lo hace el jugador, no tú): instalar `addon/WoWForeverFarm` del plugin en
+  `Interface/AddOns` (la primera vez, reiniciar el cliente), `/wff start` al salir a farmear
+  (el reloj arranca en la primera pelea con muerte; el camino previo es «viaje»), `/wff stop` al
+  terminar y `/reload`. La ventana muestra reloj, % de combate y saqueo, muertes/h, oro/h y la
+  lista del botín recibido en vivo. Forever cierra el registro de combate a los addons: las
+  muertes llegan por `PARTY_KILL`, XP y cadáveres, y algunas pueden quedar «sin mob conocido»
+  (`muertesSinMob`). El contador **no está probado en Forever**; si las muertes salen en 0 o los
+  números son raros, pídele `/wff test` y `/wff status` y seguir `addon/WoWForeverFarm/VERIFICAR.md`.
+- **Qué significa cada número.** Combate/saqueo/resto: reparto del tiempo activo (el resto es
+  caminar, comer y buscar). «Predicho»: el modelo base del plugin (drops de Classic, estilo por
+  defecto) para los mismos mobs; «ritmo» y «botín» dicen cuánto se aparta el jugador de ese modelo.
+  El estilo calibrado (DPS efectivo, saqueo, pausas) sale de sus sesiones con ≥ 30 muertes y el
+  plan lo usa si tiene activo «Usar mis métricas». El oro/h de una sesión valora el botín al
+  precio de subasta actual: **no es lo vendido**.
+- **Tope de venta.** El plan solo cuenta a precio de subasta lo que se puede vender por sesión:
+  sus ventas TSM si las hay (`ventas-propias`), si no una fracción declarada de lo publicado
+  (`kappa-ofertas`, 5 % por defecto); con ≤ 5 ofertas, solo vendedor. Por eso un ítem caro y
+  escaso (por ejemplo, Elemental Air) puede perder frente a un campamento con botín variado.
+- **Cómo aconsejar.** Corre primero `farmeo-diagnostico` y `farmeo-estilo`; cita cada número con
+  su origen (`[tus sesiones]` o `[estimación]`). Ata cada consejo a un cuello de botella medido:
+  mucho «resto» → campamento más denso del plan o menos pausas; saqueo > 3 s → autosaqueo;
+  ritmo muy bajo frente a lo predicho → competencia o spawns dispersos; botín bajo → drops de
+  Forever menores que Classic o precios que bajaron. Si el plan recomienda otra zona que la que
+  farmea, explícalo con `farmeo-plan` (minutos, aportes y tope). Sin sesiones, explica cómo
+  medir una; no inventes métricas del jugador.
+- **Meta de oro.** Si el jugador escribe en Farmeo una meta (montura, dual spec…) y su
+  oro actual, `farmeo-plan` dice cuántas horas faltan con el plan y su rango. El plugin
+  no trae el precio de la montura ni del dual spec: no lo afirmes como dato del plugin.
+- **Pesca.** El plugin no la estima: la base de Classic no trae bancos de peces ni restos
+  de naufragio (donde salen los cofres) y la pesca en agua abierta casi no deja oro. Si
+  pregunta si conviene pescar, pídele que la mida con WoWForeverFarm 0.3.0 (`/wff start`,
+  pescar, `/wff stop`, `/reload`); `farmeo-sesiones` marca esas sesiones `[pesca]` con
+  sus capturas por hora y su oro/h real.
+- **Hierbas y minería.** «Por tu profesión» filtra los nodos por el skill que el jugador
+  escribió en Profesiones (Herboristería 182, Minería 186); sin ese dato supone los nodos
+  de su nivel. Si recomiendas nodos, pregúntale su skill.
+- **¿Existe en Forever?** Los spawns y drops del plugin son de Classic 1.12. La única
+  verificación en Forever es la del propio jugador: `farmeo-mob` dice «Visto en Forever»
+  si alguna de sus sesiones mató a ese mob, o «Sin verificar». Antes de mandarlo lejos a
+  un campamento sin verificar, dilo. Si avisa «el N % del oro sale de un solo ítem», ese
+  número es frágil: cualquier cambio de precio o de drop lo mueve casi igual.
+- **Si cita una guía, un video o un foro** («dicen que los Burning Exile dan 14 o/h»): corre
+  `farmeo-mob "<mob>"` (o `farmeo-zona`) y compara **el precio usado aquí** con el que supone la
+  fuente. Las guías usan precios de otros reinos y otras fechas; en el reino del jugador el ítem
+  que sostiene ese número puede valer mucho menos (o más). Di qué ítem explica el valor, su precio
+  en el escaneo del jugador, su tope de venta y en qué puesto queda frente a lo demás. Si el mob
+  no está evaluado, la orden dice por qué (nivel, élite o raro, pocos spawns, facción, o que no
+  está en el dataset porque solo aparece durante un evento). La cifra de la guía es «fuera de la
+  guía»: nunca la presentes como del plugin. `farmeo-ranking` lista los mejores campamentos.
+- Tú no juegas por el jugador ni envías entradas al juego: solo lees lo exportado y explicas.
 
 ## Reglas
 

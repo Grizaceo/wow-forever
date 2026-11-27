@@ -40,20 +40,21 @@ function expected(name, fallback) {
   const n = Number(raw);
   return Number.isInteger(n) && n >= 0 ? n : fallback;
 }
-const EXPECT_NODE = expected('NODE', 417);
-const EXPECT_PY = expected('PY', 122);
+const EXPECT_NODE = expected('NODE', 453);
+const EXPECT_PY = expected('PY', 148);
 const EXPECT_LUA = expected('LUA', 180);
+const EXPECT_LUA_FARM = expected('LUA_FARM', 258);
 // Tests unitarios del motor en standalone/tests/*.cjs (node:test). Los «real
 // fixture» son stat-only por defecto; WOW_FOREVER_REAL_FIXTURE=1 los hace leer
 // contenido de SavedVariables (solo para diagnóstico manual, nunca en gates).
-const EXPECT_CJS = expected('CJS', 123);
+const EXPECT_CJS = expected('CJS', 134);
 const BROWSER = [
   ['navegador', process.env.HERMES_SDK_TABS === '1' ? 68 : 67], ['vista-clase', 23],
   ['mercado-auto', 14], ['mercado-procedencia', 24],
   ['tsm', 54], ['tsm-valoracion', 108], ['vista-mercado', 59], ['vista-davi', 50], ['vista-guia', 28],
   ['vista-profesiones', 41], ['vista-ruta-dungeons', 31], ['bridge', 19],
   ['vista-personaje-simc', 11], ['vista-pawn', 15], ['vista-subasta-pawn', 28],
-  ['farm-routing', 11], ['tab-performance', 14],
+  ['farm-routing', 11], ['farm-sesiones', 13], ['tab-performance', 14],
 ];
 const EXPECT_BROWSER_TOTAL = BROWSER.reduce((n, [, c]) => n + c, 0);
 
@@ -144,7 +145,8 @@ console.log(`raíz: ${ROOT}\n`);
   const r = sh('node', ['--test',
     'standalone/tests/market.cjs', 'standalone/tests/market-history.cjs',
     'standalone/tests/market-deals.cjs', 'standalone/tests/market-chart.cjs',
-    'standalone/tests/market-farm.cjs', 'standalone/tests/market-farm-routing.cjs']);
+    'standalone/tests/market-farm.cjs', 'standalone/tests/market-farm-routing.cjs',
+    'standalone/tests/farm-plan-real.cjs']);
   const pass = num(/(?:ℹ|#)\s+pass (\d+)/, r.out);
   const fail = num(/(?:ℹ|#)\s+fail (\d+)/, r.out);
   const ok = r.code === 0 && fail === 0 && pass === EXPECT_CJS;
@@ -164,6 +166,12 @@ if (NO_LUA) {
     const fallos = num(/(\d+) fallos/, r.out);
     const ok = r.code === 0 && fallos === 0 && checks === EXPECT_LUA;
     record('lua bridge', EXPECT_LUA, checks, ok, ok ? `fallos=${fallos}` : `fallos=${fallos}\n${tail(r.out)}`);
+    // 3b) contador de sesiones WoWForeverFarm (addon hermano)
+    const rf = sh(luaPath, ['addon/tests/test_farm.lua']);
+    const cf = num(/(\d+) checks/, rf.out);
+    const ff = num(/(\d+) fallos/, rf.out);
+    const okf = rf.code === 0 && ff === 0 && cf === EXPECT_LUA_FARM;
+    record('lua farm', EXPECT_LUA_FARM, cf, okf, okf ? `fallos=${ff}` : `fallos=${ff}\n${tail(rf.out)}`);
   }
 }
 

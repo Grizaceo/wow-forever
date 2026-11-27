@@ -229,9 +229,9 @@ test('modelo: la liquidez es proxy de ofertas, jamás ventas realizadas', () => 
   assert.doesNotMatch(F.MODEL.liquidity.basis, /ventas realizadas/i);
 });
 
-test('modelo: métricas por ÍTEM no aplican L (sólo la vía zona)', () => {
+test('modelo: ítem y zona aplican la misma liquidez (F0 farmeo-oro)', () => {
   const F = fresh();
-  assert.equal(F.MODEL.itemMetrics.liquidityApplied, false);
+  assert.equal(F.MODEL.itemMetrics.liquidityApplied, true);
   assert.equal(F.MODEL.zoneEntry.liquidityApplied, true);
 });
 
@@ -290,12 +290,13 @@ test('integración: rareza con respawn conocido no usa 0,2/h en el ranking', () 
   assert.equal(z.rareApprox, false);
 });
 
-test('integración: itemMetrics rotula ROI como margen y no aplica liquidez', () => {
+test('integración: itemMetrics rotula ROI como margen y declara la liquidez', () => {
   const F = fixture();
   const m = F.itemMetrics(scan()[0], prof, { gph: 5, session: 2 });
   const first = m.best || (Array.isArray(m) ? m[0] : Object.values(m)[0]);
   assert.ok(first);
-  assert.equal(m.liquidityApplied, false);
+  assert.equal(m.liquidityApplied, true);
+  assert.equal(m.liquidity.label, 'SIN DATOS'); // sin available: sin ajuste
   assert.equal(m.roiLabel, 'retorno/coste');
   assert.ok(typeof first.rateApprox === 'boolean');
   assert.ok(Number.isFinite(m.returnOverCost) || m.returnOverCost === null || m.returnOverCost === undefined);
@@ -350,4 +351,97 @@ test('respawn positivo conocido menor de 60 s no se sustituye por el fallback', 
   const info = fresh().rateInfo(mob({ respawnSec: 30 }), 60);
   assert.equal(info.spawnCap, 120);
   assert.equal(info.rate, Math.min(info.cycleRate, 120));
+});
+
+/* ------------------------------------ F0 farmeo-oro: oro, no heurísticas */
+
+const DAY0 = Math.floor((Date.now() - Date.UTC(2020, 0, 1)) / 86400000);
+const obs = (itemId, low, available, days = [0]) => ({
+  itemId, unitPriceCopper: low, observedDay: DAY0,
+  history: days.map((d, i) => ({ day: DAY0 - d, low: Array.isArray(low) ? low[i] : low, high: Array.isArray(low) ? low[i] : low, available })),
+});
+
+test('F0: precio de referencia = mediana de mínimos de la ventana, no el último', () => {
+  const F = fresh();
+  const it = { ...obs(1, [900, 100, 120, 110], 50, [0, 1, 2, 3]), unitPriceCopper: 900 };
+  const rp = F.referencePrice(it);
+  assert.equal(rp.price, 115);            // mediana de 100,110,120,900
+  assert.equal(rp.priceDays, 4);
+  const viejo = { ...it, history: [...it.history, { day: DAY0 - 30, low: 5, high: 5, available: 50 }] };
+  assert.equal(F.referencePrice(viejo).price, 115); // fuera de la ventana de 14 días
+});
+
+test('F0: el canal es el mejor entre subasta neta y vendedor', () => {
+  const F = fresh();
+  const barato = { ...obs(1, 50, 100), sellPriceCopper: 80 };   // subasta neta 47 < vendedor 80
+  const rp = F.referencePrice(barato);
+  assert.equal(rp.vendorFloor, true);
+  assert.equal(rp.ahNet, 47);
+  const caro = { ...obs(1, 1000, 100), sellPriceCopper: 80 };
+  assert.equal(F.referencePrice(caro).vendorFloor, false);
+  assert.equal(F.referencePrice(caro).ahNet, 950);
+});
+
+test('F0: con ≤5 ofertas no hay canal de subasta (mercado delgado)', () => {
+  const F = fresh();
+  const delgado = { ...obs(1, 90000, 3), sellPriceCopper: 500 };
+  const rp = F.referencePrice(delgado);
+  assert.equal(rp.thin, true);
+  assert.equal(rp.vendorFloor, true);
+  assert.equal(F.referencePrice({ ...obs(1, 90000, 6), sellPriceCopper: 500 }).thin, false);
+  assert.equal(F.referencePrice({ ...obs(1, 90000, null), sellPriceCopper: 500 }).thin, false); // sin dato: no se asume
+});
+
+test('F0: la ruta por ítem de un mercado delgado vale lo del vendedor', () => {
+  const F = fixture();
+  const lleno = F.itemMetrics({ ...obs(500, 10000, 50) }, prof, { gph: 5, session: 2, comp: 'low' });
+  const delgado = F.itemMetrics({ ...obs(500, 10000, 3) }, prof, { gph: 5, session: 2, comp: 'low' });
+  assert.ok(delgado.gph > 0);
+  assert.ok(near(delgado.gph / lleno.gph, 100 / 9500, 1e-9)); // vendedor 100 c frente a subasta neta 9500 c
+});
+
+test('F0: la competencia automática no depende de la hora del reloj', () => {
+  const F = fixture();
+  F.index();
+  const a = F.compFor('1', 'Westfall', { comp: 'auto', zoneComp: {} }, { hubZones: '' });
+  const b = F.compFor('1', 'Westfall', { comp: 'auto', zoneComp: {} }, { hubZones: 'Westfall' });
+  assert.equal(a.comp, 'med');
+  assert.equal(b.comp, 'high');
+  assert.doesNotMatch(a.why + b.why, /horario/);
+});
+
+test('F0: los ítems útiles se informan pero no suben el puntaje', () => {
+  const F = fixture();
+  const z = F.rank(scan(), prof, { gph: 5, session: 2, comp: 'low' }).A;
+  assert.equal(z.usefulBonus, 0);
+  assert.equal(z.score, z.scoreNoBonus);
+  assert.match(F.MODEL.usefulBonus.basis, /no entra al puntaje/);
+});
+
+test('recolección: con tu skill, los nodos que piden más no cuentan; sin skill queda el proxy de iLvl', () => {
+  const F = fresh();
+  F.configure({ HunterDropData: {
+    zones: { '1': ['Westfall', 'horde', 'horde', 1, 10] },
+    mobs: {},
+    objects: { '700': ['Hierba fácil', 'herb', '1', 10, 300], '701': ['Hierba difícil', 'herb', '1', 10, 300] },
+    objSkill: { '701': 150 },
+    items: {
+      '510': ['Hoja', 1, 7, 0, 0, 0, 5, 0, -1, 100, [['o', 700, 100, 1, 1]]],
+      '511': ['Flor', 1, 7, 0, 0, 0, 15, 0, -1, 100, [['o', 701, 100, 1, 1]]],
+    },
+  } });
+  const sc = [{ itemId: 510, unitPriceCopper: 1000, observedDay: 0, history: [] },
+    { itemId: 511, unitPriceCopper: 5000, observedDay: 0, history: [] }];
+  const zona = (extra) => F.profRecommendations(sc, prof, { prof: { herb: true }, campMode: 'single', ...extra })[0]?.zones[0];
+  const sin = zona({}), bajo = zona({ skill: { herb: 100 } }), alto = zona({ skill: { herb: 200 } });
+  assert.deepEqual([...sin.items].sort(), ['Flor', 'Hoja'], 'sin skill: el proxy de iLvl deja pasar ambas');
+  assert.deepEqual(bajo.items, ['Hoja'], 'skill 100 < 150: la Flor no se recolecta');
+  assert.deepEqual([...alto.items].sort(), ['Flor', 'Hoja']);
+  assert.ok(bajo.gph < alto.gph, 'sin el nodo caro rinde menos');
+  assert.equal(sin.gph, alto.gph);
+  assert.equal(zona({ skill: { herb: 'x' } }).gph, sin.gph, 'un skill inválido se ignora');
+  // ≤5 ofertas: la recolección tampoco valora la Flor a subasta (queda a vendedor).
+  const delgado = [sc[0], { itemId: 511, unitPriceCopper: 5000, observedDay: 0, history: [{ day: 0, low: 5000, high: 5000, available: 2 }] }];
+  const zd = F.profRecommendations(delgado, prof, { prof: { herb: true }, campMode: 'single' })[0]?.zones[0];
+  assert.ok(zd.gph < sin.gph, 'el mercado delgado no se valora a subasta en la recolección');
 });

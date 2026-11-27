@@ -13,14 +13,16 @@ import { C, S } from '../estilos.js'
 import { agregarTextos, t } from '../i18n.js'
 import { Aviso, Dinero, IconoItem, Origen, Tarjeta } from '../ui.jsx'
 import {
-  Farm, HunterChart, HunterDeals, HunterHistory, HunterIdentity, HunterMarket,
-  PAGE_SIZE, ajustesFarm, catalogoMercado, compararPools, edadItem, fechaDe, filtrarMercado,
+  Farm, FarmPlan, HunterChart, HunterDeals, HunterHistory, HunterIdentity, HunterMarket,
+  PAGE_SIZE, ajustesFarm, catalogoMercado, compararPools, contextoFarmeo, edadItem, fechaDe, filtrarMercado,
   fmtCobre, frescura, fuentesItem, hoy, hubZonesDe, infoHistorial, nombreItem, ordenarMercado,
   parsearFuenteAislada, perfilMotor, snapshotVisible, textosBusqueda,
 } from '../mercado-logica.js'
 import { DetalleItem } from './mercado/detalle.jsx'
 import { Farmeo } from './mercado/farmeo.jsx'
-import { RutaFarmeo } from './mercado/ruta-farmeo.jsx'
+import { NombreCampamento, oro as oroTxt, pct as pctTxt } from './mercado/campamento.jsx'
+import { createFarmSync } from '../farm-sync.js'
+import { perfilJugador, observados, ventasPorDia } from '../farm-sesiones.js'
 import { PreguntarDavi } from './preguntar-davi.jsx'
 import { MisVentas } from './mercado/mis-ventas.jsx'
 import { VistaSubastaPawn } from './subasta-pawn.jsx'
@@ -76,7 +78,6 @@ agregarTextos({
   'mercado.orden.nombre': 'Nombre',
   'mercado.orden.precio': 'Precio',
   'mercado.orden.ofertas': 'Mejores ofertas',
-  'mercado.orden.roi': 'Margen frente al oro/h objetivo',
   'mercado.orden.gph': 'Oro/hora estimado',
   'mercado.col.item': 'Ítem / clave',
   'mercado.col.min': 'Último mínimo por unidad',
@@ -88,7 +89,6 @@ agregarTextos({
   'mercado.ordenTxt.precio': 'precio descendente',
   'mercado.ordenTxt.nombre': 'nombre',
   'mercado.ordenTxt.ofertas': 'mejores ofertas vs mediana histórica (approx)',
-  'mercado.ordenTxt.roi': 'orden por margen frente al oro/h objetivo (estimado)',
   'mercado.ordenTxt.gph': 'orden por oro/hora estimado (approx)',
   'mercado.vacio.scan': 'Todavía no importaste precios. Elige tu Auctionator.lua para empezar.',
   'mercado.restaurado': 'Precios importados restaurados. Son ofertas anunciadas, no ventas.',
@@ -274,7 +274,6 @@ agregarTextos({
   'mercado.orden.nombre': 'Name',
   'mercado.orden.precio': 'Price',
   'mercado.orden.ofertas': 'Best deals',
-  'mercado.orden.roi': 'Margin vs target gold/h',
   'mercado.orden.gph': 'Estimated gold/hour',
   'mercado.col.item': 'Item / key',
   'mercado.col.min': 'Last unit minimum',
@@ -286,7 +285,6 @@ agregarTextos({
   'mercado.ordenTxt.precio': 'price descending',
   'mercado.ordenTxt.nombre': 'name',
   'mercado.ordenTxt.ofertas': 'best deals vs historical median (approx)',
-  'mercado.ordenTxt.roi': 'sorted by margin vs target gold/h (estimate)',
   'mercado.ordenTxt.gph': 'sorted by estimated gold/hour (approx)',
   'mercado.vacio.scan': 'No prices imported yet. Pick your Auctionator.lua to start.',
   'mercado.restaurado': 'Imported prices restored. They are listed offers, not sales.',
@@ -432,9 +430,13 @@ const CATALOGO = catalogoMercado(D.items, D.dungeons)
 // las zonas de tráfico del recomendador.
 Farm.configure({ HunterDropData: D.dropData, HunterMarketCatalog: CATALOGO, HunterHistory, HunterChart,
   GUIDE_HUNTER: GUIAS[3] })
+// Motor v2 (plan de sesión, campamentos y columna de farmeo): mismo dataset.
+FarmPlan.configure({ HunterDropData: D.dropData })
 
 const fmt = Farm.fmt || {}
-const ORDENES = ['nombre', 'precio', 'ofertas', 'roi', 'gph']
+// Sin «margen frente al oro/h objetivo»: el índice del motor v2 no tiene margen y,
+// con un objetivo fijo, ese orden sería el mismo que el de oro/hora.
+const ORDENES = ['nombre', 'precio', 'ofertas', 'gph']
 
 /* ------------------------------------------------ procedencia / comparación */
 // Textos nuevos, deliberadamente fuera del catálogo i18n grande: son avisos de
@@ -568,7 +570,7 @@ function PuenteEstado({ puente, lang }) {
   )
 }
 
-export function VistaMercado({ ctx, almacen, sincronizador, ventas, puente, estado, recargar, perfil, lang }) {
+export function VistaMercado({ ctx, almacen, sincronizador, ventas, puente, farmeo, estado, recargar, perfil, lang }) {
   const sync = useMemo(() => sincronizador || createMarketSync(ctx, almacen), [sincronizador, ctx, almacen])
   const [auto, setAuto] = useState(sync.getState())
   useEffect(() => sync.subscribe(setAuto), [sync])
@@ -661,18 +663,39 @@ export function VistaMercado({ ctx, almacen, sincronizador, ventas, puente, esta
     try { await ctx?.storage?.set?.('farm-settings', normalizado) } catch { /* queda en memoria */ }
   }
 
-  // Cachés de métricas/deals por clave de ítem, invalidadas al cambiar de
-  // perfil, ajustes, realm o importación (igual que market-ui.js).
-  const mkey = JSON.stringify([motorProfile, settings, realm ? realmId(realm) : realmName, snapshot?.importedAt || ''])
-  const mcache = useRef({ key: '', map: new Map() })
+  // Sesiones del contador WoWForeverFarm: sincronizador del plugin (sondeo de 30 s
+  // con «Seguimiento automático», como el puente y TSM); la vista se suscribe y
+  // «Leer sesiones» fuerza una lectura.
+  const farmSync = useMemo(() => farmeo || createFarmSync(ctx, sync), [farmeo, ctx, sync])
+  const [farmState, setFarmState] = useState(() => farmSync.getState())
+  useEffect(() => farmSync.subscribe(setFarmState), [farmSync])
+  useEffect(() => { if (!farmeo) { void farmSync.restore().then(() => farmSync.read()) } }, [farmeo, farmSync])
+  const sesionesFarm = farmState.sesiones || []
+  const abiertaFarm = farmState.abierta || null
+  const lecturaFarm = farmState.lectura || null
+  const leerFarm = useCallback(() => farmSync.read(), [farmSync])
+  const estiloFarm = useMemo(() => perfilJugador(sesionesFarm, D.dropData, { nivel }), [sesionesFarm, nivel])
+  const observadosFarm = useMemo(() => observados(sesionesFarm), [sesionesFarm])
+  // Tope por ventas propias: solo las del reino que miras (nunca se suman reinos).
+  const reinoVentas = realm?.name ?? realmName
+  const ventasFarm = useMemo(() => ventasPorDia(tsmSnapshot, { reino: reinoVentas }), [tsmSnapshot, reinoVentas])
+  // Contexto del motor v2: lo comparten la columna, el detalle y el plan.
+  const planCtx = useMemo(() => contextoFarmeo({
+    perfil, settings, items, ventas: ventasFarm, estilo: estiloFarm, observados: observadosFarm,
+    marketKey: `${snapshot?.importedAt || ''}|${realm ? realmId(realm) : realmName}`,
+  }), [perfil, settings, items, ventasFarm, estiloFarm, observadosFarm, snapshot?.importedAt, realm, realmName])
+
+  // Métrica de farmeo por ítem: campamentos donde cae (motor v2), con el oro/h
+  // del campamento completo. Un índice por contexto: O(1) por fila.
+  const indiceFarm = useMemo(() => {
+    if (!items.length) return null
+    try { return FarmPlan.itemIndex(planCtx) } catch { return null }
+  }, [planCtx, items])
   const metricOf = useCallback((item) => {
     if (!item?.itemId) return null
-    if (mcache.current.key !== mkey) mcache.current = { key: mkey, map: new Map() }
-    if (!mcache.current.map.has(item.sourceKey)) {
-      mcache.current.map.set(item.sourceKey, Farm.itemMetrics(item, motorProfile, settings))
-    }
-    return mcache.current.map.get(item.sourceKey)
-  }, [mkey, motorProfile, settings])
+    const farms = indiceFarm ? indiceFarm.get(item.itemId) : []
+    return { farmable: farms.length > 0, gph: farms[0]?.gph || 0, best: farms[0] || null, farms }
+  }, [indiceFarm])
   const dkey = `${snapshot?.importedAt || ''}|${realm ? realmId(realm) : realmName}`
   const dcache = useRef({ key: '', map: new Map() })
   const dealOf = useCallback((item) => {
@@ -969,20 +992,16 @@ export function VistaMercado({ ctx, almacen, sincronizador, ventas, puente, esta
   const farmCell = (item) => {
     const m = metricOf(item)
     if (!m || item.itemId == null) return <span style={S.etiqueta}>{t(lang, 'mercado.farmeo.sinId')}</span>
-    const doubt = m.doubtful ? ` · ${t(lang, 'mercado.farmeo.dudosoPre')}` : ''
     if (m.farmable && m.best) {
-      const s = m.best
-      const kind = s.kind === 'mob' ? '' : s.kind === 'skin' ? 'Piel: ' : s.kind === 'pick' ? 'Pillosidad: '
-        : s.kind === 'object' ? `${s.objKind || 'objeto'}: ` : s.kind === 'rare-obs' ? 'Rareza observada: ' : s.kind === 'chest-obs' ? 'Cofre observado: ' : ''
-      const lvl = s.lvlMin != null || s.lvlMax != null ? `nv ${s.lvlMin ?? '?'}–${s.lvlMax ?? '?'} ` : ''
-      const rank = { normal: 'normal', elite: 'élite', rareelite: 'élite rara', rare: 'rara', boss: 'jefe' }[s.rank] || ''
-      const margin = m.marginPct == null ? '' : ` · ${t(lang, 'mercado.orden.roi')} ${m.marginPct >= 0 ? '+' : ''}${Math.round(m.marginPct * 100)}%`
-      return <>{kind}{s.name} · {fmt.zoneName(s.zoneKey)} · {lvl}{rank ? rank + ' · ' : ''}{fmt.pct(s.chance)} · ~{fmt.gph(m.gph)}/h{margin}{doubt} <Chip color={C.verde}>{t(lang, 'mercado.farmeo.farmeable')}</Chip><RutaFarmeo fuente={s} fmt={fmt} lang={lang} /></>
+      const f = m.best
+      return <span data-farm-camp style={{ whiteSpace: 'normal', overflowWrap: 'anywhere' }}>
+        <NombreCampamento f={f} lang={lang} /> · ~{oroTxt(f.gph)}/h {cp(lang, 'el campamento', 'the camp')} · {pctTxt(f.itemShare)} {cp(lang, 'este ítem', 'this item')} · ~{f.itemPerHour.toFixed(1)}/h
+        {' '}<Chip color={C.verde}>{t(lang, 'mercado.farmeo.farmeable')}</Chip>
+        {m.farms.length > 1 ? <span style={S.etiqueta}> · +{m.farms.length - 1} {cp(lang, 'campamentos', 'camps')}</span> : null}
+      </span>
     }
-    if (m.sources.length) {
-      const inel = m.sources.filter((s) => !s.eligible).sort((a, b) => (b.gph || 0) - (a.gph || 0))[0] || m.sources[0]
-      return <>{t(lang, 'mercado.farmeo.noFar')} ({inel.reason || t(lang, 'mercado.farmeo.sinElegible')}){doubt}</>
-    }
+    const dd = D.dropData?.items?.[String(item.itemId)]
+    if (dd) return <>{t(lang, 'mercado.farmeo.noFar')} ({cp(lang, 'sin campamento elegible para tu nivel y facción', 'no eligible camp for your level and faction')})</>
     return t(lang, 'mercado.farmeo.sinDato')
   }
 
@@ -1481,7 +1500,9 @@ export function VistaMercado({ ctx, almacen, sincronizador, ventas, puente, esta
           </Tarjeta>
         ) : null}
 
-        <Farmeo items={items} perfil={perfil} settings={settings} onSettings={guardarFarm} lang={lang} />
+        <Farmeo ctx={ctx} items={items} perfil={perfil} settings={settings} onSettings={guardarFarm} lang={lang}
+          planCtx={planCtx} sesiones={sesionesFarm} abierta={abiertaFarm} lectura={lecturaFarm} onLeer={leerFarm}
+          estilo={estiloFarm} resumenPerfil={resumenPerfilMercado} />
       </div>
     </div>
   )

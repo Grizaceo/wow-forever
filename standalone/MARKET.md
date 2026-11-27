@@ -388,9 +388,10 @@ materiales del oficio en cada zona candidata, con las mismas reglas de
 `vendorGph` (top-3 entidades, elegibilidad completa) pero filtrado a fuentes
 del oficio: `skin` en cadáveres, nodos `herb`/`ore`. El valor unitario es el
 mejor canal real: AH neto si el material está en tu scan, si no `sellPrice`.
-Los materiales con `itemLevel > nivel+10` se excluyen — los nodos de
-hierbas/menas no tienen nivel propio y el iLvl es el proxy del tier que tu
-personaje puede recolectar. El `gph` mostrado descuenta riesgo de facción y
+Los materiales con `itemLevel > nivel+10` se excluyen cuando no se conoce tu skill
+— el iLvl es el proxy del tier que tu personaje puede recolectar. Con tu skill
+de Profesiones (Herboristería 182, Minería 186) manda el skill mínimo de cada
+nodo (`objSkill`, de `Lock.csv`): los nodos que piden más no cuentan. El `gph` mostrado descuenta riesgo de facción y
 factor de traslado como el ranking principal. Las profesiones del SimC
 importado (`Skinning`/`Herbalism`/`Mining`) pre-marcan los checks del toolbar
 de farmeo al aplicar el perfil. La card "Por tu profesión" lista el top-3 por
@@ -437,9 +438,9 @@ La capa privada RareScanner aporta 2243 (50.1%). El catálogo FDJ aporta 93
 todas las capas: 3014 (67.3%). IDs exclusivos de Forever (>25000): 622, de
 los cuales 81 tienen cobertura. La fracción del valor listado (precio ×
 cantidad ofertada) con cobertura es 76.5%. Esas cifras se midieron con el
-dataset anterior a 2.2.1 (5424 ítems, 2477 mobs, 183 objetos); sin los spawns
-de evento contiene 5401 ítems, 2460 mobs, 173 objetos y 72 zonas. La capa
-privada: 484 rares y 52 contenedores.
+dataset schema 1 anterior a 2.2.1 (5424 ítems, 2477 mobs, 183 objetos). El schema 2,
+sin spawns de evento (se conservan los diarios, como «Nights»), contiene 5401 ítems,
+3144 mobs, 173 objetos y 72 zonas. La capa privada: 484 rares y 52 contenedores.
 
 ## Seguridad, persistencia y recuperación
 
