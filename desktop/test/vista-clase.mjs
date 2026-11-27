@@ -8,7 +8,7 @@
 // un doble sintético con los MISMOS componentes del repo (desktop/src/ui.jsx y
 // desktop/src/vistas/clase.jsx) y datos sintéticos: no toca data/ ni el juego.
 import { execFileSync } from 'node:child_process'
-import { mkdtempSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -17,6 +17,9 @@ import { abrirVista, iniciar, PERFILES } from './arnes.mjs'
 const aqui = path.dirname(fileURLToPath(import.meta.url))
 const raiz = path.resolve(aqui, '..', '..')
 const tmp = mkdtempSync(path.join(tmpdir(), 'wow-p0-clase-'))
+// El bundle de prueba pesa ~10 MB: se borra al salir, también si un check falla.
+// Si no se puede borrar (p. ej. un archivo bloqueado), no cambia el resultado del test.
+process.on('exit', () => { try { rmSync(tmp, { recursive: true, force: true }) } catch {} })
 
 // El bundle se construye aparte: desktop/plugin.js es un artefacto que regenera el
 // integrador; aquí se usa el bundle recién hecho desde desktop/src. Con
